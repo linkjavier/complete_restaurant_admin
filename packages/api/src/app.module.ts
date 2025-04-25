@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
-import { PrismaModule } from './prisma/prisma.module';
+import { ProductsModule } from './products/products.module';
 import { TablesModule } from './tables/tables.module';
-import { KitchenModule } from './kitchen/kitchen.module';
-import { PosModule } from './pos/pos.module';
+import { LocationsModule } from './locations/locations.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -15,9 +18,12 @@ import { PosModule } from './pos/pos.module';
     PrismaModule,
     AuthModule,
     UsersModule,
+    ProductsModule,
     TablesModule,
-    KitchenModule,
-    PosModule,
+    LocationsModule,
+    CategoriesModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {} 

@@ -58,6 +58,8 @@ export function useAuth() {
       }
 
       const data = await response.json();
+      // Guardar el token en localStorage
+      localStorage.setItem('token', data.access_token);
       setState({ user: data.user, isLoading: false, error: null });
       return data;
     } catch (error) {
@@ -74,6 +76,8 @@ export function useAuth() {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      // Limpiar el token de localStorage
+      localStorage.removeItem('token');
       setState({ user: null, isLoading: false, error: null });
       router.push('/auth/login');
     } catch (error) {

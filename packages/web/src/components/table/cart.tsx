@@ -60,7 +60,7 @@ export function Cart({ customerName, tableId }: CartProps) {
                 className="flex items-center justify-between border-b pb-2"
               >
                 <div>
-                  <p className="font-medium">{item.name}</p>
+                  <p className="font-medium">{item.product.name}</p>
                   <p className="text-sm text-muted-foreground">
                     ${item.price.toFixed(2)} x {item.quantity}
                   </p>

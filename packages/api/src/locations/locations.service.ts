@@ -1,15 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLocationDto } from './dto/create-location.dto';
-import { UserRole } from '@prisma/client';
+import { UserRole, Location, Prisma } from '@prisma/client';
 
 @Injectable()
 export class LocationsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createLocationDto: CreateLocationDto) {
+  async create(data: { name: string }) {
     return this.prisma.location.create({
-      data: createLocationDto,
+      data,
     });
   }
 
@@ -48,15 +48,14 @@ export class LocationsService {
     });
   }
 
-  async updateLocation(data: { id: string; name?: string; address?: string; phone?: string }) {
-    const { id, ...updateData } = data;
+  async update(id: string, data: { name: string }) {
     return this.prisma.location.update({
       where: { id },
-      data: updateData,
+      data,
     });
   }
 
-  async deleteLocation({ id }: { id: string }) {
+  async remove(id: string) {
     return this.prisma.location.delete({
       where: { id },
     });

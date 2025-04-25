@@ -9,7 +9,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
-import { Product as ProductModel, Prisma } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('products')
@@ -18,50 +17,38 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  async create(@Body() data: Prisma.ProductCreateInput): Promise<ProductModel> {
-    return this.productsService.createProduct(data);
+  create(@Body() createProductDto: any) {
+    return this.productsService.create(createProductDto);
   }
 
   @Get()
-  async findAll(
-    @Query('skip') skip?: string,
-    @Query('take') take?: string,
-    @Query('where') where?: string,
-    @Query('orderBy') orderBy?: string,
-  ): Promise<ProductModel[]> {
-    const params: {
-      skip?: number;
-      take?: number;
-      where?: Prisma.ProductWhereInput;
-      orderBy?: Prisma.ProductOrderByWithRelationInput;
-    } = {};
-
-    if (skip) params.skip = parseInt(skip, 10);
-    if (take) params.take = parseInt(take, 10);
-    if (where) params.where = JSON.parse(where);
-    if (orderBy) params.orderBy = JSON.parse(orderBy);
-
-    return this.productsService.products(params);
-  }
-
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<ProductModel | null> {
-    return this.productsService.product({ id });
-  }
-
-  @Patch(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() data: Prisma.ProductUpdateInput,
-  ): Promise<ProductModel> {
-    return this.productsService.updateProduct({
-      where: { id },
-      data,
+  findAll(
+    @Query('locationId') locationId: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.productsService.findAll({
+      locationId,
+      categoryId,
+      search,
     });
   }
 
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.productsService.findOne(id);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() updateProductDto: any,
+  ) {
+    return this.productsService.update(id, updateProductDto);
+  }
+
   @Delete(':id')
-  async remove(@Param('id') id: string): Promise<ProductModel> {
-    return this.productsService.deleteProduct({ id });
+  remove(@Param('id') id: string) {
+    return this.productsService.remove(id);
   }
 } 

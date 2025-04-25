@@ -1,0 +1,159 @@
+Objetivo: Crear una aplicación web full stack moderna y escalable para la gestión integral de un restaurante/panadería con servicio a la mesa, pedidos inteligentes con QR, módulo de cocina, inventario por ingredientes, reportes y analíticas multi-sede.
+
+💡 Funcionalidades Generales del Proyecto
+Gestión Multi-sede: La aplicación debe permitir crear múltiples sedes de un mismo restaurante, permitiendo que un superadministrador visualice métricas, inventarios, ventas y estadísticas separadas o consolidadas por cada sede.
+
+Roles de Usuario y Jerarquías:
+
+SuperAdmin: Acceso a todas las sedes, configuración global, visualización de KPIs.
+
+Administrador: Acceso a su sede específica, manejo de inventarios, reportes, configuración de menús.
+
+Cajero: Gestión de caja, pedidos desde el POS, cobros, división de cuentas.
+
+Cocinero: Visualización de pedidos en cocina, estados de preparación.
+
+Mesero: Visualización de mesas, toma de pedidos desde tableta/móvil.
+
+Cliente: Accede vía QR o redes sociales, realiza pedidos, paga desde su dispositivo.
+
+📲 Funcionalidad Principal: Pedidos desde Mesa vía Código QR
+Cada mesa genera un código QR único asociado a la sede y número de mesa.
+
+Al escanear el QR, el cliente accede a la webapp sin instalar nada.
+
+Puede:
+
+Ingresar solo su nombre para comenzar un pedido rápido.
+
+Iniciar sesión con redes sociales para desbloquear promociones como 10% de descuento en el primer pedido.
+
+El cliente visualiza el menú interactivo, selecciona productos, añade al carrito y confirma el pedido.
+
+Se debe implementar botón "📞 Llamar al mesero" que se notifica al sistema de caja (y tabletas de meseros).
+
+Opción de dividir cuenta por comensal.
+
+🧑‍🍳 Módulo de Cocina
+Visualización en tiempo real de los pedidos por mesa.
+
+Cada pedido puede tener estado:
+
+Nuevo
+
+En preparación
+
+Listo para servir
+
+Cocineros interactúan cambiando los estados.
+
+Soporte a impresión automática de tickets de cocina (opcional).
+
+💼 Módulo de Caja / POS
+Caja registradora digital.
+
+Visualización de pedidos activos, en cocina, listos, entregados.
+
+Registro de formas de pago (efectivo, tarjeta, QR, etc.).
+
+División de cuenta entre varios clientes.
+
+Visualización de "llamados de mesero" activos.
+
+🥐 Módulo de Preparaciones y Manejo de Ingredientes
+Soporte para productos preparados (como buñuelos).
+
+Cada preparación tiene una receta con ingredientes y cantidades (unidad de medida configurable: gr, ml, unidad, etc.).
+
+El sistema permite "fabricar" productos preparados y agrega unidades al stock, descontando automáticamente los ingredientes del inventario.
+
+🗃️ Inventario Avanzado
+Soporte para ingredientes individuales y productos terminados.
+
+Seguimiento de entradas y salidas por compras, ventas y preparaciones.
+
+Alertas de stock bajo.
+
+Reportes por sede e histórico por ingredientes.
+
+📈 Dashboard y Reportes
+Ventas diarias / semanales / mensuales.
+
+Gastos por sede.
+
+Ganancias netas.
+
+Métodos de pago utilizados.
+
+Productos más vendidos.
+
+Actividad de empleados (pedidos tomados, entregados, cancelados).
+
+Panel multi-sede consolidado para SuperAdmin.
+
+💸 Módulo de Pagos
+Integración con pasarela de pago para pago desde el dispositivo del cliente (Wompi, MercadoPago, Stripe, etc.).
+
+Registro de pagos en efectivo.
+
+Soporte a propinas.
+
+Código de descuento aplicable vía login social o cupones.
+
+✨ Características Extra y Detalles Únicos para Escalar
+Gamificación para Clientes:
+
+Clientes frecuentes suben de nivel, acceden a descuentos y productos secretos.
+
+Notificaciones vía email/SMS con promociones personalizadas.
+
+Sistema de Fidelización:
+
+Puntos acumulables con cada pedido.
+
+Canjeables por productos u ofertas exclusivas.
+
+Soporte para Kioskos de Autoservicio (opcional).
+
+Soporte para menú digital con imágenes, descripciones, alérgenos, etc.
+
+Sistema de Reviews por pedido.
+
+Gestión de proveedores y compras.
+
+Aplicación PWA para usarse sin conexión estable.
+
+🛠️ Stack Tecnológico Recomendado
+Frontend: Next.js (App Router) + TailwindCSS + React Query
+
+Backend: Nest.js + Prisma + PostgreSQL
+
+Infraestructura: Docker + Kubernetes (para escalar) + GCP o AWS
+
+Notificaciones: WebSockets (para cocina y meseros en tiempo real)
+
+QR Generator: API para generar códigos QR únicos por mesa
+
+Autenticación: Auth0 / Firebase Auth con OAuth (Google, Facebook)
+
+Análisis: Google Analytics + PostHog (para entender uso de clientes)
+
+🧪 Funcionalidades a Testear en MVP
+Crear sede y generar QR por mesa.
+
+Cliente escanea QR, pide comida desde su celular.
+
+Pedido aparece en cocina.
+
+Cocinero cambia estado del pedido.
+
+Cajero ve el pedido, procesa pago.
+
+Ingredientes son descontados.
+
+Reporte de ventas se actualiza.
+
+Cliente valora el pedido.
+
+SuperAdmin ve estadística de la sede.
+

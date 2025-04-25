@@ -1,0 +1,1 @@
+export { LocationsManager } from './locations-manager' 

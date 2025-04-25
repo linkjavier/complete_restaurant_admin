@@ -1,193 +1,46 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Minus } from "lucide-react"
+import { getProducts, Product } from "@/lib/api"
 
-interface Product {
-  id: string
-  name: string
-  description: string
-  price: number
-  image: string
-  category: string
+interface MenuProps {
+  locationId: string
 }
 
-const mockProducts: Product[] = [
-  // Entradas
-  {
-    id: "e1",
-    name: "Nachos con Queso",
-    description: "Tortillas chips bañadas en queso fundido, jalapeños y guacamole",
-    price: 8.99,
-    image: "/images/nachos.jpg",
-    category: "Entradas",
-  },
-  {
-    id: "e2",
-    name: "Alitas BBQ",
-    description: "Alitas de pollo bañadas en salsa BBQ, acompañadas de apio y aderezo ranch",
-    price: 12.99,
-    image: "/images/alitas.jpg",
-    category: "Entradas",
-  },
-  {
-    id: "e3",
-    name: "Ceviche Mixto",
-    description: "Pescado, camarones y calamares marinados en limón, cebolla y ají",
-    price: 14.99,
-    image: "/images/ceviche.jpg",
-    category: "Entradas",
-  },
-
-  // Platos Fuertes
-  {
-    id: "p1",
-    name: "Lomo Saltado",
-    description: "Lomo de res salteado con cebolla, tomate y papas fritas",
-    price: 18.99,
-    image: "/images/lomo.jpg",
-    category: "Platos Fuertes",
-  },
-  {
-    id: "p2",
-    name: "Pasta Alfredo",
-    description: "Fettuccine con salsa cremosa de queso parmesano y pollo",
-    price: 16.99,
-    image: "/images/pasta.jpg",
-    category: "Platos Fuertes",
-  },
-  {
-    id: "p3",
-    name: "Parrillada Mixta",
-    description: "Selección de carnes a la parrilla con guarniciones",
-    price: 24.99,
-    image: "/images/parrillada.jpg",
-    category: "Platos Fuertes",
-  },
-
-  // Desayunos
-  {
-    id: "d1",
-    name: "Desayuno Americano",
-    description: "Huevos, tocino, pan tostado, papas y café",
-    price: 12.99,
-    image: "/images/desayuno-americano.jpg",
-    category: "Desayunos",
-  },
-  {
-    id: "d2",
-    name: "Omelette del Chef",
-    description: "Omelette con jamón, queso, champiñones y espinacas",
-    price: 10.99,
-    image: "/images/omelette.jpg",
-    category: "Desayunos",
-  },
-  {
-    id: "d3",
-    name: "Pancakes con Frutas",
-    description: "Pancakes esponjosos con frutas frescas y sirope de maple",
-    price: 9.99,
-    image: "/images/pancakes.jpg",
-    category: "Desayunos",
-  },
-
-  // Bebidas
-  {
-    id: "b1",
-    name: "Limonada Casera",
-    description: "Limonada fresca con menta y jengibre",
-    price: 4.99,
-    image: "/images/limonada.jpg",
-    category: "Bebidas",
-  },
-  {
-    id: "b2",
-    name: "Mojito",
-    description: "Ron, menta, limón, azúcar y soda",
-    price: 8.99,
-    image: "/images/mojito.jpg",
-    category: "Bebidas",
-  },
-  {
-    id: "b3",
-    name: "Café Latte",
-    description: "Café espresso con leche vaporizada",
-    price: 4.99,
-    image: "/images/latte.jpg",
-    category: "Bebidas",
-  },
-
-  // Panadería
-  {
-    id: "pa1",
-    name: "Croissant de Chocolate",
-    description: "Croissant relleno de chocolate belga",
-    price: 3.99,
-    image: "/images/croissant.jpg",
-    category: "Panadería",
-  },
-  {
-    id: "pa2",
-    name: "Pan de Ajo",
-    description: "Pan artesanal con mantequilla de ajo y perejil",
-    price: 5.99,
-    image: "/images/pan-ajo.jpg",
-    category: "Panadería",
-  },
-  {
-    id: "pa3",
-    name: "Muffin de Arándanos",
-    description: "Muffin casero con arándanos frescos",
-    price: 3.99,
-    image: "/images/muffin.jpg",
-    category: "Panadería",
-  },
-
-  // Postres
-  {
-    id: "po1",
-    name: "Tiramisú",
-    description: "Postre italiano con café, mascarpone y cacao",
-    price: 7.99,
-    image: "/images/tiramisu.jpg",
-    category: "Postres",
-  },
-  {
-    id: "po2",
-    name: "Cheesecake de Frutos Rojos",
-    description: "Cheesecake cremoso con salsa de frutos rojos",
-    price: 8.99,
-    image: "/images/cheesecake.jpg",
-    category: "Postres",
-  },
-  {
-    id: "po3",
-    name: "Brownie con Helado",
-    description: "Brownie caliente con helado de vainilla y salsa de chocolate",
-    price: 7.99,
-    image: "/images/brownie.jpg",
-    category: "Postres",
-  },
-]
-
-export function Menu() {
+export function Menu({ locationId }: MenuProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [cart, setCart] = useState<Record<string, number>>({})
   const [searchTerm, setSearchTerm] = useState("")
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const categories = ["all", ...new Set(mockProducts.map((p) => p.category))]
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true)
+        const data = await getProducts(
+          locationId,
+          selectedCategory === "all" ? undefined : selectedCategory,
+          searchTerm || undefined
+        )
+        setProducts(data)
+      } catch (err) {
+        setError("Error al cargar los productos")
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const filteredProducts = mockProducts.filter((product) => {
-    const matchesCategory =
-      selectedCategory === "all" || product.category === selectedCategory
-    const matchesSearch = product.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
+    fetchProducts()
+  }, [locationId, selectedCategory, searchTerm])
+
+  const categories = ["all", ...Array.from(new Set(products.map((p) => p.category)))]
 
   const handleAddToCart = (productId: string) => {
     setCart((prev) => ({
@@ -206,6 +59,14 @@ export function Menu() {
       }
       return newCart
     })
+  }
+
+  if (loading) {
+    return <div className="text-center">Cargando productos...</div>
+  }
+
+  if (error) {
+    return <div className="text-center text-red-500">{error}</div>
   }
 
   return (
@@ -231,7 +92,7 @@ export function Menu() {
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredProducts.map((product) => (
+        {products.map((product) => (
           <Card key={product.id}>
             <CardHeader>
               <CardTitle>{product.name}</CardTitle>

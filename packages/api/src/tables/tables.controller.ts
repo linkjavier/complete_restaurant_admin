@@ -19,59 +19,58 @@ import { UserRole } from '@prisma/client';
 
 @ApiTags('tables')
 @Controller('tables')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class TablesController {
   constructor(private readonly tablesService: TablesService) {}
 
   @Post()
-  async create(@Body() data: Prisma.TableCreateInput): Promise<TableModel> {
-    return this.tablesService.createTable(data);
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Create a new table' })
+  @ApiResponse({ status: 201, description: 'Table created successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  async create(@Body() data: { number: number; seats: number; locationId: string }) {
+    return this.tablesService.create(data);
   }
 
   @Get()
-  async findAll(
-    @Query('skip') skip?: string,
-    @Query('take') take?: string,
-    @Query('where') where?: string,
-    @Query('orderBy') orderBy?: string,
-  ): Promise<TableModel[]> {
-    const params: {
-      skip?: number;
-      take?: number;
-      where?: Prisma.TableWhereInput;
-      orderBy?: Prisma.TableOrderByWithRelationInput;
-    } = {};
-
-    if (skip) params.skip = parseInt(skip, 10);
-    if (take) params.take = parseInt(take, 10);
-    if (where) params.where = JSON.parse(where);
-    if (orderBy) params.orderBy = JSON.parse(orderBy);
-
-    return this.tablesService.tables(params);
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Get all tables' })
+  @ApiResponse({ status: 200, description: 'Return all tables' })
+  async findAll() {
+    return this.tablesService.findAll();
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<TableModel | null> {
-    return this.tablesService.table({ id });
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Get table by id' })
+  @ApiResponse({ status: 200, description: 'Return table by id' })
+  @ApiResponse({ status: 404, description: 'Table not found' })
+  async findOne(@Param('id') id: string) {
+    return this.tablesService.findOne(id);
   }
 
   @Patch(':id')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Update table' })
+  @ApiResponse({ status: 200, description: 'Table updated successfully' })
+  @ApiResponse({ status: 404, description: 'Table not found' })
   async update(
     @Param('id') id: string,
-    @Body() data: Prisma.TableUpdateInput,
-  ): Promise<TableModel> {
-    return this.tablesService.updateTable({
-      where: { id },
-      data,
-    });
+    @Body() data: { number?: number; seats?: number; locationId?: string },
+  ) {
+    return this.tablesService.update(id, data);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string): Promise<TableModel> {
-    return this.tablesService.deleteTable({ id });
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Delete table' })
+  @ApiResponse({ status: 200, description: 'Table deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Table not found' })
+  async remove(@Param('id') id: string) {
+    return this.tablesService.delete(id);
   }
 
   @Get(':id/qr-code')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Generate QR code for a table' })

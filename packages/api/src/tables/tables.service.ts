@@ -47,27 +47,82 @@ export class TablesService {
     });
   }
 
-  async createTable(data: Prisma.TableCreateInput): Promise<Table> {
+  async create(data: { number: number; seats: number; locationId: string }): Promise<Table> {
+    // Verificar si la ubicación existe
+    const location = await this.prisma.location.findUnique({
+      where: { id: data.locationId },
+    });
+
+    if (!location) {
+      throw new NotFoundException(`Ubicación con ID ${data.locationId} no encontrada`);
+    }
+
     return this.prisma.table.create({
-      data,
+      data: {
+        number: data.number,
+        seats: data.seats,
+        location: {
+          connect: {
+            id: data.locationId,
+          },
+        },
+      },
     });
   }
 
-  async updateTable(params: {
-    where: Prisma.TableWhereUniqueInput;
-    data: Prisma.TableUpdateInput;
-  }): Promise<Table> {
-    const { where, data } = params;
-    return this.prisma.table.update({
-      data,
-      where,
-    });
+  async update(id: string, data: { number?: number; seats?: number; locationId?: string }): Promise<Table> {
+    try {
+      if (data.locationId) {
+        // Verificar si la nueva ubicación existe
+        const location = await this.prisma.location.findUnique({
+          where: { id: data.locationId },
+        });
+
+        if (!location) {
+          throw new NotFoundException(`Ubicación con ID ${data.locationId} no encontrada`);
+        }
+      }
+
+      return await this.prisma.table.update({
+        where: { id },
+        data: {
+          number: data.number,
+          seats: data.seats,
+          ...(data.locationId && {
+            location: {
+              connect: {
+                id: data.locationId,
+              },
+            },
+          }),
+        },
+        include: {
+          location: true,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          throw new NotFoundException(`Mesa con ID ${id} no encontrada`);
+        }
+      }
+      throw error;
+    }
   }
 
-  async deleteTable(where: Prisma.TableWhereUniqueInput): Promise<Table> {
-    return this.prisma.table.delete({
-      where,
-    });
+  async delete(id: string): Promise<Table> {
+    try {
+      return await this.prisma.table.delete({
+        where: { id },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          throw new NotFoundException(`Mesa con ID ${id} no encontrada`);
+        }
+      }
+      throw error;
+    }
   }
 
   async generateQRCode(tableId: string): Promise<string> {
@@ -151,5 +206,28 @@ export class TablesService {
     });
 
     return notifications[0];
+  }
+
+  async findAll(): Promise<Table[]> {
+    return this.prisma.table.findMany({
+      include: {
+        location: true,
+      },
+    });
+  }
+
+  async findOne(id: string): Promise<Table> {
+    const table = await this.prisma.table.findUnique({
+      where: { id },
+      include: {
+        location: true,
+      },
+    });
+
+    if (!table) {
+      throw new NotFoundException(`Mesa con ID ${id} no encontrada`);
+    }
+
+    return table;
   }
 } 
