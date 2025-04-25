@@ -11,7 +11,9 @@
   "dependencies": {
     "@headlessui/react": "^1.7.17",
     "@heroicons/react": "^2.0.18",
+    "@radix-ui/react-avatar": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.0",
+    "@radix-ui/react-tabs": "^1.1.9",
     "@radix-ui/react-toast": "^1.2.11",
     "@tanstack/react-query": "^4.36.1",
     "axios": "^1.6.2",
@@ -23,6 +25,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.49.2",
+    "recharts": "^2.15.3",
     "socket.io-client": "^4.7.2",
     "tailwind-merge": "^3.2.0",
     "tailwindcss-animate": "^1.0.7",

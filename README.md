@@ -57,3 +57,7 @@ Manual Exec
 
 En root, $ npm run dev
 en /packages/api $npm start
+
+1. docker-compose up postgres
+2. backend npm start (npm run build, si es necesario)
+3. frontend npm run dev (npm run build, si es necesario)
