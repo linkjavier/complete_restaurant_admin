@@ -44,6 +44,7 @@ model Location {
   tables         Table[]
   products       Product[]
   inventoryItems InventoryItem[]
+  ingredients    Ingredient[]
   orders         Order[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -98,7 +99,12 @@ model Category {
 model Ingredient {
   id          String             @id @default(cuid())
   name        String
+  description String?
+  quantity    Float
   unit        String
+  minQuantity Float
+  location    Location          @relation(fields: [locationId], references: [id])
+  locationId  String
   products    ProductIngredient[]
   inventory   InventoryItem[]
   createdAt   DateTime          @default(now())

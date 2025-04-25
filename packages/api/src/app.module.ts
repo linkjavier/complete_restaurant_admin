@@ -9,6 +9,11 @@ import { ProductsModule } from './products/products.module';
 import { TablesModule } from './tables/tables.module';
 import { LocationsModule } from './locations/locations.module';
 import { CategoriesModule } from './categories/categories.module';
+import { OrdersModule } from './orders/orders.module';
+import { PaymentsModule } from './payments/payments.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { IngredientsModule } from './ingredients/ingredients.module';
 
 @Module({
   imports: [
@@ -22,6 +27,11 @@ import { CategoriesModule } from './categories/categories.module';
     TablesModule,
     LocationsModule,
     CategoriesModule,
+    OrdersModule,
+    PaymentsModule,
+    NotificationsModule,
+    InventoryModule,
+    IngredientsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

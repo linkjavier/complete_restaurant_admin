@@ -12,6 +12,7 @@ import {
   Package,
   Users,
   Settings,
+  Utensils,
 } from "lucide-react"
 
 const routes = [
@@ -39,6 +40,11 @@ const routes = [
     label: "Productos",
     icon: Package,
     href: "/admin/products",
+  },
+  {
+    label: "Ingredientes",
+    icon: Utensils,
+    href: "/admin/ingredients",
   },
   {
     label: "Usuarios",
