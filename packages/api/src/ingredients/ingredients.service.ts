@@ -1,67 +1,60 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Ingredient as IngredientModel, Prisma } from '@prisma/client';
+import { CreateIngredientDto } from './dto/create-ingredient.dto';
+import { UpdateIngredientDto } from './dto/update-ingredient.dto';
 
 @Injectable()
 export class IngredientsService {
   constructor(private prisma: PrismaService) {}
 
-  async createIngredient(data: Prisma.IngredientCreateInput): Promise<IngredientModel> {
+  async create(createIngredientDto: CreateIngredientDto) {
     return this.prisma.ingredient.create({
-      data,
-      include: {
-        location: true,
-      },
+      data: createIngredientDto,
     });
   }
 
-  async ingredients(params: {
-    skip?: number;
-    take?: number;
-    where?: Prisma.IngredientWhereInput;
-    orderBy?: Prisma.IngredientOrderByWithRelationInput;
-  }): Promise<IngredientModel[]> {
-    const { skip, take, where, orderBy } = params;
-    return this.prisma.ingredient.findMany({
-      skip,
-      take,
-      where,
-      orderBy,
-      include: {
-        location: true,
-      },
-    });
+  async findAll() {
+    return this.prisma.ingredient.findMany();
   }
 
-  async ingredient(where: Prisma.IngredientWhereUniqueInput): Promise<IngredientModel | null> {
-    return this.prisma.ingredient.findUnique({
-      where,
-      include: {
-        location: true,
-      },
+  async findOne(id: string) {
+    const ingredient = await this.prisma.ingredient.findUnique({
+      where: { id },
     });
+
+    if (!ingredient) {
+      throw new NotFoundException(`Ingredient with ID ${id} not found`);
+    }
+
+    return ingredient;
   }
 
-  async updateIngredient(params: {
-    where: Prisma.IngredientWhereUniqueInput;
-    data: Prisma.IngredientUpdateInput;
-  }): Promise<IngredientModel> {
-    const { where, data } = params;
+  async update(id: string, updateIngredientDto: UpdateIngredientDto) {
+    const ingredient = await this.prisma.ingredient.findUnique({
+      where: { id },
+    });
+
+    if (!ingredient) {
+      throw new NotFoundException(`Ingredient with ID ${id} not found`);
+    }
+
     return this.prisma.ingredient.update({
-      where,
-      data,
-      include: {
-        location: true,
-      },
+      where: { id },
+      data: updateIngredientDto,
     });
   }
 
-  async deleteIngredient(where: Prisma.IngredientWhereUniqueInput): Promise<IngredientModel> {
+  async remove(id: string) {
+    const ingredient = await this.prisma.ingredient.findUnique({
+      where: { id },
+    });
+
+    if (!ingredient) {
+      throw new NotFoundException(`Ingredient with ID ${id} not found`);
+    }
+
     return this.prisma.ingredient.delete({
-      where,
-      include: {
-        location: true,
-      },
+      where: { id },
     });
   }
 } 

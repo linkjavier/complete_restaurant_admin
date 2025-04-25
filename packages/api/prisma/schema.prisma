@@ -103,7 +103,7 @@ model Ingredient {
   quantity    Float
   unit        String
   minQuantity Float
-  location    Location          @relation(fields: [locationId], references: [id])
+  location    Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
   locationId  String
   products    ProductIngredient[]
   inventory   InventoryItem[]
