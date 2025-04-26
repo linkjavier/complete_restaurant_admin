@@ -61,17 +61,31 @@ export class OrdersService {
   }
 
   async create(createOrderDto: CreateOrderDto) {
+    // Extraemos userId y items del DTO para manejarlos separadamente
+    const { userId, items, ...orderData } = createOrderDto;
+
+    // Construimos el objeto de datos para la creación de la orden
+    const orderCreateData: any = {
+      ...orderData,
+      items: {
+        create: items.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          status: 'PENDING',
+        })),
+      }
+    };
+
+    // Solo incluimos userId si está presente
+    if (userId) {
+      orderCreateData.user = {
+        connect: { id: userId }
+      };
+    }
+
+    // Creamos la orden con los datos preparados
     const order = await this.prisma.order.create({
-      data: {
-        ...createOrderDto,
-        items: {
-          create: createOrderDto.items.map(item => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            status: 'PENDING',
-          })),
-        },
-      },
+      data: orderCreateData,
       include: {
         items: {
           include: {

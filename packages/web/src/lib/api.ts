@@ -471,4 +471,44 @@ export async function getUser(): Promise<User> {
   }
 
   return response.json();
+}
+
+export async function getKitchenOrders(): Promise<any[]> {
+  console.log("Fetching kitchen orders DEEPER...")
+  const response = await fetch(`${API_URL}/orders`, {
+    headers: getAuthHeaders(),
+  });
+
+  console.log("Response:", response)
+  if (!response.ok) {
+    throw new Error('Error al obtener las órdenes de cocina');
+  }
+  return response.json();
+}
+
+
+export async function updateKitchenOrderItemStatus(
+  itemId: string,
+  status: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'COMPLETED' | 'CANCELLED'
+): Promise<any> {
+  const response = await fetch(`${API_URL}/kitchen/orders/items/${itemId}/status`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) {
+    throw new Error('Error al actualizar el estado del item');
+  }
+  return response.json();
+}
+
+export async function printKitchenTicket(orderId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/kitchen/orders/${orderId}/print`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Error al imprimir el ticket de cocina');
+  }
+  return response.json();
 } 

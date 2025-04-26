@@ -13,6 +13,7 @@ import {
   Users,
   Settings,
   Utensils,
+  ChefHat
 } from "lucide-react"
 
 const routes = [
@@ -30,6 +31,11 @@ const routes = [
     label: "Ubicaciones",
     icon: MapPin,
     href: "/admin/locations",
+  },
+  {
+    label: "Cocina",
+    icon: ChefHat,
+    href: "/admin/kitchen-manager",
   },
   {
     label: "Categorías",

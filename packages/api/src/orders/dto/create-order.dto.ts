@@ -1,4 +1,4 @@
-import { IsString, IsArray, ValidateNested, IsNotEmpty } from 'class-validator';
+import { IsString, IsArray, ValidateNested, IsNotEmpty, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class OrderItemDto {
@@ -19,6 +19,7 @@ export class CreateOrderDto {
   @IsNotEmpty()
   locationId: string;
 
+  @IsOptional()
   @IsString()
   userId?: string;
 

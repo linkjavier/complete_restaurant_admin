@@ -42,36 +42,45 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
   const handleConfirmOrder = async () => {
     try {
       setIsSubmitting(true)
+      
+      // Construir el objeto de datos para la orden
+      const orderData = {
+        tableId,
+        locationId,
+        items: items.map(item => ({
+          productId: item.product.id,
+          quantity: item.quantity,
+        }))
+      };
+      
+      // Solo añadir splitBill si es necesario
+      if (splitBill && splitNames.length > 0) {
+        // Guardamos los nombres como metadatos, no como customerName
+        (orderData as any).splitBill = splitNames;
+      }
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
-        body: JSON.stringify({
-          tableId,
-          locationId,
-          customerName,
-          items: items.map(item => ({
-            productId: item.product.id,
-            quantity: item.quantity,
-            price: item.price
-          })),
-          splitBill: splitBill ? splitNames : undefined
-        })
-      })
+        body: JSON.stringify(orderData)
+      });
 
       if (!response.ok) {
-        throw new Error('Error al crear el pedido')
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error('Error al crear el pedido: ' + (errorData.message || response.statusText));
       }
 
-      toast.success('Pedido enviado correctamente')
-      onItemsChange([]) // Limpiar el carrito
+      toast.success('Pedido enviado correctamente');
+      onItemsChange([]); // Limpiar el carrito
     } catch (error) {
-      console.error('Error:', error)
-      toast.error('Error al enviar el pedido')
+      console.error('Error:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al enviar el pedido');
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 

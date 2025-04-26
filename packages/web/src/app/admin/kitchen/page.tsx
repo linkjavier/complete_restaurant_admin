@@ -2,31 +2,25 @@
 
 import { KitchenView } from "@/components/kitchen/kitchen-view";
 import { useAuth } from "@/hooks/use-auth";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function KitchenPage() {
-  const { user, isLoading } = useAuth();
-  const router = useRouter();
+  const { user } = useAuth();
 
-  useEffect(() => {
-    if (!isLoading && (!user || (user.role !== "CHEF" && user.role !== "ADMIN"))) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
-  if (!user || !user.locationId) {
-    return <div>No location assigned</div>;
+  if (!user?.locationId) {
+    return null;
   }
 
   return (
     <div className="container mx-auto py-6">
-      <h1 className="text-2xl font-bold mb-6">Kitchen View</h1>
-      <KitchenView locationId={user.locationId} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Cocina - Vista de Órdenes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <KitchenView locationId={user.locationId} />
+        </CardContent>
+      </Card>
     </div>
   );
 } 
