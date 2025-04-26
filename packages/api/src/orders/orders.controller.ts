@@ -9,7 +9,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
-import { Order as OrderModel, Prisma } from '@prisma/client';
+import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderDto } from './dto/update-order.dto';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('orders')
@@ -18,50 +19,36 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
-  async create(@Body() data: Prisma.OrderCreateInput): Promise<OrderModel> {
-    return this.ordersService.createOrder(data);
+  create(@Body() createOrderDto: CreateOrderDto) {
+    return this.ordersService.create(createOrderDto);
   }
 
   @Get()
-  async findAll(
-    @Query('skip') skip?: string,
-    @Query('take') take?: string,
-    @Query('where') where?: string,
-    @Query('orderBy') orderBy?: string,
-  ): Promise<OrderModel[]> {
-    const params: {
-      skip?: number;
-      take?: number;
-      where?: Prisma.OrderWhereInput;
-      orderBy?: Prisma.OrderOrderByWithRelationInput;
-    } = {};
-
-    if (skip) params.skip = parseInt(skip, 10);
-    if (take) params.take = parseInt(take, 10);
-    if (where) params.where = JSON.parse(where);
-    if (orderBy) params.orderBy = JSON.parse(orderBy);
-
-    return this.ordersService.orders(params);
+  findAll(@Query('locationId') locationId?: string) {
+    return this.ordersService.findAll(locationId);
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<OrderModel | null> {
-    return this.ordersService.order({ id });
+  findOne(@Param('id') id: string) {
+    return this.ordersService.findOne(id);
   }
 
   @Patch(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() data: Prisma.OrderUpdateInput,
-  ): Promise<OrderModel> {
-    return this.ordersService.updateOrder({
-      where: { id },
-      data,
-    });
+  update(@Param('id') id: string, @Body() updateOrderDto: UpdateOrderDto) {
+    return this.ordersService.update(id, updateOrderDto);
+  }
+
+  @Patch(':orderId/items/:itemId/status')
+  updateItemStatus(
+    @Param('orderId') orderId: string,
+    @Param('itemId') itemId: string,
+    @Body('status') status: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'DELIVERED' | 'CANCELLED',
+  ) {
+    return this.ordersService.updateItemStatus(orderId, itemId, status);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string): Promise<OrderModel> {
-    return this.ordersService.deleteOrder({ id });
+  remove(@Param('id') id: string) {
+    return this.ordersService.remove(id);
   }
 } 

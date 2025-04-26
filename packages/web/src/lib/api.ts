@@ -6,8 +6,13 @@ export interface Product {
   description: string;
   price: number;
   image?: string;
-  category: string;
+  categoryId: string;
+  category?: Category;
   isActive: boolean;
+  locationId?: string;
+  ingredients?: ProductIngredient[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Table {
@@ -29,20 +34,9 @@ export interface Location {
 
 export interface OrderItem {
   id: string
-  orderId: string
-  productId: string
-  product: {
-    id: string
-    name: string
-    description: string
-    price: number
-    image: string
-    categoryId: string
-  }
+  product: Product
   quantity: number
   price: number
-  createdAt: string
-  updatedAt: string
 }
 
 export interface Category {
@@ -78,6 +72,15 @@ export interface ProductIngredient {
   updatedAt: string
 }
 
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
   return {
@@ -85,6 +88,11 @@ const getAuthHeaders = () => {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 };
+
+export function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('auth_token');
+}
 
 export async function getProducts(
   locationId?: string,
@@ -387,4 +395,80 @@ export async function deleteProduct(id: string): Promise<void> {
   if (!response.ok) {
     throw new Error("Error al eliminar el producto")
   }
+}
+
+export async function getOrders(locationId?: string) {
+  const url = new URL('/orders', process.env.NEXT_PUBLIC_API_URL);
+  if (locationId) {
+    url.searchParams.append('locationId', locationId);
+  }
+  const response = await fetch(url.toString(), {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch orders');
+  }
+  return response.json();
+}
+
+export async function createOrder(data: {
+  tableId: string;
+  locationId: string;
+  userId?: string;
+  items: Array<{
+    productId: string;
+    quantity: number;
+  }>;
+}) {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to create order');
+  }
+  return response.json();
+}
+
+export async function updateOrderItemStatus(
+  orderId: string,
+  itemId: string,
+  status: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'DELIVERED' | 'CANCELLED',
+) {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/items/${itemId}/status`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error('Failed to update order item status');
+  }
+  return response.json();
+}
+
+export async function getUser(): Promise<User> {
+  const token = getAuthToken();
+  if (!token) throw new Error("No authentication token found");
+
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch user");
+  }
+
+  return response.json();
 } 

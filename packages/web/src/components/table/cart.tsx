@@ -5,17 +5,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Minus, Users } from "lucide-react"
-import { OrderItem } from "@/types/table"
+import { OrderItem, Product } from "@/lib/api"
+import { toast } from "sonner"
 
 interface CartProps {
   customerName: string
   tableId: string
+  locationId: string
+  items: OrderItem[]
+  onItemsChange: (items: OrderItem[]) => void
 }
 
-export function Cart({ customerName, tableId }: CartProps) {
-  const [items, setItems] = useState<OrderItem[]>([])
+export function Cart({ customerName, tableId, locationId, items, onItemsChange }: CartProps) {
   const [splitBill, setSplitBill] = useState(false)
   const [splitNames, setSplitNames] = useState<string[]>([customerName])
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
@@ -35,15 +39,40 @@ export function Cart({ customerName, tableId }: CartProps) {
     })
   }
 
-  const handleConfirmOrder = () => {
-    // Implementar lógica para enviar el pedido
-    console.log("Confirmando pedido...", {
-      customerName,
-      tableId,
-      items,
-      splitBill,
-      splitNames,
-    })
+  const handleConfirmOrder = async () => {
+    try {
+      setIsSubmitting(true)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          tableId,
+          locationId,
+          customerName,
+          items: items.map(item => ({
+            productId: item.product.id,
+            quantity: item.quantity,
+            price: item.price
+          })),
+          splitBill: splitBill ? splitNames : undefined
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al crear el pedido')
+      }
+
+      toast.success('Pedido enviado correctamente')
+      onItemsChange([]) // Limpiar el carrito
+    } catch (error) {
+      console.error('Error:', error)
+      toast.error('Error al enviar el pedido')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -70,8 +99,8 @@ export function Cart({ customerName, tableId }: CartProps) {
                     variant="outline"
                     size="icon"
                     onClick={() => {
-                      setItems((prev) =>
-                        prev.map((i) =>
+                      onItemsChange(
+                        items.map((i) =>
                           i.id === item.id
                             ? { ...i, quantity: Math.max(0, i.quantity - 1) }
                             : i
@@ -85,8 +114,8 @@ export function Cart({ customerName, tableId }: CartProps) {
                     variant="outline"
                     size="icon"
                     onClick={() => {
-                      setItems((prev) =>
-                        prev.map((i) =>
+                      onItemsChange(
+                        items.map((i) =>
                           i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
                         )
                       )
@@ -150,9 +179,9 @@ export function Cart({ customerName, tableId }: CartProps) {
       <Button
         className="w-full"
         onClick={handleConfirmOrder}
-        disabled={items.length === 0}
+        disabled={items.length === 0 || isSubmitting}
       >
-        Confirmar Pedido
+        {isSubmitting ? "Enviando pedido..." : "Confirmar Pedido"}
       </Button>
     </div>
   )

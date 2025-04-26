@@ -14,6 +14,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { IngredientsModule } from './ingredients/ingredients.module';
+import { WebsocketModule } from './websocket/websocket.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { IngredientsModule } from './ingredients/ingredients.module';
     NotificationsModule,
     InventoryModule,
     IngredientsModule,
+    WebsocketModule,
   ],
   controllers: [AppController],
   providers: [AppService],

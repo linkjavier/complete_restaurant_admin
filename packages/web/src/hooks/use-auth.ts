@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from "react";
+import { getAuthToken } from "@/lib/auth";
+import { getUser } from "@/lib/api";
 import { useRouter } from 'next/navigation';
 
 interface User {
@@ -25,20 +27,23 @@ export function useAuth() {
   });
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      setState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
+
+    const fetchUser = async () => {
       try {
-        const response = await fetch('/api/auth/me');
-        if (!response.ok) {
-          throw new Error('Not authenticated');
-        }
-        const user = await response.json();
-        setState({ user, isLoading: false, error: null });
+        const userData = await getUser();
+        setState({ user: userData, isLoading: false, error: null });
       } catch (error) {
-        setState({ user: null, isLoading: false, error: 'Not authenticated' });
+        console.error("Failed to fetch user:", error);
+        setState({ user: null, isLoading: false, error: 'Failed to fetch user' });
       }
     };
 
-    checkAuth();
+    fetchUser();
   }, []);
 
   const login = async (email: string, password: string) => {

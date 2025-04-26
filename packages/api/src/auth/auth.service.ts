@@ -127,4 +127,37 @@ export class AuthService {
       locationId: dbUser.locationId,
     });
   }
+
+  async verifyToken(token: string) {
+    try {
+      const payload = this.jwtService.verify(token);
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        include: {
+          location: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException();
+      }
+
+      return {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        locationId: user.locationId,
+        location: user.location,
+      };
+    } catch (error) {
+      throw new UnauthorizedException();
+    }
+  }
 } 
