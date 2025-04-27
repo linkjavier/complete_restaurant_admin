@@ -36,7 +36,14 @@ export function ProductsManager() {
     categoryId: "",
     locationId: "",
     isActive: true,
-    ingredients: [] as { ingredientId: string; quantity: number }[],
+    ingredients: [] as {
+      id: string;
+      productId: string;
+      ingredientId: string;
+      quantity: number;
+      createdAt: string;
+      updatedAt: string;
+    }[],
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const { toast } = useToast()
@@ -206,7 +213,15 @@ export function ProductsManager() {
       quantity: 0,
     }
     if ('ingredients' in product) {
-      product.ingredients.push(newIngredient)
+      const fullIngredient = {
+        id: `temp-${Date.now()}`,
+        productId: ('id' in product) ? product.id : "",
+        ingredientId: "",
+        quantity: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      product.ingredients.push(fullIngredient)
     }
   }
 
@@ -410,11 +425,25 @@ export function ProductsManager() {
                   onClick={() => {
                     if (editingProduct) {
                       const newIngredients = [...editingProduct.ingredients || []]
-                      newIngredients.push({ ingredientId: "", quantity: 0 })
+                      newIngredients.push({
+                        id: `temp-${Date.now()}`,
+                        productId: editingProduct.id,
+                        ingredientId: "",
+                        quantity: 0,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                      })
                       setEditingProduct({ ...editingProduct, ingredients: newIngredients })
                     } else {
                       const newIngredients = [...newProduct.ingredients]
-                      newIngredients.push({ ingredientId: "", quantity: 0 })
+                      newIngredients.push({
+                        id: `temp-${Date.now()}`,
+                        productId: "",
+                        ingredientId: "",
+                        quantity: 0,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                      })
                       setNewProduct({ ...newProduct, ingredients: newIngredients })
                     }
                   }}
@@ -489,7 +518,7 @@ export function ProductsManager() {
                         Categoría: {product.category?.name}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Ubicación: {product.location?.name}
+                        Ubicación: {locations.find(loc => loc.id === product.locationId)?.name}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         Estado: {product.isActive ? "Activo" : "Inactivo"}

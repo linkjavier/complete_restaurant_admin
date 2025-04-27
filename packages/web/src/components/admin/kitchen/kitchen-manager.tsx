@@ -10,6 +10,7 @@ import { getKitchenOrders, updateKitchenOrderItemStatus, printKitchenTicket } fr
 import { useToast } from "@/components/ui/use-toast"
 import { useKitchenSocket } from "@/hooks/use-kitchen-socket"
 import { useAuth } from "@/hooks/use-auth"
+import { useRouter } from "next/navigation"
 
 export function KitchenManager() {
   const [orders, setOrders] = useState<any[]>([])
@@ -18,12 +19,14 @@ export function KitchenManager() {
   const { toast } = useToast()
   const { subscribe, connected, socket, emit } = useKitchenSocket()
   const { user } = useAuth()
+  const router = useRouter()
 
+  // Initial fetch of orders
   useEffect(() => {
     fetchOrders()
     
-    // Set up polling as a fallback (every 30 seconds)
-    const interval = setInterval(fetchOrders, 15000)
+    // Set up polling as a fallback (every 2 minutes)
+    const interval = setInterval(fetchOrders, 120000)
     return () => clearInterval(interval)
   }, [])
 
@@ -42,9 +45,22 @@ export function KitchenManager() {
         )
       )
       setOrders(activeOrders)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching orders:', err)
-      setError("Error al cargar las órdenes de cocina. Por favor, asegúrate de estar autenticado.")
+      
+      // Check if the error is authentication related
+      if (err.message?.includes('No authentication token found') || 
+          err.message?.includes('Authentication expired') ||
+          err.message?.includes('Unauthorized')) {
+        setError("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.")
+        
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          router.push('/auth/login')
+        }, 2000)
+      } else {
+        setError("Error al cargar las órdenes de cocina. Por favor, intenta de nuevo.")
+      }
     } finally {
       setLoading(false)
     }
@@ -58,13 +74,30 @@ export function KitchenManager() {
         description: `Estado del item actualizado a ${status}`,
       })
       // No es necesario refrescar órdenes inmediatamente porque el socket lo hará
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating item status:', err)
-      toast({
-        title: "Error",
-        description: "Error al actualizar el estado del item. Por favor, asegúrate de estar autenticado.",
-        variant: "destructive",
-      })
+      
+      // Check if the error is authentication related
+      if (err.message?.includes('No authentication token found') || 
+          err.message?.includes('Authentication expired') ||
+          err.message?.includes('Unauthorized')) {
+        toast({
+          title: "Error de autenticación",
+          description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
+          variant: "destructive",
+        })
+        
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          router.push('/auth/login')
+        }, 2000)
+      } else {
+        toast({
+          title: "Error",
+          description: "Error al actualizar el estado del item. Por favor, intenta de nuevo.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
@@ -75,110 +108,184 @@ export function KitchenManager() {
         title: "Éxito",
         description: "Ticket enviado a la impresora",
       })
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error printing ticket:', err)
-      toast({
-        title: "Error",
-        description: "Error al imprimir el ticket. Por favor, asegúrate de estar autenticado.",
-        variant: "destructive",
-      })
+      
+      // Check if the error is authentication related
+      if (err.message?.includes('No authentication token found') || 
+          err.message?.includes('Authentication expired') ||
+          err.message?.includes('Unauthorized')) {
+        toast({
+          title: "Error de autenticación",
+          description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
+          variant: "destructive",
+        })
+        
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          router.push('/auth/login')
+        }, 2000)
+      } else {
+        toast({
+          title: "Error",
+          description: "Error al imprimir el ticket. Por favor, intenta de nuevo.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
-  // Unirse al canal de kitchen cuando el socket esté conectado y el usuario tenga locationId
+  // Join the kitchen-specific channel when socket is connected and user has a locationId
   useEffect(() => {
     if (connected && user?.locationId) {
-      console.log(`Trying to join kitchen-${user.locationId} channel...`)
-      // Emitir evento para unirse al canal de la ubicación
-      const joined = emit('join-kitchen', user.locationId)
-      console.log(`Emit join-kitchen for location: ${user.locationId}. Success: ${joined}`)
+      try {
+        console.log(`Trying to join kitchen-${user.locationId} channel...`);
+        
+        // Add a delay to ensure connection is fully established
+        setTimeout(() => {
+          // Emit event to join the kitchen channel for this location
+          const joined = emit('join-kitchen', user.locationId);
+          console.log(`Emit join-kitchen for location: ${user.locationId}. Success: ${joined}`);
+          
+          // If successfully emitted, check for response
+          if (joined) {
+            setTimeout(() => {
+              console.log("Testing WebSocket by emitting a test message");
+              // Send a test message just to check if events are flowing
+              emit('ping', { test: 'message' });
+            }, 1000);
+          }
+        }, 500);
+      } catch (error) {
+        console.error("Error joining kitchen channel:", error);
+      }
     }
   }, [connected, user, emit])
 
-  // Configurar suscripciones a eventos de socket
+  // Set up WebSocket event listeners
   useEffect(() => {
     if (!connected) {
       console.log("Socket not connected yet, waiting...")
       return
     }
 
-    console.log("Setting up socket listeners")
+    console.log("Setting up WebSocket event listeners for kitchen")
 
-    // Evento para cuando se actualiza un item de orden
-    const unsubscribeOrderItemUpdated = subscribe('orderItemUpdated', (updatedItem) => {
-      console.log("orderItemUpdated event received:", updatedItem)
+    // Listen for new orders
+    const unsubscribeNewOrder = subscribe('new_order_created', (newOrderData) => {
+      // Socket.io sometimes wraps the data in an array when using namespaces
+      const newOrder = Array.isArray(newOrderData) ? newOrderData[0] : newOrderData;
       
-      setOrders(prevOrders => {
-        // Actualizar la orden que contiene el item actualizado
-        return prevOrders.map(order => {
-          if (order.id === updatedItem.order.id) {
-            // Reemplazar la orden con la orden actualizada del socket
-            return updatedItem.order
+      console.log("new_order_created event received:", newOrder)
+      
+      // Verify this order has PENDING or IN_PROGRESS items
+      if (newOrder && newOrder.items && newOrder.items.some(item => 
+        item.status === "PENDING" || item.status === "IN_PROGRESS"
+      )) {
+        // Add to orders if not already present
+        setOrders(prevOrders => {
+          if (prevOrders.some(order => order.id === newOrder.id)) {
+            return prevOrders
           }
-          return order
-        }).filter(order => 
-          order.items.some(item => 
-            item.status === "PENDING" || item.status === "IN_PROGRESS"
-          )
-        )
-      })
+          
+          toast({
+            title: "Nueva Orden",
+            description: `Mesa #${newOrder.table?.number} - ${newOrder.items.length} productos`,
+          })
+          
+          return [newOrder, ...prevOrders]
+        })
+      } else {
+        console.warn("Received order without PENDING or IN_PROGRESS items:", newOrder)
+      }
     })
 
-    // Evento para cuando se actualiza una orden completa
-    const unsubscribeOrderUpdated = subscribe('orderUpdated', (updatedOrder) => {
-      console.log("orderUpdated event received:", updatedOrder)
+    // Listen for order updates
+    const unsubscribeOrderUpdated = subscribe('order_updated', (updatedOrderData) => {
+      // Socket.io sometimes wraps the data in an array when using namespaces
+      const updatedOrder = Array.isArray(updatedOrderData) ? updatedOrderData[0] : updatedOrderData;
+      
+      console.log("order_updated event received:", updatedOrder)
+      
+      if (!updatedOrder) {
+        console.warn("Received invalid order update")
+        return;
+      }
       
       setOrders(prevOrders => {
-        // Si la orden no tiene items PENDING o IN_PROGRESS, eliminarla
-        if (!updatedOrder.items.some(item => 
+        // If the order has no more PENDING or IN_PROGRESS items, remove it
+        if (!updatedOrder.items || !updatedOrder.items.some(item => 
           item.status === "PENDING" || item.status === "IN_PROGRESS"
         )) {
           return prevOrders.filter(order => order.id !== updatedOrder.id)
         }
         
-        // Si la orden ya existe, actualizarla
-        if (prevOrders.some(order => order.id === updatedOrder.id)) {
-          return prevOrders.map(order => 
-            order.id === updatedOrder.id ? updatedOrder : order
-          )
-        }
-        
-        // Si es una nueva orden con items pendientes, agregarla
-        return [...prevOrders, updatedOrder]
+        // Update the order if it exists in the list
+        return prevOrders.map(order => 
+          order.id === updatedOrder.id ? updatedOrder : order
+        )
       })
     })
 
-    // Evento para cuando se crea una nueva orden - desde OrderGateway
-    const unsubscribeOrderCreated = subscribe('order-updated', (newOrder) => {
-      console.log("order-updated (new order) event received:", newOrder)
+    // Listen for order item updates
+    const unsubscribeOrderItemUpdated = subscribe('order_item_updated', (dataRaw) => {
+      // Socket.io sometimes wraps the data in an array when using namespaces
+      const data = Array.isArray(dataRaw) ? dataRaw[0] : dataRaw;
       
-      // Verificar si la orden tiene items pendientes o en progreso
-      if (newOrder.items && newOrder.items.some(item => 
-        item.status === "PENDING" || item.status === "IN_PROGRESS"
-      )) {
-        setOrders(prevOrders => {
-          // Verificar si la orden ya existe
-          if (prevOrders.some(order => order.id === newOrder.id)) {
-            // Actualizar la orden existente
-            return prevOrders.map(order => 
-              order.id === newOrder.id ? newOrder : order
-            )
-          }
-          // Agregar la nueva orden
-          return [...prevOrders, newOrder]
-        })
+      console.log("order_item_updated event received:", data)
+      
+      if (!data || !data.item || !data.order) {
+        console.warn("Received invalid order item update", data)
+        return;
       }
+      
+      const { item, order } = data
+      
+      setOrders(prevOrders => {
+        // Find the order containing this item
+        const orderIndex = prevOrders.findIndex(o => o.id === order.id)
+        
+        if (orderIndex === -1) {
+          // Order not in list, could be a new order
+          if (item.status === "PENDING" || item.status === "IN_PROGRESS") {
+            return [...prevOrders, order]
+          }
+          return prevOrders
+        }
+        
+        // Update the order with the new item
+        const updatedOrders = [...prevOrders]
+        const updatedOrder = { ...updatedOrders[orderIndex] }
+        
+        // Update the item in the order
+        updatedOrder.items = updatedOrder.items.map(i => 
+          i.id === item.id ? { ...i, status: item.status } : i
+        )
+        
+        // If all items are completed, remove the order
+        if (!updatedOrder.items.some(i => 
+          i.status === "PENDING" || i.status === "IN_PROGRESS"
+        )) {
+          updatedOrders.splice(orderIndex, 1)
+          return updatedOrders
+        }
+        
+        // Otherwise update the order
+        updatedOrders[orderIndex] = updatedOrder
+        return updatedOrders
+      })
     })
 
-    // Limpiar suscripciones cuando el componente se desmonte
+    // Clean up subscriptions when component unmounts
     return () => {
-      unsubscribeOrderItemUpdated()
+      console.log("Cleaning up WebSocket event listeners")
+      unsubscribeNewOrder()
       unsubscribeOrderUpdated()
-      unsubscribeOrderCreated()
+      unsubscribeOrderItemUpdated()
     }
-  }, [connected, subscribe])
+  }, [connected, subscribe, toast])
 
-  // Mostrar un indicador de estado de conexión
+  // Create a connection status indicator
   const connectionStatus = connected ? (
     <div className="text-sm text-green-500 flex items-center justify-end mb-2">
       <span className="h-2 w-2 rounded-full bg-green-500 mr-2"></span>

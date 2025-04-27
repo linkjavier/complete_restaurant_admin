@@ -1,17 +1,25 @@
-import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Order, Prisma } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
-import { OrderGateway } from '../websocket/order.gateway';
+import { OrdersGateway } from './orders.gateway';
+import { OrdersQueueService } from './orders-workers/orders-queue.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private prisma: PrismaService,
-    @Inject(forwardRef(() => OrderGateway))
-    private orderGateway: OrderGateway,
-  ) {}
+    @Inject(forwardRef(() => OrdersGateway))
+    private ordersGateway: OrdersGateway,
+    private ordersQueueService: OrdersQueueService,
+  ) {
+    // Log to verify gateway is injected
+    this.logger.log(`OrdersService initialized with OrdersGateway: ${!!this.ordersGateway}`);
+    this.logger.log(`OrdersGateway methods available: ${Object.keys(this.ordersGateway || {}).join(', ')}`);
+  }
 
   async order(
     orderWhereUniqueInput: Prisma.OrderWhereUniqueInput,
@@ -61,145 +69,286 @@ export class OrdersService {
   }
 
   async create(createOrderDto: CreateOrderDto) {
-    // Extraemos userId y items del DTO para manejarlos separadamente
-    const { userId, items, ...orderData } = createOrderDto;
+    try {
+      this.logger.log(`Creating order from DTO: ${JSON.stringify(createOrderDto)}`);
+      
+      // Extraemos userId y items del DTO para manejarlos separadamente
+      const { userId, items, ...orderData } = createOrderDto;
 
-    // Construimos el objeto de datos para la creación de la orden
-    const orderCreateData: any = {
-      ...orderData,
-      items: {
-        create: items.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          status: 'PENDING',
-        })),
-      }
-    };
-
-    // Solo incluimos userId si está presente
-    if (userId) {
-      orderCreateData.user = {
-        connect: { id: userId }
-      };
-    }
-
-    // Creamos la orden con los datos preparados
-    const order = await this.prisma.order.create({
-      data: orderCreateData,
-      include: {
+      // Construimos el objeto de datos para la creación de la orden
+      const orderCreateData: any = {
+        ...orderData,
         items: {
-          include: {
-            product: true,
-          },
-        },
-        table: true,
-      },
-    });
+          create: items.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            status: 'PENDING',
+          })),
+        }
+      };
 
-    await this.orderGateway.notifyOrderUpdate(order.id, order.locationId);
-    return order;
+      // Solo incluimos userId si está presente
+      if (userId) {
+        orderCreateData.user = {
+          connect: { id: userId }
+        };
+      }
+
+      // Database transaction to ensure atomicity of the operation
+      const order = await this.prisma.$transaction(async (tx) => {
+        // Create the order
+        const newOrder = await tx.order.create({
+          data: orderCreateData,
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            table: true,
+            location: true,
+          },
+        });
+        
+        this.logger.log(`Order created with ID: ${newOrder.id}`);
+        return newOrder;
+      });
+
+      // Only emit events and queue jobs after the transaction succeeds
+      
+      // Check if ordersGateway is available
+      if (!this.ordersGateway) {
+        this.logger.error('OrdersGateway is not available!');
+      } else {
+        this.logger.log(`OrdersGateway instance is available. Methods: ${Object.keys(this.ordersGateway).join(', ')}`);
+      }
+      
+      // 1. Emit WebSocket event for real-time kitchen updates
+      if (order.locationId) {
+        try {
+          this.logger.log(`Attempting to emit WebSocket event for new order ${order.id} to location ${order.locationId}`);
+          
+          // Check if server is available on gateway
+          if (this.ordersGateway.server) {
+            this.logger.log('Server instance is available on gateway');
+            
+            // Try direct broadcast to debug
+            this.logger.log('Testing direct server broadcast');
+            this.ordersGateway.server.emit('test_broadcast', { message: 'Test broadcast' });
+            
+            // Now try room broadcast
+            const roomName = `kitchen-${order.locationId}`;
+            this.logger.log(`Testing room broadcast to ${roomName}`);
+            this.ordersGateway.server.to(roomName).emit('test_room_broadcast', { 
+              message: `Test broadcast to room ${roomName}`,
+              orderId: order.id
+            });
+            
+            // Then do the actual order broadcast
+            this.ordersGateway.emitNewOrder(order, order.locationId);
+          } else {
+            this.logger.error('Server is not available on gateway!');
+          }
+          
+          this.logger.log(`Successfully emitted WebSocket event for new order ${order.id}`);
+        } catch (wsError) {
+          this.logger.error(
+            `WebSocket event emission failed for order ${order.id}: ${wsError.message}`, 
+            wsError.stack
+          );
+        }
+      } else {
+        this.logger.warn(`No locationId for order ${order.id}, skipping WebSocket notification`);
+      }
+      
+      // 2. Queue background processing jobs
+      await this.ordersQueueService.addOrderProcessingJob(order);
+      this.logger.log(`Background processing jobs queued for order ${order.id}`);
+      
+      return order;
+    } catch (error) {
+      this.logger.error(`Error creating order: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   async findAll(locationId?: string) {
-    return this.prisma.order.findMany({
-      where: locationId ? { locationId } : undefined,
-      include: {
-        items: {
-          include: {
-            product: true,
+    try {
+      return this.prisma.order.findMany({
+        where: locationId ? { locationId } : undefined,
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
           },
+          table: true,
         },
-        table: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Error finding orders: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   async findOne(id: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: {
-        items: {
-          include: {
-            product: true,
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
           },
+          table: true,
         },
-        table: true,
-      },
-    });
+      });
 
-    if (!order) {
-      throw new NotFoundException(`Order with ID ${id} not found`);
+      if (!order) {
+        this.logger.warn(`Order with ID ${id} not found`);
+        throw new NotFoundException(`Order with ID ${id} not found`);
+      }
+
+      return order;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error finding order ${id}: ${error.message}`, error.stack);
+      throw error;
     }
-
-    return order;
   }
 
   async update(id: string, updateOrderDto: UpdateOrderDto) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-    });
-
-    if (!order) {
-      throw new NotFoundException(`Order with ID ${id} not found`);
-    }
-
-    const updatedOrder = await this.prisma.order.update({
-      where: { id },
-      data: updateOrderDto,
-      include: {
-        items: {
-          include: {
-            product: true,
-          },
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id },
+        include: {
+          location: true,
         },
-        table: true,
-      },
-    });
+      });
 
-    await this.orderGateway.notifyOrderUpdate(id, order.locationId);
-    return updatedOrder;
+      if (!order) {
+        this.logger.warn(`Order with ID ${id} not found for update`);
+        throw new NotFoundException(`Order with ID ${id} not found`);
+      }
+
+      const updatedOrder = await this.prisma.order.update({
+        where: { id },
+        data: updateOrderDto,
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          table: true,
+          location: true,
+        },
+      });
+
+      // Emit WebSocket event for real-time kitchen updates
+      if (updatedOrder.locationId) {
+        this.ordersGateway.emitOrderUpdated(updatedOrder, updatedOrder.locationId);
+        this.logger.log(`WebSocket event emitted for updated order ${id}`);
+      }
+      
+      return updatedOrder;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error updating order ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   async updateItemStatus(orderId: string, itemId: string, status: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'DELIVERED' | 'CANCELLED') {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        items: true,
-      },
-    });
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            include: {
+              product: true,
+            }
+          },
+          location: true,
+        },
+      });
 
-    if (!order) {
-      throw new NotFoundException(`Order with ID ${orderId} not found`);
+      if (!order) {
+        this.logger.warn(`Order with ID ${orderId} not found for item status update`);
+        throw new NotFoundException(`Order with ID ${orderId} not found`);
+      }
+
+      const item = order.items.find(item => item.id === itemId);
+      if (!item) {
+        this.logger.warn(`Item with ID ${itemId} not found in order ${orderId}`);
+        throw new NotFoundException(`Item with ID ${itemId} not found in order ${orderId}`);
+      }
+
+      const updatedItem = await this.prisma.orderItem.update({
+        where: { id: itemId },
+        data: { status },
+        include: {
+          product: true,
+          order: true,
+        },
+      });
+
+      // Emit WebSocket event for real-time kitchen updates
+      if (order.locationId) {
+        this.ordersGateway.emitOrderItemUpdated(
+          { item: updatedItem, order },
+          order.locationId
+        );
+        this.logger.log(`WebSocket event emitted for updated item ${itemId} in order ${orderId}`);
+        
+        // Queue notifications for status changes if needed
+        await this.ordersQueueService.addOrderItemStatusChangeJob(updatedItem, order);
+      }
+      
+      return this.findOne(orderId);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error updating item status for order ${orderId}, item ${itemId}: ${error.message}`, error.stack);
+      throw error;
     }
-
-    const item = order.items.find(item => item.id === itemId);
-    if (!item) {
-      throw new NotFoundException(`Item with ID ${itemId} not found in order ${orderId}`);
-    }
-
-    await this.prisma.orderItem.update({
-      where: { id: itemId },
-      data: { status },
-    });
-
-    await this.orderGateway.notifyItemStatusUpdate(orderId, itemId, order.locationId);
-    return this.findOne(orderId);
   }
 
   async remove(id: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-    });
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id },
+        include: {
+          location: true,
+        },
+      });
 
-    if (!order) {
-      throw new NotFoundException(`Order with ID ${id} not found`);
+      if (!order) {
+        this.logger.warn(`Order with ID ${id} not found for deletion`);
+        throw new NotFoundException(`Order with ID ${id} not found`);
+      }
+
+      const deletedOrder = await this.prisma.order.delete({
+        where: { id },
+      });
+      
+      this.logger.log(`Order ${id} deleted successfully`);
+      return deletedOrder;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error removing order ${id}: ${error.message}`, error.stack);
+      throw error;
     }
-
-    return this.prisma.order.delete({
-      where: { id },
-    });
   }
 } 

@@ -77,6 +77,7 @@ export interface User {
   email: string;
   name: string;
   role: string;
+  locationId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -91,7 +92,7 @@ const getAuthHeaders = () => {
 
 export function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('auth_token');
+  return localStorage.getItem('token');
 }
 
 export async function getProducts(
@@ -467,6 +468,11 @@ export async function getUser(): Promise<User> {
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      // Remove invalid token
+      localStorage.removeItem('token');
+      throw new Error("Authentication expired or invalid");
+    }
     throw new Error("Failed to fetch user");
   }
 
@@ -475,39 +481,67 @@ export async function getUser(): Promise<User> {
 
 export async function getKitchenOrders(): Promise<any[]> {
   console.log("Fetching kitchen orders DEEPER...")
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("No authentication token found");
+  }
+  
   const response = await fetch(`${API_URL}/orders`, {
     headers: getAuthHeaders(),
   });
 
   console.log("Response:", response)
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      throw new Error("Authentication expired or invalid");
+    }
     throw new Error('Error al obtener las órdenes de cocina');
   }
   return response.json();
 }
 
-
 export async function updateKitchenOrderItemStatus(
   itemId: string,
   status: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'COMPLETED' | 'CANCELLED'
 ): Promise<any> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("No authentication token found");
+  }
+  
   const response = await fetch(`${API_URL}/kitchen/orders/items/${itemId}/status`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ status }),
   });
+  
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      throw new Error("Authentication expired or invalid");
+    }
     throw new Error('Error al actualizar el estado del item');
   }
   return response.json();
 }
 
 export async function printKitchenTicket(orderId: string): Promise<any> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("No authentication token found");
+  }
+  
   const response = await fetch(`${API_URL}/kitchen/orders/${orderId}/print`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
+  
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      throw new Error("Authentication expired or invalid");
+    }
     throw new Error('Error al imprimir el ticket de cocina');
   }
   return response.json();

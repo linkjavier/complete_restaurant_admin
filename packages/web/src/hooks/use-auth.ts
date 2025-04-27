@@ -1,16 +1,7 @@
 import { useEffect, useState } from "react";
 import { getAuthToken } from "@/lib/auth";
-import { getUser } from "@/lib/api";
+import { getUser, User } from "@/lib/api";
 import { useRouter } from 'next/navigation';
-
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  locationId?: string;
-}
 
 interface AuthState {
   user: User | null;
