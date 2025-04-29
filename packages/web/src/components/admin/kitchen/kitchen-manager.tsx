@@ -357,10 +357,20 @@ export function KitchenManager() {
                               <li key={item.id} className="border-b pb-2">
                                 <div className="flex justify-between items-center">
                                   <div>
-                                    <p className="font-medium">{item.product.name}</p>
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-medium">{item.product.name}</p>
+                                      <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                        x{item.quantity}
+                                      </span>
+                                    </div>
                                     <p className="text-sm text-gray-500">
                                       {item.status === "PENDING" ? "Pendiente" : "En preparación"}
                                     </p>
+                                    {item.notes && (
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        Notas: {item.notes}
+                                      </p>
+                                    )}
                                   </div>
                                   <div className="flex space-x-2">
                                     {item.status === "PENDING" && (
