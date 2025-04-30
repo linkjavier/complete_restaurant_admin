@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { ImageUpload } from "./image-upload"
 
 export function ProductsManager() {
   const [products, setProducts] = useState<Product[]>([])
@@ -282,16 +283,16 @@ export function ProductsManager() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="image">URL de la Imagen</Label>
-              <Input
-                id="image"
-                placeholder="Ingresa la URL de la imagen"
-                value={editingProduct ? editingProduct.image || "" : newProduct.image}
-                onChange={(e) =>
-                  editingProduct
-                    ? setEditingProduct({ ...editingProduct, image: e.target.value })
-                    : setNewProduct({ ...newProduct, image: e.target.value })
-                }
+              <Label>Imagen del Producto</Label>
+              <ImageUpload
+                onImageUploaded={(url) => {
+                  if (editingProduct) {
+                    setEditingProduct({ ...editingProduct, image: url })
+                  } else {
+                    setNewProduct({ ...newProduct, image: url })
+                  }
+                }}
+                currentImage={editingProduct ? editingProduct.image : newProduct.image}
               />
             </div>
             <div className="grid gap-2">
@@ -504,37 +505,48 @@ export function ProductsManager() {
                     key={product.id}
                     className="flex items-center justify-between p-4 border rounded-lg"
                   >
-                    <div>
-                      <p className="font-medium">{product.name}</p>
-                      {product.description && (
-                        <p className="text-sm text-muted-foreground">
-                          {product.description}
-                        </p>
-                      )}
-                      <p className="text-sm text-muted-foreground">
-                        Precio: ${product.price}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Categoría: {product.category?.name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Ubicación: {locations.find(loc => loc.id === product.locationId)?.name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Estado: {product.isActive ? "Activo" : "Inactivo"}
-                      </p>
-                      {product.ingredients && product.ingredients.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-sm font-medium">Ingredientes:</p>
-                          <ul className="text-sm text-muted-foreground">
-                            {product.ingredients.map((pi, index) => (
-                              <li key={index}>
-                                {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
-                              </li>
-                            ))}
-                          </ul>
+                    <div className="flex items-center gap-4">
+                      {product.image && (
+                        <div className="relative w-20 h-20">
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
                         </div>
                       )}
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        {product.description && (
+                          <p className="text-sm text-muted-foreground">
+                            {product.description}
+                          </p>
+                        )}
+                        <p className="text-sm text-muted-foreground">
+                          Precio: ${product.price}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Categoría: {product.category?.name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Ubicación: {locations.find(loc => loc.id === product.locationId)?.name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Estado: {product.isActive ? "Activo" : "Inactivo"}
+                        </p>
+                        {product.ingredients && product.ingredients.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-sm font-medium">Ingredientes:</p>
+                            <ul className="text-sm text-muted-foreground">
+                              {product.ingredients.map((pi, index) => (
+                                <li key={index}>
+                                  {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button
