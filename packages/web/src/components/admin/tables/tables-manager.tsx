@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Pencil } from "lucide-react"
+import { Plus, Trash2, Pencil, ExternalLink } from "lucide-react"
 import { getTables, createTable, deleteTable, updateTable, Table } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { getLocations, Location } from "@/lib/api"
@@ -250,10 +250,16 @@ export function TablesManager() {
             {tables.map((table) => (
               <div
                 key={table.id}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                onClick={() => window.open(`/table/${table.id}`, '_blank')}
               >
                 <div>
-                  <p className="font-medium">Mesa {table.number}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">Mesa {table.number}</p>
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                      ID: {table.id.substring(0, 8)}
+                    </span>
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {table.seats} asientos
                   </p>
@@ -265,16 +271,32 @@ export function TablesManager() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => setEditingTable(table)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingTable(table);
+                    }}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="destructive"
                     size="icon"
-                    onClick={() => handleDeleteTable(table.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteTable(table.id);
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(`/table/${table.id}`, '_blank');
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

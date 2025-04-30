@@ -25,12 +25,13 @@ export class PosService {
 
   constructor(private prisma: PrismaService) {}
 
-  async getActiveOrders() {
+  async getActiveOrders(tableId?: string) {
     return this.prisma.order.findMany({
       where: {
         status: {
           in: ['PENDING', 'IN_PROGRESS', 'READY', 'DELIVERED'],
         },
+        ...(tableId && { tableId }),
       },
       include: {
         table: true,

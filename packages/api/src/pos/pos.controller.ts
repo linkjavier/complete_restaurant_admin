@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { PosService } from './pos.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -38,8 +39,8 @@ export class PosController {
   @Roles(UserRole.CASHIER)
   @ApiOperation({ summary: 'Get all active orders for POS' })
   @ApiResponse({ status: 200, description: 'Returns all active orders' })
-  async getActiveOrders() {
-    return this.posService.getActiveOrders();
+  async getActiveOrders(@Query('tableId') tableId?: string) {
+    return this.posService.getActiveOrders(tableId);
   }
 
   @Get('waiter-calls')

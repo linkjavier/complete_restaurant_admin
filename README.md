@@ -65,3 +65,4 @@ en /packages/api $npm start
 5. curl -X POST http://localhost:3000/api/auth/login   -H "Content-Type: application/json"   -d '{"email": "javier@test.com", "password": "12345678"}'
 6. curl -X GET http://localhost:3000/auth/me   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiMTgzMGQ3ZS0wMjI5LTRkZTgtOWM4ZS1hZTAxMzZjNGVhMjYiLCJlbWFpbCI6ImphdmllckB0ZXN0Mi5jb20iLCJyb2xlIjoiQURNSU4iLCJsb2NhdGlvbklkIjpudWxsLCJpYXQiOjE3NDU1NDM1NzIsImV4cCI6MTc0NTYyOTk3Mn0.9CXZ8DFfsmVFt5yxg-LPa9A2CzFH9E03J_3PsMzWvlY"
 
+7. (Crear usuario) curl -X POST http://localhost:3000/auth/register -H "Content-Type: application/json" -d '{"email": "javier@test.com", "password": "12345678", "firstName": "Javier", "lastName": "Test", "role": "ADMIN"}'

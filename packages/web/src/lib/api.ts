@@ -545,4 +545,36 @@ export async function printKitchenTicket(orderId: string): Promise<any> {
     throw new Error('Error al imprimir el ticket de cocina');
   }
   return response.json();
+}
+
+export async function getActiveOrders(tableId: string) {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?tableId=${tableId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        throw new Error('Authentication expired or invalid');
+      }
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Error al obtener las órdenes activas');
+    }
+
+    const orders = await response.json();
+    console.log(`Received ${orders.length} orders for table ${tableId}`);
+    return orders;
+  } catch (error) {
+    console.error('Error fetching active orders:', error);
+    throw error;
+  }
 } 

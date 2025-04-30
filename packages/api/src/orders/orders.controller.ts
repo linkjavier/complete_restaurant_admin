@@ -7,14 +7,18 @@ import {
   Param,
   Delete,
   Query,
+  BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('orders')
 @Controller('orders')
+@UseGuards(JwtAuthGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
@@ -24,8 +28,14 @@ export class OrdersController {
   }
 
   @Get()
-  findAll(@Query('locationId') locationId?: string) {
-    return this.ordersService.findAll(locationId);
+  findAll(
+    @Query('locationId') locationId?: string,
+    @Query('tableId') tableId?: string,
+  ) {
+    if (!tableId) {
+      throw new BadRequestException('tableId is required');
+    }
+    return this.ordersService.findAll(locationId, tableId);
   }
 
   @Get(':id')

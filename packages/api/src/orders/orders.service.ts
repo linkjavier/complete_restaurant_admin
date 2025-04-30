@@ -172,10 +172,31 @@ export class OrdersService {
     }
   }
 
-  async findAll(locationId?: string) {
+  async findAll(locationId?: string, tableId?: string) {
     try {
-      return this.prisma.order.findMany({
-        where: locationId ? { locationId } : undefined,
+      this.logger.log(`Finding orders with locationId: ${locationId}, tableId: ${tableId}`);
+      
+      // Si no se proporciona tableId, no devolver ninguna orden
+      if (!tableId) {
+        this.logger.log('No tableId provided, returning empty array');
+        return [];
+      }
+
+      const where: any = {
+        tableId: tableId,
+        status: {
+          notIn: ['PAID', 'CANCELLED']
+        }
+      };
+      
+      if (locationId) {
+        where.locationId = locationId;
+      }
+
+      this.logger.log(`Query where clause: ${JSON.stringify(where)}`);
+
+      const orders = await this.prisma.order.findMany({
+        where,
         include: {
           items: {
             include: {
@@ -183,11 +204,15 @@ export class OrdersService {
             },
           },
           table: true,
+          location: true,
         },
         orderBy: {
           createdAt: 'desc',
         },
       });
+
+      this.logger.log(`Found ${orders.length} orders for table ${tableId}`);
+      return orders;
     } catch (error) {
       this.logger.error(`Error finding orders: ${error.message}`, error.stack);
       throw error;
