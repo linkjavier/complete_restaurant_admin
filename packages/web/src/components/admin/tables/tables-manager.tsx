@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Pencil, ExternalLink } from "lucide-react"
+import { Plus, Trash2, Pencil, ExternalLink, QrCode, Download } from "lucide-react"
 import { getTables, createTable, deleteTable, updateTable, Table } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { getLocations, Location } from "@/lib/api"
+import { QRCodeSVG } from 'qrcode.react'
 import {
   Select,
   SelectContent,
@@ -16,6 +17,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 export function TablesManager() {
   const [tables, setTables] = useState<Table[]>([])
@@ -28,11 +36,14 @@ export function TablesManager() {
     locationId: "",
   })
   const [editingTable, setEditingTable] = useState<Table | null>(null)
+  const [qrDialogOpen, setQrDialogOpen] = useState<string | null>(null)
+  const [qrUrl, setQrUrl] = useState<string>("")
   const { toast } = useToast()
 
   useEffect(() => {
     fetchTables()
     fetchLocations()
+    setQrUrl(window.location.origin)
   }, [])
 
   const fetchTables = async () => {
@@ -150,6 +161,29 @@ export function TablesManager() {
     }
   }
 
+  const handleDownloadQR = (tableId: string) => {
+    const svg = document.getElementById(`qr-${tableId}`)
+    if (!svg) return
+
+    const svgData = new XMLSerializer().serializeToString(svg)
+    const canvas = document.createElement("canvas")
+    const ctx = canvas.getContext("2d")
+    const img = new Image()
+
+    img.onload = () => {
+      canvas.width = img.width
+      canvas.height = img.height
+      ctx?.drawImage(img, 0, 0)
+      const pngFile = canvas.toDataURL("image/png")
+      const downloadLink = document.createElement("a")
+      downloadLink.download = `qr-mesa-${tableId}.png`
+      downloadLink.href = pngFile
+      downloadLink.click()
+    }
+
+    img.src = "data:image/svg+xml;base64," + btoa(svgData)
+  }
+
   if (loading) {
     return <div className="text-center">Cargando mesas...</div>
   }
@@ -250,10 +284,12 @@ export function TablesManager() {
             {tables.map((table) => (
               <div
                 key={table.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                onClick={() => window.open(`/table/${table.id}`, '_blank')}
+                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
               >
-                <div>
+                <div
+                  className="cursor-pointer flex-1"
+                  onClick={() => window.open(`/table/${table.id}`, '_blank')}
+                >
                   <div className="flex items-center gap-2">
                     <p className="font-medium">Mesa {table.number}</p>
                     <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
@@ -268,6 +304,46 @@ export function TablesManager() {
                   </p>
                 </div>
                 <div className="flex gap-2">
+                  <Dialog open={qrDialogOpen === table.id} onOpenChange={(open) => setQrDialogOpen(open ? table.id : null)}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        <QrCode className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent 
+                      className="sm:max-w-md"
+                      onPointerDownOutside={(e) => e.preventDefault()}
+                    >
+                      <DialogHeader>
+                        <DialogTitle>Código QR - Mesa {table.number}</DialogTitle>
+                      </DialogHeader>
+                      <div className="flex flex-col items-center gap-4 py-4">
+                        <QRCodeSVG
+                          id={`qr-${table.id}`}
+                          value={`${qrUrl}/table/${table.id}`}
+                          size={200}
+                          level="H"
+                          includeMargin
+                        />
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadQR(table.id);
+                          }}
+                          className="flex items-center gap-2"
+                        >
+                          <Download className="h-4 w-4" />
+                          Descargar QR
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   <Button
                     variant="outline"
                     size="icon"
