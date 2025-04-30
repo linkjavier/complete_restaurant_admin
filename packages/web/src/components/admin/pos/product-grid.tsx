@@ -20,6 +20,15 @@ export function ProductGrid({ products, onAddToCart }: ProductGridProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {product.image && (
+                <div className="relative w-full h-48">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                </div>
+              )}
               <p className="text-sm text-muted-foreground">
                 {product.description}
               </p>

@@ -242,28 +242,39 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                       <CardTitle>{product.name}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          {product.description}
-                        </p>
-                        <p className="font-bold">${product.price.toFixed(2)}</p>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleRemoveFromCart(product.id)}
-                            disabled={!cart[product.id]}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span>{cart[product.id] || 0}</span>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleAddToCart(product.id)}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
+                      <div className="space-y-4">
+                        {product.image && (
+                          <div className="relative w-full h-40">
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            {product.description}
+                          </p>
+                          <p className="font-bold">${product.price.toFixed(2)}</p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleRemoveFromCart(product.id)}
+                              disabled={!cart[product.id]}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span>{cart[product.id] || 0}</span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleAddToCart(product.id)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
