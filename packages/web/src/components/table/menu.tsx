@@ -128,6 +128,18 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div className="md:col-span-2">
         <div className="space-y-4">
+          {/* Welcome Message */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold">¡Hola {customerName}!</h2>
+                <p className="text-muted-foreground">
+                  Aquí podrás ver nuestro menú, ordenar productos, ver tus pedidos y pagar la cuenta.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Tabs */}
           <div className="flex gap-2 mb-4">
             <Button

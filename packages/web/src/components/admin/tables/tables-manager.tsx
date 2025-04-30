@@ -24,6 +24,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export function TablesManager() {
   const [tables, setTables] = useState<Table[]>([])
@@ -304,18 +310,27 @@ export function TablesManager() {
                   </p>
                 </div>
                 <div className="flex gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQrDialogOpen(table.id);
+                          }}
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Ver Código QR</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
                   <Dialog open={qrDialogOpen === table.id} onOpenChange={(open) => setQrDialogOpen(open ? table.id : null)}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
-                        <QrCode className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
                     <DialogContent 
                       className="sm:max-w-md"
                       onPointerDownOutside={(e) => e.preventDefault()}
@@ -344,36 +359,66 @@ export function TablesManager() {
                       </div>
                     </DialogContent>
                   </Dialog>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingTable(table);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteTable(table.id);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.open(`/table/${table.id}`, '_blank');
-                    }}
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTable(table);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Editar Mesa</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTable(table.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Eliminar Mesa</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`/table/${table.id}`, '_blank');
+                          }}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Abrir Mesa</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
             ))}
