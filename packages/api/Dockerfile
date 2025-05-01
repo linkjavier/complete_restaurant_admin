@@ -13,7 +13,6 @@ WORKDIR /app
 # Copiar solo los package.json para aprovechar la cache de Docker
 COPY package*.json ./
 COPY packages/api/package*.json ./packages/api/
-COPY packages/shared/package*.json ./packages/shared/
 
 # Instala las dependencias solo de producción si es para prod
 # RUN npm install --legacy-peer-deps

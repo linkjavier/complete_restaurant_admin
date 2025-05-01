@@ -72,7 +72,7 @@ export class NotificationsService {
   async markAsRead(id: string): Promise<Notification> {
     return this.prisma.notification.update({
       where: { id },
-      data: { isRead: true },
+      data: { read: true },
       include: {
         user: true,
       },

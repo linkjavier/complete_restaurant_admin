@@ -4,7 +4,6 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY packages/web/package*.json ./packages/web/
-COPY packages/shared/package*.json ./packages/shared/
 
 RUN npm install
 

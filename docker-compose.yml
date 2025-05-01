@@ -12,6 +12,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
   api:
     build:
       context: .
@@ -20,8 +25,10 @@ services:
       - "3001:3000"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/blondie
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - postgres
+      - redis
 
   web:
     build:
@@ -35,4 +42,4 @@ services:
       - api
 
 volumes:
-  postgres_data: 
+  postgres_data:

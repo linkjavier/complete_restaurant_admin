@@ -172,51 +172,44 @@ export class OrdersService {
     }
   }
 
-  async findAll(locationId?: string, tableId?: string) {
-    try {
-      this.logger.log(`Finding orders with locationId: ${locationId}, tableId: ${tableId}`);
-      
-      // Si no se proporciona tableId, no devolver ninguna orden
-      if (!tableId) {
-        this.logger.log('No tableId provided, returning empty array');
-        return [];
-      }
+  async findAll(locationId?: string, tableId?: string, kitchen?: boolean) {
+    const where: Prisma.OrderWhereInput = {};
 
-      const where: any = {
-        tableId: tableId,
-        status: {
-          notIn: ['PAID', 'CANCELLED']
+    if (locationId) {
+      where.locationId = locationId;
+    }
+
+    if (tableId) {
+      where.tableId = tableId;
+    }
+
+    if (kitchen) {
+      where.items = {
+        some: {
+          status: {
+            in: ['PENDING', 'IN_PROGRESS']
+          }
         }
       };
-      
-      if (locationId) {
-        where.locationId = locationId;
-      }
-
-      this.logger.log(`Query where clause: ${JSON.stringify(where)}`);
-
-      const orders = await this.prisma.order.findMany({
-        where,
-        include: {
-          items: {
-            include: {
-              product: true,
-            },
-          },
-          table: true,
-          location: true,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      });
-
-      this.logger.log(`Found ${orders.length} orders for table ${tableId}`);
-      return orders;
-    } catch (error) {
-      this.logger.error(`Error finding orders: ${error.message}`, error.stack);
-      throw error;
     }
+
+    return this.prisma.order.findMany({
+      where,
+      include: {
+        table: true,
+        location: true,
+        user: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        payments: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
   }
 
   async findOne(id: string) {

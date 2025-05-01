@@ -31,11 +31,12 @@ export class OrdersController {
   findAll(
     @Query('locationId') locationId?: string,
     @Query('tableId') tableId?: string,
+    @Query('kitchen') kitchen?: boolean,
   ) {
-    if (!tableId) {
-      throw new BadRequestException('tableId is required');
+    if (!kitchen && !tableId) {
+      throw new BadRequestException('tableId is required for non-kitchen requests');
     }
-    return this.ordersService.findAll(locationId, tableId);
+    return this.ordersService.findAll(locationId, tableId, kitchen);
   }
 
   @Get(':id')

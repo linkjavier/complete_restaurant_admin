@@ -486,7 +486,7 @@ export async function getKitchenOrders(): Promise<any[]> {
     throw new Error("No authentication token found");
   }
   
-  const response = await fetch(`${API_URL}/orders`, {
+  const response = await fetch(`${API_URL}/orders?kitchen=true`, {
     headers: getAuthHeaders(),
   });
 
@@ -498,7 +498,9 @@ export async function getKitchenOrders(): Promise<any[]> {
     }
     throw new Error('Error al obtener las órdenes de cocina');
   }
-  return response.json();
+
+  const data = await response.json();
+  return data;
 }
 
 export async function updateKitchenOrderItemStatus(

@@ -52,7 +52,7 @@ export class PosService {
     return this.prisma.notification.findMany({
       where: {
         type: 'WAITER_CALL',
-        isRead: false,
+        read: false,
       },
       include: {
         user: true,
@@ -171,7 +171,7 @@ export class PosService {
   async markWaiterCallAsResolved(notificationId: string): Promise<void> {
     await this.prisma.notification.update({
       where: { id: notificationId },
-      data: { isRead: true },
+      data: { read: true },
     });
 
     this.server.emit('waiterCallResolved', { notificationId });
