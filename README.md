@@ -244,7 +244,7 @@ curl -X POST http://localhost:3000/auth/register \
 1. Configurar variables de entorno de producción
 2. Construir imágenes Docker
 3. Configurar base de datos de producción
-4. Ejecutar migraciones
+4. Ejecutar migraciones - npx prisma migrate dev --name init
 5. Iniciar servicios
 
 ## 🤝 Contribución

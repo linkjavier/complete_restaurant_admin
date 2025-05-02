@@ -1,34 +1,34 @@
-# Usa slim en lugar de alpine por compatibilidad con Prisma
-FROM node:18-slim
+# Usa la imagen oficial de Node.js (Linux)
+FROM node:20
 
-# Evita prompts
 ENV CI=true
+ENV DATABASE_URL="postgresql://postgres:postgres@postgres:5432/restaurant_admin?schema=public"
+ENV REDIS_HOST=redis
+ENV REDIS_PORT=6379
 
-# Instalación de OpenSSL en el contenedor
-RUN apt-get update -y && apt-get install -y openssl
-
-# Directorio de trabajo
 WORKDIR /app
 
-# Copiar solo los package.json para aprovechar la cache de Docker
+# Copiamos los package.json para usar la cache
 COPY package*.json ./
 COPY packages/api/package*.json ./packages/api/
 
-# Instala las dependencias solo de producción si es para prod
-# RUN npm install --legacy-peer-deps
-
-# Copia el resto del código
-COPY . .
-
-# Generar Prisma Client (antes de build)
+# Instalamos dependencias
 WORKDIR /app/packages/api
+RUN npm cache clean --force && \
+    npm install --legacy-peer-deps
+
+# Copiamos el schema de Prisma y generamos el cliente
+COPY packages/api/prisma ./prisma/
 RUN npx prisma generate
 
-# Compilar el proyecto
-RUN npm run build
+# Copiamos todo el código
+WORKDIR /app
+COPY . .
 
-# Exponer el puerto de la API
+# Recompilamos bcrypt para Linux y construimos la aplicación
+WORKDIR /app/packages/api
+RUN npm rebuild bcrypt --build-from-source && \
+    npm run build
+
 EXPOSE 3000
-
-# Comando para ejecutar la API
 CMD ["npm", "run", "start:dev"]
