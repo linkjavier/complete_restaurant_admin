@@ -185,9 +185,12 @@ blondie-restaurant-bar/
 
 ### Iniciar el Proyecto
 
-1. Iniciar la base de datos:
+1. Iniciar las bases de datos:
    ```bash
    docker-compose up postgres
+   ```
+   ```bash
+   docker-compose up redis
    ```
 
 2. Iniciar el backend:

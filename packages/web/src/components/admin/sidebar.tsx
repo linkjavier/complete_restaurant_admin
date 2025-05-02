@@ -16,7 +16,8 @@ import {
   ChefHat,
   ShoppingCart,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Receipt
 } from "lucide-react"
 import { getAuthToken } from "@/lib/auth"
 import {
@@ -37,6 +38,11 @@ const routes = [
     label: "POS",
     icon: ShoppingCart,
     href: "/admin/pos",
+  },
+  {
+    label: "Órdenes",
+    icon: Receipt,
+    href: "/admin/orders",
   },
   {
     label: "Mesas",
