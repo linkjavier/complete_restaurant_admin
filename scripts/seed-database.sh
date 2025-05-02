@@ -1,110 +1,376 @@
 #!/bin/bash
 
-# URL base de la API
-API_URL="http://localhost:3000"
+# Crear un usuario de prueba
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@test.com",
+    "password": "12345678",
+    "firstName": "Test",
+    "lastName": "User",
+    "role": "ADMIN"
+  }'
 
-# Token de autenticación
-TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYTNlODIzYy1lMTU5LTQ4MWEtODRkMi1mYTI3YjU3MGY0Y2YiLCJlbWFpbCI6ImphdmllckB0ZXN0LmNvbSIsInJvbGUiOiJBRE1JTiIsImxvY2F0aW9uSWQiOm51bGwsImlhdCI6MTc0NTYwMDEwMywiZXhwIjoxNzQ1Njg2NTAzfQ.h3zgg8Z7CjpUR_rHbOdcr5NrXsbmApfiSfDU6k4Sni8"
+# Iniciar sesión con el usuario de prueba y guardar el token en una variable
+TOKEN=$(curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@test.com",
+    "password": "12345678"
+  }' | jq -r '.access_token')
 
-# ID de la ubicación
-LOCATION_ID="b02e311d-9358-4115-a813-2999d416e62f"
+# Verificar si obtuvimos el token
+if [ -z "$TOKEN" ]; then
+    echo "Error: No se pudo obtener el token de autenticación"
+    exit 1
+fi
 
-# Función para crear una categoría
-create_category() {
-    curl -X POST "$API_URL/categories" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $TOKEN" \
-    -d "$1"
-}
+echo "Token obtenido exitosamente"
 
-# Función para crear un producto
-create_product() {
-    curl -X POST "$API_URL/products" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $TOKEN" \
-    -d "$1"
-}
+# Crear una ubicación llamada "Principal" y guardar su ID
+LOCATION_RESPONSE=$(curl -X POST http://localhost:3000/locations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Principal"
+  }')
 
-# Crear categorías
-ENTRADAS_ID=$(create_category '{"name":"Entradas","description":"Aperitivos y entradas"}' | jq -r '.id')
-PLATOS_FUERTES_ID=$(create_category '{"name":"Platos Fuertes","description":"Platos principales"}' | jq -r '.id')
-DESAYUNOS_ID=$(create_category '{"name":"Desayunos","description":"Desayunos y brunch"}' | jq -r '.id')
-BEBIDAS_ID=$(create_category '{"name":"Bebidas","description":"Bebidas y cócteles"}' | jq -r '.id')
-PANADERIA_ID=$(create_category '{"name":"Panadería","description":"Pan y repostería"}' | jq -r '.id')
-POSTRES_ID=$(create_category '{"name":"Postres","description":"Postres y dulces"}' | jq -r '.id')
-ENSALADAS_ID=$(create_category '{"name":"Ensaladas","description":"Ensaladas y bowls"}' | jq -r '.id')
-SOPAS_ID=$(create_category '{"name":"Sopas","description":"Sopas y cremas"}' | jq -r '.id')
-PIZZAS_ID=$(create_category '{"name":"Pizzas","description":"Pizzas y calzones"}' | jq -r '.id')
-HAMBURGUESAS_ID=$(create_category '{"name":"Hamburguesas","description":"Hamburguesas y sandwiches"}' | jq -r '.id')
+LOCATION_ID=$(echo $LOCATION_RESPONSE | jq -r '.id')
 
-# Entradas
-create_product '{"name":"Nachos con Queso","description":"Tortillas chips bañadas en queso fundido, jalapeños y guacamole","price":8.99,"image":"/images/nachos.jpg","categoryId":"'$ENTRADAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Alitas BBQ","description":"Alitas de pollo bañadas en salsa BBQ, acompañadas de apio y aderezo ranch","price":12.99,"image":"/images/alitas.jpg","categoryId":"'$ENTRADAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Ceviche Mixto","description":"Pescado, camarones y calamares marinados en limón, cebolla y ají","price":14.99,"image":"/images/ceviche.jpg","categoryId":"'$ENTRADAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Empanadas de Carne","description":"Empanadas caseras rellenas de carne molida, huevo y aceitunas","price":6.99,"image":"/images/empanadas.jpg","categoryId":"'$ENTRADAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Ensalada César","description":"Lechuga romana, crutones, queso parmesano y aderezo césar","price":9.99,"image":"/images/cesar.jpg","categoryId":"'$ENTRADAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
+# Verificar si obtuvimos el ID de la ubicación
+if [ -z "$LOCATION_ID" ] || [ "$LOCATION_ID" = "null" ]; then
+    echo "Error: No se pudo obtener el ID de la ubicación"
+    echo "Respuesta del servidor: $LOCATION_RESPONSE"
+    exit 1
+fi
 
-# Platos Fuertes
-create_product '{"name":"Lomo Saltado","description":"Lomo de res salteado con cebolla, tomate y papas fritas","price":18.99,"image":"/images/lomo.jpg","categoryId":"'$PLATOS_FUERTES_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Pasta Alfredo","description":"Fettuccine con salsa cremosa de queso parmesano y pollo","price":16.99,"image":"/images/pasta.jpg","categoryId":"'$PLATOS_FUERTES_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Parrillada Mixta","description":"Selección de carnes a la parrilla con guarniciones","price":24.99,"image":"/images/parrillada.jpg","categoryId":"'$PLATOS_FUERTES_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Pollo a la Brasa","description":"Pollo asado al carbón con papas fritas y ensalada","price":15.99,"image":"/images/pollo.jpg","categoryId":"'$PLATOS_FUERTES_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Pescado a la Plancha","description":"Filete de pescado fresco con vegetales salteados","price":19.99,"image":"/images/pescado.jpg","categoryId":"'$PLATOS_FUERTES_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
+echo "Location ID obtenido: $LOCATION_ID"
 
-# Desayunos
-create_product '{"name":"Desayuno Americano","description":"Huevos, tocino, pan tostado, papas y café","price":12.99,"image":"/images/desayuno-americano.jpg","categoryId":"'$DESAYUNOS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Omelette del Chef","description":"Omelette con jamón, queso, champiñones y espinacas","price":10.99,"image":"/images/omelette.jpg","categoryId":"'$DESAYUNOS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Pancakes con Frutas","description":"Pancakes esponjosos con frutas frescas y sirope de maple","price":9.99,"image":"/images/pancakes.jpg","categoryId":"'$DESAYUNOS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Huevos Benedictinos","description":"Huevos pochados sobre pan inglés con jamón y salsa holandesa","price":13.99,"image":"/images/benedict.jpg","categoryId":"'$DESAYUNOS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Tostada Francesa","description":"Pan remojado en huevo y leche, servido con frutas y miel","price":8.99,"image":"/images/tostada.jpg","categoryId":"'$DESAYUNOS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
+# Guardar IDs de las categorías
+ALMUERZOS_ID=$(curl -X POST http://localhost:3000/categories \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Almuerzos",
+    "description": "Deliciosos platos principales y especialidades del día"
+  }' | jq -r '.id')
 
-# Bebidas
-create_product '{"name":"Limonada Casera","description":"Limonada fresca con menta y jengibre","price":4.99,"image":"/images/limonada.jpg","categoryId":"'$BEBIDAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Mojito","description":"Ron, menta, limón, azúcar y soda","price":8.99,"image":"/images/mojito.jpg","categoryId":"'$BEBIDAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Café Latte","description":"Café espresso con leche vaporizada","price":4.99,"image":"/images/latte.jpg","categoryId":"'$BEBIDAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Jugo Natural","description":"Jugo fresco de naranja, piña o maracuyá","price":3.99,"image":"/images/jugo.jpg","categoryId":"'$BEBIDAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Té Helado","description":"Té negro con limón y menta","price":3.99,"image":"/images/te.jpg","categoryId":"'$BEBIDAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
+PANADERIA_ID=$(curl -X POST http://localhost:3000/categories \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Panaderia",
+    "description": "Pan fresco y productos horneados artesanalmente"
+  }' | jq -r '.id')
 
-# Panadería
-create_product '{"name":"Croissant de Chocolate","description":"Croissant relleno de chocolate belga","price":3.99,"image":"/images/croissant.jpg","categoryId":"'$PANADERIA_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Pan de Ajo","description":"Pan artesanal con mantequilla de ajo y perejil","price":5.99,"image":"/images/pan-ajo.jpg","categoryId":"'$PANADERIA_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Muffin de Arándanos","description":"Muffin casero con arándanos frescos","price":3.99,"image":"/images/muffin.jpg","categoryId":"'$PANADERIA_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Pan de Centeno","description":"Pan integral de centeno con semillas","price":4.99,"image":"/images/centeno.jpg","categoryId":"'$PANADERIA_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Baguette","description":"Pan francés crujiente","price":3.99,"image":"/images/baguette.jpg","categoryId":"'$PANADERIA_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
+DESAYUNOS_ID=$(curl -X POST http://localhost:3000/categories \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Desayunos",
+    "description": "Opciones nutritivas para comenzar el día"
+  }' | jq -r '.id')
 
-# Postres
-create_product '{"name":"Tiramisú","description":"Postre italiano con café, mascarpone y cacao","price":7.99,"image":"/images/tiramisu.jpg","categoryId":"'$POSTRES_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Cheesecake de Frutos Rojos","description":"Cheesecake cremoso con salsa de frutos rojos","price":8.99,"image":"/images/cheesecake.jpg","categoryId":"'$POSTRES_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Brownie con Helado","description":"Brownie caliente con helado de vainilla y salsa de chocolate","price":7.99,"image":"/images/brownie.jpg","categoryId":"'$POSTRES_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Mousse de Chocolate","description":"Mousse suave de chocolate negro","price":6.99,"image":"/images/mousse.jpg","categoryId":"'$POSTRES_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Tarta de Manzana","description":"Tarta casera de manzana con canela","price":7.99,"image":"/images/tarta.jpg","categoryId":"'$POSTRES_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
+BEBIDAS_ID=$(curl -X POST http://localhost:3000/categories \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Bebidas",
+    "description": "Refrescantes bebidas frías y calientes"
+  }' | jq -r '.id')
 
-# Ensaladas
-create_product '{"name":"Ensalada Griega","description":"Lechuga, tomate, pepino, aceitunas y queso feta","price":10.99,"image":"/images/griega.jpg","categoryId":"'$ENSALADAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Ensalada Caprese","description":"Tomate, mozzarella y albahaca con aceite de oliva","price":11.99,"image":"/images/caprese.jpg","categoryId":"'$ENSALADAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Ensalada de Quinoa","description":"Quinoa con vegetales frescos y aderezo de limón","price":12.99,"image":"/images/quinoa.jpg","categoryId":"'$ENSALADAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Ensalada de Atún","description":"Atún fresco con vegetales y aderezo de mostaza","price":13.99,"image":"/images/atun.jpg","categoryId":"'$ENSALADAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Ensalada de Frutas","description":"Mezcla de frutas frescas con yogurt","price":8.99,"image":"/images/frutas.jpg","categoryId":"'$ENSALADAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
+# Crear productos de Almuerzos
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Pollo a la Parrilla",
+    "description": "Pechuga de pollo marinada a la parrilla con guarnición",
+    "price": 15000,
+    "categoryId": "'$ALMUERZOS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
 
-# Sopas
-create_product '{"name":"Sopa de Pollo","description":"Sopa casera de pollo con fideos y verduras","price":8.99,"image":"/images/sopa-pollo.jpg","categoryId":"'$SOPAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Crema de Espárragos","description":"Crema suave de espárragos con crutones","price":7.99,"image":"/images/esparragos.jpg","categoryId":"'$SOPAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Sopa de Mariscos","description":"Sopa con variedad de mariscos frescos","price":12.99,"image":"/images/mariscos.jpg","categoryId":"'$SOPAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Minestrone","description":"Sopa italiana de verduras con pasta","price":9.99,"image":"/images/minestrone.jpg","categoryId":"'$SOPAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Sopa de Tomate","description":"Sopa cremosa de tomate con albahaca","price":7.99,"image":"/images/tomate.jpg","categoryId":"'$SOPAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Lomo de Res",
+    "description": "Lomo de res con salsa de champiñones",
+    "price": 18000,
+    "categoryId": "'$ALMUERZOS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
 
-# Pizzas
-create_product '{"name":"Pizza Margarita","description":"Pizza con salsa de tomate, mozzarella y albahaca","price":12.99,"image":"/images/margarita.jpg","categoryId":"'$PIZZAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Pizza Pepperoni","description":"Pizza con salsa de tomate, mozzarella y pepperoni","price":14.99,"image":"/images/pepperoni.jpg","categoryId":"'$PIZZAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Pizza Hawaiana","description":"Pizza con jamón, piña y queso mozzarella","price":13.99,"image":"/images/hawaiana.jpg","categoryId":"'$PIZZAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Pizza Vegetariana","description":"Pizza con variedad de vegetales frescos","price":13.99,"image":"/images/vegetariana.jpg","categoryId":"'$PIZZAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Pizza Cuatro Quesos","description":"Pizza con mezcla de cuatro quesos diferentes","price":15.99,"image":"/images/cuatro-quesos.jpg","categoryId":"'$PIZZAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Pescado Frito",
+    "description": "Filete de pescado fresco frito con patacones",
+    "price": 16000,
+    "categoryId": "'$ALMUERZOS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
 
-# Hamburguesas
-create_product '{"name":"Hamburguesa Clásica","description":"Hamburguesa con carne, lechuga, tomate y cebolla","price":10.99,"image":"/images/clasica.jpg","categoryId":"'$HAMBURGUESAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Hamburguesa BBQ","description":"Hamburguesa con salsa BBQ y cebolla caramelizada","price":12.99,"image":"/images/bbq.jpg","categoryId":"'$HAMBURGUESAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Hamburguesa Vegetariana","description":"Hamburguesa de lentejas con vegetales","price":11.99,"image":"/images/vegetariana.jpg","categoryId":"'$HAMBURGUESAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Hamburguesa Doble","description":"Doble carne con queso y vegetales","price":14.99,"image":"/images/doble.jpg","categoryId":"'$HAMBURGUESAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
-create_product '{"name":"Hamburguesa de Pollo","description":"Hamburguesa de pollo a la parrilla","price":11.99,"image":"/images/pollo.jpg","categoryId":"'$HAMBURGUESAS_ID'","locationId":"'$LOCATION_ID'","isActive":true}'
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Pasta Alfredo",
+    "description": "Pasta en salsa cremosa con pollo",
+    "price": 14000,
+    "categoryId": "'$ALMUERZOS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
 
-echo "Productos creados exitosamente!" 
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Arroz con Camarones",
+    "description": "Arroz salteado con camarones y vegetales",
+    "price": 17000,
+    "categoryId": "'$ALMUERZOS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+# Crear productos de Panadería
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Croissant",
+    "description": "Croissant de mantequilla recién horneado",
+    "price": 3500,
+    "categoryId": "'$PANADERIA_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Pan Baguette",
+    "description": "Pan baguette tradicional",
+    "price": 4000,
+    "categoryId": "'$PANADERIA_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Pan de Chocolate",
+    "description": "Pan dulce relleno de chocolate",
+    "price": 3800,
+    "categoryId": "'$PANADERIA_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Almojábana",
+    "description": "Pan de queso tradicional colombiano",
+    "price": 2500,
+    "categoryId": "'$PANADERIA_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Pan Integral",
+    "description": "Pan integral con semillas",
+    "price": 4500,
+    "categoryId": "'$PANADERIA_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+# Crear productos de Desayunos
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Huevos Revueltos",
+    "description": "Huevos revueltos con tostadas y café",
+    "price": 8000,
+    "categoryId": "'$DESAYUNOS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Calentado",
+    "description": "Calentado tradicional con huevo y arepa",
+    "price": 12000,
+    "categoryId": "'$DESAYUNOS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Pancakes",
+    "description": "Torre de pancakes con sirope de maple",
+    "price": 9000,
+    "categoryId": "'$DESAYUNOS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Cereal con Frutas",
+    "description": "Cereal con yogurt y frutas frescas",
+    "price": 7500,
+    "categoryId": "'$DESAYUNOS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Sandwich Desayuno",
+    "description": "Sandwich con huevo, queso y jamón",
+    "price": 8500,
+    "categoryId": "'$DESAYUNOS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+# Crear productos de Bebidas
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Café Americano",
+    "description": "Café negro recién preparado",
+    "price": 3000,
+    "categoryId": "'$BEBIDAS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Jugo Natural",
+    "description": "Jugo de frutas naturales",
+    "price": 4500,
+    "categoryId": "'$BEBIDAS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Limonada",
+    "description": "Limonada natural con hierbabuena",
+    "price": 4000,
+    "categoryId": "'$BEBIDAS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Cappuccino",
+    "description": "Café espresso con leche espumada",
+    "price": 5000,
+    "categoryId": "'$BEBIDAS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+curl -X POST http://localhost:3000/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Chocolate Caliente",
+    "description": "Chocolate caliente con queso y pan",
+    "price": 5500,
+    "categoryId": "'$BEBIDAS_ID'",
+    "locationId": "'$LOCATION_ID'",
+    "isActive": true
+  }'
+
+echo "Creando mesas..."
+
+# Crear Mesa 1
+MESA_RESPONSE=$(curl -X POST http://localhost:3000/tables \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "number": 1,
+    "seats": 4,
+    "locationId": "'$LOCATION_ID'"
+  }')
+
+echo "Respuesta Mesa 1: $MESA_RESPONSE"
+
+# Crear Mesa 2
+MESA_RESPONSE=$(curl -X POST http://localhost:3000/tables \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "number": 2,
+    "seats": 4,
+    "locationId": "'$LOCATION_ID'"
+  }')
+
+echo "Respuesta Mesa 2: $MESA_RESPONSE"
+
+# Crear Mesa 3
+MESA_RESPONSE=$(curl -X POST http://localhost:3000/tables \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "number": 3,
+    "seats": 4,
+    "locationId": "'$LOCATION_ID'"
+  }')
+
+echo "Respuesta Mesa 3: $MESA_RESPONSE"
+
+# Crear Mesa 4
+MESA_RESPONSE=$(curl -X POST http://localhost:3000/tables \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "number": 4,
+    "seats": 4,
+    "locationId": "'$LOCATION_ID'"
+  }')
+
+echo "Respuesta Mesa 4: $MESA_RESPONSE"
+
+echo "Script completado"  
