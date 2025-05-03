@@ -37,6 +37,7 @@ export function ProductsManager() {
     categoryId: "",
     locationId: "",
     isActive: true,
+    quantity: 0,
     ingredients: [] as {
       id: string;
       productId: string;
@@ -116,6 +117,7 @@ export function ProductsManager() {
         categoryId: newProduct.categoryId,
         locationId: newProduct.locationId,
         isActive: newProduct.isActive,
+        quantity: newProduct.quantity,
         ingredients: newProduct.ingredients,
       })
 
@@ -132,6 +134,7 @@ export function ProductsManager() {
         categoryId: "",
         locationId: "",
         isActive: true,
+        quantity: 0,
         ingredients: [],
       })
 
@@ -167,6 +170,7 @@ export function ProductsManager() {
         categoryId: editingProduct.categoryId,
         locationId: editingProduct.locationId,
         isActive: editingProduct.isActive,
+        quantity: editingProduct.quantity,
         ingredients: editingProduct.ingredients?.map(pi => ({
           ingredientId: pi.ingredientId,
           quantity: pi.quantity,
@@ -352,6 +356,21 @@ export function ProductsManager() {
               <Label htmlFor="isActive">Producto Activo</Label>
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="quantity">Stock Actual</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="0"
+                placeholder="Ingresa el stock actual"
+                value={editingProduct ? editingProduct.quantity || 0 : newProduct.quantity}
+                onChange={(e) =>
+                  editingProduct
+                    ? setEditingProduct({ ...editingProduct, quantity: parseFloat(e.target.value) })
+                    : setNewProduct({ ...newProduct, quantity: parseFloat(e.target.value) })
+                }
+              />
+            </div>
+            <div className="grid gap-2">
               <Label>Ingredientes</Label>
               <div className="space-y-4">
                 {(editingProduct ? editingProduct.ingredients : newProduct.ingredients)?.map((ingredient, index) => (
@@ -534,6 +553,9 @@ export function ProductsManager() {
                         <p className="text-sm text-muted-foreground">
                           Estado: {product.isActive ? "Activo" : "Inactivo"}
                         </p>
+                        <p className="text-sm text-muted-foreground">
+                          Stock actual: {product.quantity || 0}
+                        </p>
                         {product.ingredients && product.ingredients.length > 0 && (
                           <div className="mt-2">
                             <p className="text-sm font-medium">Ingredientes:</p>
@@ -573,4 +595,4 @@ export function ProductsManager() {
       </Card>
     </div>
   )
-} 
+}

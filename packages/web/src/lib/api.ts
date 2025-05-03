@@ -13,6 +13,7 @@ export interface Product {
   ingredients?: ProductIngredient[];
   createdAt?: string;
   updatedAt?: string;
+  quantity: number;
 }
 
 export interface Table {
@@ -342,6 +343,7 @@ export async function createProduct(data: {
   categoryId: string
   locationId: string
   isActive: boolean
+  quantity: number
   ingredients?: {
     ingredientId: string
     quantity: number
@@ -369,6 +371,7 @@ export async function updateProduct(id: string, data: {
   categoryId?: string
   locationId?: string
   isActive?: boolean
+  quantity?: number
   ingredients?: {
     ingredientId: string
     quantity: number
@@ -579,4 +582,4 @@ export async function getActiveOrders(tableId: string) {
     console.error('Error fetching active orders:', error);
     throw error;
   }
-} 
+}

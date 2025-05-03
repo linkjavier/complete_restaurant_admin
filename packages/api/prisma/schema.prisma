@@ -80,10 +80,13 @@ model Product {
   category    Category          @relation(fields: [categoryId], references: [id])
   categoryId  String
   isActive    Boolean           @default(true)
+  isFinal     Boolean           @default(false)  // true if it's a processed product
+  quantity    Float             @default(0)      // current stock quantity
   location    Location          @relation(fields: [locationId], references: [id])
   locationId  String
   ingredients ProductIngredient[]
   orderItems  OrderItem[]
+  productions ProductionLog[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 }
@@ -227,4 +230,12 @@ enum NotificationType {
   LOW_STOCK
   SYSTEM
   WAITER_CALL
-} 
+}
+
+model ProductionLog {
+  id         String    @id @default(cuid())
+  product    Product   @relation(fields: [productId], references: [id])
+  productId  String
+  quantity   Float
+  createdAt  DateTime  @default(now())
+}
