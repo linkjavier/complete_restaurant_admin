@@ -135,6 +135,47 @@ export function KitchenManager() {
     }
   }
 
+  const handleStartOrder = async (orderId: string, items: any[]) => {
+    try {
+      // Actualizar todos los items pendientes a IN_PROGRESS
+      const pendingItems = items.filter(item => item.status === "PENDING");
+      for (const item of pendingItems) {
+        await updateKitchenOrderItemStatus(item.id, "IN_PROGRESS");
+      }
+
+      toast({
+        title: "Éxito",
+        description: "Orden iniciada correctamente",
+      });
+    } catch (err: any) {
+      console.error('Error starting order:', err);
+      toast({
+        title: "Error",
+        description: "Error al iniciar la orden",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCompleteItem = async (itemId: string, orderId: string, items: any[]) => {
+    try {
+      await updateKitchenOrderItemStatus(itemId, "COMPLETED");
+
+      // Los eventos WebSocket se encargarán de actualizar la UI
+      toast({
+        title: "Éxito",
+        description: "Item completado correctamente",
+      });
+    } catch (err: any) {
+      console.error('Error completing item:', err);
+      toast({
+        title: "Error",
+        description: "Error al completar el item",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Join the kitchen-specific channel when socket is connected and user has a locationId
   useEffect(() => {
     if (connected && user?.locationId) {
@@ -171,62 +212,6 @@ export function KitchenManager() {
 
     console.log("Setting up WebSocket event listeners for kitchen")
 
-    // Listen for new orders
-    const unsubscribeNewOrder = subscribe('new_order_created', (newOrderData) => {
-      // Socket.io sometimes wraps the data in an array when using namespaces
-      const newOrder = Array.isArray(newOrderData) ? newOrderData[0] : newOrderData;
-      
-      console.log("new_order_created event received:", newOrder)
-      
-      // Verify this order has PENDING or IN_PROGRESS items
-      if (newOrder && newOrder.items && newOrder.items.some(item => 
-        item.status === "PENDING" || item.status === "IN_PROGRESS"
-      )) {
-        // Add to orders if not already present
-        setOrders(prevOrders => {
-          if (prevOrders.some(order => order.id === newOrder.id)) {
-            return prevOrders
-          }
-          
-          toast({
-            title: "Nueva Orden",
-            description: `Mesa #${newOrder.table?.number} - ${newOrder.items.length} productos`,
-          })
-          
-          return [newOrder, ...prevOrders]
-        })
-      } else {
-        console.warn("Received order without PENDING or IN_PROGRESS items:", newOrder)
-      }
-    })
-
-    // Listen for order updates
-    const unsubscribeOrderUpdated = subscribe('order_updated', (updatedOrderData) => {
-      // Socket.io sometimes wraps the data in an array when using namespaces
-      const updatedOrder = Array.isArray(updatedOrderData) ? updatedOrderData[0] : updatedOrderData;
-      
-      console.log("order_updated event received:", updatedOrder)
-      
-      if (!updatedOrder) {
-        console.warn("Received invalid order update")
-        return;
-      }
-      
-      setOrders(prevOrders => {
-        // If the order has no more PENDING or IN_PROGRESS items, remove it
-        if (!updatedOrder.items || !updatedOrder.items.some(item => 
-          item.status === "PENDING" || item.status === "IN_PROGRESS"
-        )) {
-          return prevOrders.filter(order => order.id !== updatedOrder.id)
-        }
-        
-        // Update the order if it exists in the list
-        return prevOrders.map(order => 
-          order.id === updatedOrder.id ? updatedOrder : order
-        )
-      })
-    })
-
     // Listen for order item updates
     const unsubscribeOrderItemUpdated = subscribe('order_item_updated', (dataRaw) => {
       // Socket.io sometimes wraps the data in an array when using namespaces
@@ -242,48 +227,55 @@ export function KitchenManager() {
       const { item, order } = data
       
       setOrders(prevOrders => {
-        // Find the order containing this item
         const orderIndex = prevOrders.findIndex(o => o.id === order.id)
         
         if (orderIndex === -1) {
-          // Order not in list, could be a new order
-          if (item.status === "PENDING" || item.status === "IN_PROGRESS") {
+          // Si la orden no existe y tiene items pendientes o en progreso, agrégala
+          if (order.items.some(i => i.status === "PENDING" || i.status === "IN_PROGRESS")) {
             return [...prevOrders, order]
           }
           return prevOrders
         }
         
-        // Update the order with the new item
+        // Actualizar la orden existente
         const updatedOrders = [...prevOrders]
-        const updatedOrder = { ...updatedOrders[orderIndex] }
-        
-        // Update the item in the order
-        updatedOrder.items = updatedOrder.items.map(i => 
-          i.id === item.id ? { ...i, status: item.status } : i
-        )
-        
-        // If all items are completed, remove the order
-        if (!updatedOrder.items.some(i => 
-          i.status === "PENDING" || i.status === "IN_PROGRESS"
-        )) {
-          updatedOrders.splice(orderIndex, 1)
-          return updatedOrders
-        }
-        
-        // Otherwise update the order
+        const updatedOrder = { ...order } // Usar la orden completa del servidor
         updatedOrders[orderIndex] = updatedOrder
-        return updatedOrders
+        
+        // Filtrar órdenes que ya no tienen items pendientes o en progreso
+        return updatedOrders.filter(order => 
+          order.items.some(i => i.status === "PENDING" || i.status === "IN_PROGRESS")
+        )
+      })
+    })
+
+    // Listen for order updates
+    const unsubscribeOrderUpdated = subscribe('order_updated', (updatedOrderData) => {
+      const updatedOrder = Array.isArray(updatedOrderData) ? updatedOrderData[0] : updatedOrderData;
+      
+      console.log("order_updated event received:", updatedOrder)
+      
+      if (!updatedOrder) {
+        console.warn("Received invalid order update")
+        return;
+      }
+      
+      setOrders(prevOrders => {
+        return prevOrders.map(order => 
+          order.id === updatedOrder.id ? updatedOrder : order
+        ).filter(order => 
+          order.items.some(item => item.status === "PENDING" || item.status === "IN_PROGRESS")
+        )
       })
     })
 
     // Clean up subscriptions when component unmounts
     return () => {
       console.log("Cleaning up WebSocket event listeners")
-      unsubscribeNewOrder()
       unsubscribeOrderUpdated()
       unsubscribeOrderItemUpdated()
     }
-  }, [connected, subscribe, toast])
+  }, [connected, subscribe])
 
   // Create a connection status indicator
   const connectionStatus = connected ? (
@@ -338,13 +330,24 @@ export function KitchenManager() {
                               Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                             </p>
                           </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handlePrintTicket(order.id)}
-                          >
-                            Imprimir Ticket
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handlePrintTicket(order.id)}
+                            >
+                              Imprimir Ticket
+                            </Button>
+                            {order.items.some(item => item.status === "PENDING") && (
+                              <Button 
+                                variant="default" 
+                                size="sm"
+                                onClick={() => handleStartOrder(order.id, order.items)}
+                              >
+                                Recibido
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                       
@@ -352,7 +355,7 @@ export function KitchenManager() {
                         <h4 className="font-medium mb-2">Items:</h4>
                         <ul className="space-y-4">
                           {order.items
-                            .filter(item => item.status === "PENDING" || item.status === "IN_PROGRESS")
+                            .filter(item => item.status !== "COMPLETED")
                             .map((item) => (
                               <li key={item.id} className="border-b pb-2">
                                 <div className="flex justify-between items-center">
@@ -364,7 +367,9 @@ export function KitchenManager() {
                                       </span>
                                     </div>
                                     <p className="text-sm text-gray-500">
-                                      {item.status === "PENDING" ? "Pendiente" : "En preparación"}
+                                      {item.status === "PENDING" ? "Pendiente" : 
+                                       item.status === "IN_PROGRESS" ? "En preparación" : 
+                                       item.status === "COMPLETED" ? "Completado" : item.status}
                                     </p>
                                     {item.notes && (
                                       <p className="text-sm text-muted-foreground mt-1">
@@ -375,20 +380,38 @@ export function KitchenManager() {
                                   <div className="flex space-x-2">
                                     {item.status === "PENDING" && (
                                       <Button 
-                                        size="sm" 
+                                        size="sm"
+                                        variant="outline"
                                         onClick={() => handleUpdateItemStatus(item.id, "IN_PROGRESS")}
                                       >
-                                        Iniciar
+                                        Iniciar Preparación
                                       </Button>
                                     )}
                                     {item.status === "IN_PROGRESS" && (
-                                      <Button 
-                                        size="sm" 
-                                        onClick={() => handleUpdateItemStatus(item.id, "READY")}
-                                      >
-                                        Completar
-                                      </Button>
+                                      <>
+                                        <Button 
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleUpdateItemStatus(item.id, "PENDING")}
+                                        >
+                                          Volver a Pendiente
+                                        </Button>
+                                        <Button 
+                                          size="sm"
+                                          variant="default"
+                                          onClick={() => handleUpdateItemStatus(item.id, "COMPLETED")}
+                                        >
+                                          Marcar Completado
+                                        </Button>
+                                      </>
                                     )}
+                                    <Button 
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleUpdateItemStatus(item.id, "CANCELLED")}
+                                    >
+                                      Cancelar
+                                    </Button>
                                   </div>
                                 </div>
                               </li>
@@ -405,4 +428,4 @@ export function KitchenManager() {
       </Card>
     </div>
   )
-} 
+}

@@ -21,7 +21,7 @@ export class KitchenService {
     return this.prisma.order.findMany({
       where: {
         status: {
-          in: ['IN_PROGRESS', 'READY'],
+          in: ['PENDING', 'IN_PROGRESS'],
         },
       },
       include: {
@@ -42,72 +42,108 @@ export class KitchenService {
     itemId: string,
     status: OrderItemStatus,
   ): Promise<OrderItem> {
-    const updatedItem = await this.prisma.orderItem.update({
-      where: { id: itemId },
-      data: { status },
-      include: {
-        order: {
-          include: {
-            table: true,
-            items: {
-              include: {
-                product: true,
+    console.log(`KitchenService: Updating item ${itemId} to status ${status}`);
+    
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Obtener el item actual para verificar que existe
+      const currentItem = await tx.orderItem.findUnique({
+        where: { id: itemId },
+        include: {
+          order: {
+            include: {
+              table: true,
+              items: {
+                include: {
+                  product: true,
+                },
               },
             },
           },
         },
-      },
-    });
-
-    // Emit real-time update
-    this.server.emit('orderItemUpdated', updatedItem);
-
-    // Check if all items are ready and update order status accordingly
-    if (status === 'READY') {
-      const allItems = await this.prisma.orderItem.findMany({
-        where: { orderId: updatedItem.order.id },
       });
 
-      const allReady = allItems.every((item) => item.status === 'READY');
-      if (allReady) {
-        const updatedOrder = await this.prisma.order.update({
-          where: { id: updatedItem.order.id },
-          data: { status: 'READY' },
-          include: {
-            table: true,
-            items: {
-              include: {
-                product: true,
+      if (!currentItem) {
+        throw new Error(`Item ${itemId} not found`);
+      }
+
+      // 2. Actualizar el item
+      const updatedItem = await tx.orderItem.update({
+        where: { id: itemId },
+        data: { status },
+        include: {
+          order: {
+            include: {
+              table: true,
+              items: {
+                include: {
+                  product: true,
+                },
               },
             },
           },
-        });
-        this.server.emit('orderUpdated', updatedOrder);
-      }
-    }
+        },
+      });
 
-    return updatedItem;
+      // 3. Emitir evento de item actualizado inmediatamente
+      this.server.emit('order_item_updated', {
+        item: updatedItem,
+        order: updatedItem.order,
+      });
+
+      // 4. Si el estado es READY (antes era COMPLETED), verificar si todos los items están listos
+      if (status === 'READY') {
+        const allItems = await tx.orderItem.findMany({
+          where: { orderId: updatedItem.order.id },
+        });
+
+        const allReady = allItems.every((item) => item.status === 'READY');
+
+        if (allReady) {
+          const updatedOrder = await tx.order.update({
+            where: { id: updatedItem.order.id },
+            data: { status: 'READY' },
+            include: {
+              table: true,
+              items: {
+                include: {
+                  product: true,
+                },
+              },
+            },
+          });
+
+          this.server.emit('order_updated', updatedOrder);
+        }
+      }
+
+      // 5. Si el estado cambió a PENDING, actualizar el estado de la orden si es necesario
+      if (status === 'PENDING') {
+        const order = updatedItem.order;
+        const orderHasInProgressItems = order.items.some(item => item.status === 'IN_PROGRESS');
+        
+        if (!orderHasInProgressItems) {
+          const updatedOrder = await tx.order.update({
+            where: { id: order.id },
+            data: { status: 'PENDING' },
+            include: {
+              table: true,
+              items: {
+                include: {
+                  product: true,
+                },
+              },
+            },
+          });
+          
+          this.server.emit('order_updated', updatedOrder);
+        }
+      }
+
+      return updatedItem;
+    });
   }
 
   async printKitchenTicket(orderId: string): Promise<void> {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        table: true,
-        items: {
-          include: {
-            product: true,
-          },
-        },
-      },
-    });
-
-    if (!order) {
-      throw new Error('Order not found');
-    }
-
-    // TODO: Implement printer integration
-    // This is a placeholder for the printing functionality
-    console.log('Printing kitchen ticket for order:', order);
+    console.log(`Printing kitchen ticket for order ${orderId}`);
   }
-} 
+}

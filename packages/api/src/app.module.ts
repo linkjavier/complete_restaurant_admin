@@ -17,6 +17,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { IngredientsModule } from './ingredients/ingredients.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { ProductionModule } from './production/production.module';
+import { KitchenModule } from './kitchen/kitchen.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { ProductionModule } from './production/production.module';
     IngredientsModule,
     WebsocketModule,
     ProductionModule,
+    KitchenModule,
   ],
   controllers: [AppController],
   providers: [AppService],

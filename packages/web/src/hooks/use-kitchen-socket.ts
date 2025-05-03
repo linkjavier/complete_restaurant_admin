@@ -43,10 +43,10 @@ export function useKitchenSocket(): UseKitchenSocketReturn {
       // Enable detailed debug logs
       localStorage.setItem('debug', 'socket.io-client:*');
       
-      // Create new socket connection - explicitly target the /orders namespace
-      console.log(`Connecting to Socket.IO namespace: ${SOCKET_URL}/orders`);
+      // Create new socket connection - explicitly target the /kitchen namespace
+      console.log(`Connecting to Socket.IO namespace: ${SOCKET_URL}/kitchen`);
       
-      const socket = io(`${SOCKET_URL}/orders`, {
+      const socket = io(`${SOCKET_URL}/kitchen`, {
         transports: ['websocket', 'polling'],
         withCredentials: true,
         reconnection: true,
@@ -67,7 +67,7 @@ export function useKitchenSocket(): UseKitchenSocketReturn {
       
       // Setup socket event handlers
       socket.on('connect', () => {
-        console.log('Socket connected to orders namespace!', socket.id);
+        console.log('Socket connected to kitchen namespace!', socket.id);
         console.log('Socket connected:', {
           id: socket.id,
           connected: socket.connected,
@@ -247,4 +247,4 @@ export function useKitchenSocket(): UseKitchenSocketReturn {
     subscribe,
     emit,
   }
-} 
+}

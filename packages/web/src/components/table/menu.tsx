@@ -199,6 +199,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                               }`}>
                                 {item.status === "PENDING" ? "Pendiente" :
                                  item.status === "IN_PROGRESS" ? "En preparación" :
+                                 item.status === "CANCELLED" ? "Cancelada" :
                                  "Listo"}
                               </span>
                             </div>

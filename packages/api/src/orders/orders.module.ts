@@ -1,29 +1,31 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
-import { KitchenController } from './kitchen.controller';
-import { PrismaModule } from '../prisma/prisma.module';
 import { OrdersGateway } from './orders.gateway';
-import { OrdersWorkersModule } from './orders-workers/orders-workers.module';
-import { OrdersQueueService } from './orders-workers/orders-queue.service';
+import { PrismaModule } from '../prisma/prisma.module';
 import { BullModule } from '@nestjs/bull';
+import { OrdersProcessor } from './orders.processor';
+import { OrdersQueueService } from './orders-workers/orders-queue.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     PrismaModule,
-    OrdersWorkersModule,
     BullModule.registerQueue(
-      { name: 'orders' },
-      { name: 'inventory-updates' },
-      { name: 'notifications' }
+      {
+        name: 'orders',
+      },
+      {
+        name: 'inventory-updates',
+      },
+      {
+        name: 'notifications',
+      }
     ),
+    NotificationsModule,
   ],
-  controllers: [OrdersController, KitchenController],
-  providers: [
-    OrdersService,
-    OrdersGateway,
-    OrdersQueueService,
-  ],
-  exports: [OrdersService, OrdersGateway],
+  controllers: [OrdersController],
+  providers: [OrdersService, OrdersGateway, OrdersProcessor, OrdersQueueService],
+  exports: [OrdersService],
 })
-export class OrdersModule {} 
+export class OrdersModule {}
