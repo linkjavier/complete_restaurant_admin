@@ -38,12 +38,8 @@ export class OrdersGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
   afterInit(server: Server) {
     this.logger.log('Orders WebSocket Gateway initialized');
-    
-    // Configure socket middleware for authentication if needed
     server.use((socket, next) => {
       try {
-        // You can add authentication logic here if necessary
-        // e.g., verify token, check permissions, etc.
         next();
       } catch (error) {
         this.logger.error(`Socket authentication error: ${error.message}`, error.stack);
@@ -55,13 +51,10 @@ export class OrdersGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   handleConnection(client: Socket) {
     try {
       this.logger.log(`Client connected: ${client.id}`);
-      
-      // Set ping timeout and interval for better connection monitoring
       client.conn.on('ping', () => {
         this.logger.debug(`Ping from client ${client.id}`);
       });
       
-      // Handle errors at the connection level
       client.conn.on('error', (error) => {
         this.logger.error(`Connection error for client ${client.id}: ${error.message}`);
       });
@@ -74,13 +67,11 @@ export class OrdersGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     try {
       this.logger.log(`Client disconnected: ${client.id}`);
       
-      // Remove client from location maps
       for (const [locationId, clients] of this.clientsMap.entries()) {
         if (clients.has(client.id)) {
           clients.delete(client.id);
           this.logger.log(`Removed client ${client.id} from location ${locationId}`);
           
-          // If no more clients for this location, clean up
           if (clients.size === 0) {
             this.clientsMap.delete(locationId);
             this.logger.log(`No more clients for location ${locationId}, removed from tracking`);
@@ -105,8 +96,6 @@ export class OrdersGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       Object.keys(client.rooms).forEach(room => {
         if (room.startsWith('kitchen-')) {
           client.leave(room);
-          
-          // Update tracking maps
           const locationFromRoom = room.replace('kitchen-', '');
           const clientsForLocation = this.clientsMap.get(locationFromRoom);
           if (clientsForLocation) {
@@ -149,81 +138,18 @@ export class OrdersGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       
       this.logger.log(`Emitting new_order_created event to kitchen-${locationId}`);
       
-      // Log the clients that should receive this event
-      let clientCount = 0;
-      let socketIds = '';
+      // Send to specific room
+      this.server.to(`kitchen-${locationId}`).emit('new_order_created', order);
       
-      try {
-        // Safely check rooms - avoid "Cannot read properties of undefined (reading 'rooms')" error
-        if (this.server && this.server.sockets) {
-          const adapter = this.server.sockets.adapter;
-          const roomName = `kitchen-${locationId}`;
-          
-          // Only try to access rooms if adapter exists
-          if (adapter && adapter.rooms) {
-            const clientsInRoom = adapter.rooms.get(roomName);
-            clientCount = clientsInRoom?.size || 0;
-            this.logger.log(`Room ${roomName} has ${clientCount} clients connected to receive the event`);
-            
-            // Log the actual socket IDs that should receive this
-            if (clientCount > 0) {
-              socketIds = '[';
-              clientsInRoom?.forEach(socketId => {
-                socketIds += `${socketId}, `;
-              });
-              socketIds = socketIds.substring(0, socketIds.length - 2) + ']';
-              this.logger.log(`Socket IDs in room ${roomName}: ${socketIds}`);
-            } else {
-              this.logger.warn(`No clients in room ${roomName} to receive new_order_created event`);
-            }
-          } else {
-            this.logger.warn('Server sockets adapter or rooms not available, skipping room check');
-          }
-        } else {
-          this.logger.warn('Server or server.sockets not available, cannot check rooms');
-        }
-      } catch (error) {
-        // Catch any errors when trying to access adapter or rooms
-        this.logger.error(`Error checking socket rooms: ${error.message}`, error.stack);
-      }
+      // Log delivery stats
+      const clientCount = this.clientsMap.get(locationId)?.size || 0;
+      this.logger.log(`Event new_order_created sent to ${clientCount} clients in kitchen-${locationId}`);
       
-      // Log event listeners and connected clients
-      try {
-        const listenerCount = this.server?.listenerCount ? this.server.listenerCount('new_order_created') : 'unknown';
-        this.logger.log(`Number of 'new_order_created' event listeners on server: ${listenerCount}`);
-        
-        // Log total connected clients - safely
-        if (this.server && this.server.sockets && this.server.sockets.sockets) {
-          const allClientIds = [...this.server.sockets.sockets.keys()];
-          this.logger.log(`Total clients connected to namespace: ${allClientIds.length}`);
-          this.logger.log(`All client IDs: ${allClientIds.join(', ') || 'none'}`);
-        } else {
-          this.logger.log('Cannot list connected clients - server.sockets.sockets not available');
-        }
-      } catch (error) {
-        this.logger.error(`Error checking listeners: ${error.message}`);
-      }
-      
-      // Send the event - wrap in try/catch for more safety
-      try {
-        // Emit to room first
-        this.server.to(`kitchen-${locationId}`).emit('new_order_created', order);
-        this.logger.log(`Emitted 'new_order_created' to room kitchen-${locationId}`);
-      } catch (error) {
-        this.logger.error(`Error emitting to room: ${error.message}`);
-      }
-      
-      try {
-        // BACKUP: Also broadcast to ALL clients (for testing)
-        this.logger.log('BACKUP: Broadcasting new_order_created to ALL clients');
+      // If no clients in room, broadcast to all in namespace as fallback
+      if (clientCount === 0) {
+        this.logger.log('No clients in kitchen room, broadcasting to all clients in namespace');
         this.server.emit('new_order_created', order);
-      } catch (error) {
-        this.logger.error(`Error broadcasting to all clients: ${error.message}`);
       }
-      
-      // Log how many clients received the event
-      const clientCount2 = this.clientsMap.get(locationId)?.size || 0;
-      this.logger.log(`Event new_order_created for location ${locationId} sent to ${clientCount2} clients (tracked in clientsMap)`);
     } catch (error) {
       this.logger.error(`Error emitting new_order_created for location ${locationId}: ${error.message}`, error.stack);
     }
@@ -240,7 +166,7 @@ export class OrdersGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       this.server.to(`kitchen-${locationId}`).emit('order_updated', order);
       
       const clientCount = this.clientsMap.get(locationId)?.size || 0;
-      this.logger.log(`Event order_updated for location ${locationId} sent to ${clientCount} clients`);
+      this.logger.log(`Event order_updated sent to ${clientCount} clients`);
     } catch (error) {
       this.logger.error(`Error emitting order_updated for location ${locationId}: ${error.message}`, error.stack);
     }
@@ -257,9 +183,9 @@ export class OrdersGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       this.server.to(`kitchen-${locationId}`).emit('order_item_updated', orderItem);
       
       const clientCount = this.clientsMap.get(locationId)?.size || 0;
-      this.logger.log(`Event order_item_updated for location ${locationId} sent to ${clientCount} clients`);
+      this.logger.log(`Event order_item_updated sent to ${clientCount} clients`);
     } catch (error) {
       this.logger.error(`Error emitting order_item_updated for location ${locationId}: ${error.message}`, error.stack);
     }
   }
-} 
+}

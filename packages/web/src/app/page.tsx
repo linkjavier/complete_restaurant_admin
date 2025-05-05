@@ -7,7 +7,7 @@ export default function HomePage() {
       <div className="container flex flex-col items-center justify-center gap-4 px-4 text-center">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
           Welcome to{' '}
-          <span className="text-primary">Blondie Restaurant Bar</span>
+          <span className="text-primary">Blondie Restaurant App</span>
         </h1>
         <p className="max-w-[42rem] leading-normal text-muted-foreground sm:text-xl sm:leading-8">
           A modern restaurant management system for multi-location restaurants and bakeries.

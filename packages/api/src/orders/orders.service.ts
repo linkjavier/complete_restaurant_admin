@@ -72,10 +72,8 @@ export class OrdersService {
     try {
       this.logger.log(`Creating order from DTO: ${JSON.stringify(createOrderDto)}`);
       
-      // Extraemos userId y items del DTO para manejarlos separadamente
       const { userId, items, ...orderData } = createOrderDto;
 
-      // Construimos el objeto de datos para la creación de la orden
       const orderCreateData: any = {
         ...orderData,
         items: {
@@ -87,16 +85,13 @@ export class OrdersService {
         }
       };
 
-      // Solo incluimos userId si está presente
       if (userId) {
         orderCreateData.user = {
           connect: { id: userId }
         };
       }
 
-      // Database transaction to ensure atomicity of the operation
       const order = await this.prisma.$transaction(async (tx) => {
-        // Create the order
         const newOrder = await tx.order.create({
           data: orderCreateData,
           include: {
@@ -114,43 +109,12 @@ export class OrdersService {
         return newOrder;
       });
 
-      // Only emit events and queue jobs after the transaction succeeds
-      
-      // Check if ordersGateway is available
-      if (!this.ordersGateway) {
-        this.logger.error('OrdersGateway is not available!');
-      } else {
-        this.logger.log(`OrdersGateway instance is available. Methods: ${Object.keys(this.ordersGateway).join(', ')}`);
-      }
-      
-      // 1. Emit WebSocket event for real-time kitchen updates
+      // Emit WebSocket event for real-time updates
       if (order.locationId) {
         try {
-          this.logger.log(`Attempting to emit WebSocket event for new order ${order.id} to location ${order.locationId}`);
-          
-          // Check if server is available on gateway
-          if (this.ordersGateway.server) {
-            this.logger.log('Server instance is available on gateway');
-            
-            // Try direct broadcast to debug
-            this.logger.log('Testing direct server broadcast');
-            this.ordersGateway.server.emit('test_broadcast', { message: 'Test broadcast' });
-            
-            // Now try room broadcast
-            const roomName = `kitchen-${order.locationId}`;
-            this.logger.log(`Testing room broadcast to ${roomName}`);
-            this.ordersGateway.server.to(roomName).emit('test_room_broadcast', { 
-              message: `Test broadcast to room ${roomName}`,
-              orderId: order.id
-            });
-            
-            // Then do the actual order broadcast
-            this.ordersGateway.emitNewOrder(order, order.locationId);
-          } else {
-            this.logger.error('Server is not available on gateway!');
-          }
-          
-          this.logger.log(`Successfully emitted WebSocket event for new order ${order.id}`);
+          this.logger.log(`Emitting new order event for order ${order.id} to location ${order.locationId}`);
+          this.ordersGateway.emitNewOrder(order, order.locationId);
+          this.logger.log(`Successfully emitted new order event`);
         } catch (wsError) {
           this.logger.error(
             `WebSocket event emission failed for order ${order.id}: ${wsError.message}`, 
@@ -161,7 +125,7 @@ export class OrdersService {
         this.logger.warn(`No locationId for order ${order.id}, skipping WebSocket notification`);
       }
       
-      // 2. Queue background processing jobs
+      // Queue background processing jobs
       await this.ordersQueueService.addOrderProcessingJob(order);
       this.logger.log(`Background processing jobs queued for order ${order.id}`);
       
@@ -187,7 +151,7 @@ export class OrdersService {
       where.items = {
         some: {
           status: {
-            in: ['PENDING', 'IN_PROGRESS']
+            in: ['PENDING', 'IN_PROGRESS', 'READY', 'CANCELLED', 'DELIVERED']
           }
         }
       };
@@ -369,4 +333,4 @@ export class OrdersService {
       throw error;
     }
   }
-} 
+}

@@ -23,7 +23,7 @@ import {
 import { useOrderSocket } from "@/hooks/use-order-socket"
 
 // Tipos para las órdenes
-type OrderStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "PAID"
+type OrderStatus = "PENDING" | "IN_PROGRESS" | "READY" | "CANCELLED" | "PAID"
 type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "OTHER"
 
 interface OrderItem {
@@ -197,7 +197,7 @@ export function OrdersManager() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?kitchen=true`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?kitchen=false`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -209,6 +209,8 @@ export function OrdersManager() {
 
       const data = await response.json();
       setOrders(data);
+
+      console.log('Orders fetched successfully:', data);
     } catch (err) {
       console.error('Error fetching orders:', err);
 
@@ -329,13 +331,20 @@ export function OrdersManager() {
     const statusConfig = {
       PENDING: { label: "Pendiente", variant: "warning" },
       IN_PROGRESS: { label: "En Progreso", variant: "info" },
-      COMPLETED: { label: "Completada", variant: "success" },
+      READY: { label: "Completada", variant: "success" },
       CANCELLED: { label: "Cancelada", variant: "destructive" },
       PAID: { label: "Pagada", variant: "default" }
     }
 
     const config = statusConfig[status]
-    return <Badge variant={config.variant as any}>{config.label}</Badge>
+    return (
+      <Badge 
+        variant={config.variant as any}
+        className={status === "CANCELLED" ? "bg-red-100 text-red-700 hover:bg-red-200" : ""}
+      >
+        {config.label}
+      </Badge>
+    )
   }
 
   const getPaymentMethodIcon = (method?: PaymentMethod) => {
@@ -354,9 +363,9 @@ export function OrdersManager() {
   const filteredOrders = orders.filter(order => {
     switch (activeTab) {
       case "active":
-        return order.status !== "COMPLETED" && order.status !== "CANCELLED" && order.status !== "PAID"
+        return order.status === "PENDING" || order.status === "IN_PROGRESS"
       case "completed":
-        return order.status === "COMPLETED"
+        return order.status === "READY"
       case "paid":
         return order.status === "PAID"
       case "cancelled":
@@ -410,15 +419,9 @@ export function OrdersManager() {
                           <div className="flex justify-between items-center">
                             <div>
                               <h3 className="font-bold text-lg">Mesa #{order.table.number}</h3>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Clock className="h-4 w-4" />
-                                <span className="text-sm text-muted-foreground">
-                                  {formatDistanceToNow(new Date(order.createdAt), { 
-                                    addSuffix: true,
-                                    locale: es 
-                                  })}
-                                </span>
-                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
+                              </p>
                             </div>
                             <div className="flex items-center gap-2">
                               {getStatusBadge(order.status)}
@@ -482,13 +485,13 @@ export function OrdersManager() {
                               <Button 
                                 variant="default" 
                                 size="sm"
-                                onClick={() => handleUpdateOrderStatus(order.id, "COMPLETED")}
+                                onClick={() => handleUpdateOrderStatus(order.id, "READY")}
                               >
                                 Marcar como Completada
                               </Button>
                             )}
 
-                            {order.status === "COMPLETED" && !order.paymentMethod && (
+                            {order.status === "READY" && !order.paymentMethod && (
                               <div className="flex gap-2">
                                 <Button 
                                   variant="outline" 

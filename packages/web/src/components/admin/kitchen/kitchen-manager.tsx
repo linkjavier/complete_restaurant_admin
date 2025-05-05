@@ -8,16 +8,18 @@ import { Label } from "@/components/ui/label"
 import { Plus, Trash2, Pencil } from "lucide-react"
 import { getKitchenOrders, updateKitchenOrderItemStatus, printKitchenTicket } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
-import { useKitchenSocket } from "@/hooks/use-kitchen-socket"
+import { useOrderSocket } from "@/hooks/use-order-socket"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 
 export function KitchenManager() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [itemToCancel, setItemToCancel] = useState<{ id: string, name: string } | null>(null)
   const { toast } = useToast()
-  const { subscribe, connected, socket, emit } = useKitchenSocket()
+  const { subscribe, connected, socket, emit } = useOrderSocket()
   const { user } = useAuth()
   const router = useRouter()
 
@@ -66,14 +68,44 @@ export function KitchenManager() {
     }
   }
 
-  const handleUpdateItemStatus = async (itemId: string, status: "PENDING" | "IN_PROGRESS" | "READY" | "COMPLETED" | "CANCELLED") => {
+  const handleUpdateItemStatus = async (itemId: string, status: "PENDING" | "IN_PROGRESS" | "READY" | "CANCELLED") => {
     try {
       await updateKitchenOrderItemStatus(itemId, status)
+      
+      // Update local state immediately
+      setOrders(prevOrders => {
+        return prevOrders.map(order => {
+          const updatedItems = order.items.map(item => 
+            item.id === itemId ? { ...item, status } : item
+          )
+          
+          // If status is READY and all items are ready, keep the order for 5 seconds
+          if (status === "READY" && updatedItems.every(i => i.status === "READY")) {
+            toast({
+              title: "Orden Completada",
+              description: "La orden se eliminará en 5 segundos",
+            })
+            
+            setTimeout(() => {
+              setOrders(currentOrders => 
+                currentOrders.filter(o => o.id !== order.id)
+              )
+            }, 5000)
+          }
+          
+          return {
+            ...order,
+            items: updatedItems
+          }
+        }).filter(order => 
+          order.items.some(i => i.status === "PENDING" || i.status === "IN_PROGRESS")
+        )
+      })
+
       toast({
         title: "Éxito",
         description: `Estado del item actualizado a ${status}`,
       })
-      // No es necesario refrescar órdenes inmediatamente porque el socket lo hará
     } catch (err: any) {
       console.error('Error updating item status:', err)
       
@@ -137,11 +169,27 @@ export function KitchenManager() {
 
   const handleStartOrder = async (orderId: string, items: any[]) => {
     try {
-      // Actualizar todos los items pendientes a IN_PROGRESS
       const pendingItems = items.filter(item => item.status === "PENDING");
+      
+      // Update all pending items to IN_PROGRESS
       for (const item of pendingItems) {
         await updateKitchenOrderItemStatus(item.id, "IN_PROGRESS");
       }
+
+      // Update local state immediately
+      setOrders(prevOrders => {
+        return prevOrders.map(order => {
+          if (order.id === orderId) {
+            return {
+              ...order,
+              items: order.items.map(item => 
+                item.status === "PENDING" ? { ...item, status: "IN_PROGRESS" } : item
+              )
+            }
+          }
+          return order
+        })
+      })
 
       toast({
         title: "Éxito",
@@ -152,25 +200,6 @@ export function KitchenManager() {
       toast({
         title: "Error",
         description: "Error al iniciar la orden",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleCompleteItem = async (itemId: string, orderId: string, items: any[]) => {
-    try {
-      await updateKitchenOrderItemStatus(itemId, "COMPLETED");
-
-      // Los eventos WebSocket se encargarán de actualizar la UI
-      toast({
-        title: "Éxito",
-        description: "Item completado correctamente",
-      });
-    } catch (err: any) {
-      console.error('Error completing item:', err);
-      toast({
-        title: "Error",
-        description: "Error al completar el item",
         variant: "destructive",
       });
     }
@@ -187,15 +216,6 @@ export function KitchenManager() {
           // Emit event to join the kitchen channel for this location
           const joined = emit('join-kitchen', user.locationId);
           console.log(`Emit join-kitchen for location: ${user.locationId}. Success: ${joined}`);
-          
-          // If successfully emitted, check for response
-          if (joined) {
-            setTimeout(() => {
-              console.log("Testing WebSocket by emitting a test message");
-              // Send a test message just to check if events are flowing
-              emit('ping', { test: 'message' });
-            }, 1000);
-          }
         }, 500);
       } catch (error) {
         console.error("Error joining kitchen channel:", error);
@@ -212,9 +232,27 @@ export function KitchenManager() {
 
     console.log("Setting up WebSocket event listeners for kitchen")
 
+    // Listen for new orders
+    const unsubscribeNewOrder = subscribe('new_order_created', (newOrderData) => {
+      const newOrder = Array.isArray(newOrderData) ? newOrderData[0] : newOrderData;
+      console.log("new_order_created event received:", newOrder);
+      
+      if (!newOrder) {
+        console.warn("Received invalid new order data");
+        return;
+      }
+      
+      setOrders(prevOrders => {
+        // Solo agregar si tiene items pendientes o en progreso
+        if (newOrder.items.some(item => item.status === "PENDING" || item.status === "IN_PROGRESS")) {
+          return [...prevOrders, newOrder];
+        }
+        return prevOrders;
+      });
+    });
+
     // Listen for order item updates
     const unsubscribeOrderItemUpdated = subscribe('order_item_updated', (dataRaw) => {
-      // Socket.io sometimes wraps the data in an array when using namespaces
       const data = Array.isArray(dataRaw) ? dataRaw[0] : dataRaw;
       
       console.log("order_item_updated event received:", data)
@@ -230,19 +268,32 @@ export function KitchenManager() {
         const orderIndex = prevOrders.findIndex(o => o.id === order.id)
         
         if (orderIndex === -1) {
-          // Si la orden no existe y tiene items pendientes o en progreso, agrégala
           if (order.items.some(i => i.status === "PENDING" || i.status === "IN_PROGRESS")) {
             return [...prevOrders, order]
           }
           return prevOrders
         }
         
-        // Actualizar la orden existente
         const updatedOrders = [...prevOrders]
-        const updatedOrder = { ...order } // Usar la orden completa del servidor
+        const updatedOrder = { ...order }
         updatedOrders[orderIndex] = updatedOrder
+
+        // Si todos los ítems están en estado READY, esperar 5 segundos antes de filtrar
+        if (updatedOrder.items.every(i => i.status === "READY")) {
+          toast({
+            title: "Orden Completada",
+            description: "La orden se eliminará en 5 segundos",
+          })
+          
+          setTimeout(() => {
+            setOrders(currentOrders => 
+              currentOrders.filter(o => o.id !== updatedOrder.id)
+            )
+          }, 5000)
+          
+          return updatedOrders
+        }
         
-        // Filtrar órdenes que ya no tienen items pendientes o en progreso
         return updatedOrders.filter(order => 
           order.items.some(i => i.status === "PENDING" || i.status === "IN_PROGRESS")
         )
@@ -272,10 +323,11 @@ export function KitchenManager() {
     // Clean up subscriptions when component unmounts
     return () => {
       console.log("Cleaning up WebSocket event listeners")
-      unsubscribeOrderUpdated()
-      unsubscribeOrderItemUpdated()
+      unsubscribeNewOrder();
+      unsubscribeOrderUpdated();
+      unsubscribeOrderItemUpdated();
     }
-  }, [connected, subscribe])
+  }, [connected, subscribe, toast])
 
   // Create a connection status indicator
   const connectionStatus = connected ? (
@@ -369,7 +421,9 @@ export function KitchenManager() {
                                     <p className="text-sm text-gray-500">
                                       {item.status === "PENDING" ? "Pendiente" : 
                                        item.status === "IN_PROGRESS" ? "En preparación" : 
-                                       item.status === "COMPLETED" ? "Completado" : item.status}
+                                       item.status === "READY" ? "Completado" : 
+                                       item.status === "CANCELLED" ? "Cancelado" : 
+                                       item.status}
                                     </p>
                                     {item.notes && (
                                       <p className="text-sm text-muted-foreground mt-1">
@@ -399,7 +453,7 @@ export function KitchenManager() {
                                         <Button 
                                           size="sm"
                                           variant="default"
-                                          onClick={() => handleUpdateItemStatus(item.id, "COMPLETED")}
+                                          onClick={() => handleUpdateItemStatus(item.id, "READY")}
                                         >
                                           Marcar Completado
                                         </Button>
@@ -408,7 +462,7 @@ export function KitchenManager() {
                                     <Button 
                                       size="sm"
                                       variant="destructive"
-                                      onClick={() => handleUpdateItemStatus(item.id, "CANCELLED")}
+                                      onClick={() => setItemToCancel({ id: item.id, name: item.product.name })}
                                     >
                                       Cancelar
                                     </Button>
@@ -426,6 +480,36 @@ export function KitchenManager() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!itemToCancel} onOpenChange={(open) => !open && setItemToCancel(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Cancelación</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro que deseas cancelar el pedido de {itemToCancel?.name}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setItemToCancel(null)}
+            >
+              No, mantener
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (itemToCancel) {
+                  handleUpdateItemStatus(itemToCancel.id, "CANCELLED")
+                  setItemToCancel(null)
+                }
+              }}
+            >
+              Sí, cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
