@@ -116,7 +116,33 @@ export class KitchenService {
         }
       }
 
-      // 5. Si el estado cambió a PENDING, actualizar el estado de la orden si es necesario
+      // 5. Si el estado es CANCELLED, verificar si todos los items están cancelados
+      if (status === 'CANCELLED') {
+        const allItems = await tx.orderItem.findMany({
+          where: { orderId: updatedItem.order.id },
+        });
+
+        const allCancelled = allItems.every((item) => item.status === 'CANCELLED');
+
+        if (allCancelled) {
+          const updatedOrder = await tx.order.update({
+            where: { id: updatedItem.order.id },
+            data: { status: 'CANCELLED' },
+            include: {
+              table: true,
+              items: {
+                include: {
+                  product: true,
+                },
+              },
+            },
+          });
+
+          this.server.emit('order_updated', updatedOrder);
+        }
+      }
+
+      // 6. Si el estado cambió a PENDING, actualizar el estado de la orden si es necesario
       if (status === 'PENDING') {
         const order = updatedItem.order;
         const orderHasInProgressItems = order.items.some(item => item.status === 'IN_PROGRESS');
