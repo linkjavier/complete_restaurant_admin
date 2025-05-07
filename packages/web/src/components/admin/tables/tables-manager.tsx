@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Pencil, ExternalLink, QrCode, Download } from "lucide-react"
-import { getTables, createTable, deleteTable, updateTable, Table } from "@/lib/api"
+import { Plus, Trash2, Pencil, ExternalLink, QrCode, Download, X } from "lucide-react"
+import { getTables, createTable, deleteTable, updateTable, Table, getOrders } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { getLocations, Location } from "@/lib/api"
 import { QRCodeSVG } from 'qrcode.react'
@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog"
 import {
   Tooltip,
@@ -30,12 +31,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Badge } from "@/components/ui/badge"
 
 export function TablesManager() {
   const [tables, setTables] = useState<Table[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeOrders, setActiveOrders] = useState<any[]>([])
   const [newTable, setNewTable] = useState({
     number: "",
     seats: "",
@@ -44,11 +47,14 @@ export function TablesManager() {
   const [editingTable, setEditingTable] = useState<Table | null>(null)
   const [qrDialogOpen, setQrDialogOpen] = useState<string | null>(null)
   const [qrUrl, setQrUrl] = useState<string>("")
+  const [tableDetailsOpen, setTableDetailsOpen] = useState<string | null>(null)
+  const [tableOrders, setTableOrders] = useState<any[]>([])
   const { toast } = useToast()
 
   useEffect(() => {
     fetchTables()
     fetchLocations()
+    fetchActiveOrders()
     setQrUrl(window.location.origin)
   }, [])
 
@@ -71,6 +77,55 @@ export function TablesManager() {
       setLocations(data)
     } catch (err) {
       console.error("Error al cargar las ubicaciones:", err)
+    }
+  }
+
+  const fetchActiveOrders = async () => {
+    try {
+      const orders = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?kitchen=true`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!orders.ok) {
+        throw new Error('Failed to fetch orders');
+      }
+
+      const data = await orders.json();
+      setActiveOrders(data.filter(order => 
+        order.status === "PENDING" || 
+        order.status === "IN_PROGRESS" || 
+        order.status === "READY"
+      ))
+    } catch (err) {
+      console.error("Error al cargar las órdenes activas:", err)
+    }
+  }
+
+  const fetchTableOrders = async (tableId: string) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?tableId=${tableId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al obtener las órdenes');
+      }
+
+      const data = await response.json();
+      setTableOrders(data);
+    } catch (err) {
+      console.error('Error fetching table orders:', err);
+      toast({
+        title: "Error",
+        description: "Error al cargar las órdenes de la mesa",
+        variant: "destructive",
+      });
     }
   }
 
@@ -287,144 +342,262 @@ export function TablesManager() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
-            {tables.map((table) => (
-              <div
-                key={table.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
-              >
+            {tables.map((table) => {
+              const isActive = activeOrders.some(order => order.tableId === table.id)
+              return (
                 <div
-                  className="cursor-pointer flex-1"
-                  onClick={() => window.open(`/table/${table.id}`, '_blank')}
+                  key={table.id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
                 >
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">Mesa {table.number}</p>
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                      ID: {table.id.substring(0, 8)}
-                    </span>
+                  <div
+                    className="cursor-pointer flex-1"
+                    onClick={() => {
+                      setTableDetailsOpen(table.id);
+                      fetchTableOrders(table.id);
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">Mesa {table.number}</p>
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                        ID: {table.id.substring(0, 8)}
+                      </span>
+                      <Badge variant={isActive ? "default" : "secondary"}>
+                        {isActive ? "Activa" : "Libre"}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {table.seats} asientos
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Ubicación: {table.location?.name}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {table.seats} asientos
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Ubicación: {table.location?.name}
-                  </p>
+                  <div className="flex gap-2">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setQrDialogOpen(table.id);
+                            }}
+                          >
+                            <QrCode className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Ver Código QR</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <Dialog open={qrDialogOpen === table.id} onOpenChange={(open) => setQrDialogOpen(open ? table.id : null)}>
+                      <DialogContent 
+                        className="sm:max-w-md"
+                        onPointerDownOutside={(e) => e.preventDefault()}
+                      >
+                        <DialogHeader>
+                          <DialogTitle>Código QR - Mesa {table.number}</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex flex-col items-center gap-4 py-4">
+                          <QRCodeSVG
+                            id={`qr-${table.id}`}
+                            value={`${qrUrl}/table/${table.id}`}
+                            size={200}
+                            level="H"
+                            includeMargin
+                          />
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownloadQR(table.id);
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Download className="h-4 w-4" />
+                            Descargar QR
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTable(table);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Editar Mesa</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTable(table.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Eliminar Mesa</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(`/table/${table.id}`, '_blank');
+                            }}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Abrir Mesa</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setQrDialogOpen(table.id);
-                          }}
-                        >
-                          <QrCode className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Ver Código QR</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <Dialog open={qrDialogOpen === table.id} onOpenChange={(open) => setQrDialogOpen(open ? table.id : null)}>
-                    <DialogContent 
-                      className="sm:max-w-md"
-                      onPointerDownOutside={(e) => e.preventDefault()}
-                    >
-                      <DialogHeader>
-                        <DialogTitle>Código QR - Mesa {table.number}</DialogTitle>
-                      </DialogHeader>
-                      <div className="flex flex-col items-center gap-4 py-4">
-                        <QRCodeSVG
-                          id={`qr-${table.id}`}
-                          value={`${qrUrl}/table/${table.id}`}
-                          size={200}
-                          level="H"
-                          includeMargin
-                        />
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownloadQR(table.id);
-                          }}
-                          className="flex items-center gap-2"
-                        >
-                          <Download className="h-4 w-4" />
-                          Descargar QR
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingTable(table);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Editar Mesa</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteTable(table.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Eliminar Mesa</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.open(`/table/${table.id}`, '_blank');
-                          }}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Abrir Mesa</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </CardContent>
       </Card>
+
+      <Dialog 
+        open={!!tableDetailsOpen} 
+        onOpenChange={(open) => !open && setTableDetailsOpen(null)}
+      >
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-[51]">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+
+          <div className="relative">
+            <DialogHeader className="pb-4 border-b">
+              <DialogTitle>
+                {tables.find(t => t.id === tableDetailsOpen)?.number 
+                  ? `Detalles de Mesa ${tables.find(t => t.id === tableDetailsOpen)?.number}`
+                  : 'Detalles de Mesa'}
+              </DialogTitle>
+            </DialogHeader>
+
+            {/* Información de la mesa */}
+            {tableDetailsOpen && (
+              <div className="py-4 border-b">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium">Ubicación:</p>
+                  <span className="text-sm text-muted-foreground">
+                    {tables.find(t => t.id === tableDetailsOpen)?.location?.name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium">Asientos:</p>
+                  <span className="text-sm text-muted-foreground">
+                    {tables.find(t => t.id === tableDetailsOpen)?.seats}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 space-y-4">
+            {tableOrders.map((order) => (
+              <Card key={order.id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="bg-muted p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Estado: {order.status}
+                        </p>
+                      </div>
+                      {order.paymentMethod && (
+                        <Badge>
+                          {order.paymentMethod}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="p-4">
+                    <div className="space-y-4">
+                      {order.items.map((item) => (
+                        <div key={item.id} className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">{item.product.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {item.quantity} x ${item.product.price.toFixed(2)}
+                            </p>
+                            {item.notes && (
+                              <p className="text-sm text-muted-foreground">
+                                Notas: {item.notes}
+                              </p>
+                            )}
+                            <Badge variant="outline" className="mt-1">
+                              {item.status}
+                            </Badge>
+                          </div>
+                          <Badge variant="secondary">
+                            ${(item.product.price * item.quantity).toFixed(2)}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold">Total:</span>
+                        <span className="font-bold">
+                          ${order.items.reduce((total, item) => 
+                            total + (item.quantity * item.product.price), 0
+                          ).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            {tableOrders.length === 0 && (
+              <div className="text-center text-muted-foreground py-8">
+                No hay órdenes para esta mesa
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
-} 
+}
