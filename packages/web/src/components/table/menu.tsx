@@ -238,7 +238,12 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
               </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {products.map((product) => (
-                  <Card key={product.id}>
+                  <Card 
+                    key={product.id}
+                    className={`${
+                      cart[product.id] ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950' : ''
+                    }`}
+                  >
                     <CardHeader>
                       <CardTitle>{product.name}</CardTitle>
                     </CardHeader>
@@ -303,4 +308,4 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
       </div>
     </div>
   )
-} 
+}
