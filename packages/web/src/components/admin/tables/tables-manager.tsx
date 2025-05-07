@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Pencil, ExternalLink, QrCode, Download, X } from "lucide-react"
+import { Plus, Trash2, Pencil, ExternalLink, QrCode, Download, X, ChevronUp } from "lucide-react"
 import { getTables, createTable, deleteTable, updateTable, Table, getOrders } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { getLocations, Location } from "@/lib/api"
@@ -49,6 +49,7 @@ export function TablesManager() {
   const [qrUrl, setQrUrl] = useState<string>("")
   const [tableDetailsOpen, setTableDetailsOpen] = useState<string | null>(null)
   const [tableOrders, setTableOrders] = useState<any[]>([])
+  const [isCreateFormVisible, setIsCreateFormVisible] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -256,84 +257,109 @@ export function TablesManager() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
-          <CardTitle>
-            {editingTable ? "Editar Mesa" : "Crear Nueva Mesa"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="number">Número de Mesa</Label>
-              <Input
-                id="number"
-                type="number"
-                value={editingTable ? editingTable.number : newTable.number}
-                onChange={(e) =>
-                  editingTable
-                    ? setEditingTable({ ...editingTable, number: parseInt(e.target.value) })
-                    : setNewTable({ ...newTable, number: e.target.value })
-                }
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="seats">Número de Asientos</Label>
-              <Input
-                id="seats"
-                type="number"
-                value={editingTable ? editingTable.seats : newTable.seats}
-                onChange={(e) =>
-                  editingTable
-                    ? setEditingTable({ ...editingTable, seats: parseInt(e.target.value) })
-                    : setNewTable({ ...newTable, seats: e.target.value })
-                }
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="locationId">Ubicación</Label>
-              <Select
-                value={editingTable ? editingTable.locationId : newTable.locationId}
-                onValueChange={(value) =>
-                  editingTable
-                    ? setEditingTable({ ...editingTable, locationId: value })
-                    : setNewTable({ ...newTable, locationId: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una ubicación" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2">
-              {editingTable ? (
+        <CardHeader className="border-b">
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              {editingTable ? "Editar Mesa" : "Crear Nueva Mesa"}
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCreateFormVisible(!isCreateFormVisible)}
+              className="flex items-center gap-2"
+            >
+              {isCreateFormVisible ? (
                 <>
-                  <Button onClick={handleUpdateTable}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Actualizar Mesa
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setEditingTable(null)}
-                  >
-                    Cancelar
-                  </Button>
+                  <ChevronUp className="h-4 w-4" />
+                  Contraer
                 </>
               ) : (
-                <Button onClick={handleCreateTable}>
-                  <Plus className="mr-2 h-4 w-4" />
+                <>
+                  <Plus className="h-4 w-4" />
                   Crear Mesa
-                </Button>
+                </>
               )}
-            </div>
+            </Button>
           </div>
-        </CardContent>
+        </CardHeader>
+        {(isCreateFormVisible || editingTable) && (
+          <CardContent className="pt-4">
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="number">Número de Mesa</Label>
+                <Input
+                  id="number"
+                  type="number"
+                  value={editingTable ? editingTable.number : newTable.number}
+                  onChange={(e) =>
+                    editingTable
+                      ? setEditingTable({ ...editingTable, number: parseInt(e.target.value) })
+                      : setNewTable({ ...newTable, number: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="seats">Número de Asientos</Label>
+                <Input
+                  id="seats"
+                  type="number"
+                  value={editingTable ? editingTable.seats : newTable.seats}
+                  onChange={(e) =>
+                    editingTable
+                      ? setEditingTable({ ...editingTable, seats: parseInt(e.target.value) })
+                      : setNewTable({ ...newTable, seats: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="locationId">Ubicación</Label>
+                <Select
+                  value={editingTable ? editingTable.locationId : newTable.locationId}
+                  onValueChange={(value) =>
+                    editingTable
+                      ? setEditingTable({ ...editingTable, locationId: value })
+                      : setNewTable({ ...newTable, locationId: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una ubicación" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2">
+                {editingTable ? (
+                  <>
+                    <Button onClick={handleUpdateTable}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Actualizar Mesa
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditingTable(null);
+                        setIsCreateFormVisible(false);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={handleCreateTable}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Crear Mesa
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       <Card>
