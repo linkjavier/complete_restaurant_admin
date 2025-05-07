@@ -39,6 +39,7 @@ export function TablesManager() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeOrders, setActiveOrders] = useState<any[]>([])
+  const [lastOrders, setLastOrders] = useState<{[key: string]: Date}>({})
   const [newTable, setNewTable] = useState({
     number: "",
     seats: "",
@@ -50,14 +51,37 @@ export function TablesManager() {
   const [tableDetailsOpen, setTableDetailsOpen] = useState<string | null>(null)
   const [tableOrders, setTableOrders] = useState<any[]>([])
   const [isCreateFormVisible, setIsCreateFormVisible] = useState(false)
+  const [currentTime, setCurrentTime] = useState(new Date())
   const { toast } = useToast()
+
+  const getTimeElapsed = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - new Date(date).getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`;
+    }
+    return `${minutes}m`;
+  }
 
   useEffect(() => {
     fetchTables()
     fetchLocations()
     fetchActiveOrders()
+    fetchLastOrders()
     setQrUrl(window.location.origin)
   }, [])
+
+  // Efecto para actualizar el tiempo cada minuto
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Actualizar cada minuto
+
+    return () => clearInterval(timer);
+  }, []);
 
   const fetchTables = async () => {
     try {
@@ -102,6 +126,37 @@ export function TablesManager() {
       ))
     } catch (err) {
       console.error("Error al cargar las órdenes activas:", err)
+    }
+  }
+
+  const fetchLastOrders = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?kitchen=true`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch orders');
+      }
+
+      const data = await response.json();
+      const lastOrdersByTable: {[key: string]: Date} = {};
+      
+      data.forEach((order: any) => {
+        if (order.tableId) {
+          const orderDate = new Date(order.createdAt);
+          if (!lastOrdersByTable[order.tableId] || orderDate > new Date(lastOrdersByTable[order.tableId])) {
+            lastOrdersByTable[order.tableId] = order.createdAt;
+          }
+        }
+      });
+      
+      setLastOrders(lastOrdersByTable);
+    } catch (err) {
+      console.error("Error al cargar las últimas órdenes:", err)
     }
   }
 
@@ -370,6 +425,7 @@ export function TablesManager() {
           <div className="grid gap-4">
             {tables.map((table) => {
               const isActive = activeOrders.some(order => order.tableId === table.id)
+              const lastOrderDate = lastOrders[table.id];
               return (
                 <div
                   key={table.id}
@@ -390,6 +446,11 @@ export function TablesManager() {
                       <Badge variant={isActive ? "default" : "secondary"}>
                         {isActive ? "Activa" : "Libre"}
                       </Badge>
+                      {lastOrderDate && (
+                        <Badge variant="outline">
+                          Última orden: {getTimeElapsed(lastOrderDate)}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {table.seats} asientos
@@ -550,6 +611,13 @@ export function TablesManager() {
                     {tables.find(t => t.id === tableDetailsOpen)?.seats}
                   </span>
                 </div>
+                {lastOrders[tableDetailsOpen] && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="outline">
+                      Última orden: {getTimeElapsed(lastOrders[tableDetailsOpen])}
+                    </Badge>
+                  </div>
+                )}
               </div>
             )}
           </div>
