@@ -8,44 +8,62 @@ import { Plus } from "lucide-react"
 interface ProductGridProps {
   products: Product[]
   onAddToCart: (productId: string) => void
+  cart: Record<string, number>
 }
 
-export function ProductGrid({ products, onAddToCart }: ProductGridProps) {
+export function ProductGrid({ products, onAddToCart, cart }: ProductGridProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {products.map((product) => (
-        <Card key={product.id} className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle className="text-lg">{product.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {product.image && (
-                <div className="relative w-full h-48">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-full object-cover rounded-lg"
-                  />
+      {products.map((product) => {
+        const quantity = cart[product.id] || 0;
+        const isInCart = quantity > 0;
+
+        return (
+          <Card 
+            key={product.id} 
+            className={`hover:shadow-lg transition-all ${
+              isInCart ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950' : ''
+            }`}
+          >
+            <CardHeader>
+              <CardTitle className="text-lg flex justify-between items-center">
+                {product.name}
+                {isInCart && (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    x{quantity}
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {product.image && (
+                  <div className="relative w-full h-48">
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  {product.description}
+                </p>
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-lg">${product.price.toFixed(2)}</p>
+                  <Button
+                    size="sm"
+                    onClick={() => onAddToCart(product.id)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
-              )}
-              <p className="text-sm text-muted-foreground">
-                {product.description}
-              </p>
-              <div className="flex items-center justify-between">
-                <p className="font-bold text-lg">${product.price.toFixed(2)}</p>
-                <Button
-                  size="sm"
-                  onClick={() => onAddToCart(product.id)}
-                  className="h-8 w-8 p-0"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
-} 
+}

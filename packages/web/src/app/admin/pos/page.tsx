@@ -191,6 +191,7 @@ export default function PosPage() {
             <ProductGrid
               products={filteredProducts}
               onAddToCart={handleAddToCart}
+              cart={cart}
             />
           </CardContent>
         </Card>
@@ -225,4 +226,4 @@ export default function PosPage() {
       </div>
     </div>
   )
-} 
+}
