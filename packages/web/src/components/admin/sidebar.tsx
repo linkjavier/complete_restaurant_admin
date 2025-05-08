@@ -20,7 +20,6 @@ import {
   ChevronRight,
   Receipt
 } from "lucide-react"
-import { getAuthToken } from "@/lib/auth"
 import {
   Tooltip,
   TooltipContent,
@@ -28,68 +27,80 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useState, useEffect } from "react"
+import { useAuth } from "@/hooks/use-auth"
 
 const routes = [
   {
     label: "Dashboard",
     icon: LayoutDashboard,
     href: "/admin/dashboard",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "POS",
     icon: ShoppingCart,
     href: "/admin/pos",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
     label: "Órdenes",
     icon: Receipt,
     href: "/admin/orders",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
     label: "Mesas",
     icon: Table,
     href: "/admin/tables",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
     label: "Ubicaciones",
     icon: MapPin,
     href: "/admin/locations",
+    roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
     label: "Cocina",
     icon: ChefHat,
     href: "/admin/kitchen-manager",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF'],
   },
   {
     label: "Categorías",
     icon: Tag,
     href: "/admin/categories",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "Productos",
     icon: Package,
     href: "/admin/products",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "Ingredientes",
     icon: Utensils,
     href: "/admin/ingredients",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF'],
   },
   {
     label: "Usuarios",
     icon: Users,
     href: "/admin/users",
+    roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
     label: "Configuración",
     icon: Settings,
     href: "/admin/settings",
+    roles: ['SUPER_ADMIN', 'ADMIN'],
   },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
-  const isAuthenticated = getAuthToken() !== null
+  const { user } = useAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -107,7 +118,7 @@ export function Sidebar() {
     localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed))
   }, [isCollapsed])
 
-  if (!isAuthenticated) {
+  if (!user) {
     return null
   }
 
@@ -157,7 +168,7 @@ export function Sidebar() {
             />
           </div>
           <div className="space-y-1">
-            {routes.map((route) => (
+            {routes.filter(route => !route.roles || route.roles.includes(user.role)).map((route) => (
               <TooltipProvider key={route.href} delayDuration={100}>
                 <Tooltip open={isCollapsed ? undefined : false}>
                   <TooltipTrigger asChild>

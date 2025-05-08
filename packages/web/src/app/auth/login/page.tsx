@@ -42,6 +42,9 @@ export default function LoginPage() {
         case 'MANAGER':
           router.push('/admin/dashboard');
           break;
+        case 'CHEF':
+          router.push('/admin/kitchen-manager');
+          break;
         case 'STAFF':
           router.push('/staff/dashboard');
           break;
