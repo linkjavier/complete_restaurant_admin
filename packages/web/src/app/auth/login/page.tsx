@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,6 +75,15 @@ export default function LoginPage() {
     <div className="container flex h-screen w-screen flex-col items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/assets/blondie-logo.png"
+              alt="Blondie Restaurant App Logo"
+              width={300}
+              height={300}
+              priority
+            />
+          </div>
           <CardTitle className="text-2xl">Welcome back</CardTitle>
           <CardDescription>
             Enter your email to sign in to your account
@@ -161,4 +171,4 @@ export default function LoginPage() {
       </Card>
     </div>
   );
-} 
+}

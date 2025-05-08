@@ -4,7 +4,7 @@ import { getOrders } from '@/lib/api';
 import { useOrderSocket } from '@/hooks/use-order-socket';
 
 export function OrderView({ tableId }: { tableId: string }) {
-  useOrderSocket(undefined, tableId);
+  useOrderSocket();
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ['orders', 'table', tableId],
@@ -66,4 +66,4 @@ export function OrderView({ tableId }: { tableId: string }) {
       ))}
     </div>
   );
-} 
+}
