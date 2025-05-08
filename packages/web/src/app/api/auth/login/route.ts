@@ -1,7 +1,6 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { type NextRequest, NextResponse } from 'next/server';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
 
     const body = await request.json();
@@ -34,15 +33,17 @@ export async function POST(request: Request) {
     const data = await response.json();
     console.log("Respuesta recibida:", data);
 
-    // Set cookie
-    cookies().set('token', data.access_token, {
+    // Create response with cookie
+    const resp = NextResponse.json(data);
+    resp.cookies.set('token', data.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 1 week
     });
 
-    return NextResponse.json(data);
+    return resp;
   } catch (error: any) {
     console.error('Login error:', error);
 

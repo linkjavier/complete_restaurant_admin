@@ -1,12 +1,12 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { type NextRequest, NextResponse } from 'next/server';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    // Clear the token cookie
-    cookies().delete('token');
+    // Create response and clear the token cookie
+    const response = NextResponse.json({ message: 'Logged out successfully' });
+    response.cookies.delete('token');
 
-    return NextResponse.json({ message: 'Logged out successfully' });
+    return response;
   } catch (error) {
     return NextResponse.json(
       { error: 'An error occurred during logout' },

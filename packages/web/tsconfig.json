@@ -18,7 +18,9 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     },
     "plugins": [
       {
@@ -26,7 +28,11 @@
       }
     ],
     "noImplicitAny": false,
-    "typeRoots": ["./src/types", "./node_modules/@types"]
+    "typeRoots": [
+      "./src/types",
+      "./node_modules/@types"
+    ],
+    "target": "ES2017"
   },
   "include": [
     "next-env.d.ts",
