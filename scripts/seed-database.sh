@@ -8,7 +8,7 @@ curl -X POST http://localhost:3000/auth/register \
     "password": "12345678",
     "firstName": "Test",
     "lastName": "User",
-    "role": "ADMIN"
+    "role": "SUPER_ADMIN"
   }'
 
 # Iniciar sesión con el usuario de prueba y guardar el token en una variable

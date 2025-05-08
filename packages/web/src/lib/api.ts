@@ -73,14 +73,36 @@ export interface ProductIngredient {
   updatedAt: string
 }
 
+// User types
 export interface User {
   id: string;
   email: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   role: string;
-  locationId?: string | null;
+  locationId: string | null;
+  avatar: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateUserDto {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  locationId?: string;
+  avatar?: string;
+}
+
+export interface UpdateUserDto {
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  locationId?: string;
+  avatar?: string;
 }
 
 const getAuthHeaders = () => {
@@ -582,4 +604,51 @@ export async function getActiveOrders(tableId: string) {
     console.error('Error fetching active orders:', error);
     throw error;
   }
+}
+
+// User API functions
+export async function getUsers(): Promise<User[]> {
+  const response = await fetch(`${API_URL}/users`, {
+    headers: {
+      'Authorization': `Bearer ${getAuthToken()}`,
+    },
+  })
+  if (!response.ok) throw new Error('Failed to fetch users')
+  return response.json()
+}
+
+export async function createUser(data: CreateUserDto): Promise<User> {
+  const response = await fetch(`${API_URL}/users`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${getAuthToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error('Failed to create user')
+  return response.json()
+}
+
+export async function updateUser(id: string, data: UpdateUserDto): Promise<User> {
+  const response = await fetch(`${API_URL}/users/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${getAuthToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error('Failed to update user')
+  return response.json()
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  const response = await fetch(`${API_URL}/users/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${getAuthToken()}`,
+    },
+  })
+  if (!response.ok) throw new Error('Failed to delete user')
 }

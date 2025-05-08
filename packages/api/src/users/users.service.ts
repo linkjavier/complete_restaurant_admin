@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { User, UserRole, Location } from '@prisma/client';
+import { UserRole, Location } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 export type UserResponse = {
@@ -9,23 +9,15 @@ export type UserResponse = {
   firstName: string;
   lastName: string;
   role: UserRole;
+  avatar: string | null;
   locationId: string | null;
   location: Location | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
-export type UserWithPassword = {
-  id: string;
-  email: string;
+export type UserWithPassword = UserResponse & {
   password: string;
-  firstName: string;
-  lastName: string;
-  role: UserRole;
-  locationId: string | null;
-  location: Location | null;
-  createdAt: Date;
-  updatedAt: Date;
 };
 
 @Injectable()
@@ -33,34 +25,20 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(): Promise<UserResponse[]> {
-    return this.prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        locationId: true,
+    const users = await this.prisma.user.findMany({
+      include: {
         location: true,
-        createdAt: true,
-        updatedAt: true,
       },
     });
+
+    return users.map(({ password, ...rest }) => rest);
   }
 
   async findOne(id: string): Promise<UserResponse> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        locationId: true,
+      include: {
         location: true,
-        createdAt: true,
-        updatedAt: true,
       },
     });
 
@@ -68,59 +46,18 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    return user;
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 
   async findByEmail(email: string): Promise<UserWithPassword | null> {
-    const user = await this.prisma.user.findUnique({
+    return this.prisma.user.findUnique({
       where: { email },
       include: {
         location: true,
       },
     });
-
-    if (!user) {
-      return null;
-    }
-
-    return {
-      ...user,
-      location: user.location,
-    };
   }
-
-  // async create(data: {
-  //   email: string;
-  //   password: string;
-  //   firstName: string;
-  //   lastName: string;
-  //   role?: UserRole;
-  //   locationId?: string | null;
-  // }): Promise<UserWithPassword> {
-  //   const existingUser = await this.findByEmail(data.email);
-  //   if (existingUser) {
-  //     throw new ConflictException('Email already in use');
-  //   }
-
-  //   const hashedPassword = await bcrypt.hash(data.password, 10);
-
-  //   const user = await this.prisma.user.create({
-  //     data: {
-  //       ...data,
-  //       password: hashedPassword,
-  //       role: data.role || UserRole.CUSTOMER,
-  //     },
-  //     include: {
-  //       location: true,
-  //     },
-  //   });
-
-  //   return {
-  //     ...user,
-  //     location: user.location,
-  //   };
-  // }
-
 
   async create(data: {
     email: string;
@@ -128,6 +65,7 @@ export class UsersService {
     firstName: string;
     lastName: string;
     role?: UserRole;
+    avatar?: string | null;
     locationId?: string | null;
   }): Promise<UserWithPassword> {
     const existingUser = await this.findByEmail(data.email);
@@ -137,26 +75,23 @@ export class UsersService {
   
     const hashedPassword = await bcrypt.hash(data.password, 10);
   
-    // Si no se proporciona locationId, asignamos null
     const user = await this.prisma.user.create({
       data: {
-        ...data,
+        email: data.email,
         password: hashedPassword,
+        firstName: data.firstName,
+        lastName: data.lastName,
         role: data.role || UserRole.CUSTOMER,
-        locationId: data.locationId || null, // Bypass de locationId
+        locationId: data.locationId || null,
+        avatar: data.avatar || null,
       },
       include: {
         location: true,
       },
     });
-  
-    return {
-      ...user,
-      location: user.location,
-    };
-  }
-  
 
+    return user;
+  }
 
   async update(
     id: string,
@@ -166,6 +101,7 @@ export class UsersService {
       firstName?: string;
       lastName?: string;
       role?: UserRole;
+      avatar?: string | null;
       locationId?: string | null;
     },
   ): Promise<UserResponse> {
@@ -180,25 +116,16 @@ export class UsersService {
       data.password = await bcrypt.hash(data.password, 10);
     }
 
-    try {
-      return await this.prisma.user.update({
-        where: { id },
-        data,
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          locationId: true,
-          location: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-    } catch (error) {
-      throw new NotFoundException(`User with ID ${id} not found`);
-    }
+    const user = await this.prisma.user.update({
+      where: { id },
+      data,
+      include: {
+        location: true,
+      },
+    });
+
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 
   async remove(id: string): Promise<void> {
@@ -210,46 +137,28 @@ export class UsersService {
   }
 
   async updateRole(id: string, role: UserRole): Promise<UserResponse> {
-    try {
-      return await this.prisma.user.update({
-        where: { id },
-        data: { role },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          locationId: true,
-          location: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-    } catch (error) {
-      throw new NotFoundException(`User with ID ${id} not found`);
-    }
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: { role },
+      include: {
+        location: true,
+      },
+    });
+
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 
   async assignLocation(userId: string, locationId: string): Promise<UserResponse> {
-    try {
-      return await this.prisma.user.update({
-        where: { id: userId },
-        data: { locationId },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          locationId: true,
-          location: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-    } catch (error) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
-    }
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { locationId },
+      include: {
+        location: true,
+      },
+    });
+
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
-} 
+}

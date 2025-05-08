@@ -19,6 +19,7 @@ model User {
   firstName     String
   lastName      String
   role          UserRole
+  avatar        String?
   location      Location?     @relation(fields: [locationId], references: [id])
   locationId    String?
   orders        Order[]

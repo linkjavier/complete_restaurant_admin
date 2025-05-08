@@ -29,8 +29,13 @@ export class RegisterDto {
   @IsNotEmpty()
   role: UserRole;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
-  locationId: string;
-} 
+  locationId?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  avatar?: string;
+}

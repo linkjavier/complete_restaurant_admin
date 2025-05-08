@@ -7,22 +7,57 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Icons } from '@/components/icons';
+import { useToast } from '@/components/ui/use-toast';
+import { AvatarUpload } from '@/components/avatar-upload';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     firstName: '',
     lastName: '',
+    avatar: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Implement registration logic
-    setIsLoading(false);
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          role: 'CUSTOMER', // Default role for registration
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Registration failed');
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Your account has been created.',
+      });
+
+      router.push('/auth/login');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,6 +66,10 @@ export default function RegisterPage() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const getInitials = () => {
+    return `${formData.firstName.charAt(0)}${formData.lastName.charAt(0)}`.toUpperCase();
   };
 
   return (
@@ -43,90 +82,65 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <div className="grid grid-cols-2 gap-6">
-            <Button variant="outline" disabled={isLoading}>
-              {isLoading ? (
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Icons.google className="mr-2 h-4 w-4" />
-              )}
-              Google
-            </Button>
-            <Button variant="outline" disabled={isLoading}>
-              {isLoading ? (
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Icons.facebook className="mr-2 h-4 w-4" />
-              )}
-              Facebook
-            </Button>
-          </div>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-          <form onSubmit={handleSubmit} className="grid gap-2">
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                id="firstName"
-                name="firstName"
-                placeholder="First name"
-                type="text"
-                autoCapitalize="none"
-                autoComplete="given-name"
-                autoCorrect="off"
-                disabled={isLoading}
-                value={formData.firstName}
-                onChange={handleChange}
-              />
-              <Input
-                id="lastName"
-                name="lastName"
-                placeholder="Last name"
-                type="text"
-                autoCapitalize="none"
-                autoComplete="family-name"
-                autoCorrect="off"
-                disabled={isLoading}
-                value={formData.lastName}
-                onChange={handleChange}
-              />
-            </div>
+          <AvatarUpload
+            onImageUploaded={(url) => setFormData(prev => ({ ...prev, avatar: url }))}
+            currentImage={formData.avatar}
+            initials={getInitials()}
+          />
+          <div className="grid grid-cols-2 gap-2">
             <Input
-              id="email"
-              name="email"
-              placeholder="name@example.com"
-              type="email"
+              id="firstName"
+              name="firstName"
+              placeholder="First name"
+              type="text"
               autoCapitalize="none"
-              autoComplete="email"
+              autoComplete="given-name"
               autoCorrect="off"
               disabled={isLoading}
-              value={formData.email}
+              value={formData.firstName}
               onChange={handleChange}
             />
             <Input
-              id="password"
-              name="password"
-              placeholder="Password"
-              type="password"
-              autoComplete="new-password"
+              id="lastName"
+              name="lastName"
+              placeholder="Last name"
+              type="text"
+              autoCapitalize="none"
+              autoComplete="family-name"
+              autoCorrect="off"
               disabled={isLoading}
-              value={formData.password}
+              value={formData.lastName}
               onChange={handleChange}
             />
-            <Button disabled={isLoading}>
-              {isLoading && (
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Create Account
-            </Button>
-          </form>
+          </div>
+          <Input
+            id="email"
+            name="email"
+            placeholder="name@example.com"
+            type="email"
+            autoCapitalize="none"
+            autoComplete="email"
+            autoCorrect="off"
+            disabled={isLoading}
+            value={formData.email}
+            onChange={handleChange}
+          />
+          <Input
+            id="password"
+            name="password"
+            placeholder="Password"
+            type="password"
+            autoComplete="new-password"
+            disabled={isLoading}
+            value={formData.password}
+            onChange={handleChange}
+          />
+          <Button disabled={isLoading}>
+            {isLoading && (
+              <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            Create Account
+          </Button>
         </CardContent>
         <CardFooter>
           <p className="text-center text-sm text-muted-foreground">
@@ -141,5 +155,5 @@ export default function RegisterPage() {
         </CardFooter>
       </Card>
     </div>
-  );
-} 
+  )
+}

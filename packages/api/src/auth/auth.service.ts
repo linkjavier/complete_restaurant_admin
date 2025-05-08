@@ -61,6 +61,7 @@ export class AuthService {
         lastName: result.lastName,
         role: result.role,
         locationId: result.locationId,
+        avatar: result.avatar,
         location: result.location,
         createdAt: result.createdAt,
         updatedAt: result.updatedAt,
@@ -88,6 +89,7 @@ export class AuthService {
         lastName: data.lastName,
         role: data.role,
         locationId: data.locationId,
+        avatar: data.avatar,
       },
       include: {
         location: {
@@ -163,10 +165,11 @@ export class AuthService {
         lastName: user.lastName,
         role: user.role,
         locationId: user.locationId,
+        avatar: user.avatar,
         location: user.location,
       };
     } catch (error) {
       throw new UnauthorizedException();
     }
   }
-} 
+}

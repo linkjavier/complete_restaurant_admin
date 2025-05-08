@@ -33,11 +33,14 @@ export default function LoginPage() {
 
       // Redirect based on user role
       switch (data.user.role) {
+        case 'SUPER_ADMIN':
+          router.push('/admin/dashboard');
+          break;
         case 'ADMIN':
           router.push('/admin/dashboard');
           break;
         case 'MANAGER':
-          router.push('/manager/dashboard');
+          router.push('/admin/dashboard');
           break;
         case 'STAFF':
           router.push('/staff/dashboard');

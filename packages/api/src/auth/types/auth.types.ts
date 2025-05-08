@@ -7,6 +7,7 @@ export interface UserResponse {
   lastName: string;
   role: string;
   locationId: string | null;
+  avatar: string | null;
   location?: {
     id: string;
     name: string;
@@ -25,4 +26,4 @@ export interface LoginUser {
   email: string;
   role: string;
   locationId: string | null;
-} 
+}
