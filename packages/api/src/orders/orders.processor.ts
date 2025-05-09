@@ -36,6 +36,7 @@ export class OrdersProcessor {
             },
           },
           location: true,
+          table: true,
         },
       });
 

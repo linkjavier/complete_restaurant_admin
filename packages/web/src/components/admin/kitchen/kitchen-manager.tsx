@@ -236,19 +236,21 @@ export function KitchenManager() {
     const unsubscribeNewOrder = subscribe('new_order_created', (newOrderData) => {
       const newOrder = Array.isArray(newOrderData) ? newOrderData[0] : newOrderData;
       console.log("new_order_created event received:", newOrder);
-      
-      if (!newOrder) {
-        console.warn("Received invalid new order data");
-        return;
+
+      // Solo agregar si tiene items pendientes o en progreso
+      if (
+        newOrder.items &&
+        newOrder.items.some(item => item.status === "PENDING" || item.status === "IN_PROGRESS")
+      ) {
+        setOrders(prevOrders => {
+          // Evitar duplicados
+          if (prevOrders.some(order => order.id === newOrder.id)) {
+            return prevOrders;
+          }
+          // Agregar al inicio para que la orden más reciente esté arriba
+          return [newOrder, ...prevOrders];
+        });
       }
-      
-      setOrders(prevOrders => {
-        // Solo agregar si tiene items pendientes o en progreso
-        if (newOrder.items.some(item => item.status === "PENDING" || item.status === "IN_PROGRESS")) {
-          return [...prevOrders, newOrder];
-        }
-        return prevOrders;
-      });
     });
 
     // Listen for order item updates
@@ -377,7 +379,7 @@ export function KitchenManager() {
                       <div className="bg-muted p-4">
                         <div className="flex justify-between items-center">
                           <div>
-                            <h3 className="font-bold text-lg">Mesa #{order.table?.number}</h3>
+                            <h3 className="font-bold text-lg">Mesa #{order.table.number}</h3>
                             <p className="text-sm text-muted-foreground">
                               Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                             </p>
