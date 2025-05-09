@@ -43,10 +43,10 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
     try {
       setIsSubmitting(true)
       
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No hay sesión activa. Por favor, inicia sesión nuevamente.');
-      }
+      // const token = getAuthToken();
+      // if (!token) {
+      //   throw new Error('No hay sesión activa. Por favor, inicia sesión nuevamente.');
+      // }
       
       // Construir el objeto de datos para la orden
       const orderData = {
@@ -68,7 +68,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          // 'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(orderData)
       });

@@ -16,6 +16,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { Public } from '../auth/decorators/public.decorator';
+
 
 @ApiTags('tables')
 @Controller('tables')
@@ -40,8 +42,9 @@ export class TablesController {
     return this.tablesService.findAll();
   }
 
+  @Public()
   @Get(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  // @Roles('SUPER_ADMIN', 'ADMIN')
   @ApiOperation({ summary: 'Get table by id' })
   @ApiResponse({ status: 200, description: 'Return table by id' })
   @ApiResponse({ status: 404, description: 'Table not found' })

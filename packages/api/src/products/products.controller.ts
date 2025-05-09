@@ -10,6 +10,8 @@ import {
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { ApiTags } from '@nestjs/swagger';
+import { Public } from '../auth/decorators/public.decorator';
+
 
 @ApiTags('products')
 @Controller('products')
@@ -21,6 +23,7 @@ export class ProductsController {
     return this.productsService.create(createProductDto);
   }
 
+  @Public()
   @Get()
   findAll(
     @Query('locationId') locationId: string,

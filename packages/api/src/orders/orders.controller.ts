@@ -15,6 +15,8 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
+
 
 @ApiTags('orders')
 @Controller('orders')
@@ -22,11 +24,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  @Public()
   @Post()
   create(@Body() createOrderDto: CreateOrderDto) {
     return this.ordersService.create(createOrderDto);
   }
 
+  @Public()
   @Get()
   findAll(
     @Query('locationId') locationId?: string,

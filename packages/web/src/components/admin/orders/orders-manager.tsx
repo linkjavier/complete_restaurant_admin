@@ -418,7 +418,7 @@ export function OrdersManager() {
                         <div className="bg-muted p-4">
                           <div className="flex justify-between items-center">
                             <div>
-                              <h3 className="font-bold text-lg">Mesa #{order.table.number}</h3>
+                              <h3 className="font-bold text-lg">Mesa #{order.table?.number}</h3>
                               <p className="text-sm text-muted-foreground">
                                 Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                               </p>

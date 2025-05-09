@@ -577,22 +577,24 @@ export async function printKitchenTicket(orderId: string): Promise<any> {
 export async function getActiveOrders(tableId: string) {
   try {
     const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
+    // if (!token) {
+    //   throw new Error('No authentication token found');
+    // }
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?tableId=${tableId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?tableId=${tableId}`, {
+    //   headers: {
+    //     'Authorization': `Bearer ${token}`,
+    //     'Content-Type': 'application/json'
+    //   }
+    // });
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?tableId=${tableId}`);
 
     if (!response.ok) {
-      if (response.status === 401) {
-        localStorage.removeItem('token');
-        throw new Error('Authentication expired or invalid');
-      }
+      // if (response.status === 401) {
+      //   localStorage.removeItem('token');
+      //   throw new Error('Authentication expired or invalid');
+      // }
       const errorData = await response.json();
       throw new Error(errorData.message || 'Error al obtener las órdenes activas');
     }
@@ -605,6 +607,8 @@ export async function getActiveOrders(tableId: string) {
     throw error;
   }
 }
+
+
 
 // User API functions
 export async function getUsers(): Promise<User[]> {
