@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Plus, Minus, Trash2, Package, Clock } from "lucide-react"
+import { Search } from "lucide-react"
 import { 
   getProducts, 
   Product, 
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select"
 import { Cart } from "@/components/admin/pos/cart"
 import { ProductGrid } from "@/components/admin/pos/product-grid"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 export default function PosPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -35,32 +36,42 @@ export default function PosPage() {
   const [orderType, setOrderType] = useState<"table" | "takeout">("table")
   const [selectedTable, setSelectedTable] = useState<string>("")
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [activeOrders, setActiveOrders] = useState<any[]>([])
+  const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchData()
   }, [])
 
+  // Fetch active orders when table is selected
   useEffect(() => {
     if (selectedTable) {
-      fetchActiveOrders()
+      refreshActiveOrders()
+    } else {
+      setActiveOrders([])
     }
   }, [selectedTable])
 
-  const fetchActiveOrders = async () => {
-    if (!selectedTable) return
+  const refreshActiveOrders = async () => {
     try {
       const orders = await getActiveOrders(selectedTable)
       setActiveOrders(orders)
     } catch (err) {
       console.error('Error fetching active orders:', err)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las órdenes activas",
+        variant: "destructive",
+      })
     }
   }
 
   const fetchData = async () => {
     try {
       setLoading(true)
+      setError(null)
       const [productsData, tablesData] = await Promise.all([
         getProducts(),
         getTables()
@@ -68,7 +79,7 @@ export default function PosPage() {
       setProducts(productsData)
       setTables(tablesData)
       
-      // Extraer categorías únicas
+      // Extract unique categories
       const uniqueCategories = new Map<string, Category>()
       productsData.forEach(product => {
         if (product.category) {
@@ -78,6 +89,7 @@ export default function PosPage() {
       setCategories(Array.from(uniqueCategories.values()))
     } catch (err) {
       console.error('Error fetching data:', err)
+      setError('Error al cargar los datos. Por favor, intente de nuevo.')
       toast({
         title: "Error",
         description: "Error al cargar los datos",
@@ -118,6 +130,7 @@ export default function PosPage() {
         return
       }
 
+      setSubmitting(true)
       const selectedTableData = tables.find(t => t.id === selectedTable)
       if (!selectedTableData && orderType === "table") {
         toast({
@@ -141,18 +154,18 @@ export default function PosPage() {
 
       await createOrder(orderData)
       
+      // Clear cart
+      setCart({})
+
+      // Refresh active orders
+      if (selectedTable) {
+        await refreshActiveOrders()
+      }
+
       toast({
         title: "Éxito",
         description: "Pedido creado correctamente",
       })
-
-      // Limpiar el carrito y mantener la mesa seleccionada
-      setCart({})
-
-      // Actualizar las órdenes activas
-      if (selectedTable) {
-        await fetchActiveOrders()
-      }
     } catch (err) {
       console.error('Error creating order:', err)
       toast({
@@ -160,12 +173,14 @@ export default function PosPage() {
         description: "Error al crear el pedido",
         variant: "destructive",
       })
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handlePaymentProcessed = async () => {
     if (selectedTable) {
-      await fetchActiveOrders()
+      await refreshActiveOrders()
     }
   }
 
@@ -176,8 +191,30 @@ export default function PosPage() {
     return matchesCategory && matchesSearch
   })
 
-  // Encontrar la orden activa más reciente para la mesa seleccionada
-  const currentOrder = activeOrders.length > 0 ? activeOrders[0] : undefined
+  // Get all active orders for selected table
+  const currentOrders = activeOrders
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner />
+          <p className="mt-4 text-sm text-muted-foreground">Cargando POS...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{error}</p>
+          <Button onClick={fetchData}>Reintentar</Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -252,10 +289,11 @@ export default function PosPage() {
           onOrderTypeChange={setOrderType}
           onTableSelect={(tableId) => {
             setSelectedTable(tableId)
-            setCart({}) // Limpiar el carrito al cambiar de mesa
+            setCart({}) // Clear cart when changing tables
           }}
           onSubmit={handleSubmitOrder}
-          currentOrder={currentOrder}
+          currentOrders={currentOrders}
+          loading={submitting}
         />
       </div>
     </div>
