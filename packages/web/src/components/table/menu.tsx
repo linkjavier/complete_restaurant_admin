@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Plus, Minus, Clock, Package } from "lucide-react"
 import { getProducts, Product, Category, getActiveOrders } from "@/lib/api"
 import { Cart } from "./cart"
+import Image from "next/image"
 
 interface MenuProps {
   locationId: string
@@ -128,42 +129,48 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div className="md:col-span-2">
         <div className="space-y-4">
-          {/* Welcome Message */}
+          {/* Welcome Message with Logo */}
           <Card>
             <CardContent className="pt-6">
-              <div className="space-y-2">
-                <h2 className="text-2xl font-bold">¡Hola {customerName}!</h2>
-                <p className="text-muted-foreground">
-                  Aquí podrás ver nuestro menú, ordenar productos, ver tus pedidos y pagar la cuenta.
-                </p>
+              <div className="flex justify-between items-center">
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold">¡Hola {customerName}!</h2>
+                  <p className="text-muted-foreground">
+                    Aquí podrás ver nuestro menú, ordenar productos, ver tus pedidos y pagar la cuenta.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Tabs */}
-          <div className="flex gap-2 mb-4">
-            <Button
-              variant={activeTab === 'menu' ? 'default' : 'outline'}
-              onClick={() => setActiveTab('menu')}
-              className="flex items-center gap-2"
-            >
-              <Package className="h-4 w-4" />
-              Menú
-            </Button>
-            <Button
-              variant={activeTab === 'orders' ? 'default' : 'outline'}
-              onClick={() => setActiveTab('orders')}
-              className="flex items-center gap-2"
-            >
-              <Clock className="h-4 w-4" />
-              Órdenes Activas
-            </Button>
+          {/* Tabs and Header */}
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex gap-2">
+              <Button
+                variant={activeTab === 'menu' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('menu')}
+                className="flex items-center gap-2"
+              >
+                <Package className="h-4 w-4" />
+                Menú
+              </Button>
+              <Button
+                variant={activeTab === 'orders' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('orders')}
+                className="flex items-center gap-2"
+              >
+                <Clock className="h-4 w-4" />
+                Órdenes Activas
+              </Button>
+            </div>
           </div>
 
           {activeTab === 'orders' ? (
             <Card>
               <CardHeader>
-                <CardTitle>Órdenes Activas</CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Órdenes Activas</CardTitle>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">

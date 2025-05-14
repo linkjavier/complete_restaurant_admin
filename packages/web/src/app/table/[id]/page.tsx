@@ -7,6 +7,7 @@ import { Menu } from "@/components/table/menu"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import Image from "next/image"
 
 export default function TablePage() {
   const params = useParams()
@@ -56,11 +57,26 @@ export default function TablePage() {
   return (
     <div className="container mx-auto py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Mesa {table.number}</h1>
-        <p className="text-muted-foreground">
-          Ubicación: {table.location?.name || "Sin ubicación"}
-        </p>
+        <div className="flex justify-between items-center">
+          <div className="flex flex-col space-y-2">
+            <h1 className="text-2xl font-bold">Mesa {table.number}</h1>
+            <p className="text-muted-foreground">
+              Ubicación: {table.location?.name || "Sin ubicación"}
+            </p>
+          </div>
+          
+          <div className="flex relative w-[280px] h-[120px]">
+            <Image
+              src="/assets/blondie-logo.png"
+              alt="Blondie Restaurant"
+              fill
+              priority
+              className="object-contain"
+            />
+          </div>
+        </div>
       </div>
+
 
       {!isOrderStarted ? (
         <div className="max-w-md mx-auto space-y-4">
