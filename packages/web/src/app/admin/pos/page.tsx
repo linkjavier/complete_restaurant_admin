@@ -5,7 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, Plus, Minus, Trash2, Package, Clock } from "lucide-react"
-import { getProducts, Product, Category, getTables, Table, createOrder, getActiveOrders } from "@/lib/api"
+import { 
+  getProducts, 
+  Product, 
+  Category, 
+  getTables, 
+  Table, 
+  createOrder, 
+  getActiveOrders 
+} from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import {
   Select,
@@ -33,6 +41,22 @@ export default function PosPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  useEffect(() => {
+    if (selectedTable) {
+      fetchActiveOrders()
+    }
+  }, [selectedTable])
+
+  const fetchActiveOrders = async () => {
+    if (!selectedTable) return
+    try {
+      const orders = await getActiveOrders(selectedTable)
+      setActiveOrders(orders)
+    } catch (err) {
+      console.error('Error fetching active orders:', err)
+    }
+  }
 
   const fetchData = async () => {
     try {
@@ -122,15 +146,12 @@ export default function PosPage() {
         description: "Pedido creado correctamente",
       })
 
-      // Limpiar el carrito y resetear el estado
+      // Limpiar el carrito y mantener la mesa seleccionada
       setCart({})
-      setSelectedTable("")
-      setOrderType("table")
 
       // Actualizar las órdenes activas
       if (selectedTable) {
-        const updatedOrders = await getActiveOrders(selectedTable)
-        setActiveOrders(updatedOrders)
+        await fetchActiveOrders()
       }
     } catch (err) {
       console.error('Error creating order:', err)
@@ -142,12 +163,21 @@ export default function PosPage() {
     }
   }
 
+  const handlePaymentProcessed = async () => {
+    if (selectedTable) {
+      await fetchActiveOrders()
+    }
+  }
+
   const filteredProducts = products.filter(product => {
     const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.description?.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesCategory && matchesSearch
   })
+
+  // Encontrar la orden activa más reciente para la mesa seleccionada
+  const currentOrder = activeOrders.length > 0 ? activeOrders[0] : undefined
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -220,8 +250,12 @@ export default function PosPage() {
           selectedTable={selectedTable}
           tables={tables}
           onOrderTypeChange={setOrderType}
-          onTableSelect={setSelectedTable}
+          onTableSelect={(tableId) => {
+            setSelectedTable(tableId)
+            setCart({}) // Limpiar el carrito al cambiar de mesa
+          }}
           onSubmit={handleSubmitOrder}
+          currentOrder={currentOrder}
         />
       </div>
     </div>

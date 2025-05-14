@@ -73,6 +73,28 @@ export interface ProductIngredient {
   updatedAt: string
 }
 
+export type PaymentMethod = 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'QR';
+
+export interface Payment {
+  id: string;
+  orderId: string;
+  amount: number;
+  method: PaymentMethod;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentDetails {
+  orderId: string;
+  orderStatus: string;
+  totalAmount: number;
+  paidAmount: number;
+  remainingBalance: number;
+  isFullyPaid: boolean;
+  payments: Payment[];
+}
+
 // User types
 export interface User {
   id: string;
@@ -608,7 +630,42 @@ export async function getActiveOrders(tableId: string) {
   }
 }
 
+export async function getOrderPaymentDetails(orderId: string): Promise<PaymentDetails> {
+  const response = await fetch(`${API_URL}/payments/orders/${orderId}`, {
+    headers: getAuthHeaders(),
+  });
 
+  if (!response.ok) {
+    throw new Error("Error al obtener los detalles de pago de la orden");
+  }
+
+  return response.json();
+}
+
+export async function processPayment(
+  orderId: string,
+  amount: number,
+  method: PaymentMethod
+): Promise<Payment> {
+  const response = await fetch(`${API_URL}/payments/process`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      orderId,
+      amount,
+      method,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Error al procesar el pago");
+  }
+
+  return response.json();
+}
 
 // User API functions
 export async function getUsers(): Promise<User[]> {

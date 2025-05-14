@@ -1,11 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { Product } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Minus, Plus, Trash2 } from "lucide-react"
 import { Table } from "@/lib/api"
+import { PaymentDialog } from "@/components/admin/pos/payment-dialog"
 
 interface CartItem {
   product: Product
@@ -22,6 +24,10 @@ interface CartProps {
   onOrderTypeChange: (type: "table" | "takeout") => void
   onTableSelect: (tableId: string) => void
   onSubmit: () => void
+  currentOrder?: {
+    id: string
+    status: string
+  }
 }
 
 export function Cart({
@@ -34,7 +40,9 @@ export function Cart({
   onOrderTypeChange,
   onTableSelect,
   onSubmit,
+  currentOrder,
 }: CartProps) {
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const total = items.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
     0
@@ -136,15 +144,32 @@ export function Cart({
             <span className="font-bold">Total:</span>
             <span className="font-bold">${total.toFixed(2)}</span>
           </div>
-          <Button
-            className="w-full"
-            onClick={onSubmit}
-            disabled={items.length === 0 || (orderType === "table" && !selectedTable)}
-          >
-            Enviar Orden
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={onSubmit}
+              disabled={items.length === 0 || (orderType === "table" && !selectedTable)}
+            >
+              Enviar Orden
+            </Button>
+            {currentOrder && currentOrder.id && (
+              <Button
+                variant="secondary"
+                onClick={() => setIsPaymentDialogOpen(true)}
+              >
+                Pagar
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
+      {currentOrder && (
+        <PaymentDialog
+          isOpen={isPaymentDialogOpen}
+          onClose={() => setIsPaymentDialogOpen(false)}
+          orderId={currentOrder.id}
+        />
+      )}
     </Card>
   )
-} 
+}

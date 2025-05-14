@@ -3,42 +3,58 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
-  Delete,
+  UseGuards,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { UpdatePaymentDto } from './dto/update-payment.dto';
-import { ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaymentMethod } from '@prisma/client';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('payments')
 @Controller('payments')
+@UseGuards(JwtAuthGuard)
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  @Post()
-  create(@Body() createPaymentDto: CreatePaymentDto) {
-    return this.paymentsService.create(createPaymentDto);
+  @Get('orders/:orderId')
+  @ApiOperation({ summary: 'Get payment details for an order' })
+  @ApiResponse({ status: 200, description: 'Return payment details' })
+  async getOrderPaymentDetails(@Param('orderId') orderId: string) {
+    return this.paymentsService.getOrderPaymentDetails(orderId);
   }
 
-  @Get()
-  findAll() {
-    return this.paymentsService.findAll();
+  @Post('process')
+  @ApiOperation({ summary: 'Process a payment for an order' })
+  @ApiResponse({ status: 200, description: 'Payment processed successfully' })
+  async processPayment(
+    @Body()
+    paymentData: {
+      orderId: string;
+      amount: number;
+      method: PaymentMethod;
+    },
+  ) {
+    try {
+      return await this.paymentsService.processPayment(
+        paymentData.orderId,
+        paymentData.amount,
+        paymentData.method,
+      );
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Error processing payment',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  @ApiOperation({ summary: 'Get a payment by ID' })
+  @ApiResponse({ status: 200, description: 'Return the payment' })
+  async findOne(@Param('id') id: string) {
     return this.paymentsService.findOne(id);
   }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
-    return this.paymentsService.update(id, updatePaymentDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.paymentsService.remove(id);
-  }
-} 
+}
