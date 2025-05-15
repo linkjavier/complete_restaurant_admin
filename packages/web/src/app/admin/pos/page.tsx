@@ -119,7 +119,7 @@ export default function PosPage() {
     })
   }
 
-  const handleSubmitOrder = async () => {
+  const handleCreateOrder = async () => {
     try {
       if (orderType === "table" && !selectedTable) {
         toast({
@@ -146,9 +146,15 @@ export default function PosPage() {
         quantity
       }))
 
+      // Si es para llevar, usar el locationId de cualquier mesa disponible
+      const locationId = orderType === "table" 
+        ? selectedTableData?.locationId 
+        : tables[0]?.locationId
+
       const orderData = {
         tableId: orderType === "table" ? selectedTable : undefined,
-        locationId: orderType === "table" ? selectedTableData?.locationId : undefined,
+        type: orderType === "table" ? "TABLE" : "TAKEOUT",
+        locationId,
         items: orderItems
       }
 
@@ -291,7 +297,7 @@ export default function PosPage() {
             setSelectedTable(tableId)
             setCart({}) // Clear cart when changing tables
           }}
-          onSubmit={handleSubmitOrder}
+          onSubmit={handleCreateOrder}
           currentOrders={currentOrders}
           loading={submitting}
         />

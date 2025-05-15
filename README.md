@@ -235,6 +235,11 @@ curl -X POST http://localhost:3000/auth/register \
   }'
 ```
 
+# Alimentar la base de datos
+```bash
+chmod +x ./scripts/seed-database.sh && ./scripts/seed-database.sh
+```
+
 ## 🚀 Despliegue
 
 ### Requisitos de Producción

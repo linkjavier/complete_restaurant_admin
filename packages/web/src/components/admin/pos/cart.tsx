@@ -59,6 +59,7 @@ export function Cart({
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [tempOrderId, setTempOrderId] = useState<string | null>(null)
   
   const cartTotal = items.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
@@ -95,12 +96,28 @@ export function Cart({
   const handleSubmit = async () => {
     try {
       setIsProcessing(true)
-      await onSubmit()
+      if (orderType === "takeout") {
+        // Para llevar: mostrar diálogo de pago primero
+        setTempOrderId("temp")  // ID temporal para el diálogo de pago
+        setIsPaymentDialogOpen(true)
+      } else {
+        // Mesa: crear orden primero
+        await onSubmit()
+      }
     } catch (error) {
       console.error('Error submitting order:', error)
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const handlePaymentProcessed = async () => {
+    if (orderType === "takeout") {
+      // Después del pago, crear la orden
+      await onSubmit()
+    }
+    setIsPaymentDialogOpen(false)
+    setTempOrderId(null)
   }
 
   return (
@@ -309,7 +326,7 @@ export function Cart({
                       <span className="ml-2">Enviando...</span>
                     </>
                   ) : (
-                    "Enviar Orden"
+                    orderType === "takeout" ? "Proceder al Pago" : "Enviar Orden"
                   )}
                 </Button>
               </div>
@@ -318,14 +335,18 @@ export function Cart({
         )}
       </CardContent>
       
-      {selectedOrderId && (
+      {(selectedOrderId || tempOrderId) && (
         <PaymentDialog
           isOpen={isPaymentDialogOpen}
           onClose={() => {
             setIsPaymentDialogOpen(false)
             setSelectedOrderId(null)
+            setTempOrderId(null)
           }}
-          orderId={selectedOrderId}
+          orderId={selectedOrderId || "temp"}
+          onPaymentProcessed={handlePaymentProcessed}
+          isPrePayment={orderType === "takeout" && tempOrderId !== null}
+          prePaymentAmount={orderType === "takeout" ? cartTotal : undefined}
         />
       )}
     </Card>

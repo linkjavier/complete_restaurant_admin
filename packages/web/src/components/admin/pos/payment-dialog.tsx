@@ -28,6 +28,8 @@ interface PaymentDialogProps {
   onClose: () => void
   orderId: string
   onPaymentProcessed?: () => void
+  isPrePayment?: boolean
+  prePaymentAmount?: number
 }
 
 export function PaymentDialog({
@@ -35,6 +37,8 @@ export function PaymentDialog({
   onClose,
   orderId,
   onPaymentProcessed,
+  isPrePayment = false,
+  prePaymentAmount = 0,
 }: PaymentDialogProps) {
   const [amount, setAmount] = useState<string>("")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH")
@@ -44,10 +48,24 @@ export function PaymentDialog({
   const { toast } = useToast()
 
   useEffect(() => {
-    if (isOpen && orderId) {
-      loadPaymentDetails()
+    if (isOpen) {
+      if (isPrePayment) {
+        // Para pre-pagos, usar el monto del carrito
+        setPaymentDetails({
+          totalAmount: prePaymentAmount,
+          paidAmount: 0,
+          remainingBalance: prePaymentAmount,
+          orderStatus: "PENDING",
+          payments: []
+        })
+        setAmount(prePaymentAmount.toString())
+        setIsLoading(false)
+      } else if (orderId) {
+        // Para pagos normales, cargar detalles de la orden
+        loadPaymentDetails()
+      }
     }
-  }, [isOpen, orderId])
+  }, [isOpen, orderId, isPrePayment, prePaymentAmount])
 
   const loadPaymentDetails = async () => {
     try {
@@ -69,22 +87,31 @@ export function PaymentDialog({
   const handlePayment = async () => {
     try {
       setIsProcessing(true)
-      await processPayment(orderId, parseFloat(amount), paymentMethod)
-      
-      toast({
-        title: "Éxito",
-        description: "Pago procesado correctamente",
-      })
-
-      await loadPaymentDetails()
-      
-      if (onPaymentProcessed) {
-        onPaymentProcessed()
-      }
-
-      // Si el pago completa la orden, cerrar el diálogo
-      if (paymentDetails && parseFloat(amount) >= paymentDetails.remainingBalance) {
+      if (isPrePayment) {
+        // Para pre-pagos, solo notificar que el pago fue procesado
+        // La orden se creará después
+        toast({
+          title: "Éxito",
+          description: "Pago procesado correctamente",
+        })
+        if (onPaymentProcessed) {
+          onPaymentProcessed()
+        }
         onClose()
+      } else {
+        // Proceso normal de pago para órdenes existentes
+        await processPayment(orderId, parseFloat(amount), paymentMethod)
+        toast({
+          title: "Éxito",
+          description: "Pago procesado correctamente",
+        })
+        await loadPaymentDetails()
+        if (onPaymentProcessed) {
+          onPaymentProcessed()
+        }
+        if (paymentDetails && parseFloat(amount) >= paymentDetails.remainingBalance) {
+          onClose()
+        }
       }
     } catch (error) {
       toast({
@@ -116,13 +143,15 @@ export function PaymentDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Procesar Pago</DialogTitle>
+          <DialogTitle>{isPrePayment ? "Procesar Pago - Para Llevar" : "Procesar Pago"}</DialogTitle>
           <DialogDescription>
-            Ingrese los detalles del pago para la orden #{orderId}
+            {isPrePayment 
+              ? "Por favor, realice el pago para proceder con su orden" 
+              : `Ingrese los detalles del pago para la orden #${orderId}`}
           </DialogDescription>
         </DialogHeader>
 
-        {paymentDetails.orderStatus !== "COMPLETED" && 
+        {!isPrePayment && paymentDetails.orderStatus !== "COMPLETED" && 
          paymentDetails.orderStatus !== "DELIVERED" && (
           <Alert>
             <AlertCircle className="h-4 w-4" />
@@ -137,10 +166,14 @@ export function PaymentDialog({
           <Card>
             <CardContent className="pt-6">
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>Total de la Orden:</div>
+                <div>Total:</div>
                 <div className="text-right">${paymentDetails.totalAmount.toFixed(2)}</div>
-                <div>Pagado hasta ahora:</div>
-                <div className="text-right">${paymentDetails.paidAmount.toFixed(2)}</div>
+                {!isPrePayment && (
+                  <>
+                    <div>Pagado hasta ahora:</div>
+                    <div className="text-right">${paymentDetails.paidAmount.toFixed(2)}</div>
+                  </>
+                )}
                 <div>Saldo Pendiente:</div>
                 <div className="text-right font-bold">
                   ${paymentDetails.remainingBalance.toFixed(2)}
@@ -149,7 +182,7 @@ export function PaymentDialog({
             </CardContent>
           </Card>
 
-          {paymentDetails.payments.length > 0 && (
+          {!isPrePayment && paymentDetails.payments.length > 0 && (
             <div className="space-y-2">
               <h3 className="font-medium">Pagos Realizados:</h3>
               <div className="space-y-2 max-h-32 overflow-y-auto">
@@ -167,19 +200,6 @@ export function PaymentDialog({
               </div>
             </div>
           )}
-
-          <div className="grid gap-2">
-            <label htmlFor="amount">Monto a Pagar</label>
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              max={paymentDetails.remainingBalance}
-              min={0.01}
-            />
-          </div>
 
           <div className="grid gap-2">
             <label>Método de Pago</label>
@@ -200,9 +220,7 @@ export function PaymentDialog({
             onClick={handlePayment}
             disabled={
               isProcessing ||
-              !amount ||
-              parseFloat(amount) <= 0 ||
-              parseFloat(amount) > paymentDetails.remainingBalance
+              !paymentMethod
             }
           >
             {isProcessing ? "Procesando..." : "Procesar Pago"}

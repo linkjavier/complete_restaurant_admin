@@ -460,9 +460,10 @@ export async function getOrders(locationId?: string) {
 }
 
 export async function createOrder(data: {
-  tableId: string;
+  tableId?: string;
   locationId: string;
   userId?: string;
+  type: 'TABLE' | 'TAKEOUT';
   items: Array<{
     productId: string;
     quantity: number;

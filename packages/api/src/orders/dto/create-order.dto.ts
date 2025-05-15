@@ -1,5 +1,6 @@
-import { IsString, IsArray, ValidateNested, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsArray, ValidateNested, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { OrderType } from '@prisma/client';
 
 class OrderItemDto {
   @IsString()
@@ -12,8 +13,8 @@ class OrderItemDto {
 
 export class CreateOrderDto {
   @IsString()
-  @IsNotEmpty()
-  tableId: string;
+  @IsOptional()
+  tableId?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -23,8 +24,12 @@ export class CreateOrderDto {
   @IsString()
   userId?: string;
 
+  @IsEnum(OrderType)
+  @IsNotEmpty()
+  type: OrderType;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[];
-} 
+}
