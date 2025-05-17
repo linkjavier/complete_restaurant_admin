@@ -200,13 +200,11 @@ export function Sidebar({ isMobile }: SidebarProps) {
                   <Tooltip open={isCollapsed ? undefined : false}>
                     <TooltipTrigger asChild>
                       {isMobile ? (
-                        <Link href={route.href} onClick={() => {
-                          // El componente Sheet maneja automáticamente el cierre
-                          const event = new Event('click');
-                          document.querySelector('[aria-label="Close"]')?.dispatchEvent(event);
-                        }}>
-                          {linkContent}
-                        </Link>
+                        <SheetClose asChild>
+                          <Link href={route.href}>
+                            {linkContent}
+                          </Link>
+                        </SheetClose>
                       ) : (
                         link
                       )}

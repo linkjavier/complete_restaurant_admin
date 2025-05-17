@@ -235,6 +235,11 @@ curl -X POST http://localhost:3000/auth/register \
   }'
 ```
 
+# Limpiar la base de datos
+```bash
+npx prisma db push --force-reset
+```
+
 # Alimentar la base de datos
 ```bash
 chmod +x ./scripts/seed-database.sh && ./scripts/seed-database.sh
