@@ -402,23 +402,25 @@ export function KitchenManager() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Órdenes Activas</CardTitle>
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <CardTitle>Órdenes Activas</CardTitle>
+              <div className="text-sm text-muted-foreground mt-1">
+                {user?.locationId ? `Ubicación: ${user.locationId}` : 'Sin ubicación asignada'}
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setSoundEnabled(!soundEnabled)}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 whitespace-nowrap"
               >
                 {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
                 {soundEnabled ? "Sonido On" : "Sonido Off"}
               </Button>
               {connectionStatus}
             </div>
-          </div>
-          <div className="text-sm text-muted-foreground mt-1">
-            {user?.locationId ? `Ubicación: ${user.locationId}` : 'Sin ubicación asignada'}
           </div>
         </CardHeader>
         <CardContent>
@@ -442,14 +444,14 @@ export function KitchenManager() {
                   <Card key={order.id} className="overflow-hidden">
                     <CardContent className="p-0">
                       <div className="bg-muted p-4">
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                           <div>
                             <h3 className="font-bold text-lg">Mesa #{order.table?.number}</h3>
                             <p className="text-sm text-muted-foreground">
                               Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                             </p>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
                             <Button 
                               variant="outline" 
                               size="sm"
@@ -476,29 +478,31 @@ export function KitchenManager() {
                           {order.items
                             .filter(item => item.status !== "COMPLETED")
                             .map((item) => (
-                              <li key={item.id} className="border-b pb-2">
-                                <div className="flex justify-between items-center">
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <p className="font-medium">{item.product.name}</p>
-                                      <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                                        x{item.quantity}
-                                      </span>
-                                    </div>
-                                    <p className="text-sm text-gray-500">
-                                      {item.status === "PENDING" ? "Pendiente" : 
-                                       item.status === "IN_PROGRESS" ? "En preparación" : 
-                                       item.status === "READY" ? "Completado" : 
-                                       item.status === "CANCELLED" ? "Cancelado" : 
-                                       item.status}
-                                    </p>
-                                    {item.notes && (
-                                      <p className="text-sm text-muted-foreground mt-1">
-                                        Notas: {item.notes}
+                              <li key={item.id} className="border-b pb-4">
+                                <div className="flex flex-col space-y-3">
+                                  <div className="flex items-start justify-between">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-medium">{item.product.name}</p>
+                                        <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                          x{item.quantity}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm text-gray-500">
+                                        {item.status === "PENDING" ? "Pendiente" : 
+                                         item.status === "IN_PROGRESS" ? "En preparación" : 
+                                         item.status === "READY" ? "Completado" : 
+                                         item.status === "CANCELLED" ? "Cancelado" : 
+                                         item.status}
                                       </p>
-                                    )}
+                                      {item.notes && (
+                                        <p className="text-sm text-muted-foreground">
+                                          Notas: {item.notes}
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="flex space-x-2">
+                                  <div className="flex flex-wrap gap-2">
                                     {item.status === "PENDING" && (
                                       <Button 
                                         size="sm"
