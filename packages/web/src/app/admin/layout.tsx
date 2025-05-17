@@ -1,8 +1,12 @@
 "use client"
 
+import { useState } from "react"
 import { Sidebar } from "@/components/admin/sidebar"
 import { UserNav } from "@/components/user-nav"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { Menu } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 
 // Create a client
 const queryClient = new QueryClient()
@@ -15,14 +19,31 @@ export default function AdminLayout({
   return (
     <QueryClientProvider client={queryClient}>
       <div className="h-full">
+        {/* Desktop Sidebar */}
         <div className="hidden md:flex h-full w-72 flex-col fixed inset-y-0 z-50">
           <Sidebar />
         </div>
+        
+        {/* Mobile Header with Menu Button */}
         <div className="fixed top-0 right-0 left-0 md:left-72 h-16 bg-white border-b z-40 flex items-center px-4">
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="mr-2">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-72">
+                <SheetTitle className="sr-only">Menú de Navegación</SheetTitle>
+                <Sidebar isMobile />
+              </SheetContent>
+            </Sheet>
+          </div>
           <div className="ml-auto">
             <UserNav />
           </div>
         </div>
+        
         <main className="md:pl-72 pt-16 h-full">
           {children}
         </main>

@@ -5,6 +5,7 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { SheetClose } from "@/components/ui/sheet"
 import {
   LayoutDashboard,
   Table,
@@ -28,6 +29,10 @@ import {
 } from "@/components/ui/tooltip"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/use-auth"
+
+interface SidebarProps {
+  isMobile?: boolean
+}
 
 const routes = [
   {
@@ -98,7 +103,7 @@ const routes = [
   },
 ]
 
-export function Sidebar() {
+export function Sidebar({ isMobile }: SidebarProps) {
   const pathname = usePathname()
   const { user } = useAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -142,18 +147,20 @@ export function Sidebar() {
                 </h1>
               </Link>
             ) : null}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-white/10"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-            >
-              {isCollapsed ? (
-                <ChevronRight className="h-4 w-4 text-white" />
-              ) : (
-                <ChevronLeft className="h-4 w-4 text-white" />
-              )}
-            </Button>
+            <div className="md:block hidden">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full hover:bg-white/10"
+                onClick={() => setIsCollapsed(!isCollapsed)}
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-white" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4 text-white" />
+                )}
+              </Button>
+            </div>
           </div>
           <div className={cn(
             "flex justify-center mb-10 transition-all duration-300",
@@ -168,30 +175,49 @@ export function Sidebar() {
             />
           </div>
           <div className="space-y-1">
-            {routes.filter(route => !route.roles || route.roles.includes(user.role)).map((route) => (
-              <TooltipProvider key={route.href} delayDuration={100}>
-                <Tooltip open={isCollapsed ? undefined : false}>
-                  <TooltipTrigger asChild>
-                    <Link
-                      href={route.href}
-                      className={cn(
-                        "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
-                        pathname === route.href ? "text-white bg-white/10" : "text-zinc-400",
-                        isCollapsed ? "justify-center" : ""
+            {routes.filter(route => !route.roles || route.roles.includes(user.role)).map((route) => {
+              const linkContent = (
+                <div
+                  className={cn(
+                    "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
+                    pathname === route.href ? "text-white bg-white/10" : "text-zinc-400",
+                    isCollapsed ? "justify-center" : ""
+                  )}
+                >
+                  <div className="flex items-center">
+                    <route.icon className="h-5 w-5" />
+                    {!isCollapsed && <span className="ml-3">{route.label}</span>}
+                  </div>
+                </div>
+              );
+
+              const link = (
+                <Link href={route.href}>{linkContent}</Link>
+              );
+
+              return (
+                <TooltipProvider key={route.href} delayDuration={100}>
+                  <Tooltip open={isCollapsed ? undefined : false}>
+                    <TooltipTrigger asChild>
+                      {isMobile ? (
+                        <Link href={route.href} onClick={() => {
+                          // El componente Sheet maneja automáticamente el cierre
+                          const event = new Event('click');
+                          document.querySelector('[aria-label="Close"]')?.dispatchEvent(event);
+                        }}>
+                          {linkContent}
+                        </Link>
+                      ) : (
+                        link
                       )}
-                    >
-                      <div className="flex items-center">
-                        <route.icon className="h-5 w-5" />
-                        {!isCollapsed && <span className="ml-3">{route.label}</span>}
-                      </div>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-[#111827] text-white border-none">
-                    {route.label}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ))}
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="bg-[#111827] text-white border-none">
+                      {route.label}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })}
           </div>
         </div>
       </div>
