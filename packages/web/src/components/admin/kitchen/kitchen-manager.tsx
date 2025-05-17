@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Pencil } from "lucide-react"
+import { Plus, Trash2, Pencil, Volume2, VolumeX } from "lucide-react"
 import { getKitchenOrders, updateKitchenOrderItemStatus, printKitchenTicket } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { useOrderSocket } from "@/hooks/use-order-socket"
@@ -18,10 +18,61 @@ export function KitchenManager() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [itemToCancel, setItemToCancel] = useState<{ id: string, name: string } | null>(null)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [hasInteracted, setHasInteracted] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const { toast } = useToast()
   const { subscribe, connected, socket, emit } = useOrderSocket()
   const { user } = useAuth()
   const router = useRouter()
+
+  const playSound = async () => {
+    if (!soundEnabled || !audioRef.current) return;
+
+    try {
+      audioRef.current.currentTime = 0;
+      await audioRef.current.play();
+    } catch (err) {
+      console.warn('No se pudo reproducir el sonido:', err);
+      // Si el error es por falta de interacción, mostramos un toast
+      if (!hasInteracted) {
+        toast({
+          title: "Atención",
+          description: "Interactúa con la página para habilitar las notificaciones de sonido",
+        });
+      }
+    }
+  };
+
+  // Initialize audio
+  useEffect(() => {
+    audioRef.current = new Audio('/sounds/new-order.mp3')
+    if (audioRef.current) {
+      audioRef.current.volume = 0.5
+    }
+  }, [])
+
+  // Detect user interaction
+  useEffect(() => {
+    const handleInteraction = () => {
+      setHasInteracted(true);
+      // Pre-load audio after interaction
+      if (audioRef.current) {
+        audioRef.current.load();
+      }
+      // Remove listeners after first interaction
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+    };
+
+    document.addEventListener('click', handleInteraction);
+    document.addEventListener('keydown', handleInteraction);
+
+    return () => {
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+    };
+  }, []);
 
   // Initial fetch of orders
   useEffect(() => {
@@ -237,6 +288,9 @@ export function KitchenManager() {
       const newOrder = Array.isArray(newOrderData) ? newOrderData[0] : newOrderData;
       console.log("new_order_created event received:", newOrder);
 
+      // Play sound alert for new order
+      playSound();
+
       // Solo agregar si tiene items pendientes o en progreso
       if (
         newOrder.items &&
@@ -329,7 +383,7 @@ export function KitchenManager() {
       unsubscribeOrderUpdated();
       unsubscribeOrderItemUpdated();
     }
-  }, [connected, subscribe, toast])
+  }, [connected, subscribe, toast, soundEnabled])
 
   // Create a connection status indicator
   const connectionStatus = connected ? (
@@ -350,7 +404,18 @@ export function KitchenManager() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Órdenes Activas</CardTitle>
-            {connectionStatus}
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="flex items-center gap-2"
+              >
+                {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                {soundEnabled ? "Sonido On" : "Sonido Off"}
+              </Button>
+              {connectionStatus}
+            </div>
           </div>
           <div className="text-sm text-muted-foreground mt-1">
             {user?.locationId ? `Ubicación: ${user.locationId}` : 'Sin ubicación asignada'}
