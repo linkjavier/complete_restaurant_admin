@@ -399,9 +399,9 @@ export function KitchenManager() {
   )
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
+    <div className="space-y-4 -mx-4 sm:mx-0">
+      <Card className="rounded-none sm:rounded-lg">
+        <CardHeader className="px-4 sm:px-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <CardTitle>Órdenes Activas</CardTitle>
@@ -423,7 +423,7 @@ export function KitchenManager() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           {loading ? (
             <div className="text-center">Cargando órdenes...</div>
           ) : error ? (
@@ -434,17 +434,17 @@ export function KitchenManager() {
               </div>
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
               {orders.length === 0 ? (
-                <div className="text-center text-muted-foreground">
+                <div className="text-center text-muted-foreground col-span-full">
                   No hay órdenes activas
                 </div>
               ) : (
                 orders.map((order) => (
-                  <Card key={order.id} className="overflow-hidden">
+                  <Card key={order.id} className="overflow-hidden border-0 sm:border">
                     <CardContent className="p-0">
-                      <div className="bg-muted p-4">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div className="bg-muted p-3 sm:p-4">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                           <div>
                             <h3 className="font-bold text-lg">Mesa #{order.table?.number}</h3>
                             <p className="text-sm text-muted-foreground">
@@ -456,6 +456,7 @@ export function KitchenManager() {
                               variant="outline" 
                               size="sm"
                               onClick={() => handlePrintTicket(order.id)}
+                              className="h-8"
                             >
                               Imprimir Ticket
                             </Button>
@@ -464,6 +465,7 @@ export function KitchenManager() {
                                 variant="default" 
                                 size="sm"
                                 onClick={() => handleStartOrder(order.id, order.items)}
+                                className="h-8"
                               >
                                 Recibido
                               </Button>
@@ -472,14 +474,14 @@ export function KitchenManager() {
                         </div>
                       </div>
                       
-                      <div className="p-4">
+                      <div className="p-3 sm:p-4">
                         <h4 className="font-medium mb-2">Items:</h4>
-                        <ul className="space-y-4">
+                        <ul className="space-y-3">
                           {order.items
                             .filter(item => item.status !== "COMPLETED")
                             .map((item) => (
-                              <li key={item.id} className="border-b pb-4">
-                                <div className="flex flex-col space-y-3">
+                              <li key={item.id} className="border-b pb-3">
+                                <div className="flex flex-col space-y-2">
                                   <div className="flex items-start justify-between">
                                     <div className="space-y-1">
                                       <div className="flex items-center gap-2">
@@ -508,6 +510,7 @@ export function KitchenManager() {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => handleUpdateItemStatus(item.id, "IN_PROGRESS")}
+                                        className="h-8"
                                       >
                                         Iniciar Preparación
                                       </Button>
@@ -518,6 +521,7 @@ export function KitchenManager() {
                                           size="sm"
                                           variant="outline"
                                           onClick={() => handleUpdateItemStatus(item.id, "PENDING")}
+                                          className="h-8"
                                         >
                                           Volver a Pendiente
                                         </Button>
@@ -525,6 +529,7 @@ export function KitchenManager() {
                                           size="sm"
                                           variant="default"
                                           onClick={() => handleUpdateItemStatus(item.id, "READY")}
+                                          className="h-8"
                                         >
                                           Marcar Completado
                                         </Button>
@@ -534,6 +539,7 @@ export function KitchenManager() {
                                       size="sm"
                                       variant="destructive"
                                       onClick={() => setItemToCancel({ id: item.id, name: item.product.name })}
+                                      className="h-8"
                                     >
                                       Cancelar
                                     </Button>
