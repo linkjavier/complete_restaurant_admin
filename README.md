@@ -243,6 +243,8 @@ npx prisma db push --force-reset
 # Alimentar la base de datos
 ```bash
 chmod +x ./scripts/seed-database.sh && ./scripts/seed-database.sh
+
+chmod +x ./scripts/seed-database-with-images.sh && ./scripts/seed-database-with-images.sh
 ```
 
 ## 🚀 Despliegue
