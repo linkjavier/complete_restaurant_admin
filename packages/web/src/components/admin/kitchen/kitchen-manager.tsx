@@ -446,7 +446,14 @@ export function KitchenManager() {
                       <div className="bg-muted p-3 sm:p-4">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                           <div>
-                            <h3 className="font-bold text-lg">Mesa #{order.table?.number}</h3>
+                            <h3 className="font-bold text-lg">
+                              {order.table?.number ? `Mesa #${order.table.number}` : 'Para Llevar'}
+                            </h3>
+                            {order.customerName && (
+                              <p className="text-sm font-medium text-primary">
+                                Cliente: {order.customerName}
+                              </p>
+                            )}
                             <p className="text-sm text-muted-foreground">
                               Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                             </p>
