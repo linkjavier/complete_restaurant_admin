@@ -348,6 +348,27 @@ export function OrdersManager() {
     )
   }
 
+  const getItemStatusBadge = (status: OrderStatus) => {
+    const statusConfig = {
+      PENDING: { label: "Pendiente", variant: "warning", icon: <Clock className="h-3 w-3 mr-1" /> },
+      IN_PROGRESS: { label: "En Progreso", variant: "info", icon: <Timer className="h-3 w-3 mr-1" /> },
+      READY: { label: "Listo", variant: "success", icon: <CheckCircle2 className="h-3 w-3 mr-1" /> },
+      CANCELLED: { label: "Cancelado", variant: "destructive", icon: <XCircle className="h-3 w-3 mr-1" /> },
+      PAID: { label: "Pagado", variant: "default", icon: <CreditCard className="h-3 w-3 mr-1" /> }
+    }
+
+    const config = statusConfig[status]
+    return (
+      <Badge 
+        variant={config.variant as any}
+        className="flex items-center"
+      >
+        {config.icon}
+        {config.label}
+      </Badge>
+    )
+  }
+
   const getPaymentMethodIcon = (method?: PaymentMethod) => {
     if (!method) return null
     
@@ -443,7 +464,10 @@ export function OrdersManager() {
                             {order.items.map((item) => (
                               <div key={item.id} className="flex justify-between items-center">
                                 <div>
-                                  <p className="font-medium">{item.product.name}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium">{item.product.name}</p>
+                                    {getItemStatusBadge(item.status)}
+                                  </div>
                                   <p className="text-sm text-muted-foreground">
                                     {item.quantity} x ${item.product.price.toFixed(2)}
                                   </p>
