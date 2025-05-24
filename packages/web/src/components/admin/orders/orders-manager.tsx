@@ -329,6 +329,7 @@ export function OrdersManager() {
   const calculateOrderTotal = (order: Order) => {
     if (!order?.items?.length) return 0;
     return order.items.reduce((total, item) => {
+      if (item.status === "CANCELLED") return total;
       return total + (item.quantity * (item.product?.price || 0));
     }, 0);
   };
