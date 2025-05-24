@@ -1,11 +1,102 @@
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Overview } from "@/components/admin/overview"
 import { RecentSales } from "@/components/admin/recent-sales"
 import { Button } from "@/components/ui/button"
-import { Building2, Users, Utensils, DollarSign, Package } from "lucide-react"
+import { Building2, Users, Utensils, DollarSign, Package, ShoppingCart, CheckCircle2, XCircle } from "lucide-react"
+import { useEffect, useState } from "react"
+
+interface Order {
+  id: string
+  status: "PENDING" | "IN_PROGRESS" | "READY" | "CANCELLED" | "PAID"
+  items: Array<{
+    quantity: number
+    product: {
+      price: number
+    }
+  }>
+  isPaid: boolean
+  total: number
+}
+
+interface OrderStats {
+  activeOrders: {
+    count: number
+    total: number
+  }
+  paidOrders: {
+    count: number
+    total: number
+  }
+  cancelledOrders: {
+    count: number
+    total: number
+  }
+}
 
 export default function AdminDashboard() {
+  const [orderStats, setOrderStats] = useState<OrderStats>({
+    activeOrders: { count: 0, total: 0 },
+    paidOrders: { count: 0, total: 0 },
+    cancelledOrders: { count: 0, total: 0 }
+  })
+
+  const calculateOrderTotal = (order: Order) => {
+    if (!order?.items?.length) return 0
+    return order.items.reduce((total, item) => {
+      return total + (item.quantity * (item.product?.price || 0))
+    }, 0)
+  }
+
+  const fetchOrderStats = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?kitchen=false`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al cargar las órdenes')
+      }
+
+      const orders: Order[] = await response.json()
+      
+      const stats: OrderStats = {
+        activeOrders: {
+          count: orders.filter(order => order.status === "PENDING" || order.status === "IN_PROGRESS").length,
+          total: orders
+            .filter(order => order.status === "PENDING" || order.status === "IN_PROGRESS")
+            .reduce((total, order) => total + calculateOrderTotal(order), 0)
+        },
+        paidOrders: {
+          count: orders.filter(order => order.isPaid).length,
+          total: orders
+            .filter(order => order.isPaid)
+            .reduce((total, order) => total + calculateOrderTotal(order), 0)
+        },
+        cancelledOrders: {
+          count: orders.filter(order => order.status === "CANCELLED").length,
+          total: orders
+            .filter(order => order.status === "CANCELLED")
+            .reduce((total, order) => total + calculateOrderTotal(order), 0)
+        }
+      }
+
+      setOrderStats(stats)
+    } catch (error) {
+      console.error('Error fetching order stats:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchOrderStats()
+    const interval = setInterval(fetchOrderStats, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
@@ -41,40 +132,40 @@ export default function AdminDashboard() {
                 <CardTitle className="text-sm font-medium">
                   Pedidos Activos
                 </CardTitle>
-                <Utensils className="h-4 w-4 text-muted-foreground" />
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">12</div>
+                <div className="text-2xl font-bold">{orderStats.activeOrders.count}</div>
                 <p className="text-xs text-muted-foreground">
-                  3 en cocina, 9 listos para servir
+                  Total: ${orderStats.activeOrders.total.toFixed(2)}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Clientes Activos
+                  Pedidos Pagados
                 </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">2350</div>
+                <div className="text-2xl font-bold">{orderStats.paidOrders.count}</div>
                 <p className="text-xs text-muted-foreground">
-                  +180 desde el mes pasado
+                  Total: ${orderStats.paidOrders.total.toFixed(2)}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Alertas de Inventario
+                  Pedidos Cancelados
                 </CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
+                <XCircle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">3</div>
+                <div className="text-2xl font-bold">{orderStats.cancelledOrders.count}</div>
                 <p className="text-xs text-muted-foreground">
-                  Productos con stock bajo
+                  Total: ${orderStats.cancelledOrders.total.toFixed(2)}
                 </p>
               </CardContent>
             </Card>
