@@ -131,7 +131,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
         <div className="space-y-4">
           {/* Welcome Message with Logo */}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-2">
               <div className="flex justify-between items-center">
                 <div className="space-y-2">
                   <h2 className="text-2xl font-bold">¡Hola {customerName}!</h2>

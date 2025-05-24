@@ -55,8 +55,8 @@ export default function TablePage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="mb-6">
+    <div className="container mx-auto py-3">
+      <div className="mb-3">
         <div className="flex justify-between items-center">
           <div className="flex flex-col space-y-2">
             <h1 className="text-2xl font-bold">Mesa {table.number}</h1>
