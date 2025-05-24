@@ -131,7 +131,7 @@ export function KitchenManager() {
           )
           
           // If status is READY and all items are ready, keep the order for 5 seconds
-          if (status === "READY" && updatedItems.every(i => i.status === "READY")) {
+          if (status === "READY" && updatedItems.every(i => i.status === "READY" || i.status === "CANCELLED")) {
             toast({
               title: "Orden Completada",
               description: "La orden se eliminará en 5 segundos",
@@ -335,7 +335,7 @@ export function KitchenManager() {
         updatedOrders[orderIndex] = updatedOrder
 
         // Si todos los ítems están en estado READY, esperar 5 segundos antes de filtrar
-        if (updatedOrder.items.every(i => i.status === "READY")) {
+        if (updatedOrder.items.every(i => i.status === "READY" || i.status === "CANCELLED")) {
           toast({
             title: "Orden Completada",
             description: "La orden se eliminará en 5 segundos",

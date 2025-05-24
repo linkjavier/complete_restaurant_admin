@@ -96,9 +96,11 @@ export class KitchenService {
           where: { orderId: updatedItem.order.id },
         });
 
-        const allReady = allItems.every((item) => item.status === 'READY');
+        const allReadyOrCancelled = allItems.every((item) => 
+          item.status === 'READY' || item.status === 'CANCELLED'
+        );
 
-        if (allReady) {
+        if (allReadyOrCancelled) {
           const updatedOrder = await tx.order.update({
             where: { id: updatedItem.order.id },
             data: { status: 'READY' },
