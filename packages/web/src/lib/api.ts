@@ -468,6 +468,9 @@ export async function createOrder(data: {
     productId: string;
     quantity: number;
   }>;
+  status?: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'DELIVERED' | 'CANCELLED';
+  isPaid?: boolean;
+  customerName?: string;
 }) {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
     method: 'POST',

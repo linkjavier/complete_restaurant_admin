@@ -12,7 +12,8 @@ import {
   getTables, 
   Table, 
   createOrder, 
-  getActiveOrders 
+  getActiveOrders,
+  processPayment
 } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -166,10 +167,22 @@ export default function PosPage() {
         type: orderType === "table" ? "TABLE" as const : "TAKEOUT" as const,
         locationId,
         customerName: orderType === "takeout" ? customerName : undefined,
-        items: orderItems
+        items: orderItems,
+        status: orderType === "takeout" ? "IN_PROGRESS" as const : "PENDING" as const,
+        isPaid: orderType === "takeout" ? true : false
       }
 
-      await createOrder(orderData)
+      const createdOrder = await createOrder(orderData)
+
+      // Si es para llevar, crear el pago automáticamente
+      if (orderType === "takeout") {
+        const total = orderItems.reduce((sum, item) => {
+          const product = products.find(p => p.id === item.productId)
+          return sum + (product?.price || 0) * item.quantity
+        }, 0)
+
+        await processPayment(createdOrder.id, total, "CASH")
+      }
       
       // Clear cart and customer name
       setCart({})

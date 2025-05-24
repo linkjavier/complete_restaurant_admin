@@ -76,8 +76,8 @@ export class OrdersService {
 
       const orderCreateData: any = {
         ...orderData,
-        status: 'PENDING',
-        isPaid: false,
+        status: orderData.status || 'PENDING',
+        isPaid: orderData.isPaid || false,
         items: {
           create: items.map(item => ({
             productId: item.productId,
@@ -127,9 +127,11 @@ export class OrdersService {
         this.logger.warn(`No locationId for order ${order.id}, skipping WebSocket notification`);
       }
       
-      // Queue background processing jobs
-      await this.ordersQueueService.addOrderProcessingJob(order);
-      this.logger.log(`Background processing jobs queued for order ${order.id}`);
+      // Queue background processing jobs only if status is PENDING
+      if (order.status === 'PENDING') {
+        await this.ordersQueueService.addOrderProcessingJob(order);
+        this.logger.log(`Background processing jobs queued for order ${order.id}`);
+      }
       
       return order;
     } catch (error) {
