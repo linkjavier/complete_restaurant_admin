@@ -3,9 +3,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Overview } from "@/components/admin/overview"
-import { RecentSales } from "@/components/admin/recent-sales"
 import { Button } from "@/components/ui/button"
-import { Building2, Users, Utensils, DollarSign, Package, ShoppingCart, CheckCircle2, XCircle } from "lucide-react"
+import { Building2, Users, Utensils, DollarSign, Package, ShoppingCart, CheckCircle2, XCircle, TrendingUp } from "lucide-react"
 import { useEffect, useState } from "react"
 
 interface Order {
@@ -15,6 +14,7 @@ interface Order {
     quantity: number
     product: {
       price: number
+      name: string
     }
   }>
   isPaid: boolean
@@ -36,18 +36,50 @@ interface OrderStats {
   }
 }
 
+interface TopProduct {
+  name: string
+  quantity: number
+  total: number
+}
+
 export default function AdminDashboard() {
   const [orderStats, setOrderStats] = useState<OrderStats>({
     activeOrders: { count: 0, total: 0 },
     paidOrders: { count: 0, total: 0 },
     cancelledOrders: { count: 0, total: 0 }
   })
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([])
 
   const calculateOrderTotal = (order: Order) => {
     if (!order?.items?.length) return 0
     return order.items.reduce((total, item) => {
       return total + (item.quantity * (item.product?.price || 0))
     }, 0)
+  }
+
+  const calculateTopProducts = (orders: Order[]) => {
+    const productMap = new Map<string, { quantity: number; total: number }>()
+
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        const productName = item.product.name
+        const current = productMap.get(productName) || { quantity: 0, total: 0 }
+        
+        productMap.set(productName, {
+          quantity: current.quantity + item.quantity,
+          total: current.total + (item.quantity * item.product.price)
+        })
+      })
+    })
+
+    return Array.from(productMap.entries())
+      .map(([name, stats]) => ({
+        name,
+        quantity: stats.quantity,
+        total: stats.total
+      }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5)
   }
 
   const fetchOrderStats = async () => {
@@ -86,6 +118,7 @@ export default function AdminDashboard() {
       }
 
       setOrderStats(stats)
+      setTopProducts(calculateTopProducts(orders))
     } catch (error) {
       console.error('Error fetching order stats:', error)
     }
@@ -181,10 +214,32 @@ export default function AdminDashboard() {
             </Card>
             <Card className="col-span-3">
               <CardHeader>
-                <CardTitle>Ventas Recientes</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Top 5 Productos Más Vendidos</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </div>
               </CardHeader>
               <CardContent>
-                <RecentSales />
+                <div className="space-y-4">
+                  {topProducts.map((product, index) => (
+                    <div key={product.name} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-sm font-medium">{index + 1}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{product.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {product.quantity} unidades vendidas
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-sm font-medium">
+                        ${product.total.toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>
