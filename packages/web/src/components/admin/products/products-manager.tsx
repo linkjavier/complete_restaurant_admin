@@ -542,7 +542,7 @@ export function ProductsManager() {
                           </p>
                         )}
                         <p className="text-sm text-muted-foreground">
-                          Precio: ${product.price}
+                          Precio: ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           Categoría: {product.category?.name}

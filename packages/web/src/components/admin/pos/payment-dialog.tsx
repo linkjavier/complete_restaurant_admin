@@ -167,16 +167,16 @@ export function PaymentDialog({
             <CardContent className="pt-6">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>Total:</div>
-                <div className="text-right">${paymentDetails.totalAmount.toFixed(2)}</div>
+                <div className="text-right">${paymentDetails.totalAmount.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</div>
                 {!isPrePayment && (
                   <>
                     <div>Pagado hasta ahora:</div>
-                    <div className="text-right">${paymentDetails.paidAmount.toFixed(2)}</div>
+                    <div className="text-right">${paymentDetails.paidAmount.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</div>
                   </>
                 )}
                 <div>Saldo Pendiente:</div>
                 <div className="text-right font-bold">
-                  ${paymentDetails.remainingBalance.toFixed(2)}
+                  ${paymentDetails.remainingBalance.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                 </div>
               </div>
             </CardContent>
@@ -194,7 +194,7 @@ export function PaymentDialog({
                     <span>
                       {new Date(payment.createdAt).toLocaleString()} - {payment.method}
                     </span>
-                    <span className="font-medium">${payment.amount.toFixed(2)}</span>
+                    <span className="font-medium">${payment.amount.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
                   </div>
                 ))}
               </div>

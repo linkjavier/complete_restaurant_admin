@@ -198,12 +198,12 @@ export function Cart({
                             <div className="flex-1">
                               <span className="font-medium">{item.product.name}</span>
                               <div className="text-muted-foreground">
-                                ${item.product.price.toFixed(2)} x {item.quantity}
+                                ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })} x {item.quantity}
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-muted-foreground">
-                                ${(item.product.price * item.quantity).toFixed(2)}
+                                ${(item.product.price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                               </span>
                               {getStatusBadge(item.status)}
                             </div>
@@ -214,7 +214,7 @@ export function Cart({
                         <span className="font-medium">Subtotal:</span>
                         <span className="font-medium">
                           ${(order.total || order.items?.reduce((sum, item) => 
-                            sum + (item.product.price * item.quantity), 0) || 0).toFixed(2)}
+                            sum + (item.product.price * item.quantity), 0) || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                         </span>
                       </div>
                       <div className="flex justify-end mt-2">
@@ -235,7 +235,7 @@ export function Cart({
                   <div className="pt-2 mt-2 border-t">
                     <div className="flex justify-between items-center font-medium">
                       <span>Total de Órdenes:</span>
-                      <span>${ordersTotal.toFixed(2)}</span>
+                      <span>${ordersTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
                     </div>
                   </div>
                 </div>
@@ -255,7 +255,7 @@ export function Cart({
                       <div className="flex-1">
                         <p className="font-medium">{item.product.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          ${item.product.price.toFixed(2)} x {item.quantity}
+                          ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })} x {item.quantity}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -309,18 +309,18 @@ export function Cart({
               {selectedTable && currentOrders.length > 0 && (
                 <div className="flex justify-between items-center mb-2 text-sm text-muted-foreground">
                   <span>Órdenes activas:</span>
-                  <span>${ordersTotal.toFixed(2)}</span>
+                  <span>${ordersTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
                 </div>
               )}
               {items.length > 0 && (
                 <div className="flex justify-between items-center mb-2 text-sm text-muted-foreground">
                   <span>Carrito actual:</span>
-                  <span>${cartTotal.toFixed(2)}</span>
+                  <span>${cartTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
                 </div>
               )}
               <div className="flex justify-between items-center mb-4 text-lg font-bold">
                 <span>Total:</span>
-                <span>${allOrdersTotal.toFixed(2)}</span>
+                <span>${allOrdersTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
               </div>
               <div className="flex gap-2">
                 <Button

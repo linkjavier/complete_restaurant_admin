@@ -651,7 +651,7 @@ export function TablesManager() {
                           <div>
                             <p className="font-medium">{item.product.name}</p>
                             <p className="text-sm text-muted-foreground">
-                              {item.quantity} x ${item.product.price.toFixed(2)}
+                              {item.quantity} x ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                             </p>
                             {item.notes && (
                               <p className="text-sm text-muted-foreground">
@@ -663,7 +663,7 @@ export function TablesManager() {
                             </Badge>
                           </div>
                           <Badge variant="secondary">
-                            ${(item.product.price * item.quantity).toFixed(2)}
+                            ${(item.product.price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                           </Badge>
                         </div>
                       ))}
@@ -675,7 +675,7 @@ export function TablesManager() {
                         <span className="font-bold">
                           ${order.items.reduce((total, item) => 
                             total + (item.quantity * item.product.price), 0
-                          ).toFixed(2)}
+                          ).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                         </span>
                       </div>
                     </div>

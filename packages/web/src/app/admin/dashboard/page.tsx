@@ -170,7 +170,7 @@ export default function AdminDashboard() {
               <CardContent>
                 <div className="text-2xl font-bold">{orderStats.activeOrders.count}</div>
                 <p className="text-xs text-muted-foreground">
-                  Total: ${orderStats.activeOrders.total.toFixed(2)}
+                  Total: ${orderStats.activeOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                 </p>
               </CardContent>
             </Card>
@@ -184,7 +184,7 @@ export default function AdminDashboard() {
               <CardContent>
                 <div className="text-2xl font-bold">{orderStats.paidOrders.count}</div>
                 <p className="text-xs text-muted-foreground">
-                  Total: ${orderStats.paidOrders.total.toFixed(2)}
+                  Total: ${orderStats.paidOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                 </p>
               </CardContent>
             </Card>
@@ -198,7 +198,7 @@ export default function AdminDashboard() {
               <CardContent>
                 <div className="text-2xl font-bold">{orderStats.cancelledOrders.count}</div>
                 <p className="text-xs text-muted-foreground">
-                  Total: ${orderStats.cancelledOrders.total.toFixed(2)}
+                  Total: ${orderStats.cancelledOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                 </p>
               </CardContent>
             </Card>
@@ -235,7 +235,7 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <div className="text-sm font-medium">
-                        ${product.total.toFixed(2)}
+                        ${product.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                       </div>
                     </div>
                   ))}

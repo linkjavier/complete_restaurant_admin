@@ -100,7 +100,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
                 <div>
                   <p className="font-medium">{item.product.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    ${item.price.toFixed(2)} x {item.quantity}
+                    ${item.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })} x {item.quantity}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -193,7 +193,9 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
         <CardContent className="pt-6">
           <div className="flex justify-between items-center">
             <span className="font-medium">Total:</span>
-            <span className="font-bold">${total.toFixed(2)}</span>
+            <div className="text-lg font-bold">
+              ${total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+            </div>
           </div>
           <Button
             className="w-full mt-4"

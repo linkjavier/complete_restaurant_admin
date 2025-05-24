@@ -475,7 +475,7 @@ export function OrdersManager() {
                                     {getItemStatusBadge(item.status)}
                                   </div>
                                   <p className="text-sm text-muted-foreground">
-                                    {item.quantity} x ${item.product.price.toFixed(2)}
+                                    {item.quantity} x ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                   </p>
                                   {item.notes && (
                                     <p className="text-sm text-muted-foreground">
@@ -484,7 +484,7 @@ export function OrdersManager() {
                                   )}
                                 </div>
                                 <Badge variant="outline">
-                                  ${(item.product.price * item.quantity).toFixed(2)}
+                                  ${(item.product.price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                 </Badge>
                               </div>
                             ))}
@@ -494,7 +494,7 @@ export function OrdersManager() {
                             <div className="flex justify-between items-center">
                               <span className="font-bold">Total:</span>
                               <span className="font-bold">
-                                ${calculateOrderTotal(order).toFixed(2)}
+                                ${calculateOrderTotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                               </span>
                             </div>
                           </div>

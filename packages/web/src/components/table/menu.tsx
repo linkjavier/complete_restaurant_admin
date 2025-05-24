@@ -269,7 +269,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                           <p className="text-sm text-muted-foreground">
                             {product.description}
                           </p>
-                          <p className="font-bold">${product.price.toFixed(2)}</p>
+                          <p className="font-bold">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
                           <div className="flex items-center gap-2">
                             <Button
                               variant="outline"

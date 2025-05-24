@@ -50,7 +50,7 @@ export function ProductGrid({ products, onAddToCart, cart }: ProductGridProps) {
                   {product.description}
                 </p>
                 <div className="flex items-center justify-between">
-                  <p className="font-bold text-lg">${product.price.toFixed(2)}</p>
+                  <p className="font-bold text-lg">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
                   <Button
                     size="sm"
                     onClick={() => onAddToCart(product.id)}
