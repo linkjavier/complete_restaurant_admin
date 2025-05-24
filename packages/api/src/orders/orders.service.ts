@@ -76,6 +76,8 @@ export class OrdersService {
 
       const orderCreateData: any = {
         ...orderData,
+        status: 'PENDING',
+        isPaid: false,
         items: {
           create: items.map(item => ({
             productId: item.productId,

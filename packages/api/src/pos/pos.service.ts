@@ -125,7 +125,7 @@ export class PosService {
     if (orderDetails.remainingBalance - amount === 0) {
       await this.prisma.order.update({
         where: { id: orderId },
-        data: { status: 'PAID' },
+        data: { isPaid: true },
       });
     }
 

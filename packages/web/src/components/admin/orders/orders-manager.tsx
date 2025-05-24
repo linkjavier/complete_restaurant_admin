@@ -49,6 +49,7 @@ interface Order {
   createdAt: string
   updatedAt: string
   customerName?: string
+  isPaid: boolean
 }
 
 export function OrdersManager() {
@@ -265,13 +266,17 @@ export function OrdersManager() {
 
   const handleProcessPayment = async (orderId: string, paymentMethod: PaymentMethod) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/payment`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/payments/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ paymentMethod })
+        body: JSON.stringify({ 
+          orderId,
+          method: paymentMethod,
+          amount: calculateOrderTotal(orders.find(o => o.id === orderId)!)
+        })
       })
 
       if (!response.ok) {
@@ -389,7 +394,7 @@ export function OrdersManager() {
       case "completed":
         return order.status === "READY"
       case "paid":
-        return order.status === "PAID"
+        return order.isPaid
       case "cancelled":
         return order.status === "CANCELLED"
       default:

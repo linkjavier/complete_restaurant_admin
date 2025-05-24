@@ -105,12 +105,12 @@ export class PaymentsService {
       },
     });
 
-    // Si el pago completa el total, actualizar el estado de la orden
+    // Si el pago completa el total, actualizar el flag isPaid
     if (paymentDetails.remainingBalance - amount === 0) {
       await this.prisma.order.update({
         where: { id: orderId },
         data: {
-          status: OrderStatus.PAID,
+          isPaid: true,
         },
       });
     }
