@@ -24,6 +24,10 @@ export class CreateOrderDto {
   @IsString()
   userId?: string;
 
+  @IsOptional()
+  @IsString()
+  customerName?: string;
+
   @IsEnum(OrderType)
   @IsNotEmpty()
   type: OrderType;

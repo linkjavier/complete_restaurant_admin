@@ -33,8 +33,9 @@ export default function PosPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [cart, setCart] = useState<Record<string, number>>({})
-  const [orderType, setOrderType] = useState<"table" | "takeout">("table")
+  const [orderType, setOrderType] = useState<"table" | "takeout">("takeout")
   const [selectedTable, setSelectedTable] = useState<string>("")
+  const [customerName, setCustomerName] = useState("")
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [activeOrders, setActiveOrders] = useState<any[]>([])
@@ -130,6 +131,15 @@ export default function PosPage() {
         return
       }
 
+      if (orderType === "takeout" && !customerName.trim()) {
+        toast({
+          title: "Error",
+          description: "Por favor ingresa el nombre del cliente",
+          variant: "destructive",
+        })
+        return
+      }
+
       setSubmitting(true)
       const selectedTableData = tables.find(t => t.id === selectedTable)
       if (!selectedTableData && orderType === "table") {
@@ -153,15 +163,17 @@ export default function PosPage() {
 
       const orderData = {
         tableId: orderType === "table" ? selectedTable : undefined,
-        type: orderType === "table" ? "TABLE" : "TAKEOUT",
+        type: orderType === "table" ? "TABLE" as const : "TAKEOUT" as const,
         locationId,
+        customerName: orderType === "takeout" ? customerName : undefined,
         items: orderItems
       }
 
       await createOrder(orderData)
       
-      // Clear cart
+      // Clear cart and customer name
       setCart({})
+      setCustomerName("")
 
       // Refresh active orders
       if (selectedTable) {
@@ -300,6 +312,8 @@ export default function PosPage() {
           onSubmit={handleCreateOrder}
           currentOrders={currentOrders}
           loading={submitting}
+          customerName={customerName}
+          onCustomerNameChange={setCustomerName}
         />
       </div>
     </div>

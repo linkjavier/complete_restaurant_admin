@@ -157,6 +157,7 @@ model Order {
   status        OrderStatus  @default(PENDING)
   user          User?        @relation(fields: [userId], references: [id])
   userId        String?
+  customerName  String?
   items         OrderItem[]
   payments      Payment[]
 }

@@ -27,6 +27,8 @@ interface CartProps {
   onTableSelect: (tableId: string) => void
   onSubmit: () => void
   loading?: boolean
+  customerName: string
+  onCustomerNameChange: (name: string) => void
   currentOrders: {
     id: string
     status: string
@@ -54,6 +56,8 @@ export function Cart({
   onTableSelect,
   onSubmit,
   loading = false,
+  customerName,
+  onCustomerNameChange,
   currentOrders = [],
 }: CartProps) {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
@@ -136,20 +140,29 @@ export function Cart({
             <div className="space-y-2">
               <div className="flex gap-2">
                 <Button
-                  variant={orderType === "table" ? "default" : "outline"}
-                  onClick={() => onOrderTypeChange("table")}
-                  disabled={isProcessing}
-                >
-                  Mesa
-                </Button>
-                <Button
                   variant={orderType === "takeout" ? "default" : "outline"}
                   onClick={() => onOrderTypeChange("takeout")}
                   disabled={isProcessing}
                 >
                   Para Llevar
                 </Button>
+                <Button
+                  variant={orderType === "table" ? "default" : "outline"}
+                  onClick={() => onOrderTypeChange("table")}
+                  disabled={isProcessing}
+                >
+                  Mesa
+                </Button>
               </div>
+
+              {orderType === "takeout" && (
+                <Input
+                  placeholder="Nombre del cliente"
+                  value={customerName}
+                  onChange={(e) => onCustomerNameChange(e.target.value)}
+                  disabled={isProcessing}
+                />
+              )}
 
               {orderType === "table" && (
                 <select
@@ -316,6 +329,7 @@ export function Cart({
                   disabled={
                     items.length === 0 ||
                     (orderType === "table" && !selectedTable) ||
+                    (orderType === "takeout" && !customerName.trim()) ||
                     isProcessing ||
                     loading
                   }
