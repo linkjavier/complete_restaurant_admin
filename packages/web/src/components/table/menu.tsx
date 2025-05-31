@@ -4,10 +4,12 @@ import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Minus, Clock, Package, ShoppingCart } from "lucide-react"
+import { Plus, Minus, Clock, Package, ShoppingCart, RefreshCw } from "lucide-react"
 import { getProducts, Product, Category, getActiveOrders } from "@/lib/api"
 import { Cart } from "./cart"
 import Image from "next/image"
+import { toast } from "sonner"
+import { io } from "socket.io-client"
 
 interface MenuProps {
   locationId: string
@@ -26,6 +28,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   const [activeTab, setActiveTab] = useState<'menu' | 'orders'>('menu')
   const [isCartVisible, setIsCartVisible] = useState(false)
   const cartRef = useRef<HTMLDivElement>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const handleScroll = () => {
     if (!cartRef.current) return
@@ -52,20 +55,16 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   const fetchData = async () => {
     try {
       setLoading(true)
-      setError(null)
       const [productsData, ordersData] = await Promise.all([
-        getProducts(
-          locationId,
-          selectedCategory === "all" ? undefined : selectedCategory,
-          searchTerm || undefined
-        ),
+        getProducts(locationId),
         getActiveOrders(tableId)
       ])
       setProducts(productsData)
       setActiveOrders(ordersData)
-    } catch (err: any) {
+      setError(null)
+    } catch (err) {
       console.error('Error fetching data:', err)
-      setError(err.message || "Error al cargar los datos")
+      setError('Error al cargar los datos. Por favor, intenta de nuevo.')
     } finally {
       setLoading(false)
     }
@@ -73,7 +72,50 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
 
   useEffect(() => {
     fetchData()
-  }, [locationId, selectedCategory, searchTerm, tableId])
+  }, [locationId, tableId])
+
+  // Add auto-refresh functionality
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        const [productsData, ordersData] = await Promise.all([
+          getProducts(locationId),
+          getActiveOrders(tableId)
+        ])
+        setProducts(productsData)
+        setActiveOrders(ordersData)
+        setError(null)
+      } catch (err) {
+        console.error('Error fetching data:', err)
+        setError('Error al cargar los datos. Por favor, intenta de nuevo.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    // Initial fetch
+    fetchData()
+
+    // Set up auto-refresh every minute
+    const refreshInterval = setInterval(fetchData, 60000)
+
+    // Cleanup interval on unmount
+    return () => clearInterval(refreshInterval)
+  }, [locationId, tableId])
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true)
+      const ordersData = await getActiveOrders(tableId)
+      setActiveOrders(ordersData)
+    } catch (err) {
+      console.error('Error refreshing orders:', err)
+      toast.error('Error al actualizar las órdenes')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   // Extraer categorías únicas de los productos
   const categoriesMap = new Map<string, Category>();
@@ -128,6 +170,43 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
       setTimeout(handleScroll, 100)
     }
   }
+
+  // Add socket connection for real-time updates
+  useEffect(() => {
+    const socket = io(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+      transports: ['websocket'],
+      path: '/socket.io',
+    });
+
+    socket.on('connect', () => {
+      socket.emit('join-kitchen', locationId);
+    });
+
+    socket.on('new_order_created', (newOrder) => {
+      setActiveOrders(prev => {
+        // Check if order already exists
+        const exists = prev.some(order => order.id === newOrder.id);
+        if (exists) return prev;
+        return [newOrder, ...prev];
+      });
+    });
+
+    socket.on('order_updated', (updatedOrder) => {
+      setActiveOrders(prev => 
+        prev.map(order => order.id === updatedOrder.id ? updatedOrder : order)
+      );
+    });
+
+    socket.on('order_item_updated', ({ order }) => {
+      setActiveOrders(prev => 
+        prev.map(o => o.id === order.id ? order : o)
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [locationId]);
 
   if (loading) {
     return (
@@ -217,58 +296,71 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
           </div>
 
           {activeTab === 'orders' ? (
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>Órdenes Activas</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {activeOrders.length === 0 ? (
-                    <p className="text-center text-muted-foreground">No hay órdenes activas</p>
-                  ) : (
-                    activeOrders.map((order) => (
-                      <div key={order.id} className="border rounded-lg p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className="font-medium">Orden #{order.id.substring(0, 8)}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(order.createdAt).toLocaleTimeString()}
-                            </p>
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Órdenes Activas</h2>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle>Órdenes Activas</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {activeOrders.length === 0 ? (
+                      <p className="text-center text-muted-foreground">No hay órdenes activas</p>
+                    ) : (
+                      activeOrders.map((order) => (
+                        <div key={order.id} className="border rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-medium">Orden #{order.id.substring(0, 8)}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(order.createdAt).toLocaleTimeString()}
+                              </p>
+                            </div>
+                            <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded-full">
+                              {order.items.reduce((sum, item) => sum + item.quantity, 0)} items
+                            </span>
                           </div>
-                          <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded-full">
-                            {order.items.reduce((sum, item) => sum + item.quantity, 0)} items
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {order.items.map((item) => (
-                            <div key={item.id} className="flex justify-between items-center">
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm">{item.product.name}</p>
-                                <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
-                                  x{item.quantity}
+                          <div className="space-y-2">
+                            {order.items.map((item) => (
+                              <div key={item.id} className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm">{item.product.name}</p>
+                                  <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
+                                    x{item.quantity}
+                                  </span>
+                                </div>
+                                <span className={`text-sm ${
+                                  item.status === "PENDING" ? "text-yellow-500" :
+                                  item.status === "IN_PROGRESS" ? "text-blue-500" :
+                                  "text-green-500"
+                                }`}>
+                                  {item.status === "PENDING" ? "Pendiente" :
+                                   item.status === "IN_PROGRESS" ? "En preparación" :
+                                   item.status === "CANCELLED" ? "Cancelada" :
+                                   "Listo"}
                                 </span>
                               </div>
-                              <span className={`text-sm ${
-                                item.status === "PENDING" ? "text-yellow-500" :
-                                item.status === "IN_PROGRESS" ? "text-blue-500" :
-                                "text-green-500"
-                              }`}>
-                                {item.status === "PENDING" ? "Pendiente" :
-                                 item.status === "IN_PROGRESS" ? "En preparación" :
-                                 item.status === "CANCELLED" ? "Cancelada" :
-                                 "Listo"}
-                              </span>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           ) : (
             <>
               <div className="flex flex-col gap-4">

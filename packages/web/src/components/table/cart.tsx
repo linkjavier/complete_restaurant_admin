@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Plus, Minus, Users } from "lucide-react"
 import { OrderItem, Product, getAuthToken } from "@/lib/api"
 import { toast } from "sonner"
+import { io } from "socket.io-client"
 
 interface CartProps {
   customerName: string
@@ -47,7 +48,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
       const orderData = {
         tableId,
         locationId,
-        type: "TABLE" as const, // Add order type as TABLE
+        type: "TABLE" as const,
         items: items.map(item => ({
           productId: item.product.id,
           quantity: item.quantity,
@@ -56,7 +57,6 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
       
       // Solo añadir splitBill si es necesario
       if (splitBill && splitNames.length > 0) {
-        // Guardamos los nombres como metadatos, no como customerName
         (orderData as any).splitBill = splitNames;
       }
       
@@ -73,6 +73,20 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
         console.error('Error response:', errorData);
         throw new Error('Error al crear el pedido: ' + (errorData.message || response.statusText));
       }
+
+      const newOrder = await response.json();
+
+      // Conectar al socket y emitir el evento de nueva orden
+      const socket = io(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+        transports: ['websocket'],
+        path: '/socket.io',
+      });
+
+      socket.on('connect', () => {
+        socket.emit('join-kitchen', locationId);
+        socket.emit('new_order_created', newOrder);
+        socket.disconnect();
+      });
 
       toast.success('Pedido enviado correctamente');
       onItemsChange([]); // Limpiar el carrito
