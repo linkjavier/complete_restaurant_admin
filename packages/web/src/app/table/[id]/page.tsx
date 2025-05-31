@@ -92,7 +92,7 @@ export default function TablePage() {
             />
           </div>
           <Button onClick={handleStartOrder} className="w-full">
-            Comenzar Pedido
+            Ver Menú
           </Button>
         </div>
       ) : (

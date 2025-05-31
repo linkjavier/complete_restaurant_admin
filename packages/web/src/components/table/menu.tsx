@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Minus, Clock, Package } from "lucide-react"
+import { Plus, Minus, Clock, Package, ShoppingCart } from "lucide-react"
 import { getProducts, Product, Category, getActiveOrders } from "@/lib/api"
 import { Cart } from "./cart"
 import Image from "next/image"
@@ -24,6 +24,30 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'menu' | 'orders'>('menu')
+  const [isCartVisible, setIsCartVisible] = useState(false)
+  const cartRef = useRef<HTMLDivElement>(null)
+
+  const handleScroll = () => {
+    if (!cartRef.current) return
+
+    const cartRect = cartRef.current.getBoundingClientRect()
+    const windowHeight = window.innerHeight
+    const documentHeight = document.documentElement.scrollHeight
+    const scrollTop = window.scrollY || document.documentElement.scrollTop
+
+    // Check if we're at the cart section or at the bottom of the page
+    const isAtCart = cartRect.top <= windowHeight * 0.8
+    const isAtBottom = windowHeight + scrollTop >= documentHeight - 100
+
+    setIsCartVisible(isAtCart || isAtBottom)
+  }
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll)
+    // Check initial position
+    handleScroll()
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const fetchData = async () => {
     try {
@@ -94,6 +118,17 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
     }
   }).filter(Boolean)
 
+  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  const scrollToCart = () => {
+    const cartElement = document.getElementById('cart-section')
+    if (cartElement) {
+      cartElement.scrollIntoView({ behavior: 'smooth' })
+      // Force check visibility after scroll
+      setTimeout(handleScroll, 100)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -127,6 +162,22 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Floating Cart Button - Only visible on mobile */}
+      {totalItems > 0 && !isCartVisible && (
+        <div className="fixed bottom-6 right-6 md:hidden z-50">
+          <Button
+            size="lg"
+            className="rounded-full w-32 h-14 shadow-lg relative bg-red-500 hover:bg-red-600 flex items-center justify-center"
+            onClick={scrollToCart}
+          >
+            <span className="text-white font-medium">Tu Pedido</span>
+            <span className="absolute -top-2 -right-2 bg-white text-red-500 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold border-2 border-red-500 z-20">
+              {totalItems}
+            </span>
+          </Button>
+        </div>
+      )}
+
       <div className="md:col-span-2">
         <div className="space-y-4">
           {/* Welcome Message with Logo */}
@@ -298,7 +349,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
           )}
         </div>
       </div>
-      <div className="md:col-span-1">
+      <div className="md:col-span-1" id="cart-section" ref={cartRef}>
         <Cart
           customerName={customerName}
           tableId={tableId}
