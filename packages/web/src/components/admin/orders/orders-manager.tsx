@@ -497,6 +497,23 @@ export function OrdersManager() {
                                 ${calculateOrderTotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                               </span>
                             </div>
+                            {order.status === "READY" && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <Badge variant={order.isPaid ? "success" : "warning"}>
+                                  {order.isPaid ? (
+                                    <div className="flex items-center gap-1">
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      Pagada
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1">
+                                      <AlertCircle className="h-3 w-3" />
+                                      Pendiente de Pago
+                                    </div>
+                                  )}
+                                </Badge>
+                              </div>
+                            )}
                           </div>
 
                           <div className="mt-4 flex justify-end gap-2">
