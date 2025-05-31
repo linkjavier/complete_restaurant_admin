@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Pencil, ChevronUp } from "lucide-react"
+import { Plus, Trash2, Pencil, ChevronUp, List, Grid } from "lucide-react"
 import { getProducts, createProduct, deleteProduct, updateProduct, Product } from "@/lib/api"
 import { getCategories, Category } from "@/lib/api"
 import { getLocations, Location } from "@/lib/api"
@@ -31,6 +31,7 @@ export function ProductsManager() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCreateFormVisible, setIsCreateFormVisible] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
@@ -526,8 +527,30 @@ export function ProductsManager() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Productos Existentes</CardTitle>
+        <CardHeader className="border-b">
+          <div className="flex items-center justify-between">
+            <CardTitle>Productos Existentes</CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="flex items-center gap-2"
+              >
+                <List className="h-4 w-4" />
+                Lista
+              </Button>
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="flex items-center gap-2"
+              >
+                <Grid className="h-4 w-4" />
+                Grid
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -540,102 +563,176 @@ export function ProductsManager() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <>
               {products.length === 0 ? (
-                <div className="col-span-full text-center text-muted-foreground">
+                <div className="text-center text-muted-foreground">
                   No hay productos creados
                 </div>
-              ) : (
-                products.map((product) => (
-                  <Card key={product.id} className="overflow-hidden">
-                    <CardContent className="p-0">
-                      <div className="relative">
-                        {product.image ? (
-                          <div className="aspect-square w-full overflow-hidden">
+              ) : viewMode === 'list' ? (
+                <div className="grid gap-4">
+                  {products.map((product) => (
+                    <div
+                      key={product.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-4">
+                        {product.image && (
+                          <div className="relative w-20 h-20">
                             <img
                               src={product.image}
                               alt={product.name}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover rounded-lg"
                             />
                           </div>
-                        ) : (
-                          <div className="aspect-square w-full bg-muted flex items-center justify-center">
-                            <span className="text-muted-foreground">Sin imagen</span>
-                          </div>
                         )}
-                        <div className="absolute top-2 right-2 flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
-                            onClick={() => setEditingProduct(product)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
-                            onClick={() => handleDeleteProduct(product.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <div>
+                          <p className="font-medium">{product.name}</p>
+                          {product.description && (
+                            <p className="text-sm text-muted-foreground">
+                              {product.description}
+                            </p>
+                          )}
+                          <p className="text-sm text-muted-foreground">
+                            Precio: ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Categoría: {product.category?.name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Ubicación: {locations.find(loc => loc.id === product.locationId)?.name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Estado: {product.isActive ? "Activo" : "Inactivo"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Stock actual: {product.quantity || 0}
+                          </p>
+                          {product.ingredients && product.ingredients.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-sm font-medium">Ingredientes:</p>
+                              <ul className="text-sm text-muted-foreground">
+                                {product.ingredients.map((pi, index) => (
+                                  <li key={index}>
+                                    {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="p-4 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h3 className="font-semibold">{product.name}</h3>
-                            {product.description && (
-                              <p className="text-sm text-muted-foreground line-clamp-2">
-                                {product.description}
-                              </p>
-                            )}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setEditingProduct(product)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => handleDeleteProduct(product.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {products.map((product) => (
+                    <Card key={product.id} className="overflow-hidden">
+                      <CardContent className="p-0">
+                        <div className="relative">
+                          {product.image ? (
+                            <div className="aspect-square w-full overflow-hidden">
+                              <img
+                                src={product.image}
+                                alt={product.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="aspect-square w-full bg-muted flex items-center justify-center">
+                              <span className="text-muted-foreground">Sin imagen</span>
+                            </div>
+                          )}
+                          <div className="absolute top-2 right-2 flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
+                              onClick={() => setEditingProduct(product)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
+                              onClick={() => handleDeleteProduct(product.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Badge variant={product.isActive ? "default" : "secondary"}>
-                            {product.isActive ? "Activo" : "Inactivo"}
-                          </Badge>
                         </div>
-                        
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Precio:</span>
-                            <span className="font-medium">
-                              ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                            </span>
+                        <div className="p-4 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h3 className="font-semibold">{product.name}</h3>
+                              {product.description && (
+                                <p className="text-sm text-muted-foreground line-clamp-2">
+                                  {product.description}
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant={product.isActive ? "default" : "secondary"}>
+                              {product.isActive ? "Activo" : "Inactivo"}
+                            </Badge>
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Categoría:</span>
-                            <span>{product.category?.name}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Ubicación:</span>
-                            <span>{locations.find(loc => loc.id === product.locationId)?.name}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Stock:</span>
-                            <span>{product.quantity || 0}</span>
-                          </div>
-                        </div>
-
-                        {product.ingredients && product.ingredients.length > 0 && (
-                          <div className="pt-2 border-t">
-                            <p className="text-sm font-medium mb-1">Ingredientes:</p>
-                            <div className="flex flex-wrap gap-1">
-                              {product.ingredients.map((pi, index) => (
-                                <Badge key={index} variant="outline" className="text-xs">
-                                  {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
-                                </Badge>
-                              ))}
+                          
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Precio:</span>
+                              <span className="font-medium">
+                                ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Categoría:</span>
+                              <span>{product.category?.name}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Ubicación:</span>
+                              <span>{locations.find(loc => loc.id === product.locationId)?.name}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Stock:</span>
+                              <span>{product.quantity || 0}</span>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+
+                          {product.ingredients && product.ingredients.length > 0 && (
+                            <div className="pt-2 border-t">
+                              <p className="text-sm font-medium mb-1">Ingredientes:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {product.ingredients.map((pi, index) => (
+                                  <Badge key={index} variant="outline" className="text-xs">
+                                    {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               )}
-            </div>
+            </>
           )}
         </CardContent>
       </Card>
