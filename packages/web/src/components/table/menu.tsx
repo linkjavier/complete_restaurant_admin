@@ -74,35 +74,26 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
     fetchData()
   }, [locationId, tableId])
 
-  // Add auto-refresh functionality
+  // Add auto-refresh functionality for orders only
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchOrders = async () => {
       try {
-        setLoading(true)
-        const [productsData, ordersData] = await Promise.all([
-          getProducts(locationId),
-          getActiveOrders(tableId)
-        ])
-        setProducts(productsData)
+        const ordersData = await getActiveOrders(tableId)
         setActiveOrders(ordersData)
-        setError(null)
       } catch (err) {
-        console.error('Error fetching data:', err)
-        setError('Error al cargar los datos. Por favor, intenta de nuevo.')
-      } finally {
-        setLoading(false)
+        console.error('Error refreshing orders:', err)
       }
     }
 
     // Initial fetch
-    fetchData()
+    fetchOrders()
 
     // Set up auto-refresh every minute
-    const refreshInterval = setInterval(fetchData, 60000)
+    const refreshInterval = setInterval(fetchOrders, 60000)
 
     // Cleanup interval on unmount
     return () => clearInterval(refreshInterval)
-  }, [locationId, tableId])
+  }, [tableId])
 
   const handleRefresh = async () => {
     try {
