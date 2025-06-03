@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/tooltip"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/use-auth"
+import { ThemeSwitch } from "@/components/theme-switch"
 
 interface SidebarProps {
   isMobile?: boolean
@@ -134,8 +135,8 @@ export function Sidebar({ isMobile }: SidebarProps) {
 
   return (
     <div className={cn(
-      "relative h-full bg-[#111827] text-white transition-all duration-300",
-      isCollapsed ? "w-[80px]" : "w-[240px]"
+      "flex h-full flex-col bg-[#111827] text-white",
+      isCollapsed ? "w-[70px]" : "w-[280px]"
     )}>
       <div className="space-y-4 py-4 flex flex-col h-full">
         <div className="px-3 py-2 flex-1">
@@ -147,19 +148,22 @@ export function Sidebar({ isMobile }: SidebarProps) {
                 </h1>
               </Link>
             ) : null}
-            <div className="md:block hidden">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full hover:bg-white/10"
-                onClick={() => setIsCollapsed(!isCollapsed)}
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4 text-white" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4 text-white" />
-                )}
-              </Button>
+            <div className="flex items-center gap-2">
+              <ThemeSwitch />
+              <div className="md:block hidden">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-white/10"
+                  onClick={() => setIsCollapsed(!isCollapsed)}
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="h-4 w-4 text-white" />
+                  ) : (
+                    <ChevronLeft className="h-4 w-4 text-white" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
           <div className={cn(

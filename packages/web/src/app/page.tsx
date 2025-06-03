@@ -1,10 +1,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import { ThemeSwitch } from "@/components/theme-switch";
 
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center">
+      <div className="absolute top-4 right-4">
+        <ThemeSwitch />
+      </div>
       <div className="container flex flex-col items-center justify-center gap-4 px-4 text-center">
         <Image
           src="/assets/blondie-logo.png"
