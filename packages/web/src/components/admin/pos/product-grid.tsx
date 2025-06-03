@@ -52,11 +52,11 @@ export function ProductGrid({ products, onAddToCart, cart }: ProductGridProps) {
                 <div className="flex items-center justify-between">
                   <p className="font-bold text-lg">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
                   <Button
-                    size="sm"
+                    size="lg"
                     onClick={() => onAddToCart(product.id)}
-                    className="h-8 w-8 p-0"
+                    className="h-12 w-12 p-0 rounded-full"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-6 w-6" />
                   </Button>
                 </div>
               </div>
