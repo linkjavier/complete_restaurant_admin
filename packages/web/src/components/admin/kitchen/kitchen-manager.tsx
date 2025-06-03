@@ -434,7 +434,7 @@ export function KitchenManager() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
               {orders.length === 0 ? (
                 <div className="text-center text-muted-foreground col-span-full">
                   No hay órdenes activas
@@ -443,27 +443,27 @@ export function KitchenManager() {
                 orders.map((order) => (
                   <Card key={order.id} className="overflow-hidden border-0 sm:border">
                     <CardContent className="p-0">
-                      <div className="bg-muted p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div className="bg-muted p-2">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
                           <div>
-                            <h3 className="font-bold text-lg">
+                            <h3 className="font-bold text-base">
                               {order.table?.number ? `Mesa #${order.table.number}` : 'Para Llevar'}
                             </h3>
                             {order.customerName && (
-                              <p className="text-sm font-medium text-primary">
+                              <p className="text-xs font-medium text-primary">
                                 Cliente: {order.customerName}
                               </p>
                             )}
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-muted-foreground">
                               Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                             </p>
                           </div>
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-1">
                             <Button 
                               variant="outline" 
                               size="sm"
                               onClick={() => handlePrintTicket(order.id)}
-                              className="h-8"
+                              className="h-7 text-xs px-2"
                             >
                               Imprimir Ticket
                             </Button>
@@ -472,7 +472,7 @@ export function KitchenManager() {
                                 variant="default" 
                                 size="sm"
                                 onClick={() => handleStartOrder(order.id, order.items)}
-                                className="h-8"
+                                className="h-7 text-xs px-2"
                               >
                                 Recibido
                               </Button>
@@ -481,23 +481,23 @@ export function KitchenManager() {
                         </div>
                       </div>
                       
-                      <div className="p-3 sm:p-4">
-                        <h4 className="font-medium mb-2">Items:</h4>
-                        <ul className="space-y-3">
+                      <div className="p-2">
+                        <h4 className="font-medium text-sm mb-1">Items:</h4>
+                        <ul className="space-y-1">
                           {order.items
                             .filter(item => item.status !== "COMPLETED")
                             .map((item) => (
-                              <li key={item.id} className="border-b pb-3">
-                                <div className="flex flex-col space-y-2">
+                              <li key={item.id} className="border-b pb-1">
+                                <div className="flex flex-col space-y-1">
                                   <div className="flex items-start justify-between">
-                                    <div className="space-y-1">
-                                      <div className="flex items-center gap-2">
-                                        <p className="font-medium">{item.product.name}</p>
-                                        <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center gap-1">
+                                        <p className="font-medium text-sm">{item.product.name}</p>
+                                        <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
                                           x{item.quantity}
                                         </span>
                                       </div>
-                                      <p className="text-sm text-gray-500">
+                                      <p className="text-xs text-gray-500">
                                         {item.status === "PENDING" ? "Pendiente" : 
                                          item.status === "IN_PROGRESS" ? "En preparación" : 
                                          item.status === "READY" ? "Completado" : 
@@ -505,19 +505,19 @@ export function KitchenManager() {
                                          item.status}
                                       </p>
                                       {item.notes && (
-                                        <p className="text-sm text-muted-foreground">
+                                        <p className="text-xs text-muted-foreground">
                                           Notas: {item.notes}
                                         </p>
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex flex-wrap gap-2">
+                                  <div className="flex flex-wrap gap-1">
                                     {item.status === "PENDING" && (
                                       <Button 
                                         size="sm"
                                         variant="outline"
                                         onClick={() => handleUpdateItemStatus(item.id, "IN_PROGRESS")}
-                                        className="h-8"
+                                        className="h-7 text-xs px-2"
                                       >
                                         Iniciar Preparación
                                       </Button>
@@ -528,7 +528,7 @@ export function KitchenManager() {
                                           size="sm"
                                           variant="outline"
                                           onClick={() => handleUpdateItemStatus(item.id, "PENDING")}
-                                          className="h-8"
+                                          className="h-7 text-xs px-2"
                                         >
                                           Volver a Pendiente
                                         </Button>
@@ -536,7 +536,7 @@ export function KitchenManager() {
                                           size="sm"
                                           variant="default"
                                           onClick={() => handleUpdateItemStatus(item.id, "READY")}
-                                          className="h-8"
+                                          className="h-7 text-xs px-2"
                                         >
                                           Marcar Completado
                                         </Button>
@@ -546,7 +546,7 @@ export function KitchenManager() {
                                       size="sm"
                                       variant="destructive"
                                       onClick={() => setItemToCancel({ id: item.id, name: item.product.name })}
-                                      className="h-8"
+                                      className="h-7 text-xs px-2"
                                     >
                                       Cancelar
                                     </Button>
