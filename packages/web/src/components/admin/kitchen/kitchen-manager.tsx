@@ -399,7 +399,7 @@ export function KitchenManager() {
   )
 
   return (
-    <div className="space-y-4 -mx-4 sm:mx-0">
+    <div className="w-full h-full flex flex-col space-y-4">
       <Card className="rounded-none sm:rounded-lg">
         <CardHeader className="px-4 sm:px-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -434,7 +434,7 @@ export function KitchenManager() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
               {orders.length === 0 ? (
                 <div className="text-center text-muted-foreground col-span-full">
                   No hay órdenes activas

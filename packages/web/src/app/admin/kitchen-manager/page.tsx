@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 export default function KitchenManagerPage() {
   return (
     <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CHEF', 'ADMIN', 'MANAGER']}>
-      <div className="container mx-auto py-6">
+      <div className="w-full h-full">
         <Card>
           <CardHeader>
             <CardTitle>Gestión de Cocina</CardTitle>
