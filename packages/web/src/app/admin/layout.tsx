@@ -25,7 +25,7 @@ export default function AdminLayout({
         </div>
         
         {/* Mobile Header with Menu Button */}
-        <div className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-width)] h-16 bg-white border-b z-40 flex items-center px-4 transition-all duration-300">
+        <div className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-width)] h-16 bg-background border-b border-border z-40 flex items-center px-4 transition-all duration-300">
           <div className="md:hidden">
             <Sheet>
               <SheetTrigger asChild>

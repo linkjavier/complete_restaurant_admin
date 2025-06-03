@@ -156,7 +156,7 @@ export function Sidebar({ isMobile }: SidebarProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-white/10"
+                  className="h-8 w-8 rounded-full hover:bg-zinc-200 dark:hover:bg-white/10 active:bg-zinc-300 dark:active:bg-white/20"
                   onClick={() => setIsCollapsed(!isCollapsed)}
                 >
                   {isCollapsed ? (
