@@ -248,10 +248,10 @@ export default function PosPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4">
-      <div className="lg:col-span-3">
-        <Card className="h-full">
-          <CardHeader>
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 h-[calc(100vh-4rem)]">
+      <div className="lg:col-span-3 h-full">
+        <Card className="h-full flex flex-col">
+          <CardHeader className="flex-none">
             <div className="flex flex-col gap-4">
               <CardTitle>Punto de Venta</CardTitle>
               <div className="flex flex-col md:flex-row gap-4">
@@ -285,7 +285,7 @@ export default function PosPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="h-[calc(100vh-16rem)] overflow-y-auto">
+          <CardContent className="flex-1 overflow-y-auto">
             <ProductGrid
               products={filteredProducts}
               onAddToCart={handleAddToCart}
@@ -294,40 +294,42 @@ export default function PosPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="lg:col-span-1">
-        <Cart
-          items={Object.entries(cart).map(([productId, quantity]) => ({
-            product: products.find(p => p.id === productId)!,
-            quantity
-          }))}
-          onUpdateQuantity={(productId, quantity) => {
-            if (quantity <= 0) {
+      <div className="lg:col-span-1 h-full">
+        <div className="sticky top-4">
+          <Cart
+            items={Object.entries(cart).map(([productId, quantity]) => ({
+              product: products.find(p => p.id === productId)!,
+              quantity
+            }))}
+            onUpdateQuantity={(productId, quantity) => {
+              if (quantity <= 0) {
+                const newCart = { ...cart }
+                delete newCart[productId]
+                setCart(newCart)
+              } else {
+                setCart(prev => ({ ...prev, [productId]: quantity }))
+              }
+            }}
+            onRemoveItem={(productId) => {
               const newCart = { ...cart }
               delete newCart[productId]
               setCart(newCart)
-            } else {
-              setCart(prev => ({ ...prev, [productId]: quantity }))
-            }
-          }}
-          onRemoveItem={(productId) => {
-            const newCart = { ...cart }
-            delete newCart[productId]
-            setCart(newCart)
-          }}
-          orderType={orderType}
-          selectedTable={selectedTable}
-          tables={tables}
-          onOrderTypeChange={setOrderType}
-          onTableSelect={(tableId) => {
-            setSelectedTable(tableId)
-            setCart({}) // Clear cart when changing tables
-          }}
-          onSubmit={handleCreateOrder}
-          currentOrders={currentOrders}
-          loading={submitting}
-          customerName={customerName}
-          onCustomerNameChange={setCustomerName}
-        />
+            }}
+            orderType={orderType}
+            selectedTable={selectedTable}
+            tables={tables}
+            onOrderTypeChange={setOrderType}
+            onTableSelect={(tableId) => {
+              setSelectedTable(tableId)
+              setCart({}) // Clear cart when changing tables
+            }}
+            onSubmit={handleCreateOrder}
+            currentOrders={currentOrders}
+            loading={submitting}
+            customerName={customerName}
+            onCustomerNameChange={setCustomerName}
+          />
+        </div>
       </div>
     </div>
   )

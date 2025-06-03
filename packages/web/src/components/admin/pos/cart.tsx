@@ -125,24 +125,25 @@ export function Cart({
   }
 
   return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle>Carrito</CardTitle>
+    <Card className="h-[calc(100vh-4rem)] flex flex-col sticky top-16">
+      <CardHeader className="flex-none p-2">
+        <CardTitle className="text-lg">Carrito</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex-1 p-2 flex flex-col min-h-0">
         {loading ? (
-          <div className="py-8">
+          <div className="py-4">
             <LoadingSpinner />
-            <p className="text-center mt-2 text-sm text-muted-foreground">Cargando...</p>
+            <p className="text-center mt-1 text-sm text-muted-foreground">Cargando...</p>
           </div>
         ) : (
-          <>
-            <div className="space-y-2">
-              <div className="flex gap-2">
+          <div className="flex flex-col h-full">
+            <div className="flex-none space-y-1">
+              <div className="flex gap-1">
                 <Button
                   variant={orderType === "takeout" ? "default" : "outline"}
                   onClick={() => onOrderTypeChange("takeout")}
                   disabled={isProcessing}
+                  size="sm"
                 >
                   Para Llevar
                 </Button>
@@ -150,6 +151,7 @@ export function Cart({
                   variant={orderType === "table" ? "default" : "outline"}
                   onClick={() => onOrderTypeChange("table")}
                   disabled={isProcessing}
+                  size="sm"
                 >
                   Mesa
                 </Button>
@@ -161,12 +163,13 @@ export function Cart({
                   value={customerName}
                   onChange={(e) => onCustomerNameChange(e.target.value)}
                   disabled={isProcessing}
+                  className="h-8"
                 />
               )}
 
               {orderType === "table" && (
                 <select
-                  className="w-full p-2 border rounded-md"
+                  className="w-full p-1 h-8 text-sm border rounded-md"
                   value={selectedTable || ""}
                   onChange={(e) => onTableSelect(e.target.value)}
                   disabled={isProcessing}
@@ -181,144 +184,152 @@ export function Cart({
               )}
             </div>
 
-            {/* Resumen de Órdenes */}
-            {selectedTable && currentOrders.length > 0 && (
-              <div className="border rounded-lg p-4 bg-muted/50">
-                <h3 className="font-medium mb-3">Resumen de Órdenes</h3>
-                <div className="space-y-3">
-                  {currentOrders.map((order) => (
-                    <div key={order.id} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Orden #{order.id.slice(0, 8)}</span>
-                        {getStatusBadge(order.status)}
-                      </div>
-                      <div className="space-y-2">
-                        {order.items?.map((item) => (
-                          <div key={item.id} className="flex justify-between items-center text-sm p-2 bg-background rounded">
-                            <div className="flex-1">
-                              <span className="font-medium">{item.product.name}</span>
-                              <div className="text-muted-foreground">
-                                ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })} x {item.quantity}
+            <div className="flex-1 overflow-y-auto mt-2">
+              {/* Resumen de Órdenes */}
+              {selectedTable && currentOrders.length > 0 && (
+                <div className="border rounded-lg p-2 bg-muted/50 mb-2">
+                  <h3 className="font-medium text-sm mb-2">Resumen de Órdenes</h3>
+                  <div className="space-y-2">
+                    {currentOrders.map((order) => (
+                      <div key={order.id} className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-medium">Orden #{order.id.slice(0, 8)}</span>
+                          {getStatusBadge(order.status)}
+                        </div>
+                        <div className="space-y-1">
+                          {order.items?.map((item) => (
+                            <div key={item.id} className="flex justify-between items-center text-xs p-1 bg-background rounded">
+                              <div className="flex-1">
+                                <span className="font-medium">{item.product.name}</span>
+                                <div className="text-muted-foreground">
+                                  ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })} x {item.quantity}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground">
+                                  ${(item.product.price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                </span>
+                                {getStatusBadge(item.status)}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground">
-                                ${(item.product.price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                              </span>
-                              {getStatusBadge(item.status)}
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                        <div className="flex justify-between items-center pt-1 border-t">
+                          <span className="text-xs font-medium">Subtotal:</span>
+                          <span className="text-xs font-medium">
+                            ${(order.total || order.items?.reduce((sum, item) => 
+                              sum + (item.product.price * item.quantity), 0) || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedOrderId(order.id)
+                              setIsPaymentDialogOpen(true)
+                            }}
+                            disabled={isProcessing || loading}
+                            className="h-6 text-xs"
+                          >
+                            Pagar
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center pt-2 border-t">
-                        <span className="font-medium">Subtotal:</span>
-                        <span className="font-medium">
-                          ${(order.total || order.items?.reduce((sum, item) => 
-                            sum + (item.product.price * item.quantity), 0) || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                        </span>
+                    ))}
+                    <div className="pt-1 mt-1 border-t">
+                      <div className="flex justify-between items-center text-xs font-medium">
+                        <span>Total de Órdenes:</span>
+                        <span>${ordersTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
                       </div>
-                      <div className="flex justify-end mt-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedOrderId(order.id)
-                            setIsPaymentDialogOpen(true)
-                          }}
-                          disabled={isProcessing || loading}
-                        >
-                          Pagar
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="pt-2 mt-2 border-t">
-                    <div className="flex justify-between items-center font-medium">
-                      <span>Total de Órdenes:</span>
-                      <span>${ordersTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Carrito actual */}
-            {items.length > 0 && (
-              <div className="border rounded-lg p-4">
-                <h3 className="font-medium mb-3">Carrito Actual</h3>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                  {items.map((item) => (
-                    <div
-                      key={item.product.id}
-                      className="flex items-center justify-between p-2 border rounded-md"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium">{item.product.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })} x {item.quantity}
-                        </p>
+              {/* Carrito actual */}
+              {items.length > 0 && (
+                <div className="border rounded-lg p-2">
+                  <h3 className="font-medium text-sm mb-2">Carrito Actual</h3>
+                  <div className="space-y-1">
+                    {items.map((item) => (
+                      <div
+                        key={item.product.id}
+                        className="flex flex-col p-1 border rounded-md"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.product.name}</p>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-xs text-muted-foreground">
+                            ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })} x {item.quantity}
+                          </p>
+                          <div className="flex items-center gap-1 flex-none">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                onUpdateQuantity(item.product.id, item.quantity - 1)
+                              }
+                              disabled={item.quantity <= 1 || isProcessing}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                onUpdateQuantity(item.product.id, parseInt(e.target.value))
+                              }
+                              className="w-12 h-6 text-center text-xs"
+                              disabled={isProcessing}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                onUpdateQuantity(item.product.id, item.quantity + 1)
+                              }
+                              disabled={isProcessing}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onRemoveItem(item.product.id)}
+                              disabled={isProcessing}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Trash2 className="h-3 w-3 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            onUpdateQuantity(item.product.id, item.quantity - 1)
-                          }
-                          disabled={item.quantity <= 1 || isProcessing}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) =>
-                            onUpdateQuantity(item.product.id, parseInt(e.target.value))
-                          }
-                          className="w-16 text-center"
-                          disabled={isProcessing}
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            onUpdateQuantity(item.product.id, item.quantity + 1)
-                          }
-                          disabled={isProcessing}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onRemoveItem(item.product.id)}
-                          disabled={isProcessing}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Resumen y acciones */}
-            <div className="border-t pt-4">
+            <div className="flex-none border-t mt-2 p-2 bg-background">
               {selectedTable && currentOrders.length > 0 && (
-                <div className="flex justify-between items-center mb-2 text-sm text-muted-foreground">
+                <div className="flex justify-between items-center mb-1 text-xs text-muted-foreground">
                   <span>Órdenes activas:</span>
                   <span>${ordersTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
                 </div>
               )}
               {items.length > 0 && (
-                <div className="flex justify-between items-center mb-2 text-sm text-muted-foreground">
+                <div className="flex justify-between items-center mb-1 text-xs text-muted-foreground">
                   <span>Carrito actual:</span>
                   <span>${cartTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
                 </div>
               )}
-              <div className="flex justify-between items-center mb-4 text-lg font-bold">
+              <div className="flex justify-between items-center mb-2 text-base font-bold">
                 <span>Total:</span>
                 <span>${allOrdersTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
               </div>
@@ -345,7 +356,7 @@ export function Cart({
                 </Button>
               </div>
             </div>
-          </>
+          </div>
         )}
       </CardContent>
       
