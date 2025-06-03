@@ -22,8 +22,10 @@ export function ProductGrid({ products, onAddToCart, cart }: ProductGridProps) {
           const isInCart = quantity > 0;
 
           return (
-            <Card key={product.id} className="overflow-hidden">
-              <div className="aspect-square relative">
+            <Card key={product.id} className={`overflow-hidden ${
+              isInCart ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950' : ''
+            }`}>
+              <div className="aspect-[2/1] relative">
                 {product.image ? (
                   <Image
                     src={product.image}
@@ -38,20 +40,29 @@ export function ProductGrid({ products, onAddToCart, cart }: ProductGridProps) {
                 )}
               </div>
               <CardContent className="p-2">
-                <div className="flex justify-between items-start gap-2">
-                  <div className="space-y-1 flex-1 min-w-0">
-                    <h3 className="text-sm font-medium line-clamp-1">{product.name}</h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
-                    <p className="text-sm font-medium">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-medium line-clamp-1 flex-1">{product.name}</h3>
+                    {isInCart && (
+                      <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                        x{quantity}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex-none flex items-center justify-center">
-                    <Button
-                      size="lg"
-                      onClick={() => onAddToCart(product.id)}
-                      className="h-16 w-16 p-0 rounded-full"
-                    >
-                      <Plus className="h-8 w-8" />
-                    </Button>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
+                      <p className="text-sm font-medium">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
+                    </div>
+                    <div className="flex-none">
+                      <Button
+                        size="lg"
+                        onClick={() => onAddToCart(product.id)}
+                        className="h-12 w-12 p-0 rounded-full"
+                      >
+                        <Plus className="h-6 w-6" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
