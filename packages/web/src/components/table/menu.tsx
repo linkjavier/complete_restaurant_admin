@@ -416,11 +416,10 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                             <span>{cart[product.id] || 0}</span>
                             <Button
                               variant="outline"
-                              size="lg"
-                              className="h-12 w-12 rounded-full"
+                              size="icon"
                               onClick={() => handleAddToCart(product.id)}
                             >
-                              <Plus className="h-6 w-6" />
+                              <Plus className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
