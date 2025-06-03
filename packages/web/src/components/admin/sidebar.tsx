@@ -122,6 +122,8 @@ export function Sidebar({ isMobile }: SidebarProps) {
   useEffect(() => {
     // Guardar el estado del sidebar en localStorage
     localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed))
+    // Actualizar la variable CSS para el ancho del sidebar
+    document.documentElement.style.setProperty('--sidebar-width', isCollapsed ? '70px' : '280px')
   }, [isCollapsed])
 
   if (!user) {

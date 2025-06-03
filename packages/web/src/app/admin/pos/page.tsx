@@ -248,9 +248,9 @@ export default function PosPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4">
       <div className="lg:col-span-3">
-        <Card>
+        <Card className="h-full">
           <CardHeader>
             <div className="flex flex-col gap-4">
               <CardTitle>Punto de Venta</CardTitle>
@@ -285,7 +285,7 @@ export default function PosPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="h-[calc(100vh-16rem)] overflow-y-auto">
             <ProductGrid
               products={filteredProducts}
               onAddToCart={handleAddToCart}

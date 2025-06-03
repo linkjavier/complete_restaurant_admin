@@ -20,12 +20,12 @@ export default function AdminLayout({
     <QueryClientProvider client={queryClient}>
       <div className="h-full">
         {/* Desktop Sidebar */}
-        <div className="hidden md:flex h-full w-72 flex-col fixed inset-y-0 z-50">
+        <div className="hidden md:flex h-full flex-col fixed inset-y-0 z-50 transition-all duration-300" id="sidebar">
           <Sidebar />
         </div>
         
         {/* Mobile Header with Menu Button */}
-        <div className="fixed top-0 right-0 left-0 md:left-72 h-16 bg-white border-b z-40 flex items-center px-4">
+        <div className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-width)] h-16 bg-white border-b z-40 flex items-center px-4 transition-all duration-300">
           <div className="md:hidden">
             <Sheet>
               <SheetTrigger asChild>
@@ -44,7 +44,7 @@ export default function AdminLayout({
           </div>
         </div>
         
-        <main className="md:pl-72 pt-16 h-full">
+        <main className="md:pl-[var(--sidebar-width)] pt-16 h-full transition-all duration-300">
           {children}
         </main>
       </div>
