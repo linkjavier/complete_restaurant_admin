@@ -214,65 +214,65 @@ For takeout orders:
         console.log(`Executing function ${functionName} with args:`, functionArgs);
 
         switch (functionName) {
-          case 'get_menu':
-            try {
-              // Parse arguments safely, defaulting to empty object if invalid
-              const menuArgs = functionArgs ? JSON.parse(functionArgs) : {};
-              console.log('Parsed menu args:', menuArgs);
-              console.log('Using locationId:', locationId);
+          // case 'get_menu':
+          //   try {
+          //     // Parse arguments safely, defaulting to empty object if invalid
+          //     const menuArgs = functionArgs ? JSON.parse(functionArgs) : {};
+          //     console.log('Parsed menu args:', menuArgs);
+          //     console.log('Using locationId:', locationId);
               
-              functionResult = await this.productsService.findAll({
-                locationId,
-                categoryId: menuArgs.category || undefined,
-              });
-              console.log('Menu result:', functionResult);
+          //     functionResult = await this.productsService.findAll({
+          //       locationId,
+          //       categoryId: menuArgs.category || undefined,
+          //     });
+          //     console.log('Menu result:', functionResult);
 
-              // Agregar el resultado a la conversación con un formato más descriptivo
-              conversation.push({
-                role: 'function',
-                name: functionName,
-                content: JSON.stringify({
-                  message: "Aquí está el menú completo:",
-                  menu: functionResult
-                }),
-              });
+          //     // Agregar el resultado a la conversación con un formato más descriptivo
+          //     conversation.push({
+          //       role: 'function',
+          //       name: functionName,
+          //       content: JSON.stringify({
+          //         message: "Aquí está el menú completo:",
+          //         menu: functionResult
+          //       }),
+          //     });
 
-              // Obtener una nueva respuesta de OpenAI con el resultado formateado
-              const menuCompletion = await this.openai.chat.completions.create({
-                model: 'gpt-4o-mini-2024-07-18',
-                messages: [
-                  ...conversation,
-                  {
-                    role: 'system',
-                    content: `Eres un asistente de restaurante. Cuando te pidan el menú, responde SOLO con el nombre del producto y su precio, organizados por categorías.
-                    Usa este formato exacto:
-                    ## [Nombre de la Categoría]
-                    - [Nombre del Producto] - $[Precio]
+          //     // Obtener una nueva respuesta de OpenAI con el resultado formateado
+          //     const menuCompletion = await this.openai.chat.completions.create({
+          //       model: 'gpt-4o-mini-2024-07-18',
+          //       messages: [
+          //         ...conversation,
+          //         {
+          //           role: 'system',
+          //           content: `Eres un asistente de restaurante. Cuando te pidan el menú, responde SOLO con el nombre del producto y su precio, organizados por categorías.
+          //           Usa este formato exacto:
+          //           ## [Nombre de la Categoría]
+          //           - [Nombre del Producto] - $[Precio]
                     
-                    No incluyas descripciones, imágenes ni información adicional.
-                    Mantén el formato markdown con ## para categorías y - para productos.
-                    Al final, agrega una línea en blanco y "¿En qué más puedo ayudarte?"`
-                  }
-                ],
-                temperature: 0.7,
-              });
+          //           No incluyas descripciones, imágenes ni información adicional.
+          //           Mantén el formato markdown con ## para categorías y - para productos.
+          //           Al final, agrega una línea en blanco y "¿En qué más puedo ayudarte?"`
+          //         }
+          //       ],
+          //       temperature: 0.7,
+          //     });
 
-              const menuResponse = menuCompletion.choices[0].message;
-              conversation.push({
-                role: 'assistant',
-                content: menuResponse.content,
-              });
+          //     const menuResponse = menuCompletion.choices[0].message;
+          //     conversation.push({
+          //       role: 'assistant',
+          //       content: menuResponse.content,
+          //     });
 
-              // Enviar respuesta al cliente
-              client.emit('ai_response', {
-                type: 'text',
-                content: menuResponse.content,
-              });
-              return;
-            } catch (error) {
-              console.error('Error in get_menu function:', error);
-              throw new Error('Error retrieving menu');
-            }
+          //     // Enviar respuesta al cliente
+          //     client.emit('ai_response', {
+          //       type: 'text',
+          //       content: menuResponse.content,
+          //     });
+          //     return;
+          //   } catch (error) {
+          //     console.error('Error in get_menu function:', error);
+          //     throw new Error('Error retrieving menu');
+          //   }
           case 'create_order':
             try {
               const orderArgs = JSON.parse(functionArgs);
@@ -392,24 +392,6 @@ For takeout orders:
       console.error('Error processing message:', error);
       client.emit('error', { 
         message: 'Error processing your message',
-        details: error.message 
-      });
-    }
-  }
-
-  @SubscribeMessage('request_signature')
-  async handleSignatureRequest(client: Socket, payload: { meetingNumber: string, meetingPassCode: string }) {
-    try {
-      // Aquí implementarías la lógica para generar la firma de Zoom
-      // Por ahora, enviamos una respuesta simulada
-      client.emit('signature', {
-        type: 'signature',
-        data: 'simulated_signature_data'
-      });
-    } catch (error) {
-      console.error('Error generating signature:', error);
-      client.emit('error', { 
-        message: 'Error generating signature',
         details: error.message 
       });
     }
