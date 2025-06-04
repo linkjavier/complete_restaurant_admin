@@ -10,6 +10,7 @@ import OpenAI from 'openai';
 import { ConfigService } from '@nestjs/config';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
+import { SettingsService } from '../settings/settings.service';
 import { Inject, forwardRef } from '@nestjs/common';
 
 @WebSocketGateway({
@@ -31,6 +32,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private productsService: ProductsService,
     @Inject(forwardRef(() => OrdersService))
     private ordersService: OrdersService,
+    private settingsService: SettingsService,
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
@@ -110,12 +112,15 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         locationId,
       });
 
+      // Get AI settings
+      const aiSettings = await this.settingsService.getAISettings();
+
       // Initialize conversation history for this location if it doesn't exist
       if (!this.conversations.has(locationId)) {
         this.conversations.set(locationId, [
           {
             role: 'system',
-            content: `You are a helpful restaurant assistant that helps with orders and customer service. Your name is "Paola" and you are a woman. You can help customers by showing them the menu and taking their orders. Always first ask for the customer's nameThe current location ID is ${locationId}.
+            content: `You are a helpful restaurant assistant that helps with orders and customer service. Your name is "${aiSettings.name}" and you are ${aiSettings.gender === 'female' ? 'a woman' : 'a man'}. You can help customers by showing them the menu and taking their orders. Always first ask for the customer's name. The current location ID is ${locationId}.
 
 Here is the current menu data:
 ${JSON.stringify(menu, null, 2)}
@@ -142,7 +147,7 @@ For takeout orders:
       // Send welcome message
       client.emit('ai_response', {
         type: 'text',
-        content: '¡Hola! Soy Paola, tu asistente virtual. ¿En qué puedo ayudarte hoy?'
+        content: `¡Hola! Soy ${aiSettings.name}, tu asistente virtual. ¿En qué puedo ayudarte hoy?`
       });
     } catch (error) {
       console.error('Error initializing conversation:', error);
