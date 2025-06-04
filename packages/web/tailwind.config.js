@@ -16,6 +16,53 @@ module.exports = {
   		}
   	},
   	extend: {
+  		typography: {
+  			DEFAULT: {
+  				css: {
+  					maxWidth: 'none',
+  					color: 'inherit',
+  					a: {
+  						color: 'inherit',
+  						textDecoration: 'none',
+  					},
+  					h1: {
+  						color: 'inherit',
+  					},
+  					h2: {
+  						color: 'inherit',
+  					},
+  					h3: {
+  						color: 'inherit',
+  					},
+  					h4: {
+  						color: 'inherit',
+  					},
+  					code: {
+  						color: 'inherit',
+  					},
+  					'pre code': {
+  						backgroundColor: 'transparent',
+  						borderRadius: 0,
+  						padding: 0,
+  					},
+  					hr: {
+  						borderColor: 'inherit',
+  					},
+  					ol: {
+  						color: 'inherit',
+  					},
+  					ul: {
+  						color: 'inherit',
+  					},
+  					li: {
+  						color: 'inherit',
+  					},
+  					blockquote: {
+  						color: 'inherit',
+  					},
+  				},
+  			},
+  		},
   		colors: {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
@@ -87,5 +134,5 @@ module.exports = {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
 }; 
