@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,9 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
-import { MessageSquare, Send, QrCode, Users, Bot, Phone, Zap } from "lucide-react"
+import { MessageSquare, Send, QrCode, Users, Bot, Phone } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { io, Socket } from "socket.io-client"
 
 interface Message {
   id: string
@@ -33,7 +33,9 @@ export default function AIManagerPage() {
   const [input, setInput] = useState("")
   const [isWhatsAppConnected, setIsWhatsAppConnected] = useState(false)
   const [showQR, setShowQR] = useState(false)
-  const [autoResponse, setAutoResponse] = useState(true)
+  const [socket, setSocket] = useState<Socket | null>(null)
+  const [isConnected, setIsConnected] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   // Mock WhatsApp chats
   const [whatsappChats] = useState<WhatsAppChat[]>([
@@ -55,8 +57,54 @@ export default function AIManagerPage() {
     }
   ])
 
+  useEffect(() => {
+    // Initialize socket connection
+    const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
+      transports: ['websocket'],
+    })
+
+    socketInstance.on('connect', () => {
+      console.log('Connected to WebSocket')
+      setIsConnected(true)
+    })
+
+    socketInstance.on('disconnect', () => {
+      console.log('Disconnected from WebSocket')
+      setIsConnected(false)
+    })
+
+    socketInstance.on('ai_response', (response) => {
+      const aiMessage: Message = {
+        id: Date.now().toString(),
+        content: response.content,
+        role: "assistant",
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, aiMessage])
+      setIsLoading(false)
+    })
+
+    socketInstance.on('error', (error) => {
+      console.error('WebSocket error:', error)
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        content: "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.",
+        role: "assistant",
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+      setIsLoading(false)
+    })
+
+    setSocket(socketInstance)
+
+    return () => {
+      socketInstance.disconnect()
+    }
+  }, [])
+
   const handleSendMessage = () => {
-    if (!input.trim()) return
+    if (!input.trim() || !socket || !isConnected || isLoading) return
 
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -67,19 +115,10 @@ export default function AIManagerPage() {
 
     setMessages([...messages, newMessage])
     setInput("")
+    setIsLoading(true)
 
-    // Solo responder automáticamente si está activado
-    if (autoResponse) {
-      setTimeout(() => {
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          content: "Gracias por tu mensaje. ¿En qué más puedo ayudarte?",
-          role: "assistant",
-          timestamp: new Date()
-        }
-        setMessages(prev => [...prev, aiResponse])
-      }, 1000)
-    }
+    // Send message through WebSocket
+    socket.emit('input_text', { text: input })
   }
 
   const handleWhatsAppConnect = () => {
@@ -96,15 +135,6 @@ export default function AIManagerPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Inteligencia Artificial</h1>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Zap className={cn("h-4 w-4", autoResponse ? "text-yellow-400" : "text-gray-400")} />
-            <span className="text-sm">Respuesta Automática</span>
-            <Switch
-              checked={autoResponse}
-              onCheckedChange={setAutoResponse}
-              className="data-[state=checked]:bg-yellow-400"
-            />
-          </div>
           <Button
             variant={isWhatsAppConnected ? "default" : "outline"}
             onClick={handleWhatsAppConnect}
@@ -149,6 +179,17 @@ export default function AIManagerPage() {
                     </div>
                   </div>
                 ))}
+                {isLoading && (
+                  <div className="flex items-start gap-4">
+                    <Avatar>
+                      <AvatarImage src="/bot-avatar.png" />
+                      <AvatarFallback>AI</AvatarFallback>
+                    </Avatar>
+                    <div className="rounded-lg p-4 bg-muted">
+                      <p>Escribiendo...</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </ScrollArea>
             <div className="flex gap-2 mt-4">
@@ -157,8 +198,12 @@ export default function AIManagerPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+                disabled={isLoading || !isConnected}
               />
-              <Button onClick={handleSendMessage}>
+              <Button 
+                onClick={handleSendMessage} 
+                disabled={isLoading || !isConnected}
+              >
                 <Send className="h-4 w-4" />
               </Button>
             </div>
