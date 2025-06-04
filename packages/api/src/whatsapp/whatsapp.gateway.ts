@@ -5,6 +5,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   ConnectedSocket,
+  MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { WhatsappService } from './whatsapp.service';
@@ -81,45 +82,53 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.connectedClients.set(client.id, client);
 
     // Enviar estado actual de WhatsApp al cliente que se conecta
-    this.whatsappService.isWhatsAppConnected().then(isConnected => {
+    this.whatsappService.isWhatsAppConnected().then(async (isConnected) => {
       this.logger.log(`Sending initial WhatsApp status: ${isConnected}`);
       client.emit('whatsapp:status', { isConnected });
       
       if (isConnected) {
         this.logger.log('WhatsApp is connected, sending initial chats');
-        this.whatsappService.getChats().then(chats => {
+        try {
+          const chats = await this.whatsappService.getChats();
           this.logger.log(`Sending ${chats.length} initial chats`);
           client.emit('whatsapp:chats', { chats });
-        }).catch(error => {
+        } catch (error) {
           this.logger.error(`Error getting initial chats: ${error.message}`);
-        });
+          client.emit('whatsapp:error', { message: 'Error getting initial chats' });
+        }
       } else {
         // Si no está conectado, intentar inicializar WhatsApp
         this.logger.log('WhatsApp is not connected, attempting to initialize...');
-        this.whatsappService.initializeWhatsApp().then(() => {
-          this.logger.log('WhatsApp initialization completed, checking status again...');
-          return this.whatsappService.isWhatsAppConnected();
-        }).then(isConnected => {
-          this.logger.log(`WhatsApp status after initialization: ${isConnected}`);
-          client.emit('whatsapp:status', { isConnected });
+        try {
+          await this.whatsappService.initializeWhatsApp();
+          // Verificar el estado después de la inicialización
+          const newStatus = await this.whatsappService.isWhatsAppConnected();
+          this.logger.log(`WhatsApp status after initialization: ${newStatus}`);
+          client.emit('whatsapp:status', { isConnected: newStatus });
           
-          if (isConnected) {
-            return this.whatsappService.getChats();
-          }
-          return [];
-        }).then(chats => {
-          if (chats.length > 0) {
+          if (newStatus) {
+            const chats = await this.whatsappService.getChats();
             this.logger.log(`Sending ${chats.length} chats after initialization`);
             client.emit('whatsapp:chats', { chats });
+          } else {
+            // Si aún no está conectado, solicitar código QR
+            const qrCode = await this.whatsappService.getQRCode();
+            if (qrCode) {
+              client.emit('whatsapp:qr', { qrCode });
+            } else {
+              client.emit('whatsapp:error', { message: 'No QR code available' });
+            }
           }
-        }).catch(error => {
+        } catch (error) {
           this.logger.error(`Error during WhatsApp initialization: ${error.message}`);
           client.emit('whatsapp:status', { isConnected: false });
-        });
+          client.emit('whatsapp:error', { message: 'Error initializing WhatsApp' });
+        }
       }
     }).catch(error => {
       this.logger.error(`Error checking WhatsApp status: ${error.message}`);
       client.emit('whatsapp:status', { isConnected: false });
+      client.emit('whatsapp:error', { message: 'Error checking WhatsApp status' });
     });
   }
 
@@ -130,48 +139,72 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   @SubscribeMessage('whatsapp:getStatus')
   async handleGetStatus(@ConnectedSocket() client: Socket) {
-    this.logger.log('Client requested WhatsApp status');
     try {
       const isConnected = await this.whatsappService.isWhatsAppConnected();
       this.logger.log(`Sending WhatsApp status: ${isConnected}`);
       client.emit('whatsapp:status', { isConnected });
-      
-      // Si está conectado, enviar los chats inmediatamente
+
       if (isConnected) {
-        this.logger.log('WhatsApp is connected, sending chats...');
+        // Si WhatsApp está conectado, enviar los chats inmediatamente
         const chats = await this.whatsappService.getChats();
+        this.logger.log(`Sending ${chats.length} chats after status check`);
         client.emit('whatsapp:chats', { chats });
+      } else {
+        // Si no está conectado, intentar inicializar
+        try {
+          await this.whatsappService.initializeWhatsApp();
+          const newStatus = await this.whatsappService.isWhatsAppConnected();
+          this.logger.log(`WhatsApp status after initialization: ${newStatus}`);
+          client.emit('whatsapp:status', { isConnected: newStatus });
+          
+          if (newStatus) {
+            const chats = await this.whatsappService.getChats();
+            this.logger.log(`Sending ${chats.length} chats after initialization`);
+            client.emit('whatsapp:chats', { chats });
+          } else {
+            // Si aún no está conectado, solicitar código QR
+            const qrCode = await this.whatsappService.getQRCode();
+            if (qrCode) {
+              client.emit('whatsapp:qr', { qrCode });
+            } else {
+              client.emit('whatsapp:error', { message: 'No QR code available' });
+            }
+          }
+        } catch (error) {
+          this.logger.error(`Error during WhatsApp initialization: ${error.message}`);
+          client.emit('whatsapp:status', { isConnected: false });
+          client.emit('whatsapp:error', { message: 'Error initializing WhatsApp' });
+        }
       }
     } catch (error) {
       this.logger.error(`Error getting WhatsApp status: ${error.message}`);
       client.emit('whatsapp:status', { isConnected: false });
+      client.emit('whatsapp:error', { message: 'Error getting WhatsApp status' });
     }
   }
 
   @SubscribeMessage('whatsapp:getChats')
   async handleGetChats(@ConnectedSocket() client: Socket) {
-    this.logger.log('Client requested WhatsApp chats');
     try {
       const isConnected = await this.whatsappService.isWhatsAppConnected();
       if (!isConnected) {
         this.logger.error('Cannot get chats: WhatsApp is not connected');
-        client.emit('whatsapp:error', { message: 'WhatsApp is not connected' });
-        return;
+        throw new Error('WhatsApp is not connected');
       }
 
       const chats = await this.whatsappService.getChats();
       this.logger.log(`Sending ${chats.length} chats to client`);
       client.emit('whatsapp:chats', { chats });
     } catch (error) {
-      this.logger.error(`Error getting WhatsApp chats: ${error.message}`);
-      client.emit('whatsapp:error', { message: 'Error getting chats' });
+      this.logger.error(`Error getting chats: ${error.message}`);
+      client.emit('whatsapp:error', { message: error.message });
     }
   }
 
   @SubscribeMessage('whatsapp:getQR')
   async handleGetQR(@ConnectedSocket() client: Socket) {
-    this.logger.log('Client requested QR code');
     try {
+      this.logger.log('Client requested QR code');
       const qrCode = await this.whatsappService.getQRCode();
       if (qrCode) {
         client.emit('whatsapp:qr', { qrCode });
@@ -180,30 +213,50 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
       }
     } catch (error) {
       this.logger.error(`Error getting QR code: ${error.message}`);
-      client.emit('whatsapp:error', { message: 'Error getting QR code' });
+      client.emit('whatsapp:error', { message: error.message });
     }
   }
 
   @SubscribeMessage('whatsapp:getChatMessages')
-  async handleGetChatMessages(client: Socket, { chatId }: { chatId: string }) {
+  async handleGetChatMessages(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { chatId: string },
+  ) {
     try {
-      this.logger.log(`Client requested messages for chat ${chatId}`);
-      const messages = await this.whatsappService.getChatMessages(chatId);
+      const isConnected = await this.whatsappService.isWhatsAppConnected();
+      if (!isConnected) {
+        throw new Error('WhatsApp is not connected');
+      }
+
+      const messages = await this.whatsappService.getChatMessages(data.chatId);
       client.emit('whatsapp:chatMessages', { messages });
     } catch (error) {
-      this.logger.error(`Error getting WhatsApp chat messages: ${error.message}`);
-      client.emit('whatsapp:error', { message: 'Error getting WhatsApp chat messages' });
+      this.logger.error(`Error getting chat messages: ${error.message}`);
+      client.emit('whatsapp:error', { message: error.message });
     }
   }
 
   @SubscribeMessage('whatsapp:sendMessage')
-  async handleSendMessage(client: Socket, { to, message }: { to: string; message: string }) {
+  async handleSendMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { to: string; message: string },
+  ) {
     try {
-      await this.whatsappService.sendMessage(to, message);
-      client.emit('whatsapp:messageSent', { success: true });
+      const isConnected = await this.whatsappService.isWhatsAppConnected();
+      if (!isConnected) {
+        throw new Error('WhatsApp is not connected');
+      }
+
+      await this.whatsappService.sendMessage(data.to, data.message);
+      client.emit('whatsapp:message', {
+        from: data.to,
+        body: data.message,
+        timestamp: Date.now() / 1000,
+        fromMe: true,
+      });
     } catch (error) {
-      this.logger.error(`Error sending WhatsApp message: ${error.message}`);
-      client.emit('whatsapp:error', { message: 'Error sending WhatsApp message' });
+      this.logger.error(`Error sending message: ${error.message}`);
+      client.emit('whatsapp:error', { message: error.message });
     }
   }
 } 

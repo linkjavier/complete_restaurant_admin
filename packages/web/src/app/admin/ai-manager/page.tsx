@@ -48,6 +48,7 @@ export default function AIManagerPage() {
   const [chatMessages, setChatMessages] = useState<Message[]>([])
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [isLoadingChats, setIsLoadingChats] = useState(false)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -91,18 +92,26 @@ export default function AIManagerPage() {
     });
 
     let reconnectTimer: NodeJS.Timeout;
+    let statusCheckTimer: NodeJS.Timeout;
+    let initialConnectionAttempted = false;
 
     socketInstance.on('connect', () => {
       console.log('Connected to WebSocket');
       setIsConnected(true);
-      // Solicitar estado de WhatsApp al conectarse
-      socketInstance.emit('whatsapp:getStatus');
+      setIsLoadingChats(true);
+      
+      // Solo solicitar estado si no se ha intentado antes
+      if (!initialConnectionAttempted) {
+        console.log('Initial connection, requesting WhatsApp status...');
+        socketInstance.emit('whatsapp:getStatus');
+        initialConnectionAttempted = true;
+      }
     });
 
     socketInstance.on('disconnect', () => {
       console.log('Disconnected from WebSocket');
       setIsConnected(false);
-      setWhatsappChats([]); // Limpiar los chats al desconectarse
+      setIsLoadingChats(true);
       
       // Intentar reconectar después de un tiempo
       reconnectTimer = setTimeout(() => {
@@ -114,6 +123,7 @@ export default function AIManagerPage() {
     socketInstance.on('reconnect', () => {
       console.log('Reconnected to WebSocket');
       setIsConnected(true);
+      setIsLoadingChats(true);
       // Solicitar estado de WhatsApp al reconectarse
       socketInstance.emit('whatsapp:getStatus');
     });
@@ -129,20 +139,35 @@ export default function AIManagerPage() {
     socketInstance.on('whatsapp:status', ({ isConnected }) => {
       console.log('Received WhatsApp status:', isConnected);
       setIsWhatsAppConnected(isConnected);
+      
       if (isConnected) {
         console.log('WhatsApp is connected, requesting chats...');
         socketInstance.emit('whatsapp:getChats');
       } else {
-        console.log('WhatsApp is not connected, clearing chats...');
-        setWhatsappChats([]);
+        console.log('WhatsApp is not connected, checking if we need to initialize...');
+        // Solo intentar inicializar si no hay un código QR mostrado
+        if (!showQR) {
+          socketInstance.emit('whatsapp:getQR');
+          setShowQR(true);
+        }
+        setIsLoadingChats(false);
       }
     });
+
+    // Configurar un timer para verificar el estado periódicamente
+    statusCheckTimer = setInterval(() => {
+      if (socketInstance.connected) {
+        console.log('Periodic status check...');
+        socketInstance.emit('whatsapp:getStatus');
+      }
+    }, 30000); // Verificar cada 30 segundos
 
     socketInstance.on('whatsapp:authenticated', () => {
       console.log('WhatsApp authenticated');
       setIsWhatsAppConnected(true);
       setShowQR(false);
       setQrCode(null);
+      setIsLoadingChats(true);
       socketInstance.emit('whatsapp:getChats');
     });
 
@@ -150,40 +175,13 @@ export default function AIManagerPage() {
       console.error('WhatsApp authentication failed:', error);
       setIsWhatsAppConnected(false);
       setShowQR(true);
+      setIsLoadingChats(false);
     });
 
     socketInstance.on('whatsapp:disconnected', (reason) => {
       console.log('WhatsApp disconnected:', reason);
       setIsWhatsAppConnected(false);
-      setWhatsappChats([]);
-    });
-
-    socketInstance.on('ai_response', (response) => {
-      const aiMessage: Message = {
-        id: Date.now().toString(),
-        content: response.content,
-        role: "assistant",
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, aiMessage])
-      setIsLoading(false)
-    })
-
-    socketInstance.on('error', (error) => {
-      console.error('WebSocket error:', error)
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        content: "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.",
-        role: "assistant",
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, errorMessage])
-      setIsLoading(false)
-    })
-
-    socketInstance.on('whatsapp:qr', ({ qrCode }) => {
-      setQrCode(qrCode);
-      setShowQR(true);
+      setIsLoadingChats(true);
     });
 
     socketInstance.on('whatsapp:ready', () => {
@@ -191,6 +189,7 @@ export default function AIManagerPage() {
       setIsWhatsAppConnected(true);
       setShowQR(false);
       setQrCode(null);
+      setIsLoadingChats(true);
       // Solicitar chats cuando WhatsApp esté listo
       console.log('Requesting chats after ready event');
       socketInstance.emit('whatsapp:getChats');
@@ -203,6 +202,20 @@ export default function AIManagerPage() {
         console.log('No chats received or empty array');
       }
       setWhatsappChats(chats || []);
+      setIsLoadingChats(false);
+    });
+
+    socketInstance.on('whatsapp:qr', ({ qrCode }) => {
+      console.log('Received QR code');
+      setQrCode(qrCode);
+      setShowQR(true);
+      setIsLoadingChats(false);
+    });
+
+    socketInstance.on('whatsapp:error', ({ message }) => {
+      console.error('WhatsApp error:', message);
+      // No cambiar el estado de carga en caso de error
+      // para evitar parpadeos en la UI
     });
 
     socketInstance.on('whatsapp:message', (message) => {
@@ -245,15 +258,14 @@ export default function AIManagerPage() {
       setIsLoadingMessages(false);
     });
 
-    socketInstance.on('whatsapp:error', ({ message }) => {
-      console.error('WhatsApp error:', message);
-    });
-
     setSocket(socketInstance)
 
     return () => {
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
+      }
+      if (statusCheckTimer) {
+        clearInterval(statusCheckTimer);
       }
       socketInstance.disconnect()
       socketInstance.off('whatsapp:status');
@@ -268,6 +280,16 @@ export default function AIManagerPage() {
       socketInstance.off('whatsapp:disconnected');
     }
   }, [user, isAuthLoading, router])
+
+  // Modificar el efecto para la pestaña de WhatsApp
+  useEffect(() => {
+    if (socket && isConnected) {
+      console.log('Tab changed to WhatsApp, checking WhatsApp status...');
+      setIsLoadingChats(true);
+      // Primero verificar el estado de WhatsApp
+      socket.emit('whatsapp:getStatus');
+    }
+  }, [socket, isConnected]);
 
   const handleSendMessage = () => {
     if (!input.trim() || !socket || !isConnected || isLoading) return
@@ -381,33 +403,43 @@ export default function AIManagerPage() {
 
                   <ScrollArea className="h-[600px]">
                     <div className="space-y-2">
-                      {whatsappChats.map((chat) => (
-                        <div
-                          key={chat.id}
-                          onClick={() => handleChatSelect(chat.id)}
-                          className={cn(
-                            "p-4 rounded-lg cursor-pointer hover:bg-muted transition-colors",
-                            selectedChat === chat.id && "bg-muted"
-                          )}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <Avatar>
-                                <AvatarFallback>{chat.name[0]}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <p className="font-medium">{chat.name}</p>
-                                <p className="text-sm text-muted-foreground truncate">
-                                  {chat.lastMessage}
-                                </p>
-                              </div>
-                            </div>
-                            {chat.unreadCount > 0 && (
-                              <Badge variant="secondary">{chat.unreadCount}</Badge>
-                            )}
-                          </div>
+                      {isLoadingChats ? (
+                        <div className="flex items-center justify-center p-4">
+                          <p className="text-muted-foreground">Cargando chats...</p>
                         </div>
-                      ))}
+                      ) : whatsappChats.length === 0 ? (
+                        <div className="flex items-center justify-center p-4">
+                          <p className="text-muted-foreground">No hay chats disponibles</p>
+                        </div>
+                      ) : (
+                        whatsappChats.map((chat) => (
+                          <div
+                            key={chat.id}
+                            onClick={() => handleChatSelect(chat.id)}
+                            className={cn(
+                              "p-4 rounded-lg cursor-pointer hover:bg-muted transition-colors",
+                              selectedChat === chat.id && "bg-muted"
+                            )}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Avatar>
+                                  <AvatarFallback>{chat.name[0]}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-medium">{chat.name}</p>
+                                  <p className="text-sm text-muted-foreground truncate">
+                                    {chat.lastMessage}
+                                  </p>
+                                </div>
+                              </div>
+                              {chat.unreadCount > 0 && (
+                                <Badge variant="secondary">{chat.unreadCount}</Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </ScrollArea>
                 </div>

@@ -13,6 +13,10 @@ export class WhatsappService {
   private isConnected = false;
   private locationId: string | null = null;
   private initializationPromise: Promise<void> | null = null;
+  private cachedChats: any[] = [];
+  private lastChatsUpdate: number = 0;
+  private readonly CHATS_CACHE_DURATION = 30000; // 30 seconds
+  private qrCodePromise: Promise<string> | null = null;
 
   constructor(
     private prisma: PrismaService,
@@ -20,7 +24,7 @@ export class WhatsappService {
     @Inject(forwardRef(() => AIGateway))
     private aiGateway: AIGateway,
   ) {
-    this.initializeWhatsApp();
+    // No inicializar en el constructor
   }
 
   async initializeWhatsApp() {
@@ -48,148 +52,247 @@ export class WhatsappService {
             }
           } catch (error) {
             this.logger.error(`Error checking existing client state: ${error.message}`);
+            // Si hay un error, destruir el cliente existente y crear uno nuevo
+            try {
+              await this.client.destroy();
+            } catch (destroyError) {
+              this.logger.error(`Error destroying existing client: ${destroyError.message}`);
+            }
+            this.client = null;
           }
         }
 
-        this.client = new Client({
-          authStrategy: new LocalAuth({
-            clientId: 'restaurant-admin',
-            dataPath: authPath,
-          }),
-          puppeteer: {
-            args: ['--no-sandbox'],
+        // Crear una nueva promesa para el código QR
+        this.qrCodePromise = new Promise((resolve) => {
+          const puppeteerOptions = {
             headless: true,
-          },
-          qrMaxRetries: 5,
-          authTimeoutMs: 60000,
-        });
+            args: [
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-dev-shm-usage',
+              '--disable-accelerated-2d-canvas',
+              '--no-first-run',
+              '--no-zygote',
+              '--disable-gpu',
+              '--disable-extensions',
+              '--disable-component-extensions-with-background-pages',
+              '--disable-default-apps',
+              '--mute-audio',
+              '--no-default-browser-check',
+              '--no-experiments',
+              '--disable-features=site-per-process',
+              '--disable-features=TranslateUI',
+              '--disable-features=IsolateOrigins',
+              '--disable-site-isolation-trials',
+            ],
+            ignoreHTTPSErrors: true,
+          };
 
-        this.client.on('qr', async (qr) => {
-          this.logger.log('Received QR code');
-          this.qrCode = await qrcode.toDataURL(qr);
-          this.eventEmitter.emit('whatsapp.qr', this.qrCode);
-        });
+          this.client = new Client({
+            authStrategy: new LocalAuth({
+              clientId: 'restaurant-admin',
+              dataPath: authPath,
+            }),
+            puppeteer: puppeteerOptions,
+            qrMaxRetries: 5,
+            authTimeoutMs: 60000,
+            restartOnAuthFail: true,
+            takeoverOnConflict: true,
+            takeoverTimeoutMs: 10000,
+          });
 
-        this.client.on('authenticated', () => {
-          this.logger.log('WhatsApp client is authenticated');
-          this.isConnected = true;
-          this.eventEmitter.emit('whatsapp.authenticated');
-        });
-
-        this.client.on('ready', async () => {
-          this.logger.log('WhatsApp client is ready!');
-          this.isConnected = true;
-          this.qrCode = null;
-          
-          // Get the first location ID when WhatsApp is ready
-          if (!this.locationId) {
-            const firstLocation = await this.prisma.location.findFirst();
-            if (firstLocation) {
-              this.locationId = firstLocation.id;
-              this.logger.log(`Using location ID: ${this.locationId}`);
-            } else {
-              this.logger.error('No location found in the database');
+          this.client.on('qr', async (qr) => {
+            this.logger.log('Received QR code');
+            try {
+              this.qrCode = await qrcode.toDataURL(qr);
+              this.eventEmitter.emit('whatsapp.qr', this.qrCode);
+              resolve(this.qrCode);
+            } catch (error) {
+              this.logger.error(`Error generating QR code: ${error.message}`);
+              resolve(null);
             }
-          }
-          
-          this.eventEmitter.emit('whatsapp.ready');
-          
-          // Automatically fetch and emit chats when ready
-          try {
-            const chats = await this.getChats();
-            this.logger.log(`Emitting ${chats.length} chats after ready event`);
-            this.eventEmitter.emit('whatsapp.chats', { chats });
-          } catch (error) {
-            this.logger.error(`Error fetching chats after ready: ${error.message}`);
-          }
-        });
+          });
 
-        this.client.on('auth_failure', (error) => {
-          this.logger.error('WhatsApp authentication failed:', error);
-          this.isConnected = false;
-          this.initializationPromise = null;
-          this.eventEmitter.emit('whatsapp.auth_failure', error);
-        });
+          this.client.on('authenticated', () => {
+            this.logger.log('WhatsApp client is authenticated');
+            this.isConnected = true;
+            this.qrCode = null;
+            this.qrCodePromise = null;
+            this.eventEmitter.emit('whatsapp.authenticated');
+          });
 
-        this.client.on('disconnected', (reason) => {
-          this.logger.log(`WhatsApp client disconnected: ${reason}`);
-          this.isConnected = false;
-          this.initializationPromise = null;
-          this.eventEmitter.emit('whatsapp.disconnected', reason);
-        });
-
-        this.client.on('message', async (message) => {
-          if (message.fromMe) return;
-
-          if (!this.locationId) {
-            this.logger.error('No location ID available for saving message');
-            return;
-          }
-
-          try {
-            // Save incoming message to database
-            await this.prisma.whatsappMessage.create({
-              data: {
-                from: message.from,
-                body: message.body,
-                timestamp: new Date(message.timestamp * 1000),
-                location: {
-                  connect: {
-                    id: this.locationId
-                  }
-                }
-              },
-            });
-
-            // Process message with AI
-            const aiResponse = await this.aiGateway.handleTextInput({
-              text: message.body,
-              locationId: this.locationId,
-            });
+          this.client.on('ready', async () => {
+            this.logger.log('WhatsApp client is ready!');
+            this.isConnected = true;
+            this.qrCode = null;
+            this.qrCodePromise = null;
             
-            // Save AI response to database
-            await this.prisma.whatsappMessage.create({
-              data: {
-                from: message.from,
-                body: aiResponse,
-                timestamp: new Date(),
-                location: {
-                  connect: {
-                    id: this.locationId
+            // Get the first location ID when WhatsApp is ready
+            if (!this.locationId) {
+              const firstLocation = await this.prisma.location.findFirst();
+              if (firstLocation) {
+                this.locationId = firstLocation.id;
+                this.logger.log(`Using location ID: ${this.locationId}`);
+              } else {
+                this.logger.error('No location found in the database');
+              }
+            }
+            
+            this.eventEmitter.emit('whatsapp.ready');
+            
+            // Automatically fetch and emit chats when ready
+            try {
+              const chats = await this.getChats();
+              this.logger.log(`Emitting ${chats.length} chats after ready event`);
+              this.eventEmitter.emit('whatsapp.chats', { chats });
+            } catch (error) {
+              this.logger.error(`Error fetching chats after ready: ${error.message}`);
+            }
+          });
+
+          this.client.on('auth_failure', (error) => {
+            this.logger.error('WhatsApp authentication failed:', error);
+            this.isConnected = false;
+            this.initializationPromise = null;
+            this.qrCodePromise = null;
+            this.eventEmitter.emit('whatsapp.auth_failure', error);
+          });
+
+          this.client.on('disconnected', (reason) => {
+            this.logger.log(`WhatsApp client disconnected: ${reason}`);
+            this.isConnected = false;
+            this.initializationPromise = null;
+            this.qrCodePromise = null;
+            this.eventEmitter.emit('whatsapp.disconnected', reason);
+          });
+
+          // Agregar manejador de mensajes entrantes
+          this.client.on('message', async (message) => {
+            try {
+              // Ignorar mensajes propios
+              if (message.fromMe) return;
+
+              this.logger.log(`Received message from ${message.from}: ${message.body}`);
+
+              // Verificar si tenemos un locationId
+              if (!this.locationId) {
+                const firstLocation = await this.prisma.location.findFirst();
+                if (firstLocation) {
+                  this.locationId = firstLocation.id;
+                  this.logger.log(`Using location ID: ${this.locationId}`);
+                } else {
+                  this.logger.error('No location found in the database');
+                  return;
+                }
+              }
+
+              // Procesar el mensaje con la IA
+              const aiResponse = await this.aiGateway.handleTextInput({
+                text: message.body,
+                locationId: this.locationId,
+              });
+
+              // Guardar el mensaje entrante en la base de datos
+              await this.prisma.whatsappMessage.create({
+                data: {
+                  id: message.id._serialized,
+                  from: message.from,
+                  body: message.body,
+                  timestamp: new Date(message.timestamp * 1000),
+                  location: {
+                    connect: {
+                      id: this.locationId
+                    }
                   }
                 },
-                isFromAI: true,
-              },
+              });
+
+              // Guardar la respuesta de la IA en la base de datos
+              await this.prisma.whatsappMessage.create({
+                data: {
+                  from: message.from,
+                  body: aiResponse,
+                  timestamp: new Date(),
+                  location: {
+                    connect: {
+                      id: this.locationId
+                    }
+                  },
+                  isFromAI: true,
+                },
+              });
+
+              // Enviar la respuesta de la IA
+              await this.client.sendMessage(message.from, aiResponse);
+
+              // Emitir eventos para actualizar el frontend
+              this.eventEmitter.emit('whatsapp.message', {
+                from: message.from,
+                body: message.body,
+                timestamp: message.timestamp,
+              });
+
+              this.eventEmitter.emit('whatsapp.message', {
+                from: message.from,
+                body: aiResponse,
+                timestamp: Date.now() / 1000,
+                fromMe: true,
+              });
+
+              // Actualizar la caché de chats si existe
+              if (this.cachedChats.length > 0) {
+                const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
+                if (chatIndex !== -1) {
+                  this.cachedChats[chatIndex] = {
+                    ...this.cachedChats[chatIndex],
+                    lastMessage: aiResponse,
+                    timestamp: Date.now() / 1000,
+                  };
+                  this.lastChatsUpdate = Date.now();
+                  this.eventEmitter.emit('whatsapp:chats', { chats: this.cachedChats });
+                }
+              }
+
+            } catch (error) {
+              this.logger.error(`Error processing incoming message: ${error.message}`);
+              // Enviar mensaje de error al usuario
+              try {
+                await this.client.sendMessage(
+                  message.from,
+                  'Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.'
+                );
+              } catch (sendError) {
+                this.logger.error(`Error sending error message: ${sendError.message}`);
+              }
+            }
+          });
+
+          // Inicializar el cliente de manera asíncrona
+          setTimeout(() => {
+            this.client.initialize().catch(error => {
+              this.logger.error(`Error initializing WhatsApp client: ${error.message}`);
+              this.initializationPromise = null;
+              this.qrCodePromise = null;
+              throw error;
             });
-
-            // Send AI response back to WhatsApp
-            await this.client.sendMessage(message.from, aiResponse);
-
-            // Emit events for frontend updates
-            this.eventEmitter.emit('whatsapp.message', {
-              from: message.from,
-              body: message.body,
-              timestamp: message.timestamp,
-            });
-
-            this.eventEmitter.emit('whatsapp.message', {
-              from: message.from,
-              body: aiResponse,
-              timestamp: Date.now() / 1000,
-              fromMe: true,
-            });
-
-          } catch (error) {
-            this.logger.error(`Error processing WhatsApp message: ${error.message}`);
-            // Send error message to user
-            await this.client.sendMessage(
-              message.from,
-              'Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.'
-            );
-          }
+          }, 1000);
         });
 
-        await this.client.initialize();
+        // Esperar a que el cliente se inicialice
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('WhatsApp initialization timeout'));
+          }, 30000);
+
+          const readyHandler = () => {
+            clearTimeout(timeout);
+            this.eventEmitter.off('whatsapp.ready', readyHandler);
+            resolve(true);
+          };
+
+          this.eventEmitter.on('whatsapp.ready', readyHandler);
+        });
+
         this.logger.log('WhatsApp client initialization completed');
 
         // Verificar el estado después de la inicialización
@@ -203,6 +306,7 @@ export class WhatsappService {
       } catch (error) {
         this.logger.error(`Error initializing WhatsApp: ${error.message}`);
         this.initializationPromise = null;
+        this.qrCodePromise = null;
         throw error;
       }
     })();
@@ -239,8 +343,30 @@ export class WhatsappService {
   }
 
   async getQRCode(): Promise<string | null> {
-    await this.initializeWhatsApp();
-    return this.qrCode;
+    try {
+      await this.initializeWhatsApp();
+      
+      if (this.isConnected) {
+        this.logger.log('WhatsApp is already connected, no QR code needed');
+        return null;
+      }
+
+      if (this.qrCode) {
+        this.logger.log('Returning existing QR code');
+        return this.qrCode;
+      }
+
+      if (this.qrCodePromise) {
+        this.logger.log('Waiting for QR code from existing promise');
+        return await this.qrCodePromise;
+      }
+
+      this.logger.log('No QR code available, waiting for initialization');
+      return null;
+    } catch (error) {
+      this.logger.error(`Error getting QR code: ${error.message}`);
+      return null;
+    }
   }
 
   async isWhatsAppConnected(): Promise<boolean> {
@@ -259,15 +385,26 @@ export class WhatsappService {
         
         if (this.isConnected) {
           // Verificar que podemos obtener los chats
-          const chats = await this.client.getChats();
-          this.logger.log(`Successfully retrieved ${chats.length} chats`);
-          return true;
+          try {
+            const chats = await this.client.getChats();
+            this.logger.log(`Successfully retrieved ${chats.length} chats`);
+            return true;
+          } catch (error) {
+            this.logger.error(`Error getting chats: ${error.message}`);
+            // Si hay un error al obtener los chats, intentar reinicializar
+            this.initializationPromise = null;
+            await this.initializeWhatsApp();
+            return false;
+          }
         }
         
         return false;
       } catch (error) {
         this.logger.error(`Error getting WhatsApp state: ${error.message}`);
         this.isConnected = false;
+        // Intentar reinicializar si hay un error
+        this.initializationPromise = null;
+        await this.initializeWhatsApp();
         return false;
       }
     } catch (error) {
@@ -277,10 +414,25 @@ export class WhatsappService {
   }
 
   async getChats(): Promise<any[]> {
-    await this.initializeWhatsApp();
-    await this.waitForConnection();
-
     try {
+      await this.initializeWhatsApp();
+      
+      if (!this.client) {
+        throw new Error('WhatsApp client not initialized');
+      }
+
+      const state = await this.client.getState();
+      if (state !== 'CONNECTED') {
+        throw new Error('WhatsApp is not connected');
+      }
+
+      // Check if we have cached chats that are still valid
+      const now = Date.now();
+      if (this.cachedChats.length > 0 && (now - this.lastChatsUpdate) < this.CHATS_CACHE_DURATION) {
+        this.logger.log('Returning cached chats');
+        return this.cachedChats;
+      }
+
       this.logger.log('Fetching WhatsApp chats...');
       const chats = await this.client.getChats();
       this.logger.log(`Found ${chats.length} chats`);
@@ -297,12 +449,21 @@ export class WhatsappService {
         return formatted;
       });
 
+      // Update cache
+      this.cachedChats = formattedChats;
+      this.lastChatsUpdate = now;
+
       this.logger.log('Emitting whatsapp:chats event with formatted chats');
       this.eventEmitter.emit('whatsapp:chats', { chats: formattedChats });
 
       return formattedChats;
     } catch (error) {
       this.logger.error(`Error getting WhatsApp chats: ${error.message}`);
+      // If we have cached chats, return them even if they're expired
+      if (this.cachedChats.length > 0) {
+        this.logger.log('Returning expired cached chats due to error');
+        return this.cachedChats;
+      }
       throw error;
     }
   }
@@ -396,6 +557,20 @@ export class WhatsappService {
           }
         },
       });
+
+      // Update cached chats if they exist
+      if (this.cachedChats.length > 0) {
+        const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
+        if (chatIndex !== -1) {
+          this.cachedChats[chatIndex] = {
+            ...this.cachedChats[chatIndex],
+            lastMessage: message.body,
+            timestamp: message.timestamp,
+          };
+          this.lastChatsUpdate = Date.now();
+          this.eventEmitter.emit('whatsapp:chats', { chats: this.cachedChats });
+        }
+      }
 
       // Get AI response
       const aiResponse = await this.aiGateway.handleTextInput({
