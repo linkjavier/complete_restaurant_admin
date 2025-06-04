@@ -27,85 +27,85 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly whatsappService: WhatsappService,
     private readonly eventEmitter: EventEmitter2,
   ) {
-    // Subscribe to WhatsApp events
+    // Suscribirse a eventos de WhatsApp
     this.eventEmitter.on('whatsapp.qr', (qrCode: string) => {
-      this.server.emit('whatsapp:qr', { qrCode });
+      this.broadcastToAll('whatsapp:qr', { qrCode });
     });
 
     this.eventEmitter.on('whatsapp.ready', () => {
-      this.server.emit('whatsapp:ready');
+      this.broadcastToAll('whatsapp:status', { isConnected: true });
     });
 
     this.eventEmitter.on('whatsapp.message', (message: any) => {
-      this.server.emit('whatsapp:message', message);
+      this.broadcastToAll('whatsapp:message', message);
     });
   }
 
-  async handleConnection(client: Socket) {
-    this.connectedClients.set(client.id, client);
+  private broadcastToAll(event: string, data: any) {
+    this.server.emit(event, data);
+  }
+
+  handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
+    this.connectedClients.set(client.id, client);
 
-    // Send initial state
-    const isConnected = await this.whatsappService.isWhatsAppConnected();
-    client.emit('whatsapp:status', { isConnected });
-
-    if (!isConnected) {
-      const qrCode = await this.whatsappService.getQRCode();
-      if (qrCode) {
-        client.emit('whatsapp:qr', { qrCode });
+    // Enviar estado actual de WhatsApp al cliente que se conecta
+    this.whatsappService.isWhatsAppConnected().then(isConnected => {
+      client.emit('whatsapp:status', { isConnected });
+      if (isConnected) {
+        this.handleGetChats(client);
       }
-    }
+    });
   }
 
   handleDisconnect(client: Socket) {
-    this.connectedClients.delete(client.id);
     this.logger.log(`Client disconnected: ${client.id}`);
+    this.connectedClients.delete(client.id);
   }
 
   @SubscribeMessage('whatsapp:getQR')
   async handleGetQR(client: Socket) {
-    const qrCode = await this.whatsappService.getQRCode();
-    if (qrCode) {
+    try {
+      const qrCode = await this.whatsappService.getQRCode();
       client.emit('whatsapp:qr', { qrCode });
+    } catch (error) {
+      this.logger.error(`Error getting QR code: ${error.message}`);
+      client.emit('whatsapp:error', { message: 'Error getting QR code' });
     }
   }
 
   @SubscribeMessage('whatsapp:getChats')
   async handleGetChats(client: Socket) {
-    this.logger.log('Client requested WhatsApp chats');
     try {
+      this.logger.log('Client requested WhatsApp chats');
       const chats = await this.whatsappService.getChats();
-      this.logger.log(`Sending ${chats.length} chats to client`);
       client.emit('whatsapp:chats', { chats });
     } catch (error) {
       this.logger.error(`Error getting WhatsApp chats: ${error.message}`);
-      client.emit('whatsapp:error', { message: error.message });
+      client.emit('whatsapp:error', { message: 'Error getting WhatsApp chats' });
     }
   }
 
   @SubscribeMessage('whatsapp:getChatMessages')
-  async handleGetChatMessages(client: Socket, payload: { chatId: string }) {
-    this.logger.log(`Client requested messages for chat ${payload.chatId}`);
+  async handleGetChatMessages(client: Socket, { chatId }: { chatId: string }) {
     try {
-      const messages = await this.whatsappService.getChatMessages(payload.chatId);
-      this.logger.log(`Sending ${messages.length} messages to client`);
+      this.logger.log(`Client requested messages for chat ${chatId}`);
+      const messages = await this.whatsappService.getChatMessages(chatId);
       client.emit('whatsapp:chatMessages', { messages });
     } catch (error) {
       this.logger.error(`Error getting WhatsApp chat messages: ${error.message}`);
-      client.emit('whatsapp:error', { message: error.message });
+      client.emit('whatsapp:error', { message: 'Error getting WhatsApp chat messages' });
     }
   }
 
   @SubscribeMessage('whatsapp:sendMessage')
-  async handleSendMessage(client: Socket, payload: { to: string; message: string }) {
-    this.logger.log(`Client sending message to ${payload.to}`);
+  async handleSendMessage(client: Socket, { to, message }: { to: string; message: string }) {
     try {
-      await this.whatsappService.sendMessage(payload.to, payload.message);
-      this.logger.log('Message sent successfully');
+      await this.whatsappService.sendMessage(to, message);
       client.emit('whatsapp:messageSent', { success: true });
     } catch (error) {
       this.logger.error(`Error sending WhatsApp message: ${error.message}`);
-      client.emit('whatsapp:error', { message: error.message });
+      client.emit('whatsapp:error', { message: 'Error sending WhatsApp message' });
     }
   }
 } 

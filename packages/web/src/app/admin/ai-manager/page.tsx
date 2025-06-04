@@ -47,6 +47,7 @@ export default function AIManagerPage() {
   const [selectedChat, setSelectedChat] = useState<string | null>(null)
   const [chatMessages, setChatMessages] = useState<Message[]>([])
   const [qrCode, setQrCode] = useState<string | null>(null)
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -180,6 +181,7 @@ export default function AIManagerPage() {
       }));
       console.log('Formatted messages:', formattedMessages);
       setChatMessages(formattedMessages);
+      setIsLoadingMessages(false);
     });
 
     socketInstance.on('whatsapp:error', ({ message }) => {
@@ -235,6 +237,7 @@ export default function AIManagerPage() {
     console.log('Selecting chat:', chatId);
     setSelectedChat(chatId);
     setChatMessages([]);
+    setIsLoadingMessages(true);
     
     if (socket) {
       console.log('Requesting messages for chat:', chatId);
@@ -348,41 +351,51 @@ export default function AIManagerPage() {
                   <div className="flex flex-col h-[600px]">
                     <ScrollArea className="flex-1 pr-4">
                       <div className="space-y-4">
-                        {chatMessages.map((message) => (
-                          <div
-                            key={message.id}
-                            className={cn(
-                              "flex items-start gap-4",
-                              message.role === "assistant" ? "flex-row" : "flex-row-reverse"
-                            )}
-                          >
-                            <Avatar>
-                              <AvatarImage
-                                src={message.role === "assistant" ? "/bot-avatar.png" : "/user-avatar.png"}
-                              />
-                              <AvatarFallback>
-                                {message.role === "assistant" ? "AI" : "U"}
-                              </AvatarFallback>
-                            </Avatar>
+                        {isLoadingMessages ? (
+                          <div className="flex items-center justify-center h-full">
+                            <p className="text-muted-foreground">Cargando mensajes...</p>
+                          </div>
+                        ) : chatMessages.length === 0 ? (
+                          <div className="flex items-center justify-center h-full">
+                            <p className="text-muted-foreground">No hay mensajes en este chat</p>
+                          </div>
+                        ) : (
+                          chatMessages.map((message) => (
                             <div
+                              key={message.id}
                               className={cn(
-                                "rounded-lg p-4 max-w-[80%]",
-                                message.role === "assistant"
-                                  ? "bg-muted"
-                                  : "bg-primary text-primary-foreground"
+                                "flex items-start gap-4",
+                                message.role === "assistant" ? "flex-row" : "flex-row-reverse"
                               )}
                             >
-                              <div className="prose prose-sm dark:prose-invert max-w-none">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                  {message.content}
-                                </ReactMarkdown>
+                              <Avatar>
+                                <AvatarImage
+                                  src={message.role === "assistant" ? "/bot-avatar.png" : "/user-avatar.png"}
+                                />
+                                <AvatarFallback>
+                                  {message.role === "assistant" ? "AI" : "U"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div
+                                className={cn(
+                                  "rounded-lg p-4 max-w-[80%]",
+                                  message.role === "assistant"
+                                    ? "bg-muted"
+                                    : "bg-primary text-primary-foreground"
+                                )}
+                              >
+                                <div className="prose prose-sm dark:prose-invert max-w-none">
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {message.content}
+                                  </ReactMarkdown>
+                                </div>
+                                <span className="text-xs opacity-70">
+                                  {message.timestamp.toLocaleTimeString()}
+                                </span>
                               </div>
-                              <span className="text-xs opacity-70">
-                                {message.timestamp.toLocaleTimeString()}
-                              </span>
                             </div>
-                          </div>
-                        ))}
+                          ))
+                        )}
                       </div>
                     </ScrollArea>
 
