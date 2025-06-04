@@ -516,14 +516,23 @@ export class WhatsappService {
       const whatsappMessages = await chat.fetchMessages({ limit: 50 });
       this.logger.log(`Found ${whatsappMessages.length} messages from WhatsApp`);
 
-      // Crear un Map para rastrear mensajes por ID
-      const messageMap = new Map();
+      // Crear un Set para rastrear IDs únicos de mensajes
+      const processedIds = new Set<string>();
+      const uniqueMessages: any[] = [];
 
-      // Procesar mensajes de la base de datos primero
+      // Función para agregar mensaje si es único
+      const addUniqueMessage = (message: any) => {
+        const messageId = message.id || message.id._serialized;
+        if (!processedIds.has(messageId)) {
+          processedIds.add(messageId);
+          uniqueMessages.push(message);
+        }
+      };
+
+      // Procesar mensajes de la base de datos
       dbMessages.forEach(msg => {
-        const id = `db_${msg.id}`;
-        messageMap.set(id, {
-          id,
+        addUniqueMessage({
+          id: msg.id,
           from: msg.from,
           body: msg.body,
           timestamp: msg.timestamp.getTime() / 1000,
@@ -531,12 +540,11 @@ export class WhatsappService {
         });
       });
 
-      // Procesar mensajes de WhatsApp, solo agregando los que no están en la base de datos
+      // Procesar mensajes de WhatsApp
       whatsappMessages.forEach(message => {
-        const id = `wa_${message.id._serialized}`;
-        if (!messageMap.has(id)) {
-          messageMap.set(id, {
-            id,
+        if (message.from === chatId || message.to === chatId) {
+          addUniqueMessage({
+            id: message.id._serialized,
             from: message.from,
             body: message.body,
             timestamp: message.timestamp,
@@ -545,11 +553,8 @@ export class WhatsappService {
         }
       });
 
-      // Convertir el Map a un array y ordenar por timestamp
-      const allMessages = Array.from(messageMap.values())
-        .sort((a, b) => a.timestamp - b.timestamp);
-
-      return allMessages;
+      // Ordenar mensajes por timestamp
+      return uniqueMessages.sort((a, b) => a.timestamp - b.timestamp);
     } catch (error) {
       this.logger.error(`Error getting WhatsApp chat messages: ${error.message}`);
       throw error;
