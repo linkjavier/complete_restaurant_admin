@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,6 +37,8 @@ export default function AIManagerPage() {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const [isWhatsAppConnected, setIsWhatsAppConnected] = useState(false)
   const [showQR, setShowQR] = useState(false)
   const [socket, setSocket] = useState<Socket | null>(null)
@@ -62,6 +64,14 @@ export default function AIManagerPage() {
       status: "away"
     }
   ])
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
 
   useEffect(() => {
     if (isAuthLoading) {
@@ -145,6 +155,7 @@ export default function AIManagerPage() {
     setMessages([...messages, newMessage])
     setInput("")
     setIsLoading(true)
+    inputRef.current?.focus()
 
     // Send message through WebSocket
     socket.emit('input_text', { text: input })
@@ -242,20 +253,23 @@ export default function AIManagerPage() {
                       </div>
                     </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
               <div className="flex gap-2 mt-4">
                 <Input
+                  ref={inputRef}
                   placeholder="Escribe tu mensaje..."
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                  disabled={isLoading || !isConnected}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSendMessage()
+                    }
+                  }}
                 />
-                <Button 
-                  onClick={handleSendMessage} 
-                  disabled={isLoading || !isConnected}
-                >
+                <Button onClick={handleSendMessage} disabled={!input.trim() || !isConnected || isLoading}>
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
