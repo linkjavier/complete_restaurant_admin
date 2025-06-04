@@ -40,3 +40,7 @@ lerna-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local 
+
+# Whatsapp cache and auth
+.wwebjs_cache
+.wwebjs_auth
