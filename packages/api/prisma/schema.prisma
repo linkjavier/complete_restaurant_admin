@@ -250,15 +250,15 @@ model ProductionLog {
 }
 
 model WhatsappMessage {
-  id        String   @id @default(cuid())
-  from      String
-  body      String
-  timestamp DateTime
+  id         String   @id @default(cuid())
+  from       String
+  body       String
+  timestamp  DateTime
   locationId String
-  location  Location @relation(fields: [locationId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  location   Location @relation(fields: [locationId], references: [id])
+  isFromAI   Boolean  @default(false)
 
   @@index([locationId])
+  @@index([from])
   @@index([timestamp])
 }

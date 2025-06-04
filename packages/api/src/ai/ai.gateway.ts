@@ -10,6 +10,7 @@ import OpenAI from 'openai';
 import { ConfigService } from '@nestjs/config';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
+import { Inject, forwardRef } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
@@ -26,7 +27,9 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   constructor(
     private configService: ConfigService,
+    @Inject(forwardRef(() => ProductsService))
     private productsService: ProductsService,
+    @Inject(forwardRef(() => OrdersService))
     private ordersService: OrdersService,
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
@@ -41,19 +44,6 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private readonly functions = [
-    // {
-    //   name: 'get_menu',
-    //   description: 'Get the list of available products in the menu',
-    //   parameters: {
-    //     type: 'object',
-    //     properties: {
-    //       category: {
-    //         type: 'string',
-    //         description: 'Optional category to filter products',
-    //       },
-    //     },
-    //   },
-    // },
     {
       name: 'create_order',
       description: 'Create a new order with specified items',
@@ -120,11 +110,12 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         locationId,
       });
 
-      // Initialize conversation history for new client with raw menu data
-      this.conversations.set(client.id, [
-        {
-          role: 'system',
-          content: `You are a helpful restaurant assistant that helps with orders and customer service. Your name is "Paola" and you are a woman. You can help customers by showing them the menu and taking their orders. Always first ask for the customer's nameThe current location ID is ${locationId}.
+      // Initialize conversation history for this location if it doesn't exist
+      if (!this.conversations.has(locationId)) {
+        this.conversations.set(locationId, [
+          {
+            role: 'system',
+            content: `You are a helpful restaurant assistant that helps with orders and customer service. Your name is "Paola" and you are a woman. You can help customers by showing them the menu and taking their orders. Always first ask for the customer's nameThe current location ID is ${locationId}.
 
 Here is the current menu data:
 ${JSON.stringify(menu, null, 2)}
@@ -144,8 +135,9 @@ For takeout orders:
 6. Include the list of items in your response. 
 7. Include the exact total amount of the order in your response.
 8. ALWAYS use the exact product IDs from the menu data when creating orders`,
-        },
-      ]);
+          },
+        ]);
+      }
 
       // Send welcome message
       client.emit('ai_response', {
@@ -164,35 +156,49 @@ For takeout orders:
 
   handleDisconnect(client: Socket) {
     console.log(`Client disconnected: ${client.id}`);
-    this.conversations.delete(client.id);
-    this.locationIds.delete(client.id);
+    const locationId = this.locationIds.get(client.id);
+    if (locationId) {
+      this.locationIds.delete(client.id);
+      // No eliminamos la conversación para mantener el contexto
+    }
   }
 
   @SubscribeMessage('input_text')
-  async handleTextInput(client: Socket, payload: { text: string }) {
+  async handleTextInput(client: Socket | { text: string, locationId: string }, payload?: { text: string }) {
     try {
-      console.log(`Received message from client ${client.id}:`, payload.text);
+      let socket: Socket;
+      let locationId: string;
+      let text: string;
+
+      if ('id' in client) {
+        // Es un Socket
+        socket = client;
+        text = payload.text;
+        locationId = this.locationIds.get(socket.id);
+        if (!locationId) {
+          throw new Error('No location ID found for this client');
+        }
+      } else {
+        // Es un objeto con text y locationId
+        text = client.text;
+        locationId = client.locationId;
+      }
+
+      console.log(`Processing message: ${text} for location: ${locationId}`);
       
-      const conversation = this.conversations.get(client.id);
+      const conversation = this.conversations.get(locationId);
       if (!conversation) {
-        console.error(`No conversation found for client ${client.id}`);
-        throw new Error('No conversation found for client');
+        console.error(`No conversation found for location ${locationId}`);
+        throw new Error('No conversation found for location');
       }
-
-      const locationId = this.locationIds.get(client.id);
-      if (!locationId) {
-        console.error(`No locationId found for client ${client.id}`);
-        throw new Error('No location ID found for this client');
-      }
-
-      console.log(`Using locationId: ${locationId} for client ${client.id}`);
 
       // Add user message to conversation history
       conversation.push({
         role: 'user',
-        content: payload.text,
+        content: text,
       });
 
+      console.log('Current conversation history:', conversation);
       console.log('Sending request to OpenAI...');
       
       // Get response from OpenAI with function calling
@@ -207,175 +213,57 @@ For takeout orders:
       const response = completion.choices[0].message;
       console.log('Received response from OpenAI:', response);
 
-      // Handle function calls
       if (response.function_call) {
+        // Handle function call
         const functionName = response.function_call.name;
-        const functionArgs = response.function_call.arguments;
+        const functionArgs = JSON.parse(response.function_call.arguments);
 
-        let functionResult;
-        console.log(`Executing function ${functionName} with args:`, functionArgs);
+        console.log(`Executing function: ${functionName} with args:`, functionArgs);
 
-        switch (functionName) {
-          // case 'get_menu':
-          //   try {
-          //     // Parse arguments safely, defaulting to empty object if invalid
-          //     const menuArgs = functionArgs ? JSON.parse(functionArgs) : {};
-          //     console.log('Parsed menu args:', menuArgs);
-          //     console.log('Using locationId:', locationId);
-              
-          //     functionResult = await this.productsService.findAll({
-          //       locationId,
-          //       categoryId: menuArgs.category || undefined,
-          //     });
-          //     console.log('Menu result:', functionResult);
+        // Add assistant's function call to conversation history
+        conversation.push({
+          role: 'assistant',
+          content: null,
+          function_call: {
+            name: functionName,
+            arguments: response.function_call.arguments,
+          },
+        });
 
-          //     // Agregar el resultado a la conversación con un formato más descriptivo
-          //     conversation.push({
-          //       role: 'function',
-          //       name: functionName,
-          //       content: JSON.stringify({
-          //         message: "Aquí está el menú completo:",
-          //         menu: functionResult
-          //       }),
-          //     });
+        // Execute the function
+        const functionResult = await this.executeFunction(functionName, functionArgs, locationId);
 
-          //     // Obtener una nueva respuesta de OpenAI con el resultado formateado
-          //     const menuCompletion = await this.openai.chat.completions.create({
-          //       model: 'gpt-4o-mini-2024-07-18',
-          //       messages: [
-          //         ...conversation,
-          //         {
-          //           role: 'system',
-          //           content: `Eres un asistente de restaurante. Cuando te pidan el menú, responde SOLO con el nombre del producto y su precio, organizados por categorías.
-          //           Usa este formato exacto:
-          //           ## [Nombre de la Categoría]
-          //           - [Nombre del Producto] - $[Precio]
-                    
-          //           No incluyas descripciones, imágenes ni información adicional.
-          //           Mantén el formato markdown con ## para categorías y - para productos.
-          //           Al final, agrega una línea en blanco y "¿En qué más puedo ayudarte?"`
-          //         }
-          //       ],
-          //       temperature: 0.7,
-          //     });
-
-          //     const menuResponse = menuCompletion.choices[0].message;
-          //     conversation.push({
-          //       role: 'assistant',
-          //       content: menuResponse.content,
-          //     });
-
-          //     // Enviar respuesta al cliente
-          //     client.emit('ai_response', {
-          //       type: 'text',
-          //       content: menuResponse.content,
-          //     });
-          //     return;
-          //   } catch (error) {
-          //     console.error('Error in get_menu function:', error);
-          //     throw new Error('Error retrieving menu');
-          //   }
-          case 'create_order':
-            try {
-              const orderArgs = JSON.parse(functionArgs);
-              console.log('Creating order with args:', orderArgs);
-              
-              // Ensure locationId is present
-              if (!locationId) {
-                throw new Error('No location ID found for this client');
-              }
-
-              // Ensure customerName is present
-              if (!orderArgs.customerName) {
-                throw new Error('Customer name is required');
-              }
-
-              // Validate product IDs
-              const menu = await this.productsService.findAll({ locationId });
-              const validProductIds = new Set(menu.map(product => product.id));
-              
-              const invalidProducts = orderArgs.items.filter(
-                item => !validProductIds.has(item.productId)
-              );
-
-              if (invalidProducts.length > 0) {
-                throw new Error(`Invalid product IDs found: ${invalidProducts.map(p => p.productId).join(', ')}`);
-              }
-
-              // Create the order with the correct type
-              const order = await this.ordersService.create({
-                ...orderArgs,
-                locationId,
-                type: 'TAKEOUT', // Always set to TAKEOUT for AI orders
-                status: 'PENDING',
-                tableId: undefined // Ensure tableId is not set for takeout orders
-              });
-
-              // Add function result to conversation
-              conversation.push({
-                role: 'function',
-                name: 'create_order',
-                content: JSON.stringify({
-                  success: true,
-                  orderId: order.id,
-                  message: `¡Orden para llevar creada exitosamente para ${orderArgs.customerName}! Número de orden: ${order.id}`
-                }),
-              });
-
-              // Get a new completion with the function result
-              const secondCompletion = await this.openai.chat.completions.create({
-                model: 'gpt-4o-mini-2024-07-18',
-                messages: conversation,
-                temperature: 0.7,
-              });
-
-              const secondResponse = secondCompletion.choices[0].message;
-              conversation.push({
-                role: 'assistant',
-                content: secondResponse.content,
-              });
-
-              // Send response to client
-              client.emit('ai_response', {
-                type: 'text',
-                content: secondResponse.content,
-              });
-
-              return;
-            } catch (error) {
-              console.error('Error in create_order function:', error);
-              throw new Error(`Error creating order: ${error.message}`);
-            }
-            break;
-          default:
-            throw new Error(`Unknown function: ${functionName}`);
-        }
-
-        // Add function result to conversation
+        // Add function result to conversation history
         conversation.push({
           role: 'function',
           name: functionName,
           content: JSON.stringify(functionResult),
         });
 
-        // Get a new completion with the function result
-        const secondCompletion = await this.openai.chat.completions.create({
+        // Get final response from OpenAI
+        const finalCompletion = await this.openai.chat.completions.create({
           model: 'gpt-4o-mini-2024-07-18',
           messages: conversation,
           temperature: 0.7,
         });
 
-        const secondResponse = secondCompletion.choices[0].message;
+        const finalResponse = finalCompletion.choices[0].message;
+
+        // Add final response to conversation history
         conversation.push({
           role: 'assistant',
-          content: secondResponse.content,
+          content: finalResponse.content,
         });
 
-        // Send response to client
-        client.emit('ai_response', {
-          type: 'text',
-          content: secondResponse.content,
-        });
+        // Send response to client if it's a socket
+        if (socket) {
+          socket.emit('ai_response', {
+            type: 'text',
+            content: finalResponse.content,
+          });
+        }
+
+        return finalResponse.content;
       } else {
         // Regular text response
         conversation.push({
@@ -383,19 +271,79 @@ For takeout orders:
           content: response.content,
         });
 
-        // Send response to client
-        client.emit('ai_response', {
-          type: 'text',
-          content: response.content,
-        });
+        // Send response to client if it's a socket
+        if (socket) {
+          socket.emit('ai_response', {
+            type: 'text',
+            content: response.content,
+          });
+        }
+
+        return response.content;
       }
 
     } catch (error) {
       console.error('Error processing message:', error);
-      client.emit('error', { 
-        message: 'Error processing your message',
-        details: error.message 
-      });
+      if ('id' in client) {
+        client.emit('error', { 
+          message: 'Error processing your message',
+          details: error.message 
+        });
+      }
+      throw error;
+    }
+  }
+
+  private async executeFunction(functionName: string, functionArgs: any, locationId: string) {
+    switch (functionName) {
+
+      case 'create_order':
+        try {
+          console.log('Creating order with args:', functionArgs);
+          
+          // Ensure locationId is present
+          if (!locationId) {
+            throw new Error('No location ID found for this client');
+          }
+
+          // Ensure customerName is present
+          if (!functionArgs.customerName) {
+            throw new Error('Customer name is required');
+          }
+
+          // Validate product IDs
+          const menu = await this.productsService.findAll({ locationId });
+          const validProductIds = new Set(menu.map(product => product.id));
+          
+          const invalidProducts = functionArgs.items.filter(
+            item => !validProductIds.has(item.productId)
+          );
+
+          if (invalidProducts.length > 0) {
+            throw new Error(`Invalid product IDs found: ${invalidProducts.map(p => p.productId).join(', ')}`);
+          }
+
+          // Create the order with the correct type
+          const order = await this.ordersService.create({
+            ...functionArgs,
+            locationId,
+            type: 'TAKEOUT', // Always set to TAKEOUT for AI orders
+            status: 'PENDING',
+            tableId: undefined // Ensure tableId is not set for takeout orders
+          });
+
+          return {
+            success: true,
+            orderId: order.id,
+            message: `¡Orden para llevar creada exitosamente para ${functionArgs.customerName}! Número de orden: ${order.id}`
+          };
+        } catch (error) {
+          console.error('Error in create_order function:', error);
+          throw new Error(`Error creating order: ${error.message}`);
+        }
+
+      default:
+        throw new Error(`Unknown function: ${functionName}`);
     }
   }
 } 

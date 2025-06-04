@@ -84,17 +84,79 @@ export default function AIManagerPage() {
       query: {
         locationId: user.locationId,
       },
-    })
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+    });
+
+    let reconnectTimer: NodeJS.Timeout;
 
     socketInstance.on('connect', () => {
-      console.log('Connected to WebSocket')
-      setIsConnected(true)
-    })
+      console.log('Connected to WebSocket');
+      setIsConnected(true);
+      // Solicitar estado de WhatsApp al conectarse
+      socketInstance.emit('whatsapp:getStatus');
+    });
 
     socketInstance.on('disconnect', () => {
-      console.log('Disconnected from WebSocket')
-      setIsConnected(false)
-    })
+      console.log('Disconnected from WebSocket');
+      setIsConnected(false);
+      setWhatsappChats([]); // Limpiar los chats al desconectarse
+      
+      // Intentar reconectar después de un tiempo
+      reconnectTimer = setTimeout(() => {
+        console.log('Attempting to reconnect...');
+        socketInstance.connect();
+      }, 5000);
+    });
+
+    socketInstance.on('reconnect', () => {
+      console.log('Reconnected to WebSocket');
+      setIsConnected(true);
+      // Solicitar estado de WhatsApp al reconectarse
+      socketInstance.emit('whatsapp:getStatus');
+    });
+
+    socketInstance.on('reconnect_error', (error) => {
+      console.error('Reconnection error:', error);
+    });
+
+    socketInstance.on('reconnect_failed', () => {
+      console.error('Failed to reconnect');
+    });
+
+    socketInstance.on('whatsapp:status', ({ isConnected }) => {
+      console.log('Received WhatsApp status:', isConnected);
+      setIsWhatsAppConnected(isConnected);
+      if (isConnected) {
+        console.log('WhatsApp is connected, requesting chats...');
+        socketInstance.emit('whatsapp:getChats');
+      } else {
+        console.log('WhatsApp is not connected, clearing chats...');
+        setWhatsappChats([]);
+      }
+    });
+
+    socketInstance.on('whatsapp:authenticated', () => {
+      console.log('WhatsApp authenticated');
+      setIsWhatsAppConnected(true);
+      setShowQR(false);
+      setQrCode(null);
+      socketInstance.emit('whatsapp:getChats');
+    });
+
+    socketInstance.on('whatsapp:auth_failure', (error) => {
+      console.error('WhatsApp authentication failed:', error);
+      setIsWhatsAppConnected(false);
+      setShowQR(true);
+    });
+
+    socketInstance.on('whatsapp:disconnected', (reason) => {
+      console.log('WhatsApp disconnected:', reason);
+      setIsWhatsAppConnected(false);
+      setWhatsappChats([]);
+    });
 
     socketInstance.on('ai_response', (response) => {
       const aiMessage: Message = {
@@ -119,25 +181,24 @@ export default function AIManagerPage() {
       setIsLoading(false)
     })
 
-    socketInstance.on('whatsapp:status', ({ isConnected }) => {
-      setIsWhatsAppConnected(isConnected);
-    });
-
     socketInstance.on('whatsapp:qr', ({ qrCode }) => {
       setQrCode(qrCode);
       setShowQR(true);
     });
 
     socketInstance.on('whatsapp:ready', () => {
-      console.log('WhatsApp is ready, requesting chats...');
+      console.log('Received WhatsApp ready event');
       setIsWhatsAppConnected(true);
       setShowQR(false);
       setQrCode(null);
+      // Solicitar chats cuando WhatsApp esté listo
+      console.log('Requesting chats after ready event');
       socketInstance.emit('whatsapp:getChats');
     });
 
     socketInstance.on('whatsapp:chats', ({ chats }) => {
-      console.log('Received WhatsApp chats:', chats);
+      console.log('Received WhatsApp chats event');
+      console.log('Chats data:', chats);
       if (!chats || chats.length === 0) {
         console.log('No chats received or empty array');
       }
@@ -191,6 +252,9 @@ export default function AIManagerPage() {
     setSocket(socketInstance)
 
     return () => {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
       socketInstance.disconnect()
       socketInstance.off('whatsapp:status');
       socketInstance.off('whatsapp:qr');
@@ -199,6 +263,9 @@ export default function AIManagerPage() {
       socketInstance.off('whatsapp:message');
       socketInstance.off('whatsapp:chatMessages');
       socketInstance.off('whatsapp:error');
+      socketInstance.off('whatsapp:authenticated');
+      socketInstance.off('whatsapp:auth_failure');
+      socketInstance.off('whatsapp:disconnected');
     }
   }, [user, isAuthLoading, router])
 

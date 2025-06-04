@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Client, LocalAuth } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AIGateway } from '../ai/ai.gateway';
 
 @Injectable()
 export class WhatsappService {
@@ -16,30 +17,67 @@ export class WhatsappService {
   constructor(
     private prisma: PrismaService,
     private eventEmitter: EventEmitter2,
+    @Inject(forwardRef(() => AIGateway))
+    private aiGateway: AIGateway,
   ) {
     this.initializeWhatsApp();
   }
 
-  private async initializeWhatsApp() {
+  async initializeWhatsApp() {
     if (this.initializationPromise) {
       return this.initializationPromise;
     }
 
     this.initializationPromise = (async () => {
       try {
+        this.logger.log('Initializing WhatsApp client...');
+        
+        // Verificar si ya existe una sesión autenticada
+        const authPath = '.wwebjs_auth';
+        const sessionExists = await this.checkSessionExists(authPath);
+        this.logger.log(`Session exists: ${sessionExists}`);
+
+        // Si el cliente ya existe y está conectado, no necesitamos reinicializarlo
+        if (this.client) {
+          try {
+            const state = await this.client.getState();
+            if (state === 'CONNECTED') {
+              this.logger.log('WhatsApp client is already connected');
+              this.isConnected = true;
+              return;
+            }
+          } catch (error) {
+            this.logger.error(`Error checking existing client state: ${error.message}`);
+          }
+        }
+
         this.client = new Client({
-          authStrategy: new LocalAuth(),
+          authStrategy: new LocalAuth({
+            clientId: 'restaurant-admin',
+            dataPath: authPath,
+          }),
           puppeteer: {
             args: ['--no-sandbox'],
+            headless: true,
           },
+          qrMaxRetries: 5,
+          authTimeoutMs: 60000,
         });
 
         this.client.on('qr', async (qr) => {
+          this.logger.log('Received QR code');
           this.qrCode = await qrcode.toDataURL(qr);
           this.eventEmitter.emit('whatsapp.qr', this.qrCode);
         });
 
+        this.client.on('authenticated', () => {
+          this.logger.log('WhatsApp client is authenticated');
+          this.isConnected = true;
+          this.eventEmitter.emit('whatsapp.authenticated');
+        });
+
         this.client.on('ready', async () => {
+          this.logger.log('WhatsApp client is ready!');
           this.isConnected = true;
           this.qrCode = null;
           
@@ -48,13 +86,36 @@ export class WhatsappService {
             const firstLocation = await this.prisma.location.findFirst();
             if (firstLocation) {
               this.locationId = firstLocation.id;
+              this.logger.log(`Using location ID: ${this.locationId}`);
             } else {
               this.logger.error('No location found in the database');
             }
           }
           
           this.eventEmitter.emit('whatsapp.ready');
-          this.logger.log('WhatsApp client is ready!');
+          
+          // Automatically fetch and emit chats when ready
+          try {
+            const chats = await this.getChats();
+            this.logger.log(`Emitting ${chats.length} chats after ready event`);
+            this.eventEmitter.emit('whatsapp.chats', { chats });
+          } catch (error) {
+            this.logger.error(`Error fetching chats after ready: ${error.message}`);
+          }
+        });
+
+        this.client.on('auth_failure', (error) => {
+          this.logger.error('WhatsApp authentication failed:', error);
+          this.isConnected = false;
+          this.initializationPromise = null;
+          this.eventEmitter.emit('whatsapp.auth_failure', error);
+        });
+
+        this.client.on('disconnected', (reason) => {
+          this.logger.log(`WhatsApp client disconnected: ${reason}`);
+          this.isConnected = false;
+          this.initializationPromise = null;
+          this.eventEmitter.emit('whatsapp.disconnected', reason);
         });
 
         this.client.on('message', async (message) => {
@@ -65,25 +126,80 @@ export class WhatsappService {
             return;
           }
 
-          // Save message to database
-          await this.prisma.whatsappMessage.create({
-            data: {
+          try {
+            // Save incoming message to database
+            await this.prisma.whatsappMessage.create({
+              data: {
+                from: message.from,
+                body: message.body,
+                timestamp: new Date(message.timestamp * 1000),
+                location: {
+                  connect: {
+                    id: this.locationId
+                  }
+                }
+              },
+            });
+
+            // Process message with AI
+            const aiResponse = await this.aiGateway.handleTextInput({
+              text: message.body,
+              locationId: this.locationId,
+            });
+            
+            // Save AI response to database
+            await this.prisma.whatsappMessage.create({
+              data: {
+                from: message.from,
+                body: aiResponse,
+                timestamp: new Date(),
+                location: {
+                  connect: {
+                    id: this.locationId
+                  }
+                },
+                isFromAI: true,
+              },
+            });
+
+            // Send AI response back to WhatsApp
+            await this.client.sendMessage(message.from, aiResponse);
+
+            // Emit events for frontend updates
+            this.eventEmitter.emit('whatsapp.message', {
               from: message.from,
               body: message.body,
-              timestamp: new Date(message.timestamp * 1000),
-              locationId: this.locationId,
-            },
-          });
+              timestamp: message.timestamp,
+            });
 
-          // Emit message event for AI processing
-          this.eventEmitter.emit('whatsapp.message', {
-            from: message.from,
-            body: message.body,
-            timestamp: message.timestamp,
-          });
+            this.eventEmitter.emit('whatsapp.message', {
+              from: message.from,
+              body: aiResponse,
+              timestamp: Date.now() / 1000,
+              fromMe: true,
+            });
+
+          } catch (error) {
+            this.logger.error(`Error processing WhatsApp message: ${error.message}`);
+            // Send error message to user
+            await this.client.sendMessage(
+              message.from,
+              'Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.'
+            );
+          }
         });
 
         await this.client.initialize();
+        this.logger.log('WhatsApp client initialization completed');
+
+        // Verificar el estado después de la inicialización
+        const state = await this.client.getState();
+        this.isConnected = state === 'CONNECTED';
+        this.logger.log(`Initial WhatsApp state: ${state}, isConnected: ${this.isConnected}`);
+        
+        if (this.isConnected) {
+          this.eventEmitter.emit('whatsapp.ready');
+        }
       } catch (error) {
         this.logger.error(`Error initializing WhatsApp: ${error.message}`);
         this.initializationPromise = null;
@@ -92,6 +208,20 @@ export class WhatsappService {
     })();
 
     return this.initializationPromise;
+  }
+
+  private async checkSessionExists(authPath: string): Promise<boolean> {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const sessionPath = path.join(process.cwd(), authPath, 'restaurant-admin');
+      const exists = fs.existsSync(sessionPath);
+      this.logger.log(`Session path ${sessionPath} exists: ${exists}`);
+      return exists;
+    } catch (error) {
+      this.logger.error(`Error checking session: ${error.message}`);
+      return false;
+    }
   }
 
   async waitForConnection(): Promise<void> {
@@ -114,8 +244,36 @@ export class WhatsappService {
   }
 
   async isWhatsAppConnected(): Promise<boolean> {
-    await this.initializeWhatsApp();
-    return this.isConnected;
+    try {
+      await this.initializeWhatsApp();
+      
+      if (!this.client) {
+        this.logger.log('WhatsApp client not initialized');
+        return false;
+      }
+
+      try {
+        const state = await this.client.getState();
+        this.isConnected = state === 'CONNECTED';
+        this.logger.log(`WhatsApp state: ${state}, isConnected: ${this.isConnected}`);
+        
+        if (this.isConnected) {
+          // Verificar que podemos obtener los chats
+          const chats = await this.client.getChats();
+          this.logger.log(`Successfully retrieved ${chats.length} chats`);
+          return true;
+        }
+        
+        return false;
+      } catch (error) {
+        this.logger.error(`Error getting WhatsApp state: ${error.message}`);
+        this.isConnected = false;
+        return false;
+      }
+    } catch (error) {
+      this.logger.error(`Error checking WhatsApp connection: ${error.message}`);
+      return false;
+    }
   }
 
   async getChats(): Promise<any[]> {
@@ -138,6 +296,9 @@ export class WhatsappService {
         this.logger.debug(`Formatted chat: ${JSON.stringify(formatted)}`);
         return formatted;
       });
+
+      this.logger.log('Emitting whatsapp:chats event with formatted chats');
+      this.eventEmitter.emit('whatsapp:chats', { chats: formattedChats });
 
       return formattedChats;
     } catch (error) {
@@ -211,6 +372,43 @@ export class WhatsappService {
       await this.client.sendMessage(to, message);
     } catch (error) {
       this.logger.error(`Error sending WhatsApp message: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async handleIncomingMessage(message: any) {
+    try {
+      if (!this.locationId) {
+        throw new Error('No location ID available for saving message');
+      }
+
+      // Store message in database
+      await this.prisma.whatsappMessage.create({
+        data: {
+          id: message.id._serialized,
+          from: message.from,
+          body: message.body,
+          timestamp: new Date(message.timestamp * 1000),
+          location: {
+            connect: {
+              id: this.locationId
+            }
+          }
+        },
+      });
+
+      // Get AI response
+      const aiResponse = await this.aiGateway.handleTextInput({
+        text: message.body,
+        locationId: this.locationId,
+      });
+
+      // Send response back to WhatsApp
+      await this.client.sendMessage(message.from, aiResponse);
+
+      return aiResponse;
+    } catch (error) {
+      this.logger.error(`Error handling incoming message: ${error.message}`);
       throw error;
     }
   }
