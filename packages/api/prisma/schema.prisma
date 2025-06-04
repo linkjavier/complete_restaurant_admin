@@ -262,3 +262,12 @@ model WhatsappMessage {
   @@index([from])
   @@index([timestamp])
 }
+
+model Settings {
+  id        String   @id @default(cuid())
+  aiName    String   @default("Sandra")
+  aiGender  String   @default("female")
+  aiEnabled Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

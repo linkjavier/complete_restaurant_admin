@@ -15,6 +15,9 @@ import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
 
 interface Message {
   id: string
@@ -49,6 +52,8 @@ export default function AIManagerPage() {
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isLoadingChats, setIsLoadingChats] = useState(false)
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -352,11 +357,66 @@ export default function AIManagerPage() {
     });
   }
 
+  const handleAIToggle = async (checked: boolean) => {
+    setIsSavingSettings(true)
+    try {
+      const response = await fetch("/api/settings/ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "Sandra", // Mantener el nombre actual
+          gender: "female", // Mantener el género actual
+          enabled: checked,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to save settings")
+      }
+
+      setAiEnabled(checked)
+      toast.success(checked ? "IA activada" : "IA desactivada")
+    } catch (error) {
+      toast.error("Error al actualizar la configuración")
+    } finally {
+      setIsSavingSettings(false)
+    }
+  }
+
+  // Load AI settings on component mount
+  useEffect(() => {
+    const loadAISettings = async () => {
+      try {
+        const response = await fetch("/api/settings/ai")
+        if (!response.ok) {
+          throw new Error("Failed to load settings")
+        }
+        const data = await response.json()
+        setAiEnabled(data.enabled)
+      } catch (error) {
+        console.error("Error loading AI settings:", error)
+      }
+    }
+
+    loadAISettings()
+  }, [])
+
   return (
     <div className="h-full p-8 space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Inteligencia Artificial</h1>
         <div className="flex items-center gap-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="ai-enabled"
+              checked={aiEnabled}
+              onCheckedChange={handleAIToggle}
+              disabled={isSavingSettings}
+            />
+            <Label htmlFor="ai-enabled">Activar IA</Label>
+          </div>
           <Button
             variant={isWhatsAppConnected ? "default" : "outline"}
             onClick={handleWhatsAppConnect}

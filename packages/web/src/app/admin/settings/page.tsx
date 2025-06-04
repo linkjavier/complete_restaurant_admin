@@ -6,12 +6,14 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 
 export default function SettingsPage() {
   const [aiName, setAiName] = useState("")
   const [aiGender, setAiGender] = useState("")
+  const [aiEnabled, setAiEnabled] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -28,6 +30,7 @@ export default function SettingsPage() {
       const data = await response.json()
       setAiName(data.name)
       setAiGender(data.gender)
+      setAiEnabled(data.enabled)
     } catch (error) {
       toast.error("Error al cargar la configuración")
     } finally {
@@ -51,6 +54,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           name: aiName,
           gender: aiGender,
+          enabled: aiEnabled,
         }),
       })
 
@@ -113,6 +117,16 @@ export default function SettingsPage() {
                   <SelectItem value="female">Femenino</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="ai-enabled"
+                checked={aiEnabled}
+                onCheckedChange={setAiEnabled}
+                disabled={isSaving}
+              />
+              <Label htmlFor="ai-enabled">Activar Asistente IA</Label>
             </div>
 
             <Button 

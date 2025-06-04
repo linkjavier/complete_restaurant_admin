@@ -186,12 +186,6 @@ export class WhatsappService {
                 }
               }
 
-              // Procesar el mensaje con la IA
-              const aiResponse = await this.aiGateway.handleTextInput({
-                text: message.body,
-                locationId: this.locationId,
-              });
-
               // Guardar el mensaje entrante en la base de datos
               await this.prisma.whatsappMessage.create({
                 data: {
@@ -205,6 +199,31 @@ export class WhatsappService {
                     }
                   }
                 },
+              });
+
+              // Verificar si la IA está habilitada
+              const aiSettings = await this.prisma.settings.findFirst();
+              if (!aiSettings?.aiEnabled) {
+                // Si la IA está deshabilitada, solo actualizar la caché de chats y salir
+                if (this.cachedChats.length > 0) {
+                  const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
+                  if (chatIndex !== -1) {
+                    this.cachedChats[chatIndex] = {
+                      ...this.cachedChats[chatIndex],
+                      lastMessage: message.body,
+                      timestamp: message.timestamp,
+                    };
+                    this.lastChatsUpdate = Date.now();
+                    this.eventEmitter.emit('whatsapp:chats', { chats: this.cachedChats });
+                  }
+                }
+                return;
+              }
+
+              // Procesar el mensaje con la IA
+              const aiResponse = await this.aiGateway.handleTextInput({
+                text: message.body,
+                locationId: this.locationId,
               });
 
               // Guardar la respuesta de la IA en la base de datos
@@ -239,7 +258,7 @@ export class WhatsappService {
                 fromMe: true,
               });
 
-              // Actualizar la caché de chats si existe
+              // Actualizar la caché de chats
               if (this.cachedChats.length > 0) {
                 const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
                 if (chatIndex !== -1) {
@@ -254,7 +273,7 @@ export class WhatsappService {
               }
 
             } catch (error) {
-              this.logger.error(`Error processing incoming message: ${error.message}`);
+              this.logger.error(`Error processing message with AI: ${error.message}`);
               // Enviar mensaje de error al usuario
               try {
                 await this.client.sendMessage(
@@ -570,6 +589,13 @@ export class WhatsappService {
           this.lastChatsUpdate = Date.now();
           this.eventEmitter.emit('whatsapp:chats', { chats: this.cachedChats });
         }
+      }
+
+      // Check if AI is enabled before processing
+      const aiSettings = await this.prisma.settings.findFirst();
+      if (!aiSettings?.aiEnabled) {
+        // If AI is disabled, just return without processing
+        return;
       }
 
       // Get AI response

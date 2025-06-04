@@ -189,6 +189,19 @@ For takeout orders:
         locationId = client.locationId;
       }
 
+      // Check if AI is enabled
+      const aiSettings = await this.settingsService.getAISettings();
+      if (!aiSettings.enabled) {
+        const message = "Lo siento, el asistente IA está desactivado en este momento.";
+        if (socket) {
+          socket.emit('ai_response', {
+            type: 'text',
+            content: message,
+          });
+        }
+        return message;
+      }
+
       console.log(`Processing message: ${text} for location: ${locationId}`);
       
       const conversation = this.conversations.get(locationId);
