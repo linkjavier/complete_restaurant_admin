@@ -19,7 +19,9 @@ import {
   ShoppingCart,
   ChevronLeft,
   ChevronRight,
-  Receipt
+  Receipt,
+  Bot,
+  MessageSquare
 } from "lucide-react"
 import {
   Tooltip,
@@ -41,6 +43,12 @@ const routes = [
     icon: LayoutDashboard,
     href: "/admin/dashboard",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
+  {
+    label: "Inteligencia Artificial",
+    icon: Bot,
+    href: "/admin/ai-manager",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
     label: "POS",
