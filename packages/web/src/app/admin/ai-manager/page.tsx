@@ -521,7 +521,7 @@ export default function AIManagerPage() {
                         ) : (
                           chatMessages.map((message) => (
                             <div
-                              key={message.id}
+                              key={`${message.fromMe ? 'ai' : 'user'}_${message.id}`}
                               className={cn(
                                 "flex items-start gap-4",
                                 message.role === "assistant" ? "flex-row" : "flex-row-reverse"
@@ -599,7 +599,7 @@ export default function AIManagerPage() {
                 <div className="space-y-4">
                   {messages.map((message) => (
                     <div
-                      key={message.id}
+                      key={`${message.fromMe ? 'ai' : 'user'}_${message.id}`}
                       className={cn(
                         "flex items-start gap-4",
                         message.role === "assistant" ? "flex-row" : "flex-row-reverse"

@@ -516,26 +516,38 @@ export class WhatsappService {
       const whatsappMessages = await chat.fetchMessages({ limit: 50 });
       this.logger.log(`Found ${whatsappMessages.length} messages from WhatsApp`);
 
-      // Combinar y formatear los mensajes
-      const allMessages = [
-        ...dbMessages.map(msg => ({
-          id: msg.id,
+      // Crear un Map para rastrear mensajes por ID
+      const messageMap = new Map();
+
+      // Procesar mensajes de la base de datos primero
+      dbMessages.forEach(msg => {
+        const id = `db_${msg.id}`;
+        messageMap.set(id, {
+          id,
           from: msg.from,
           body: msg.body,
           timestamp: msg.timestamp.getTime() / 1000,
-          fromMe: false,
-        })),
-        ...whatsappMessages.map(message => ({
-          id: message.id._serialized,
-          from: message.from,
-          body: message.body,
-          timestamp: message.timestamp,
-          fromMe: message.fromMe,
-        })),
-      ];
+          fromMe: msg.isFromAI || false,
+        });
+      });
 
-      // Ordenar por timestamp
-      allMessages.sort((a, b) => a.timestamp - b.timestamp);
+      // Procesar mensajes de WhatsApp, solo agregando los que no están en la base de datos
+      whatsappMessages.forEach(message => {
+        const id = `wa_${message.id._serialized}`;
+        if (!messageMap.has(id)) {
+          messageMap.set(id, {
+            id,
+            from: message.from,
+            body: message.body,
+            timestamp: message.timestamp,
+            fromMe: message.fromMe,
+          });
+        }
+      });
+
+      // Convertir el Map a un array y ordenar por timestamp
+      const allMessages = Array.from(messageMap.values())
+        .sort((a, b) => a.timestamp - b.timestamp);
 
       return allMessages;
     } catch (error) {
