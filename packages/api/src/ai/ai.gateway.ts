@@ -41,19 +41,19 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private readonly functions = [
-    {
-      name: 'get_menu',
-      description: 'Get the list of available products in the menu',
-      parameters: {
-        type: 'object',
-        properties: {
-          category: {
-            type: 'string',
-            description: 'Optional category to filter products',
-          },
-        },
-      },
-    },
+    // {
+    //   name: 'get_menu',
+    //   description: 'Get the list of available products in the menu',
+    //   parameters: {
+    //     type: 'object',
+    //     properties: {
+    //       category: {
+    //         type: 'string',
+    //         description: 'Optional category to filter products',
+    //       },
+    //     },
+    //   },
+    // },
     {
       name: 'create_order',
       description: 'Create a new order with specified items',
@@ -83,30 +83,21 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
               required: ['productId', 'quantity'],
             },
           },
-          tableId: {
-            type: 'string',
-            description: 'ID of the table where the order is being placed',
-          },
           locationId: {
             type: 'string',
             description: 'ID of the location where the order is being placed',
           },
-          type: {
-            type: 'string',
-            description: 'Type of the order (DINE_IN, TAKEAWAY, DELIVERY)',
-            enum: ['DINE_IN', 'TAKEAWAY', 'DELIVERY'],
-          },
           customerName: {
             type: 'string',
-            description: 'Optional name of the customer',
+            description: 'Name of the customer',
           },
         },
-        required: ['items', 'tableId', 'locationId', 'type'],
+        required: ['items', 'locationId', 'customerName'],
       },
     },
   ];
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
     const locationId = client.handshake.query.locationId as string;
     
@@ -123,19 +114,50 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log(`Client ${client.id} connected with locationId: ${locationId}`);
     this.locationIds.set(client.id, locationId);
     
-    // Initialize conversation history for new client
-    this.conversations.set(client.id, [
-      {
-        role: 'system',
-        content: `You are a helpful restaurant assistant that helps with orders and customer service. Your name is "Paola" and you are a woman. You can help customers by showing them the menu and taking their orders. The current location ID is ${locationId}.`,
-      },
-    ]);
+    try {
+      // Get menu for this location
+      const menu = await this.productsService.findAll({
+        locationId,
+      });
 
-    // Send welcome message
-    client.emit('ai_response', {
-      type: 'text',
-      content: '¡Hola! Soy Paola, tu asistente virtual. ¿En qué puedo ayudarte hoy?'
-    });
+      // Initialize conversation history for new client with raw menu data
+      this.conversations.set(client.id, [
+        {
+          role: 'system',
+          content: `You are a helpful restaurant assistant that helps with orders and customer service. Your name is "Paola" and you are a woman. You can help customers by showing them the menu and taking their orders. The current location ID is ${locationId}.
+
+Here is the current menu data:
+${JSON.stringify(menu, null, 2)}
+
+IMPORTANT: When creating orders, you MUST use the exact product IDs from the menu data above. Each product has a unique 'id' field that must be used as the 'productId' when creating orders.
+
+When showing the menu to customers, always use this exact format:
+## [Category Name]
+- [Product Name] - $[Price]
+
+For takeout orders:
+1. Always ask for the customer's name
+2. Don't ask for table number
+3. Confirm the order details before creating it
+4. Use TAKEOUT as the order type
+5. Include the order number in your response
+6. ALWAYS use the exact product IDs from the menu data when creating orders`,
+        },
+      ]);
+
+      // Send welcome message
+      client.emit('ai_response', {
+        type: 'text',
+        content: '¡Hola! Soy Paola, tu asistente virtual. ¿En qué puedo ayudarte hoy?'
+      });
+    } catch (error) {
+      console.error('Error initializing conversation:', error);
+      client.emit('error', {
+        message: 'Error initializing conversation',
+        details: error.message
+      });
+      client.disconnect();
+    }
   }
 
   handleDisconnect(client: Socket) {
@@ -261,20 +283,66 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 throw new Error('No location ID found for this client');
               }
 
+              // Ensure customerName is present
+              if (!orderArgs.customerName) {
+                throw new Error('Customer name is required');
+              }
+
+              // Validate product IDs
+              const menu = await this.productsService.findAll({ locationId });
+              const validProductIds = new Set(menu.map(product => product.id));
+              
+              const invalidProducts = orderArgs.items.filter(
+                item => !validProductIds.has(item.productId)
+              );
+
+              if (invalidProducts.length > 0) {
+                throw new Error(`Invalid product IDs found: ${invalidProducts.map(p => p.productId).join(', ')}`);
+              }
+
               // Create the order with the correct type
               const order = await this.ordersService.create({
                 ...orderArgs,
                 locationId,
-                type: orderArgs.type === 'TAKEAWAY' ? 'TAKEOUT' : orderArgs.type, // Convert TAKEAWAY to TAKEOUT
-                status: 'PENDING'
+                type: 'TAKEOUT', // Always set to TAKEOUT for AI orders
+                status: 'PENDING',
+                tableId: undefined // Ensure tableId is not set for takeout orders
               });
 
-              return {
-                content: `¡Orden creada exitosamente! Número de orden: ${order.id}`
-              };
+              // Add function result to conversation
+              conversation.push({
+                role: 'function',
+                name: 'create_order',
+                content: JSON.stringify({
+                  success: true,
+                  orderId: order.id,
+                  message: `¡Orden para llevar creada exitosamente para ${orderArgs.customerName}! Número de orden: ${order.id}`
+                }),
+              });
+
+              // Get a new completion with the function result
+              const secondCompletion = await this.openai.chat.completions.create({
+                model: 'gpt-4o-mini-2024-07-18',
+                messages: conversation,
+                temperature: 0.7,
+              });
+
+              const secondResponse = secondCompletion.choices[0].message;
+              conversation.push({
+                role: 'assistant',
+                content: secondResponse.content,
+              });
+
+              // Send response to client
+              client.emit('ai_response', {
+                type: 'text',
+                content: secondResponse.content,
+              });
+
+              return;
             } catch (error) {
               console.error('Error in create_order function:', error);
-              throw new Error('Error creating order');
+              throw new Error(`Error creating order: ${error.message}`);
             }
             break;
           default:
