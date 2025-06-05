@@ -34,9 +34,13 @@ export default function PosPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [cart, setCart] = useState<Record<string, number>>({})
-  const [orderType, setOrderType] = useState<"table" | "takeout">("takeout")
+  const [orderType, setOrderType] = useState<"table" | "takeout" | "delivery">("takeout")
   const [selectedTable, setSelectedTable] = useState<string>("")
   const [customerName, setCustomerName] = useState("")
+  const [deliveryAddress, setDeliveryAddress] = useState("")
+  const [neighborhood, setNeighborhood] = useState("")
+  const [phone, setPhone] = useState("")
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER">("CASH")
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [activeOrders, setActiveOrders] = useState<any[]>([])
@@ -132,13 +136,32 @@ export default function PosPage() {
         return
       }
 
-      if (orderType === "takeout" && !customerName.trim()) {
+      if ((orderType === "takeout" || orderType === "delivery") && !customerName.trim()) {
         toast({
           title: "Error",
           description: "Por favor ingresa el nombre del cliente",
           variant: "destructive",
         })
         return
+      }
+
+      if (orderType === "delivery") {
+        if (!deliveryAddress.trim()) {
+          toast({
+            title: "Error",
+            description: "Por favor ingresa la dirección de entrega",
+            variant: "destructive",
+          })
+          return
+        }
+        if (!phone.trim()) {
+          toast({
+            title: "Error",
+            description: "Por favor ingresa el teléfono",
+            variant: "destructive",
+          })
+          return
+        }
       }
 
       setSubmitting(true)
@@ -157,16 +180,21 @@ export default function PosPage() {
         quantity
       }))
 
-      // Si es para llevar, usar el locationId de cualquier mesa disponible
+      // Si es para llevar o domicilio, usar el locationId de cualquier mesa disponible
       const locationId = orderType === "table" 
         ? selectedTableData?.locationId 
         : tables[0]?.locationId
 
       const orderData = {
         tableId: orderType === "table" ? selectedTable : undefined,
-        type: orderType === "table" ? "TABLE" as const : "TAKEOUT" as const,
+        type: orderType === "table" ? "TABLE" as const : 
+              orderType === "delivery" ? "DELIVERY" as const : "TAKEOUT" as const,
         locationId,
-        customerName: orderType === "takeout" ? customerName : undefined,
+        customerName: (orderType === "takeout" || orderType === "delivery") ? customerName : undefined,
+        deliveryAddress: orderType === "delivery" ? deliveryAddress : undefined,
+        neighborhood: orderType === "delivery" ? neighborhood : undefined,
+        phone: orderType === "delivery" ? phone : undefined,
+        paymentMethod: orderType === "delivery" ? paymentMethod : undefined,
         items: orderItems,
         status: orderType === "takeout" ? "IN_PROGRESS" as const : "PENDING" as const,
         isPaid: orderType === "takeout" ? true : false
@@ -184,9 +212,13 @@ export default function PosPage() {
         await processPayment(createdOrder.id, total, "CASH")
       }
       
-      // Clear cart and customer name
+      // Clear cart and form fields
       setCart({})
       setCustomerName("")
+      setDeliveryAddress("")
+      setNeighborhood("")
+      setPhone("")
+      setPaymentMethod("CASH")
 
       // Refresh active orders
       if (selectedTable) {
@@ -328,6 +360,14 @@ export default function PosPage() {
             loading={submitting}
             customerName={customerName}
             onCustomerNameChange={setCustomerName}
+            deliveryAddress={deliveryAddress}
+            onDeliveryAddressChange={setDeliveryAddress}
+            neighborhood={neighborhood}
+            onNeighborhoodChange={setNeighborhood}
+            phone={phone}
+            onPhoneChange={setPhone}
+            paymentMethod={paymentMethod}
+            onPaymentMethodChange={setPaymentMethod}
           />
         </div>
       </div>
