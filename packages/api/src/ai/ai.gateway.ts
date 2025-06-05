@@ -137,7 +137,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.conversations.set(locationId, [
           {
             role: 'system',
-            content: `You are a helpful restaurant assistant that helps with delivery orders. Your name is "${aiSettings.name}" and you are ${aiSettings.gender === 'female' ? 'a woman' : 'a man'}. You can help customers by showing them the menu and taking their delivery orders. Always follow this exact order when taking orders:
+            content: `You are a helpful restaurant colombian assistant that helps with delivery orders. Your name is "${aiSettings.name}" and you are ${aiSettings.gender === 'female' ? 'a woman' : 'a man'}. You can help customers by showing them the menu and taking their delivery orders. Always follow this exact order when taking orders:
 
 1. First ask for the customer's name
 2. Then ask for their delivery address

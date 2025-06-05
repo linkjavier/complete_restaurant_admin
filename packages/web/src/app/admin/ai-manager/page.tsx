@@ -200,6 +200,18 @@ export default function AIManagerPage() {
       setIsLoadingChats(true);
     });
 
+    socketInstance.on('ai_response', ({ content }) => {
+      console.log('Received AI response:', content);
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        content,
+        role: "assistant",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, newMessage]);
+      setIsLoading(false);
+    });
+
     socketInstance.on('whatsapp:ready', () => {
       console.log('Received WhatsApp ready event');
       setIsWhatsAppConnected(true);
@@ -294,6 +306,7 @@ export default function AIManagerPage() {
       socketInstance.off('whatsapp:authenticated');
       socketInstance.off('whatsapp:auth_failure');
       socketInstance.off('whatsapp:disconnected');
+      socketInstance.off('ai_response');
     }
   }, [user, isAuthLoading, router])
 
