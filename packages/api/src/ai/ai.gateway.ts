@@ -148,10 +148,23 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
 The current location ID is ${locationId}.
 
+CRITICAL INSTRUCTION ABOUT PRODUCT IDs:
+When creating orders, you MUST use the EXACT product IDs from the menu data below. Each product has a unique 'id' field that must be used as the 'productId' when creating orders. DO NOT modify, guess, or generate new IDs. Copy and paste the exact IDs from the menu data.
+
+CRITICAL INSTRUCTION ABOUT PRICES:
+1. ALWAYS use the exact prices from the menu data
+2. Calculate the subtotal for each item by multiplying the item's price by its quantity
+3. Sum up all subtotals to get the total order amount
+4. Double-check all calculations before creating the order
+5. Show the breakdown of the order with:
+   - Item name
+   - Quantity
+   - Price per unit
+   - Subtotal per item
+   - Total order amount
+
 Here is the current menu data:
 ${JSON.stringify(menu, null, 2)}
-
-IMPORTANT: When creating orders, you MUST use the exact product IDs from the menu data above. Each product has a unique 'id' field that must be used as the 'productId' when creating orders.
 
 Your responses must be in whatsapp format. You can use Bold, Italic, or Monospace.
 
@@ -169,9 +182,15 @@ For delivery orders:
 2. IMPORTANT: Confirm the order details before creating it
 3. Use DELIVERY (Domicilio) as the order type
 4. Include the order number in your response
-5. Include the list of items in your response
+5. Include the list of items in your response with:
+   - Item name
+   - Quantity
+   - Price per unit
+   - Subtotal per item
 6. Include the exact total amount of the order in your response
-7. ALWAYS use the exact product IDs from the menu data when creating orders`,
+7. ALWAYS use the exact product IDs from the menu data when creating orders
+8. DOUBLE CHECK all product IDs before creating the order
+9. VERIFY all price calculations before creating the order`,
           },
         ]);
       }
@@ -290,6 +309,17 @@ For delivery orders:
           content: JSON.stringify(functionResult),
         });
 
+        // If there was an error, we already got a response from the AI
+        if (functionResult.error) {
+          if (socket) {
+            socket.emit('ai_response', {
+              type: 'text',
+              content: functionResult.message,
+            });
+          }
+          return functionResult.message;
+        }
+
         // Get final response from OpenAI
         const finalCompletion = await this.openai.chat.completions.create({
           model: 'gpt-4o-mini-2024-07-18',
@@ -346,7 +376,6 @@ For delivery orders:
 
   private async executeFunction(functionName: string, functionArgs: any, locationId: string) {
     switch (functionName) {
-
       case 'create_order':
         try {
           console.log('Creating order with args:', functionArgs);
@@ -370,6 +399,74 @@ For delivery orders:
           );
 
           if (invalidProducts.length > 0) {
+            // Add error to conversation history
+            const conversation = this.conversations.get(locationId);
+            if (conversation) {
+              // Create a more detailed error message with menu data
+              const errorMessage = {
+                error: true,
+                message: `Error: Invalid product IDs found: ${invalidProducts.map(p => p.productId).join(', ')}. Please use the exact product IDs from the menu below:`,
+                menu: menu.map(product => ({
+                  id: product.id,
+                  name: product.name,
+                  price: product.price,
+                  category: product.category?.name
+                }))
+              };
+
+              conversation.push({
+                role: 'function',
+                name: functionName,
+                content: JSON.stringify(errorMessage)
+              });
+
+              // Get a new response from OpenAI with the error context
+              const retryCompletion = await this.openai.chat.completions.create({
+                model: 'gpt-4o-mini-2024-07-18',
+                messages: [
+                  ...conversation,
+                  {
+                    role: 'system',
+                    content: 'You made a mistake with the product IDs. Please review the menu data carefully and create the order again using the exact product IDs provided. Do not modify or generate new IDs.'
+                  }
+                ],
+                temperature: 0.7,
+                functions: this.functions,
+                function_call: 'auto',
+              });
+
+              const retryResponse = retryCompletion.choices[0].message;
+              
+              // Add the retry response to conversation history
+              conversation.push({
+                role: 'assistant',
+                content: retryResponse.content,
+              });
+
+              // If there's a new function call, execute it
+              if (retryResponse.function_call) {
+                const retryFunctionName = retryResponse.function_call.name;
+                const retryFunctionArgs = JSON.parse(retryResponse.function_call.arguments);
+                
+                // Add the retry function call to conversation history
+                conversation.push({
+                  role: 'assistant',
+                  content: null,
+                  function_call: {
+                    name: retryFunctionName,
+                    arguments: retryResponse.function_call.arguments,
+                  },
+                });
+
+                // Execute the retry function
+                return this.executeFunction(retryFunctionName, retryFunctionArgs, locationId);
+              }
+
+              return {
+                error: true,
+                message: retryResponse.content
+              };
+            }
             throw new Error(`Invalid product IDs found: ${invalidProducts.map(p => p.productId).join(', ')}`);
           }
 
