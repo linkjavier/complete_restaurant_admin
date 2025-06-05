@@ -683,7 +683,9 @@ export default function AIManagerPage() {
                                     >
                                       <Avatar>
                                         <AvatarImage
-                                          src={message.role === "assistant" ? "/bot-avatar.png" : "/user-avatar.png"}
+                                          src={message.role === "assistant" 
+                                            ? "/bot-avatar.png" 
+                                            : user?.avatar || "/user-avatar.png"} 
                                         />
                                         <AvatarFallback>
                                           {message.role === "assistant" ? "AI" : "U"}
@@ -765,7 +767,11 @@ export default function AIManagerPage() {
                       )}
                     >
                       <Avatar>
-                        <AvatarImage src={message.role === "assistant" ? "/bot-avatar.png" : "/user-avatar.png"} />
+                        <AvatarImage 
+                          src={message.role === "assistant" 
+                            ? "/bot-avatar.png" 
+                            : user?.avatar || "/user-avatar.png"} 
+                        />
                         <AvatarFallback>{message.role === "assistant" ? "AI" : "U"}</AvatarFallback>
                       </Avatar>
                       <div className={cn(
