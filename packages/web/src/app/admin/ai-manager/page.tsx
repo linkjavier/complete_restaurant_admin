@@ -45,7 +45,8 @@ export default function AIManagerPage() {
   const chatMessagesEndRef = useRef<HTMLDivElement>(null)
   const [isWhatsAppConnected, setIsWhatsAppConnected] = useState(false)
   const [showQR, setShowQR] = useState(false)
-  const [socket, setSocket] = useState<Socket | null>(null)
+  const [mainSocket, setMainSocket] = useState<Socket | null>(null)
+  const [chatSocket, setChatSocket] = useState<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [whatsappChats, setWhatsappChats] = useState<WhatsAppChat[]>([])
@@ -95,11 +96,13 @@ export default function AIManagerPage() {
       return;
     }
 
-    // Initialize socket connection
+    // Initialize main socket connection
     const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
       transports: ['websocket'],
       query: {
         locationId: user.locationId,
+        chatType: 'ai',
+        chatId: 'admin-chat',
       },
       reconnection: true,
       reconnectionAttempts: 5,
@@ -112,11 +115,10 @@ export default function AIManagerPage() {
     let initialConnectionAttempted = false;
 
     socketInstance.on('connect', () => {
-      console.log('Connected to WebSocket');
+      console.log('Connected to main WebSocket');
       setIsConnected(true);
       setIsLoadingChats(true);
       
-      // Solo solicitar estado si no se ha intentado antes
       if (!initialConnectionAttempted) {
         console.log('Initial connection, requesting WhatsApp status...');
         socketInstance.emit('whatsapp:getStatus');
@@ -150,6 +152,24 @@ export default function AIManagerPage() {
 
     socketInstance.on('reconnect_failed', () => {
       console.error('Failed to reconnect');
+    });
+
+    socketInstance.on('ai_response', ({ content }) => {
+      console.log('Received AI response:', content);
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        content,
+        role: "assistant",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, newMessage]);
+      setIsLoading(false);
+    });
+
+    socketInstance.on('error', ({ message, details }) => {
+      console.error('Socket error:', message, details);
+      setIsLoading(false);
+      toast.error(message || 'Error en la conexión');
     });
 
     socketInstance.on('whatsapp:status', ({ isConnected }) => {
@@ -200,18 +220,6 @@ export default function AIManagerPage() {
       setIsLoadingChats(true);
     });
 
-    socketInstance.on('ai_response', ({ content }) => {
-      console.log('Received AI response:', content);
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        content,
-        role: "assistant",
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, newMessage]);
-      setIsLoading(false);
-    });
-
     socketInstance.on('whatsapp:ready', () => {
       console.log('Received WhatsApp ready event');
       setIsWhatsAppConnected(true);
@@ -238,12 +246,6 @@ export default function AIManagerPage() {
       setQrCode(qrCode);
       setShowQR(true);
       setIsLoadingChats(false);
-    });
-
-    socketInstance.on('whatsapp:error', ({ message }) => {
-      console.error('WhatsApp error:', message);
-      // No cambiar el estado de carga en caso de error
-      // para evitar parpadeos en la UI
     });
 
     socketInstance.on('whatsapp:message', (message) => {
@@ -286,7 +288,7 @@ export default function AIManagerPage() {
       setIsLoadingMessages(false);
     });
 
-    setSocket(socketInstance)
+    setMainSocket(socketInstance)
 
     return () => {
       if (reconnectTimer) {
@@ -312,16 +314,16 @@ export default function AIManagerPage() {
 
   // Modificar el efecto para la pestaña de WhatsApp
   useEffect(() => {
-    if (socket && isConnected) {
+    if (mainSocket && isConnected) {
       console.log('Tab changed to WhatsApp, checking WhatsApp status...');
       setIsLoadingChats(true);
       // Primero verificar el estado de WhatsApp
-      socket.emit('whatsapp:getStatus');
+      mainSocket.emit('whatsapp:getStatus');
     }
-  }, [socket, isConnected]);
+  }, [mainSocket, isConnected]);
 
   const handleSendMessage = () => {
-    if (!input.trim() || !socket || !isConnected || isLoading) return
+    if (!input.trim() || !mainSocket || !isConnected || isLoading) return
 
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -330,20 +332,20 @@ export default function AIManagerPage() {
       timestamp: new Date()
     }
 
-    setMessages([...messages, newMessage])
+    setMessages(prev => [...prev, newMessage])
     setInput("")
     setIsLoading(true)
     inputRef.current?.focus()
 
     // Send message through WebSocket
-    socket.emit('input_text', { text: input })
+    mainSocket.emit('input_text', { text: input })
   }
 
   const handleWhatsAppConnect = () => {
-    if (!socket) return;
+    if (!mainSocket) return;
     
     if (!isWhatsAppConnected) {
-      socket.emit('whatsapp:getQR');
+      mainSocket.emit('whatsapp:getQR');
       setShowQR(true);
     } else {
       // Si ya está conectado, podemos mostrar un mensaje o hacer algo más
@@ -352,25 +354,86 @@ export default function AIManagerPage() {
   };
 
   const handleChatSelect = (chatId: string) => {
-    console.log('Selecting chat:', chatId);
     setSelectedChat(chatId);
+    setShowChatView(true);
     setChatMessages([]);
     setIsLoadingMessages(true);
-    setShowChatView(true);
-    
-    if (socket) {
-      console.log('Requesting messages for chat:', chatId);
-      socket.emit('whatsapp:getChatMessages', { chatId });
+
+    // Disconnect previous chat socket if exists
+    if (chatSocket) {
+      chatSocket.disconnect();
     }
+
+    // Create new socket connection for this chat
+    const newChatSocket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
+      transports: ['websocket'],
+      query: {
+        locationId: user.locationId,
+        chatType: 'whatsapp',
+        chatId: chatId,
+      },
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+    });
+
+    // Configurar los event listeners para el nuevo socket
+    newChatSocket.on('connect', () => {
+      console.log('Connected to chat socket');
+      // Solicitar los mensajes del chat cuando se conecte
+      newChatSocket.emit('whatsapp:getChatMessages', { chatId });
+    });
+
+    newChatSocket.on('whatsapp:chatMessages', ({ messages }) => {
+      console.log('Received chat messages:', messages);
+      if (!messages || messages.length === 0) {
+        console.log('No messages received or empty array');
+      }
+      const formattedMessages = messages.map(msg => ({
+        id: msg.id,
+        content: msg.body,
+        role: msg.fromMe ? "assistant" : "user",
+        timestamp: new Date(msg.timestamp * 1000)
+      }));
+      console.log('Formatted messages:', formattedMessages);
+      setChatMessages(formattedMessages);
+      setIsLoadingMessages(false);
+    });
+
+    newChatSocket.on('whatsapp:message', (message) => {
+      console.log('Received new WhatsApp message:', message);
+      if (message.from === chatId) {
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          content: message.body,
+          role: "user",
+          timestamp: new Date(message.timestamp * 1000)
+        }]);
+      }
+    });
+
+    newChatSocket.on('error', ({ message, details }) => {
+      console.error('Socket error:', message, details);
+      setIsLoadingMessages(false);
+      toast.error(message || 'Error en la conexión');
+    });
+
+    setChatSocket(newChatSocket);
   }
 
   const handleBackToChats = () => {
     setShowChatView(false);
     setSelectedChat(null);
+    // Desconectar el socket del chat cuando volvemos a la lista
+    if (chatSocket) {
+      chatSocket.disconnect();
+      setChatSocket(null);
+    }
   }
 
   const handleSendWhatsAppMessage = (message: string) => {
-    if (!socket || !selectedChat) return;
+    if (!chatSocket || !selectedChat) return;
 
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -381,7 +444,7 @@ export default function AIManagerPage() {
 
     setChatMessages(prev => [...prev, newMessage]);
     
-    socket.emit('whatsapp:sendMessage', {
+    chatSocket.emit('whatsapp:sendMessage', {
       to: selectedChat,
       message
     });

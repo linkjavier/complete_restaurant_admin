@@ -224,6 +224,8 @@ export class WhatsappService {
               const aiResponse = await this.aiGateway.handleTextInput({
                 text: message.body,
                 locationId: this.locationId,
+                chatType: 'whatsapp',
+                chatId: message.from,
               });
 
               // Guardar la respuesta de la IA en la base de datos
@@ -575,59 +577,36 @@ export class WhatsappService {
 
   async handleIncomingMessage(message: any) {
     try {
+      // Verificar si tenemos un locationId
       if (!this.locationId) {
-        throw new Error('No location ID available for saving message');
-      }
-
-      // Store message in database
-      await this.prisma.whatsappMessage.create({
-        data: {
-          id: message.id._serialized,
-          from: message.from,
-          body: message.body,
-          timestamp: new Date(message.timestamp * 1000),
-          location: {
-            connect: {
-              id: this.locationId
-            }
-          }
-        },
-      });
-
-      // Update cached chats if they exist
-      if (this.cachedChats.length > 0) {
-        const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
-        if (chatIndex !== -1) {
-          this.cachedChats[chatIndex] = {
-            ...this.cachedChats[chatIndex],
-            lastMessage: message.body,
-            timestamp: message.timestamp,
-          };
-          this.lastChatsUpdate = Date.now();
-          this.eventEmitter.emit('whatsapp:chats', { chats: this.cachedChats });
+        const firstLocation = await this.prisma.location.findFirst();
+        if (firstLocation) {
+          this.locationId = firstLocation.id;
+          this.logger.log(`Using location ID: ${this.locationId}`);
+        } else {
+          this.logger.error('No location found in the database');
+          return;
         }
       }
 
-      // Check if AI is enabled before processing
+      // Verificar si la IA está habilitada
       const aiSettings = await this.prisma.settings.findFirst();
       if (!aiSettings?.aiEnabled) {
-        // If AI is disabled, just return without processing
         return;
       }
 
-      // Get AI response
+      // Procesar el mensaje con la IA
       const aiResponse = await this.aiGateway.handleTextInput({
         text: message.body,
         locationId: this.locationId,
+        chatType: 'whatsapp',
+        chatId: message.from,
       });
 
-      // Send response back to WhatsApp
+      // Enviar la respuesta de la IA
       await this.client.sendMessage(message.from, aiResponse);
-
-      return aiResponse;
     } catch (error) {
       this.logger.error(`Error handling incoming message: ${error.message}`);
-      throw error;
     }
   }
 } 

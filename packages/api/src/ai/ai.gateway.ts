@@ -25,6 +25,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private openai: OpenAI;
   private conversations: Map<string, OpenAI.Chat.ChatCompletionMessageParam[]> = new Map();
   private locationIds: Map<string, string> = new Map();
+  private chatTypes: Map<string, 'whatsapp' | 'ai'> = new Map();
 
   constructor(
     private configService: ConfigService,
@@ -109,19 +110,22 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
     const locationId = client.handshake.query.locationId as string;
+    const chatType = client.handshake.query.chatType as 'whatsapp' | 'ai';
+    const chatId = client.handshake.query.chatId as string;
     
-    if (!locationId) {
-      console.error(`No locationId provided for client ${client.id}`);
+    if (!locationId || !chatType || !chatId) {
+      console.error(`Missing required parameters for client ${client.id}`);
       client.emit('error', {
-        message: 'No location ID provided',
-        details: 'A location ID is required to connect'
+        message: 'Missing required parameters',
+        details: 'Location ID, chat type, and chat ID are required to connect'
       });
       client.disconnect();
       return;
     }
 
-    console.log(`Client ${client.id} connected with locationId: ${locationId}`);
+    console.log(`Client ${client.id} connected with locationId: ${locationId}, chatType: ${chatType}, chatId: ${chatId}`);
     this.locationIds.set(client.id, locationId);
+    this.chatTypes.set(client.id, chatType);
     
     try {
       // Get menu for this location
@@ -132,9 +136,12 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Get AI settings
       const aiSettings = await this.settingsService.getAISettings();
 
-      // Initialize conversation history for this location if it doesn't exist
-      if (!this.conversations.has(locationId)) {
-        this.conversations.set(locationId, [
+      // Create a unique conversation ID combining location, chat type and chat ID
+      const conversationId = `${locationId}:${chatType}:${chatId}`;
+
+      // Initialize conversation history for this specific chat if it doesn't exist
+      if (!this.conversations.has(conversationId)) {
+        this.conversations.set(conversationId, [
           {
             role: 'system',
             content: `You are a helpful restaurant colombian assistant that helps with delivery orders. Your name is "${aiSettings.name}" and you are ${aiSettings.gender === 'female' ? 'a woman' : 'a man'}. You can help customers by showing them the menu and taking their delivery orders. Always follow this exact order when taking orders:
@@ -147,6 +154,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
 6. Finally, help them select items from the menu
 
 The current location ID is ${locationId}.
+The current chat ID is ${chatId}.
 
 CRITICAL INSTRUCTION ABOUT PRODUCT IDs:
 When creating orders, you MUST use the EXACT product IDs from the menu data below. Each product has a unique 'id' field that must be used as the 'productId' when creating orders. DO NOT modify, guess, or generate new IDs. Copy and paste the exact IDs from the menu data.
@@ -198,12 +206,12 @@ For delivery orders:
       // Send welcome message
       client.emit('ai_response', {
         type: 'text',
-        content: `¡Hola! Soy ${aiSettings.name}, tu asistente virtual. ¿En qué puedo ayudarte hoy?`
+        content: `¡Hola! Soy ${aiSettings.name}, tu asistente virtual. ¿En qué puedo ayudarte hoy?`,
       });
     } catch (error) {
-      console.error('Error initializing conversation:', error);
+      console.error('Error in handleConnection:', error);
       client.emit('error', {
-        message: 'Error initializing conversation',
+        message: 'Error initializing chat',
         details: error.message
       });
       client.disconnect();
@@ -213,168 +221,191 @@ For delivery orders:
   handleDisconnect(client: Socket) {
     console.log(`Client disconnected: ${client.id}`);
     const locationId = this.locationIds.get(client.id);
-    if (locationId) {
-      this.locationIds.delete(client.id);
-      // No eliminamos la conversación para mantener el contexto
+    const chatType = this.chatTypes.get(client.id);
+    const chatId = client.handshake.query.chatId as string;
+    
+    if (locationId && chatType && chatId) {
+      const conversationId = `${locationId}:${chatType}:${chatId}`;
+      this.conversations.delete(conversationId);
     }
+    
+    this.locationIds.delete(client.id);
+    this.chatTypes.delete(client.id);
   }
 
   @SubscribeMessage('input_text')
-  async handleTextInput(client: Socket | { text: string, locationId: string }, payload?: { text: string }) {
+  async handleTextInput(client: Socket | { text: string, locationId: string, chatType: string, chatId: string }, payload?: { text: string }): Promise<string> {
+    const locationId = 'locationId' in client ? client.locationId : this.locationIds.get(client.id);
+    const chatType = 'chatType' in client ? client.chatType : this.chatTypes.get(client.id);
+    const chatId = 'chatId' in client ? client.chatId : client.handshake.query.chatId as string;
+    const text = payload?.text || ('text' in client ? client.text : '');
+
+    if (!locationId || !chatType || !chatId) {
+      console.error('Missing required parameters for text input');
+      return 'Error: Missing required parameters';
+    }
+
+    const conversationId = `${locationId}:${chatType}:${chatId}`;
+    let conversation = this.conversations.get(conversationId);
+
+    // Solo inicializamos la conversación si no existe
+    if (!conversation) {
+      try {
+        // Get menu for this location
+        const menu = await this.productsService.findAll({
+          locationId,
+        });
+
+        // Get AI settings
+        const aiSettings = await this.settingsService.getAISettings();
+
+        // Initialize conversation with system message
+        conversation = [
+          {
+            role: 'system',
+            content: `You are a helpful restaurant colombian assistant that helps with delivery orders. Your name is "${aiSettings.name}" and you are ${aiSettings.gender === 'female' ? 'a woman' : 'a man'}. You can help customers by showing them the menu and taking their delivery orders. Always follow this exact order when taking orders:
+
+1. First ask for the customer's name
+2. Then ask for their delivery address
+3. Then ask for their phone number
+4. Then ask for their neighborhood
+5. Then ask for their preferred payment method (CASH, CREDIT_CARD, DEBIT_CARD, or TRANSFER)
+6. Finally, help them select items from the menu
+
+The current location ID is ${locationId}.
+The current chat ID is ${chatId}.
+
+CRITICAL INSTRUCTION ABOUT PRODUCT IDs:
+When creating orders, you MUST use the EXACT product IDs from the menu data below. Each product has a unique 'id' field that must be used as the 'productId' when creating orders. DO NOT modify, guess, or generate new IDs. Copy and paste the exact IDs from the menu data.
+
+CRITICAL INSTRUCTION ABOUT PRICES:
+1. ALWAYS use the exact prices from the menu data
+2. Calculate the subtotal for each item by multiplying the item's price by its quantity
+3. Sum up all subtotals to get the total order amount
+4. Double-check all calculations before creating the order
+5. Show the breakdown of the order with:
+   - Item name
+   - Quantity
+   - Price per unit
+   - Subtotal per item
+   - Total order amount
+
+Here is the current menu data:
+${JSON.stringify(menu, null, 2)}
+
+Your responses must be in whatsapp format. You can use Bold, Italic, or Monospace.
+
+When showing the menu to customers, always use this exact format:
+## [Category Name]
+- [Product Name] - $[Price]
+
+For delivery orders:
+1. Always collect ALL required information in this order:
+   - Customer name
+   - Delivery address
+   - Phone number
+   - Neighborhood (Barrio o Sector)
+   - Payment method (Efectivo, Tarjeta de Crédito, Tarjeta Débito, o Transferencia)
+2. IMPORTANT: Confirm the order details before creating it
+3. Use DELIVERY (Domicilio) as the order type
+4. Include the order number in your response
+5. Include the list of items in your response with:
+   - Item name
+   - Quantity
+   - Price per unit
+   - Subtotal per item
+6. Include the exact total amount of the order in your response
+7. ALWAYS use the exact product IDs from the menu data when creating orders
+8. DOUBLE CHECK all product IDs before creating the order
+9. VERIFY all price calculations before creating the order`,
+          },
+        ];
+
+        // Guardamos la conversación inicializada
+        this.conversations.set(conversationId, conversation);
+      } catch (error) {
+        console.error('Error initializing conversation:', error);
+        return 'Error initializing conversation. Please try again.';
+      }
+    }
+
+    // Agregamos el mensaje del usuario a la conversación existente
+    conversation.push({
+      role: 'user',
+      content: text,
+    });
+
     try {
-      let socket: Socket;
-      let locationId: string;
-      let text: string;
-
-      if ('id' in client) {
-        // Es un Socket
-        socket = client;
-        text = payload.text;
-        locationId = this.locationIds.get(socket.id);
-        if (!locationId) {
-          throw new Error('No location ID found for this client');
-        }
-      } else {
-        // Es un objeto con text y locationId
-        text = client.text;
-        locationId = client.locationId;
-      }
-
-      // Check if AI is enabled
-      const aiSettings = await this.settingsService.getAISettings();
-      if (!aiSettings.enabled) {
-        const message = "Lo siento, el asistente IA está desactivado en este momento.";
-        if (socket) {
-          socket.emit('ai_response', {
-            type: 'text',
-            content: message,
-          });
-        }
-        return message;
-      }
-
-      console.log(`Processing message: ${text} for location: ${locationId}`);
-      
-      const conversation = this.conversations.get(locationId);
-      if (!conversation) {
-        console.error(`No conversation found for location ${locationId}`);
-        throw new Error('No conversation found for location');
-      }
-
-      // Add user message to conversation history
-      conversation.push({
-        role: 'user',
-        content: text,
-      });
-
-      console.log('Current conversation history:', conversation);
-      console.log('Sending request to OpenAI...');
-      
-      // Get response from OpenAI with function calling
       const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini-2024-07-18',
+        model: 'gpt-4-turbo-preview',
         messages: conversation,
-        temperature: 0.7,
         functions: this.functions,
         function_call: 'auto',
       });
 
       const response = completion.choices[0].message;
-      console.log('Received response from OpenAI:', response);
+      
+      // Add assistant response to conversation
+      conversation.push({
+        role: 'assistant',
+        content: response.content || '',
+      });
 
+      // Update conversation in map
+      this.conversations.set(conversationId, conversation);
+
+      // Handle function calls if any
       if (response.function_call) {
-        // Handle function call
         const functionName = response.function_call.name;
         const functionArgs = JSON.parse(response.function_call.arguments);
-
-        console.log(`Executing function: ${functionName} with args:`, functionArgs);
-
-        // Add assistant's function call to conversation history
-        conversation.push({
-          role: 'assistant',
-          content: null,
-          function_call: {
-            name: functionName,
-            arguments: response.function_call.arguments,
-          },
-        });
-
-        // Execute the function
         const functionResult = await this.executeFunction(functionName, functionArgs, locationId);
-
-        // Add function result to conversation history
+        
+        // Add function result to conversation
         conversation.push({
           role: 'function',
           name: functionName,
           content: JSON.stringify(functionResult),
         });
 
-        // If there was an error, we already got a response from the AI
-        if (functionResult.error) {
-          if (socket) {
-            socket.emit('ai_response', {
-              type: 'text',
-              content: functionResult.message,
-            });
-          }
-          return functionResult.message;
-        }
-
-        // Get final response from OpenAI
-        const finalCompletion = await this.openai.chat.completions.create({
-          model: 'gpt-4o-mini-2024-07-18',
-          messages: conversation,
-          temperature: 0.7,
-        });
-
-        const finalResponse = finalCompletion.choices[0].message;
-
-        // Add final response to conversation history
-        conversation.push({
-          role: 'assistant',
-          content: finalResponse.content,
-        });
-
-        // Send response to client if it's a socket
-        if (socket) {
-          socket.emit('ai_response', {
+        // Update conversation in map
+        this.conversations.set(conversationId, conversation);
+        
+        // Emit response to client if it's a socket
+        if ('emit' in client) {
+          client.emit('ai_response', {
             type: 'text',
-            content: finalResponse.content,
+            content: functionResult.message,
           });
         }
+        
+        return functionResult.message;
+      }
 
-        return finalResponse.content;
-      } else {
-        // Regular text response
-        conversation.push({
-          role: 'assistant',
+      // Emit response to client if it's a socket
+      if ('emit' in client) {
+        client.emit('ai_response', {
+          type: 'text',
           content: response.content,
         });
-
-        // Send response to client if it's a socket
-        if (socket) {
-          socket.emit('ai_response', {
-            type: 'text',
-            content: response.content,
-          });
-        }
-
-        return response.content;
       }
 
+      return response.content || 'No response from AI';
     } catch (error) {
-      console.error('Error processing message:', error);
-      if ('id' in client) {
-        client.emit('error', { 
-          message: 'Error processing your message',
-          details: error.message 
+      console.error('Error in handleTextInput:', error);
+      const errorMessage = 'Error processing your message. Please try again.';
+      
+      if ('emit' in client) {
+        client.emit('error', {
+          message: errorMessage,
+          details: error.message
         });
       }
-      throw error;
+      
+      return errorMessage;
     }
   }
 
-  private async executeFunction(functionName: string, functionArgs: any, locationId: string) {
+  private async executeFunction(functionName: string, functionArgs: any, locationId: string): Promise<{ message: string }> {
     switch (functionName) {
       case 'create_order':
         try {
@@ -422,7 +453,7 @@ For delivery orders:
 
               // Get a new response from OpenAI with the error context
               const retryCompletion = await this.openai.chat.completions.create({
-                model: 'gpt-4o-mini-2024-07-18',
+                model: 'gpt-4-turbo-preview',
                 messages: [
                   ...conversation,
                   {
@@ -430,7 +461,6 @@ For delivery orders:
                     content: 'You made a mistake with the product IDs. Please review the menu data carefully and create the order again using the exact product IDs provided. Do not modify or generate new IDs.'
                   }
                 ],
-                temperature: 0.7,
                 functions: this.functions,
                 function_call: 'auto',
               });
@@ -463,8 +493,7 @@ For delivery orders:
               }
 
               return {
-                error: true,
-                message: retryResponse.content
+                message: retryResponse.content || 'Error processing order'
               };
             }
             throw new Error(`Invalid product IDs found: ${invalidProducts.map(p => p.productId).join(', ')}`);
@@ -480,17 +509,19 @@ For delivery orders:
           });
 
           return {
-            success: true,
-            orderId: order.id,
             message: `¡Orden para llevar creada exitosamente para ${functionArgs.customerName}! Número de orden: ${order.id}`
           };
         } catch (error) {
           console.error('Error in create_order function:', error);
-          throw new Error(`Error creating order: ${error.message}`);
+          return {
+            message: `Error creating order: ${error.message}`
+          };
         }
 
       default:
-        throw new Error(`Unknown function: ${functionName}`);
+        return {
+          message: `Unknown function: ${functionName}`
+        };
     }
   }
 } 
