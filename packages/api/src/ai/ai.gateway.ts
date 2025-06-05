@@ -48,7 +48,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly functions = [
     {
       name: 'create_order',
-      description: 'Create a new order with specified items',
+      description: 'Create a new delivery order with specified items',
       parameters: {
         type: 'object',
         properties: {
@@ -83,8 +83,25 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
             type: 'string',
             description: 'Name of the customer',
           },
+          deliveryAddress: {
+            type: 'string',
+            description: 'Delivery address for the order',
+          },
+          phone: {
+            type: 'string',
+            description: 'Customer phone number',
+          },
+          neighborhood: {
+            type: 'string',
+            description: 'Customer neighborhood',
+          },
+          paymentMethod: {
+            type: 'string',
+            description: 'Payment method for the order',
+            enum: ['CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'TRANSFER'],
+          },
         },
-        required: ['items', 'locationId', 'customerName'],
+        required: ['items', 'locationId', 'customerName', 'deliveryAddress', 'phone', 'neighborhood', 'paymentMethod'],
       },
     },
   ];
@@ -120,26 +137,41 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.conversations.set(locationId, [
           {
             role: 'system',
-            content: `You are a helpful restaurant assistant that helps with orders and customer service. Your name is "${aiSettings.name}" and you are ${aiSettings.gender === 'female' ? 'a woman' : 'a man'}. You can help customers by showing them the menu and taking their orders. Always first ask for the customer's name. The current location ID is ${locationId}.
+            content: `You are a helpful restaurant assistant that helps with delivery orders. Your name is "${aiSettings.name}" and you are ${aiSettings.gender === 'female' ? 'a woman' : 'a man'}. You can help customers by showing them the menu and taking their delivery orders. Always follow this exact order when taking orders:
+
+1. First ask for the customer's name
+2. Then ask for their delivery address
+3. Then ask for their phone number
+4. Then ask for their neighborhood
+5. Then ask for their preferred payment method (CASH, CREDIT_CARD, DEBIT_CARD, or TRANSFER)
+6. Finally, help them select items from the menu
+
+The current location ID is ${locationId}.
 
 Here is the current menu data:
 ${JSON.stringify(menu, null, 2)}
 
 IMPORTANT: When creating orders, you MUST use the exact product IDs from the menu data above. Each product has a unique 'id' field that must be used as the 'productId' when creating orders.
 
+Your responses must be in whatsapp format. You can use Bold, Italic, or Monospace.
+
 When showing the menu to customers, always use this exact format:
 ## [Category Name]
 - [Product Name] - $[Price]
 
-For takeout orders:
-1. Always ask for the customer's name
-2. Don't ask for table number
-3. Confirm the order details before creating it
-4. Use TAKEOUT as the order type
-5. Include the order number in your response
-6. Include the list of items in your response. 
-7. Include the exact total amount of the order in your response.
-8. ALWAYS use the exact product IDs from the menu data when creating orders`,
+For delivery orders:
+1. Always collect ALL required information in this order:
+   - Customer name
+   - Delivery address
+   - Phone number
+   - Neighborhood (Barrio o Sector)
+   - Payment method (Efectivo, Tarjeta de Crédito, Tarjeta Débito, o Transferencia)
+2. IMPORTANT: Confirm the order details before creating it
+3. Use DELIVERY (Domicilio) as the order type
+4. Include the order number in your response
+5. Include the list of items in your response
+6. Include the exact total amount of the order in your response
+7. ALWAYS use the exact product IDs from the menu data when creating orders`,
           },
         ]);
       }
@@ -345,9 +377,9 @@ For takeout orders:
           const order = await this.ordersService.create({
             ...functionArgs,
             locationId,
-            type: 'TAKEOUT', // Always set to TAKEOUT for AI orders
+            type: 'DELIVERY', // Always set to DELIVERY for AI orders
             status: 'PENDING',
-            tableId: undefined // Ensure tableId is not set for takeout orders
+            tableId: undefined // Ensure tableId is not set for delivery orders
           });
 
           return {
