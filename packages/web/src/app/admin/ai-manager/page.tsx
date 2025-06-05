@@ -434,9 +434,21 @@ export default function AIManagerPage() {
   }, [])
 
   return (
-    <div className="h-full p-8 space-y-8 w-fit">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Inteligencia Artificial</h1>
+    <div className="h-full p-8 space-y-8 w-full">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Inteligencia Artificial</h1>
+          <Button
+            variant={isWhatsAppConnected ? "default" : "outline"}
+            onClick={handleWhatsAppConnect}
+            className="flex flex-col items-center gap-0.5 px-1.5 py-1 h-auto min-h-0 md:flex-row md:gap-2 md:px-4 md:py-2 md:h-10 md:text-base md:hidden"
+          >
+            <Phone className="h-3 w-3 md:h-4 md:w-4" />
+            <span className="text-[10px] leading-none md:text-base md:leading-normal">
+              {isWhatsAppConnected ? "WhatsApp Conectado" : "Conectar"}
+            </span>
+          </Button>
+        </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center space-x-2">
             <Switch
@@ -450,7 +462,7 @@ export default function AIManagerPage() {
           <Button
             variant={isWhatsAppConnected ? "default" : "outline"}
             onClick={handleWhatsAppConnect}
-            className="flex items-center gap-2"
+            className="hidden md:flex items-center gap-2"
           >
             <Phone className="h-4 w-4" />
             {isWhatsAppConnected ? "WhatsApp Conectado" : "Conectar WhatsApp"}
@@ -471,10 +483,12 @@ export default function AIManagerPage() {
         </Card>
       ) : (
         <Tabs defaultValue="whatsapp" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-            <TabsTrigger value="chat">Chat IA</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between">
+            <TabsList>
+              <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+              <TabsTrigger value="chat">Chat IA</TabsTrigger>
+            </TabsList>
+          </div>
           <TabsContent value="whatsapp" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 relative">
               <AnimatePresence mode="wait">
@@ -675,8 +689,8 @@ export default function AIManagerPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="chat" className="space-y-4">
-            <Card className="p-4">
+          <TabsContent value="chat" className="space-y-4 w-full">
+            <Card className="p-4 w-full">
               <ScrollArea className="h-[600px] pr-4">
                 <div className="space-y-4">
                   {messages.map((message) => (
