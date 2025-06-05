@@ -554,7 +554,7 @@ export default function AIManagerPage() {
           </div>
           <TabsContent value="whatsapp" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 relative">
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="sync">
                 {(!showChatView || window.innerWidth >= 768) && (
                   <motion.div
                     key="chats"
@@ -562,7 +562,7 @@ export default function AIManagerPage() {
                     animate={{ x: 0, opacity: 1 }}
                     exit={{ x: -300, opacity: 0 }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="col-span-1 md:col-span-4 "
+                    className="col-span-1 md:col-span-4"
                   >
                     <Card className="p-4">
                       <div className="space-y-4">
@@ -600,7 +600,7 @@ export default function AIManagerPage() {
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                       <Avatar>
-                                        <AvatarFallback>{chat.name[0]}</AvatarFallback>
+                                        <AvatarFallback>{chat.name ? chat.name[0] : '?'}</AvatarFallback>
                                       </Avatar>
                                       <div>
                                         <p className="font-medium">{chat.name}</p>

@@ -17,6 +17,7 @@ export class WhatsappService {
   private lastChatsUpdate: number = 0;
   private readonly CHATS_CACHE_DURATION = 30000; // 30 seconds
   private qrCodePromise: Promise<string> | null = null;
+  private aiEnabled: boolean = false;
 
   constructor(
     private prisma: PrismaService,
@@ -489,124 +490,153 @@ export class WhatsappService {
     }
   }
 
-  async getChatMessages(chatId: string): Promise<any[]> {
-    await this.initializeWhatsApp();
-    await this.waitForConnection();
-
+  async getChatMessages(chatId: string) {
     try {
-      this.logger.log(`Fetching messages for chat ${chatId}...`);
+      if (!this.client) {
+        throw new Error('WhatsApp client not initialized');
+      }
+
+      // Verificar si el chat existe
+      const chat = await this.client.getChatById(chatId);
+      if (!chat) {
+        throw new Error(`Chat not found for ${chatId}`);
+      }
+
+      // Obtener los mensajes del chat
+      const messages = await chat.fetchMessages({ limit: 50 });
       
-      // Primero, obtener los mensajes históricos de la base de datos
+      // Obtener los mensajes de la base de datos
       const dbMessages = await this.prisma.whatsappMessage.findMany({
         where: {
           from: chatId,
+          locationId: this.locationId
         },
         orderBy: {
-          timestamp: 'asc',
-        },
-      });
-
-      this.logger.log(`Found ${dbMessages.length} messages in database`);
-
-      // Luego, obtener los mensajes más recientes de WhatsApp
-      const chat = await this.client.getChatById(chatId);
-      if (!chat) {
-        this.logger.error(`Chat ${chatId} not found`);
-        throw new Error(`Chat ${chatId} not found`);
-      }
-
-      const whatsappMessages = await chat.fetchMessages({ limit: 50 });
-      this.logger.log(`Found ${whatsappMessages.length} messages from WhatsApp`);
-
-      // Crear un Set para rastrear IDs únicos de mensajes
-      const processedIds = new Set<string>();
-      const uniqueMessages: any[] = [];
-
-      // Función para agregar mensaje si es único
-      const addUniqueMessage = (message: any) => {
-        const messageId = message.id || message.id._serialized;
-        if (!processedIds.has(messageId)) {
-          processedIds.add(messageId);
-          uniqueMessages.push(message);
-        }
-      };
-
-      // Procesar mensajes de la base de datos
-      dbMessages.forEach(msg => {
-        addUniqueMessage({
-          id: msg.id,
-          from: msg.from,
-          body: msg.body,
-          timestamp: msg.timestamp.getTime() / 1000,
-          fromMe: msg.isFromAI || false,
-        });
-      });
-
-      // Procesar mensajes de WhatsApp
-      whatsappMessages.forEach(message => {
-        if (message.from === chatId || message.to === chatId) {
-          addUniqueMessage({
-            id: message.id._serialized,
-            from: message.from,
-            body: message.body,
-            timestamp: message.timestamp,
-            fromMe: message.fromMe,
-          });
+          timestamp: 'asc'
         }
       });
 
-      // Ordenar mensajes por timestamp
-      return uniqueMessages.sort((a, b) => a.timestamp - b.timestamp);
+      // Convertir los mensajes de WhatsApp a un formato simple
+      const whatsappMessages = messages.map(msg => ({
+        id: msg.id._serialized,
+        body: msg.body,
+        from: msg.from,
+        timestamp: msg.timestamp,
+        fromMe: msg.fromMe
+      }));
+
+      // Convertir los mensajes de la base de datos al mismo formato
+      const formattedDbMessages = dbMessages.map(msg => ({
+        id: msg.id,
+        body: msg.body,
+        from: msg.from,
+        timestamp: new Date(msg.timestamp).getTime() / 1000,
+        fromMe: msg.isFromAI
+      }));
+
+      // Combinar y ordenar todos los mensajes
+      const allMessages = [...whatsappMessages, ...formattedDbMessages]
+        .filter((msg, index, self) => 
+          index === self.findIndex(m => m.id === msg.id)
+        )
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+      return allMessages;
     } catch (error) {
-      this.logger.error(`Error getting WhatsApp chat messages: ${error.message}`);
+      this.logger.error(`Error getting chat messages: ${error.message}`);
       throw error;
     }
   }
 
   async sendMessage(to: string, message: string): Promise<void> {
-    await this.initializeWhatsApp();
-    await this.waitForConnection();
-
     try {
-      await this.client.sendMessage(to, message);
+      if (!this.client) {
+        throw new Error('WhatsApp client not initialized');
+      }
+
+      // Verificar si el chat existe
+      const chat = await this.client.getChatById(to);
+      if (!chat) {
+        throw new Error(`Chat not found for ${to}`);
+      }
+
+      // Enviar el mensaje
+      await chat.sendMessage(message);
+      this.logger.log(`Message sent to ${to}: ${message}`);
     } catch (error) {
-      this.logger.error(`Error sending WhatsApp message: ${error.message}`);
+      this.logger.error(`Error sending message: ${error.message}`);
       throw error;
     }
   }
 
   async handleIncomingMessage(message: any) {
     try {
-      // Verificar si tenemos un locationId
-      if (!this.locationId) {
-        const firstLocation = await this.prisma.location.findFirst();
-        if (firstLocation) {
-          this.locationId = firstLocation.id;
-          this.logger.log(`Using location ID: ${this.locationId}`);
-        } else {
-          this.logger.error('No location found in the database');
-          return;
-        }
-      }
+      this.logger.log(`Received message from ${message.from}: ${message.body}`);
 
-      // Verificar si la IA está habilitada
-      const aiSettings = await this.prisma.settings.findFirst();
-      if (!aiSettings?.aiEnabled) {
+      // Verificar si el mensaje ya existe en la base de datos
+      const existingMessage = await this.prisma.whatsappMessage.findUnique({
+        where: { id: message.id._serialized }
+      });
+
+      if (existingMessage) {
+        this.logger.log(`Message ${message.id._serialized} already exists, skipping...`);
         return;
       }
 
-      // Procesar el mensaje con la IA
-      const aiResponse = await this.aiGateway.handleTextInput({
-        text: message.body,
-        locationId: this.locationId,
-        chatType: 'whatsapp',
-        chatId: message.from,
+      // Guardar el mensaje entrante en la base de datos
+      await this.prisma.whatsappMessage.create({
+        data: {
+          id: message.id._serialized,
+          from: message.from,
+          body: message.body,
+          timestamp: new Date(message.timestamp * 1000),
+          locationId: this.locationId,
+          isFromAI: false
+        }
       });
 
-      // Enviar la respuesta de la IA
-      await this.client.sendMessage(message.from, aiResponse);
+      // Procesar el mensaje con IA si está habilitada
+      if (this.aiEnabled) {
+        try {
+          const aiResponse = await this.processMessageWithAI(message);
+          
+          // Generar un ID único para el mensaje de IA
+          const aiMessageId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          // Guardar la respuesta de la IA en la base de datos
+          await this.prisma.whatsappMessage.create({
+            data: {
+              id: aiMessageId,
+              from: message.from,
+              body: aiResponse,
+              timestamp: new Date(),
+              locationId: this.locationId,
+              isFromAI: true
+            }
+          });
+
+          // Enviar la respuesta de la IA
+          await this.sendMessage(message.from, aiResponse);
+        } catch (error) {
+          this.logger.error(`Error processing message with AI: ${error.message}`);
+          try {
+            await this.sendMessage(
+              message.from,
+              "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo más tarde."
+            );
+          } catch (sendError) {
+            this.logger.error(`Error sending error message: ${sendError.message}`);
+          }
+        }
+      }
     } catch (error) {
       this.logger.error(`Error handling incoming message: ${error.message}`);
     }
+  }
+
+  private async processMessageWithAI(message: any) {
+    // Implement the logic to process the message with AI
+    // This is a placeholder and should be replaced with the actual implementation
+    return "This is a placeholder AI response. The actual implementation should be here.";
   }
 } 
