@@ -39,7 +39,7 @@ interface OrderItem {
 
 interface Order {
   id: string
-  table: {
+  table?: {
     number: number
   }
   items: OrderItem[]
@@ -50,6 +50,10 @@ interface Order {
   updatedAt: string
   customerName?: string
   isPaid: boolean
+  type: "TABLE" | "TAKEOUT" | "DELIVERY"
+  deliveryAddress?: string
+  neighborhood?: string
+  phone?: string
 }
 
 export function OrdersManager() {
@@ -447,9 +451,36 @@ export function OrdersManager() {
                           <div className="flex justify-between items-center">
                             <div>
                               <h3 className="font-bold text-lg">
-                                {order.table?.number ? `Mesa #${order.table.number}` : 'Para Llevar'}
+                                {order.type === "DELIVERY" ? (
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span>Domicilio</span>
+                                      {getStatusBadge(order.status)}
+                                    </div>
+                                    <div className="text-sm space-y-1 mt-1">
+                                      <p className="font-medium text-primary">
+                                        Cliente: {order.customerName}
+                                      </p>
+                                      <p className="text-muted-foreground">
+                                        Dirección: {order.deliveryAddress}
+                                      </p>
+                                      {order.neighborhood && (
+                                        <p className="text-muted-foreground">
+                                          Barrio: {order.neighborhood}
+                                        </p>
+                                      )}
+                                      <p className="text-muted-foreground">
+                                        Teléfono: {order.phone}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ) : order.table?.number ? (
+                                  `Mesa #${order.table.number}`
+                                ) : (
+                                  'Para Llevar'
+                                )}
                               </h3>
-                              {order.customerName && (
+                              {order.type !== "DELIVERY" && order.customerName && (
                                 <p className="text-sm font-medium text-primary">
                                   Cliente: {order.customerName}
                                 </p>
