@@ -6,6 +6,7 @@ ENV DATABASE_URL="postgresql://postgres:postgres@postgres:5432/restaurant_admin?
 ENV REDIS_HOST=redis
 ENV REDIS_PORT=6379
 
+# Establecemos el directorio de trabajo principal
 WORKDIR /app
 
 # Copiamos los package.json para usar la cache
@@ -21,12 +22,11 @@ RUN npm cache clean --force && \
 COPY prisma ./prisma/
 RUN npx prisma generate
 
-# Copiamos todo el código
-WORKDIR /app
-COPY . .
+# Copiamos el código fuente de la API
+COPY src ./src/
+COPY tsconfig*.json ./
 
 # Recompilamos bcrypt para Linux y construimos la aplicación
-WORKDIR /app/packages/api
 RUN npm rebuild bcrypt --build-from-source && \
     npm run build
 
