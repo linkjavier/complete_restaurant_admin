@@ -9,22 +9,21 @@ ENV REDIS_PORT=6379
 # Establecemos el directorio de trabajo principal
 WORKDIR /app
 
-# Copiamos los package.json para usar la cache
-COPY package*.json ./
-COPY packages/api/package*.json ./packages/api/
+# Copiamos el package.json de la API
+COPY package.json ./
+COPY packages/api/package.json ./
 
 # Instalamos dependencias
-WORKDIR /app/packages/api
 RUN npm cache clean --force && \
     npm install --legacy-peer-deps
 
 # Copiamos el schema de Prisma y generamos el cliente
-COPY prisma ./prisma/
+COPY packages/api/prisma ./prisma/
 RUN npx prisma generate
 
 # Copiamos el código fuente de la API
-COPY src ./src/
-COPY tsconfig*.json ./
+COPY packages/api/src ./src/
+COPY packages/api/tsconfig*.json ./
 
 # Recompilamos bcrypt para Linux y construimos la aplicación
 RUN npm rebuild bcrypt --build-from-source && \
