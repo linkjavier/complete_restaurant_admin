@@ -18,7 +18,7 @@ RUN npm cache clean --force && \
     npm install --legacy-peer-deps
 
 # Copiamos el schema de Prisma y generamos el cliente
-COPY packages/api/prisma ./prisma/
+COPY prisma ./prisma/
 RUN npx prisma generate
 
 # Copiamos todo el código
