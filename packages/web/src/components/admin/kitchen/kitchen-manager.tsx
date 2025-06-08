@@ -447,9 +447,22 @@ export function KitchenManager() {
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
                           <div>
                             <h3 className="font-bold text-base">
-                              {order.table?.number ? `Mesa #${order.table.number}` : 'Para Llevar'}
+                              {order.type === "DELIVERY" ? (
+                                <div>
+                                  <span>Domicilio</span>
+                                  {order.customerName && (
+                                    <p className="text-xs font-medium text-primary">
+                                      Cliente: {order.customerName}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : order.table?.number ? (
+                                `Mesa #${order.table.number}`
+                              ) : (
+                                'Para Llevar'
+                              )}
                             </h3>
-                            {order.customerName && (
+                            {order.type !== "DELIVERY" && order.customerName && (
                               <p className="text-xs font-medium text-primary">
                                 Cliente: {order.customerName}
                               </p>

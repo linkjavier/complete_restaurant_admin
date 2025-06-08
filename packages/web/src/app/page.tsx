@@ -12,10 +12,9 @@ export default function HomePage() {
       <div className="container flex flex-col items-center justify-center gap-4 px-4 text-center">
         <Image
           src="/assets/blondie-logo.png"
-          alt="Blondie Restaurant App Logo"
-          width={300}
-          height={300}
-          className="mb-6"
+          alt="Blondie Logo"
+          width={200}
+          height={200}
           priority
         />
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">

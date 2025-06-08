@@ -88,9 +88,9 @@ export default function LoginPage() {
           <div className="flex justify-center mb-6">
             <Image
               src="/assets/blondie-logo.png"
-              alt="Blondie Restaurant App Logo"
-              width={300}
-              height={300}
+              alt="Blondie Logo"
+              width={200}
+              height={200}
               priority
             />
           </div>

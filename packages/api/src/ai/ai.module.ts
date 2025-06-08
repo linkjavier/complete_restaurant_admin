@@ -1,9 +1,17 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { AIGateway } from './ai.gateway';
+import { ProductsModule } from '../products/products.module';
+import { OrdersModule } from '../orders/orders.module';
+import { ConfigModule } from '@nestjs/config';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [
+    ConfigModule,
+    ProductsModule,
+    OrdersModule,
+    SettingsModule,
+  ],
   providers: [AIGateway],
   exports: [AIGateway],
 })

@@ -18,7 +18,9 @@ import {
   Printer, 
   Receipt, 
   AlertCircle,
-  Timer
+  Timer,
+  Nfc,
+  HandCoins
 } from "lucide-react"
 import { useOrderSocket } from "@/hooks/use-order-socket"
 
@@ -39,7 +41,7 @@ interface OrderItem {
 
 interface Order {
   id: string
-  table: {
+  table?: {
     number: number
   }
   items: OrderItem[]
@@ -50,6 +52,10 @@ interface Order {
   updatedAt: string
   customerName?: string
   isPaid: boolean
+  type: "TABLE" | "TAKEOUT" | "DELIVERY"
+  deliveryAddress?: string
+  neighborhood?: string
+  phone?: string
 }
 
 export function OrdersManager() {
@@ -64,10 +70,19 @@ export function OrdersManager() {
 
   // Initial fetch and polling setup
   useEffect(() => {
-    fetchOrders()
-    const interval = setInterval(fetchOrders, 30000)
-    return () => clearInterval(interval)
-  }, [])
+    const initialFetch = async () => {
+      setLoading(true);
+      try {
+        await fetchOrders();
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initialFetch();
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Join orders room when socket is connected and user has a locationId
   useEffect(() => {
@@ -112,13 +127,16 @@ export function OrdersManager() {
           return prevOrders
         }
         
+        return [newOrder, ...prevOrders]
+      })
+
+      // Move toast outside of setState
+      if (!orders.some(order => order.id === newOrder.id)) {
         toast({
           title: "Nueva Orden",
           description: `Mesa #${newOrder.table?.number} - ${newOrder.items.length} productos`,
         })
-        
-        return [newOrder, ...prevOrders]
-      })
+      }
     })
 
     // Listen for order updates
@@ -196,9 +214,6 @@ export function OrdersManager() {
   // Updated fetchOrders function to include the required kitchen=true query parameter
   const fetchOrders = async () => {
     try {
-      setLoading(true);
-      setError(null);
-
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?kitchen=false`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -210,7 +225,13 @@ export function OrdersManager() {
       }
 
       const data = await response.json();
-      setOrders(data);
+      
+      // Silently update orders without affecting UI state
+      setOrders(prevOrders => {
+        // Only update if there are actual changes
+        const hasChanges = JSON.stringify(prevOrders) !== JSON.stringify(data);
+        return hasChanges ? data : prevOrders;
+      });
 
       console.log('Orders fetched successfully:', data);
     } catch (err) {
@@ -228,8 +249,6 @@ export function OrdersManager() {
       } else {
         setError('Error al cargar las órdenes. Por favor, intenta de nuevo.');
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -381,11 +400,12 @@ export function OrdersManager() {
     const icons = {
       CASH: <Receipt className="h-4 w-4" />,
       CARD: <CreditCard className="h-4 w-4" />,
-      TRANSFER: <CreditCard className="h-4 w-4" />,
-      OTHER: <AlertCircle className="h-4 w-4" />
+      TRANSFER: <Nfc className="h-4 w-4" />,
+      OTHER: <HandCoins className="h-4 w-4" />
     }
 
-    return icons[method]
+    // Si method es null, undefined o 'OTHER', muestra el ícono de OTHER
+    return icons[method as PaymentMethod] || icons.OTHER
   }
 
   const filteredOrders = orders.filter(order => {
@@ -447,9 +467,36 @@ export function OrdersManager() {
                           <div className="flex justify-between items-center">
                             <div>
                               <h3 className="font-bold text-lg">
-                                {order.table?.number ? `Mesa #${order.table.number}` : 'Para Llevar'}
+                                {order.type === "DELIVERY" ? (
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span>Domicilio</span>
+                                      {getStatusBadge(order.status)}
+                                    </div>
+                                    <div className="text-sm space-y-1 mt-1">
+                                      <p className="font-medium text-primary">
+                                        Cliente: {order.customerName}
+                                      </p>
+                                      <p className="text-muted-foreground">
+                                        Dirección: {order.deliveryAddress}
+                                      </p>
+                                      {order.neighborhood && (
+                                        <p className="text-muted-foreground">
+                                          Barrio: {order.neighborhood}
+                                        </p>
+                                      )}
+                                      <p className="text-muted-foreground">
+                                        Teléfono: {order.phone}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ) : order.table?.number ? (
+                                  `Mesa #${order.table.number}`
+                                ) : (
+                                  'Para Llevar'
+                                )}
                               </h3>
-                              {order.customerName && (
+                              {order.type !== "DELIVERY" && order.customerName && (
                                 <p className="text-sm font-medium text-primary">
                                   Cliente: {order.customerName}
                                 </p>
@@ -457,6 +504,16 @@ export function OrdersManager() {
                               <p className="text-sm text-muted-foreground">
                                 Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                               </p>
+                              {order.paymentMethod && (
+                                <p className="text-sm font-medium text-primary mt-1">
+                                  Método de pago: {
+                                    order.paymentMethod === "CASH" ? "Efectivo" :
+                                    order.paymentMethod === "CARD" ? "Tarjeta" :
+                                    order.paymentMethod === "TRANSFER" ? "Transferencia" :
+                                    "Otro"
+                                  }
+                                </p>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               {getStatusBadge(order.status)}

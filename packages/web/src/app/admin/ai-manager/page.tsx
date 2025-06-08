@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,100 +11,320 @@ import { Badge } from "@/components/ui/badge"
 import { MessageSquare, Send, QrCode, Users, Bot, Phone } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { io, Socket } from "socket.io-client"
+import { useAuth } from "@/hooks/use-auth"
+import { useRouter } from "next/navigation"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface Message {
   id: string
   content: string
   role: "user" | "assistant"
   timestamp: Date
+  fromMe?: boolean
 }
 
 interface WhatsAppChat {
   id: string
-  phoneNumber: string
   name: string
   lastMessage: string
-  unread: number
-  status: "online" | "offline" | "away"
+  timestamp: number | null
+  unreadCount: number
 }
 
 export default function AIManagerPage() {
+  const { user, isLoading: isAuthLoading } = useAuth()
+  const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null)
   const [isWhatsAppConnected, setIsWhatsAppConnected] = useState(false)
   const [showQR, setShowQR] = useState(false)
-  const [socket, setSocket] = useState<Socket | null>(null)
+  const [mainSocket, setMainSocket] = useState<Socket | null>(null)
+  const [chatSocket, setChatSocket] = useState<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [whatsappChats, setWhatsappChats] = useState<WhatsAppChat[]>([])
+  const [selectedChat, setSelectedChat] = useState<string | null>(null)
+  const [chatMessages, setChatMessages] = useState<Message[]>([])
+  const [qrCode, setQrCode] = useState<string | null>(null)
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [isLoadingChats, setIsLoadingChats] = useState(false)
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
+  const [showChatView, setShowChatView] = useState(false)
 
-  // Mock WhatsApp chats
-  const [whatsappChats] = useState<WhatsAppChat[]>([
-    {
-      id: "1",
-      phoneNumber: "+1234567890",
-      name: "Juan Pérez",
-      lastMessage: "Quisiera hacer un pedido",
-      unread: 2,
-      status: "online"
-    },
-    {
-      id: "2",
-      phoneNumber: "+0987654321",
-      name: "María García",
-      lastMessage: "¿Tienen delivery?",
-      unread: 0,
-      status: "away"
-    }
-  ])
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  const scrollChatToBottom = () => {
+    chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
 
   useEffect(() => {
-    // Initialize socket connection
-    const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
-      transports: ['websocket'],
-    })
+    scrollToBottom()
+  }, [messages])
 
-    socketInstance.on('connect', () => {
-      console.log('Connected to WebSocket')
-      setIsConnected(true)
-    })
+  useEffect(() => {
+    scrollChatToBottom()
+  }, [chatMessages, showChatView])
 
-    socketInstance.on('disconnect', () => {
-      console.log('Disconnected from WebSocket')
-      setIsConnected(false)
-    })
+  useEffect(() => {
+    if (isAuthLoading) {
+      return;
+    }
 
-    socketInstance.on('ai_response', (response) => {
-      const aiMessage: Message = {
-        id: Date.now().toString(),
-        content: response.content,
-        role: "assistant",
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, aiMessage])
-      setIsLoading(false)
-    })
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
 
-    socketInstance.on('error', (error) => {
-      console.error('WebSocket error:', error)
+    if (!user.locationId) {
       const errorMessage: Message = {
         id: Date.now().toString(),
-        content: "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.",
+        content: "No tienes una ubicación asignada. Por favor, contacta al administrador para que te asigne una ubicación.",
         role: "assistant",
         timestamp: new Date()
-      }
-      setMessages(prev => [...prev, errorMessage])
-      setIsLoading(false)
-    })
+      };
+      setMessages([errorMessage]);
+      return;
+    }
 
-    setSocket(socketInstance)
+    // Initialize main socket connection
+    const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
+      transports: ['websocket'],
+      query: {
+        locationId: user.locationId,
+        chatType: 'ai',
+        chatId: 'admin-chat',
+      },
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+    });
+
+    let reconnectTimer: NodeJS.Timeout;
+    let statusCheckTimer: NodeJS.Timeout;
+    let initialConnectionAttempted = false;
+
+    socketInstance.on('connect', () => {
+      console.log('Connected to main WebSocket');
+      setIsConnected(true);
+      setIsLoadingChats(true);
+      
+      if (!initialConnectionAttempted) {
+        console.log('Initial connection, requesting WhatsApp status...');
+        socketInstance.emit('whatsapp:getStatus');
+        initialConnectionAttempted = true;
+      }
+    });
+
+    socketInstance.on('disconnect', () => {
+      console.log('Disconnected from WebSocket');
+      setIsConnected(false);
+      setIsLoadingChats(true);
+      
+      // Intentar reconectar después de un tiempo
+      reconnectTimer = setTimeout(() => {
+        console.log('Attempting to reconnect...');
+        socketInstance.connect();
+      }, 5000);
+    });
+
+    socketInstance.on('reconnect', () => {
+      console.log('Reconnected to WebSocket');
+      setIsConnected(true);
+      setIsLoadingChats(true);
+      // Solicitar estado de WhatsApp al reconectarse
+      socketInstance.emit('whatsapp:getStatus');
+    });
+
+    socketInstance.on('reconnect_error', (error) => {
+      console.error('Reconnection error:', error);
+    });
+
+    socketInstance.on('reconnect_failed', () => {
+      console.error('Failed to reconnect');
+    });
+
+    socketInstance.on('ai_response', ({ content }) => {
+      console.log('Received AI response:', content);
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        content,
+        role: "assistant",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, newMessage]);
+      setIsLoading(false);
+    });
+
+    socketInstance.on('error', ({ message, details }) => {
+      console.error('Socket error:', message, details);
+      setIsLoading(false);
+      toast.error(message || 'Error en la conexión');
+    });
+
+    socketInstance.on('whatsapp:status', ({ isConnected }) => {
+      console.log('Received WhatsApp status:', isConnected);
+      setIsWhatsAppConnected(isConnected);
+      
+      if (isConnected) {
+        console.log('WhatsApp is connected, requesting chats...');
+        socketInstance.emit('whatsapp:getChats');
+      } else {
+        console.log('WhatsApp is not connected, checking if we need to initialize...');
+        // Solo intentar inicializar si no hay un código QR mostrado
+        if (!showQR) {
+          socketInstance.emit('whatsapp:getQR');
+          setShowQR(true);
+        }
+        setIsLoadingChats(false);
+      }
+    });
+
+    // Configurar un timer para verificar el estado periódicamente
+    statusCheckTimer = setInterval(() => {
+      if (socketInstance.connected) {
+        console.log('Periodic status check...');
+        socketInstance.emit('whatsapp:getStatus');
+      }
+    }, 30000); // Verificar cada 30 segundos
+
+    socketInstance.on('whatsapp:authenticated', () => {
+      console.log('WhatsApp authenticated');
+      setIsWhatsAppConnected(true);
+      setShowQR(false);
+      setQrCode(null);
+      setIsLoadingChats(true);
+      socketInstance.emit('whatsapp:getChats');
+    });
+
+    socketInstance.on('whatsapp:auth_failure', (error) => {
+      console.error('WhatsApp authentication failed:', error);
+      setIsWhatsAppConnected(false);
+      setShowQR(true);
+      setIsLoadingChats(false);
+    });
+
+    socketInstance.on('whatsapp:disconnected', (reason) => {
+      console.log('WhatsApp disconnected:', reason);
+      setIsWhatsAppConnected(false);
+      setIsLoadingChats(true);
+    });
+
+    socketInstance.on('whatsapp:ready', () => {
+      console.log('Received WhatsApp ready event');
+      setIsWhatsAppConnected(true);
+      setShowQR(false);
+      setQrCode(null);
+      setIsLoadingChats(true);
+      // Solicitar chats cuando WhatsApp esté listo
+      console.log('Requesting chats after ready event');
+      socketInstance.emit('whatsapp:getChats');
+    });
+
+    socketInstance.on('whatsapp:chats', ({ chats }) => {
+      console.log('Received WhatsApp chats event');
+      console.log('Chats data:', chats);
+      if (!chats || chats.length === 0) {
+        console.log('No chats received or empty array');
+      }
+      setWhatsappChats(chats || []);
+      setIsLoadingChats(false);
+    });
+
+    socketInstance.on('whatsapp:qr', ({ qrCode }) => {
+      console.log('Received QR code');
+      setQrCode(qrCode);
+      setShowQR(true);
+      setIsLoadingChats(false);
+    });
+
+    socketInstance.on('whatsapp:message', (message) => {
+      console.log('Received WhatsApp message:', message);
+      setWhatsappChats(prevChats => {
+        console.log('Previous chats:', prevChats);
+        const updatedChats = prevChats.map(chat => 
+          chat.id === message.from 
+            ? { ...chat, lastMessage: message.body, timestamp: message.timestamp }
+            : chat
+        );
+        console.log('Updated chats:', updatedChats);
+        return updatedChats;
+      });
+
+      if (selectedChat === message.from) {
+        console.log('Adding message to selected chat:', message);
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          content: message.body,
+          role: "user",
+          timestamp: new Date(message.timestamp * 1000)
+        }]);
+      }
+    });
+
+    socketInstance.on('whatsapp:chatMessages', ({ messages }) => {
+      console.log('Received chat messages:', messages);
+      if (!messages || messages.length === 0) {
+        console.log('No messages received or empty array');
+      }
+      const formattedMessages = messages.map(msg => ({
+        id: msg.id,
+        content: msg.body,
+        role: msg.fromMe ? "assistant" : "user",
+        timestamp: new Date(msg.timestamp * 1000)
+      }));
+      console.log('Formatted messages:', formattedMessages);
+      setChatMessages(formattedMessages);
+      setIsLoadingMessages(false);
+    });
+
+    setMainSocket(socketInstance)
 
     return () => {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      if (statusCheckTimer) {
+        clearInterval(statusCheckTimer);
+      }
       socketInstance.disconnect()
+      socketInstance.off('whatsapp:status');
+      socketInstance.off('whatsapp:qr');
+      socketInstance.off('whatsapp:ready');
+      socketInstance.off('whatsapp:chats');
+      socketInstance.off('whatsapp:message');
+      socketInstance.off('whatsapp:chatMessages');
+      socketInstance.off('whatsapp:error');
+      socketInstance.off('whatsapp:authenticated');
+      socketInstance.off('whatsapp:auth_failure');
+      socketInstance.off('whatsapp:disconnected');
+      socketInstance.off('ai_response');
     }
-  }, [])
+  }, [user, isAuthLoading, router])
+
+  // Modificar el efecto para la pestaña de WhatsApp
+  useEffect(() => {
+    if (mainSocket && isConnected) {
+      console.log('Tab changed to WhatsApp, checking WhatsApp status...');
+      setIsLoadingChats(true);
+      // Primero verificar el estado de WhatsApp
+      mainSocket.emit('whatsapp:getStatus');
+    }
+  }, [mainSocket, isConnected]);
 
   const handleSendMessage = () => {
-    if (!input.trim() || !socket || !isConnected || isLoading) return
+    if (!input.trim() || !mainSocket || !isConnected || isLoading) return
 
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -113,32 +333,200 @@ export default function AIManagerPage() {
       timestamp: new Date()
     }
 
-    setMessages([...messages, newMessage])
+    setMessages(prev => [...prev, newMessage])
     setInput("")
     setIsLoading(true)
+    inputRef.current?.focus()
 
     // Send message through WebSocket
-    socket.emit('input_text', { text: input })
+    mainSocket.emit('input_text', { text: input })
   }
 
   const handleWhatsAppConnect = () => {
-    setShowQR(true)
-    // Simulate connection after 3 seconds
-    setTimeout(() => {
-      setIsWhatsAppConnected(true)
-      setShowQR(false)
-    }, 3000)
+    if (!mainSocket) return;
+    
+    if (!isWhatsAppConnected) {
+      mainSocket.emit('whatsapp:getQR');
+      setShowQR(true);
+    } else {
+      // Si ya está conectado, podemos mostrar un mensaje o hacer algo más
+      console.log('WhatsApp ya está conectado');
+    }
+  };
+
+  const handleChatSelect = (chatId: string) => {
+    setSelectedChat(chatId);
+    setShowChatView(true);
+    setChatMessages([]);
+    setIsLoadingMessages(true);
+
+    // Disconnect previous chat socket if exists
+    if (chatSocket) {
+      chatSocket.disconnect();
+    }
+
+    // Create new socket connection for this chat
+    const newChatSocket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
+      transports: ['websocket'],
+      query: {
+        locationId: user.locationId,
+        chatType: 'whatsapp',
+        chatId: chatId,
+      },
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+    });
+
+    // Configurar los event listeners para el nuevo socket
+    newChatSocket.on('connect', () => {
+      console.log('Connected to chat socket');
+      // Solicitar los mensajes del chat cuando se conecte
+      newChatSocket.emit('whatsapp:getChatMessages', { chatId });
+    });
+
+    newChatSocket.on('whatsapp:chatMessages', ({ messages }) => {
+      console.log('Received chat messages:', messages);
+      if (!messages || messages.length === 0) {
+        console.log('No messages received or empty array');
+      }
+      const formattedMessages = messages.map(msg => ({
+        id: msg.id,
+        content: msg.body,
+        role: msg.fromMe ? "assistant" : "user",
+        timestamp: new Date(msg.timestamp * 1000)
+      }));
+      console.log('Formatted messages:', formattedMessages);
+      setChatMessages(formattedMessages);
+      setIsLoadingMessages(false);
+    });
+
+    newChatSocket.on('whatsapp:message', (message) => {
+      console.log('Received new WhatsApp message:', message);
+      if (message.from === chatId) {
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          content: message.body,
+          role: "user",
+          timestamp: new Date(message.timestamp * 1000)
+        }]);
+      }
+    });
+
+    newChatSocket.on('error', ({ message, details }) => {
+      console.error('Socket error:', message, details);
+      setIsLoadingMessages(false);
+      toast.error(message || 'Error en la conexión');
+    });
+
+    setChatSocket(newChatSocket);
   }
 
+  const handleBackToChats = () => {
+    setShowChatView(false);
+    setSelectedChat(null);
+    // Desconectar el socket del chat cuando volvemos a la lista
+    if (chatSocket) {
+      chatSocket.disconnect();
+      setChatSocket(null);
+    }
+  }
+
+  const handleSendWhatsAppMessage = (message: string) => {
+    if (!chatSocket || !selectedChat) return;
+
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      content: message,
+      role: "assistant",
+      timestamp: new Date()
+    };
+
+    setChatMessages(prev => [...prev, newMessage]);
+    
+    chatSocket.emit('whatsapp:sendMessage', {
+      to: selectedChat,
+      message
+    });
+  }
+
+  const handleAIToggle = async (checked: boolean) => {
+    setIsSavingSettings(true)
+    try {
+      const response = await fetch("/api/settings/ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "Sandra", // Mantener el nombre actual
+          gender: "female", // Mantener el género actual
+          enabled: checked,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to save settings")
+      }
+
+      setAiEnabled(checked)
+      toast.success(checked ? "IA activada" : "IA desactivada")
+    } catch (error) {
+      toast.error("Error al actualizar la configuración")
+    } finally {
+      setIsSavingSettings(false)
+    }
+  }
+
+  // Load AI settings on component mount
+  useEffect(() => {
+    const loadAISettings = async () => {
+      try {
+        const response = await fetch("/api/settings/ai")
+        if (!response.ok) {
+          throw new Error("Failed to load settings")
+        }
+        const data = await response.json()
+        setAiEnabled(data.enabled)
+      } catch (error) {
+        console.error("Error loading AI settings:", error)
+      }
+    }
+
+    loadAISettings()
+  }, [])
+
   return (
-    <div className="h-full p-8 space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Inteligencia Artificial</h1>
-        <div className="flex items-center gap-4">
+    <div className="h-full p-8 space-y-8 w-full">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Inteligencia Artificial</h1>
           <Button
             variant={isWhatsAppConnected ? "default" : "outline"}
             onClick={handleWhatsAppConnect}
-            className="flex items-center gap-2"
+            className="flex flex-col items-center gap-0.5 px-1.5 py-1 h-auto min-h-0 md:flex-row md:gap-2 md:px-4 md:py-2 md:h-10 md:text-base md:hidden"
+          >
+            <Phone className="h-3 w-3 md:h-4 md:w-4" />
+            <span className="text-[10px] leading-none md:text-base md:leading-normal">
+              {isWhatsAppConnected ? "WhatsApp Conectado" : "Conectar"}
+            </span>
+          </Button>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="ai-enabled"
+              checked={aiEnabled}
+              onCheckedChange={handleAIToggle}
+              disabled={isSavingSettings}
+            />
+            <Label htmlFor="ai-enabled">Activar Agente IA</Label>
+          </div>
+          <Button
+            variant={isWhatsAppConnected ? "default" : "outline"}
+            onClick={handleWhatsAppConnect}
+            className="hidden md:flex items-center gap-2"
           >
             <Phone className="h-4 w-4" />
             {isWhatsAppConnected ? "WhatsApp Conectado" : "Conectar WhatsApp"}
@@ -146,127 +534,304 @@ export default function AIManagerPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="whatsapp" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-          <TabsTrigger value="chat">Chat IA</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="chat" className="space-y-4">
-          <Card className="p-4">
-            <ScrollArea className="h-[600px] pr-4">
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex items-start gap-4",
-                      message.role === "assistant" ? "flex-row" : "flex-row-reverse"
-                    )}
+      {isAuthLoading ? (
+        <div className="text-center">Cargando...</div>
+      ) : !user ? (
+        <div className="text-center">Redirigiendo al inicio de sesión...</div>
+      ) : !user.locationId ? (
+        <Card className="p-4">
+          <div className="text-center text-red-500">
+            <p className="font-medium">No tienes una ubicación asignada</p>
+            <p className="text-sm mt-2">Por favor, contacta al administrador para que te asigne una ubicación.</p>
+          </div>
+        </Card>
+      ) : (
+        <Tabs defaultValue="whatsapp" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <TabsList>
+              <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+              <TabsTrigger value="chat">Chat IA</TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="whatsapp" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 relative">
+              <AnimatePresence mode="sync">
+                {(!showChatView || window.innerWidth >= 768) && (
+                  <motion.div
+                    key="chats"
+                    initial={{ x: -300, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: -300, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="col-span-1 md:col-span-4"
                   >
-                    <Avatar>
-                      <AvatarImage src={message.role === "assistant" ? "/bot-avatar.png" : "/user-avatar.png"} />
-                      <AvatarFallback>{message.role === "assistant" ? "AI" : "U"}</AvatarFallback>
-                    </Avatar>
-                    <div className={cn(
-                      "rounded-lg p-4 max-w-[80%]",
-                      message.role === "assistant" ? "bg-muted" : "bg-primary text-primary-foreground"
-                    )}>
-                      <p>{message.content}</p>
-                      <span className="text-xs opacity-70">
-                        {message.timestamp.toLocaleTimeString()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="flex items-start gap-4">
-                    <Avatar>
-                      <AvatarImage src="/bot-avatar.png" />
-                      <AvatarFallback>AI</AvatarFallback>
-                    </Avatar>
-                    <div className="rounded-lg p-4 bg-muted">
-                      <p>Escribiendo...</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-            <div className="flex gap-2 mt-4">
-              <Input
-                placeholder="Escribe tu mensaje..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                disabled={isLoading || !isConnected}
-              />
-              <Button 
-                onClick={handleSendMessage} 
-                disabled={isLoading || !isConnected}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          </Card>
-        </TabsContent>
+                    <Card className="p-4">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-lg font-semibold">Chats</h2>
+                        </div>
 
-        <TabsContent value="whatsapp" className="space-y-4">
-          {showQR ? (
-            <Card className="p-8 flex flex-col items-center justify-center space-y-4">
-              <QrCode className="h-32 w-32" />
-              <p>Escanea el código QR con WhatsApp para conectar</p>
-            </Card>
-          ) : (
-            <>
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Chats de WhatsApp</h2>
-                <Button className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Mensaje Masivo
+                        {showQR && qrCode && (
+                          <div className="flex flex-col items-center gap-4 p-4 border rounded-lg">
+                            <p className="text-sm text-center">Escanea el código QR con WhatsApp</p>
+                            <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
+                          </div>
+                        )}
+
+                        <ScrollArea className="h-[600px]">
+                          <div className="space-y-2">
+                            {isLoadingChats ? (
+                              <div className="flex items-center justify-center p-4">
+                                <p className="text-muted-foreground">Cargando chats...</p>
+                              </div>
+                            ) : whatsappChats.length === 0 ? (
+                              <div className="flex items-center justify-center p-4">
+                                <p className="text-muted-foreground">No hay chats disponibles</p>
+                              </div>
+                            ) : (
+                              whatsappChats.map((chat) => (
+                                <div
+                                  key={chat.id}
+                                  onClick={() => handleChatSelect(chat.id)}
+                                  className={cn(
+                                    "p-4 rounded-lg cursor-pointer hover:bg-muted transition-colors",
+                                    selectedChat === chat.id && "bg-muted"
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <Avatar>
+                                        <AvatarFallback>{chat.name ? chat.name[0] : '?'}</AvatarFallback>
+                                      </Avatar>
+                                      <div>
+                                        <p className="font-medium">{chat.name}</p>
+                                        <p className="text-sm text-muted-foreground truncate">
+                                          {chat.lastMessage}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {chat.unreadCount > 0 && (
+                                      <Badge variant="secondary">{chat.unreadCount}</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {(showChatView || window.innerWidth >= 768) && (
+                  <motion.div
+                    key="chat"
+                    initial={{ x: 300, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: 300, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="col-span-1 md:col-span-8"
+                  >
+                    <Card className="p-4">
+                      {selectedChat ? (
+                        <div className="flex flex-col h-[600px]">
+                          <div className="flex items-center gap-2 mb-4 md:hidden">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={handleBackToChats}
+                              className="md:hidden"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="h-5 w-5"
+                              >
+                                <path d="m15 18-6-6 6-6" />
+                              </svg>
+                            </Button>
+                            <h2 className="text-lg font-semibold">
+                              {whatsappChats.find(chat => chat.id === selectedChat)?.name}
+                            </h2>
+                          </div>
+                          <ScrollArea className="flex-1 pr-4">
+                            <div className="space-y-4">
+                              {isLoadingMessages ? (
+                                <div className="flex items-center justify-center h-full">
+                                  <p className="text-muted-foreground">Cargando mensajes...</p>
+                                </div>
+                              ) : chatMessages.length === 0 ? (
+                                <div className="flex items-center justify-center h-full">
+                                  <p className="text-muted-foreground">No hay mensajes en este chat</p>
+                                </div>
+                              ) : (
+                                <>
+                                  {chatMessages.map((message) => (
+                                    <div
+                                      key={`${message.role === "assistant" ? 'ai' : 'user'}_${message.id}`}
+                                      className={cn(
+                                        "flex items-start gap-4",
+                                        message.role === "assistant" ? "flex-row" : "flex-row-reverse"
+                                      )}
+                                    >
+                                      <Avatar>
+                                        <AvatarImage
+                                          src={message.role === "assistant" 
+                                            ? "/bot-avatar.png" 
+                                            : user?.avatar || "/user-avatar.png"} 
+                                        />
+                                        <AvatarFallback>
+                                          {message.role === "assistant" ? "AI" : "U"}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div
+                                        className={cn(
+                                          "rounded-lg p-4 max-w-[80%]",
+                                          message.role === "assistant"
+                                            ? "bg-muted"
+                                            : "bg-primary text-primary-foreground"
+                                        )}
+                                      >
+                                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {message.content}
+                                          </ReactMarkdown>
+                                        </div>
+                                        <span className="text-xs opacity-70">
+                                          {message.timestamp.toLocaleTimeString()}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <div ref={chatMessagesEndRef} />
+                                </>
+                              )}
+                            </div>
+                          </ScrollArea>
+
+                          <div className="mt-4 flex gap-2">
+                            <Input
+                              ref={inputRef}
+                              value={input}
+                              onChange={(e) => setInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleSendWhatsAppMessage(input);
+                                  setInput("");
+                                }
+                              }}
+                              placeholder="Escribe un mensaje..."
+                              className="flex-1"
+                            />
+                            <Button
+                              onClick={() => {
+                                handleSendWhatsAppMessage(input);
+                                setInput("");
+                              }}
+                              disabled={!input.trim()}
+                            >
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-[600px] flex items-center justify-center text-muted-foreground">
+                          Selecciona un chat para comenzar
+                        </div>
+                      )}
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="chat" className="space-y-4 w-full">
+            <Card className="p-4 w-full">
+              <ScrollArea className="h-[600px] pr-4">
+                <div className="space-y-4">
+                  {messages.map((message) => (
+                    <div
+                      key={`${message.role === "assistant" ? 'ai' : 'user'}_${message.id}`}
+                      className={cn(
+                        "flex items-start gap-4",
+                        message.role === "assistant" ? "flex-row" : "flex-row-reverse"
+                      )}
+                    >
+                      <Avatar>
+                        <AvatarImage 
+                          src={message.role === "assistant" 
+                            ? "/bot-avatar.png" 
+                            : user?.avatar || "/user-avatar.png"} 
+                        />
+                        <AvatarFallback>{message.role === "assistant" ? "AI" : "U"}</AvatarFallback>
+                      </Avatar>
+                      <div className={cn(
+                        "rounded-lg p-4 max-w-[80%]",
+                        message.role === "assistant" ? "bg-muted" : "bg-primary text-primary-foreground"
+                      )}>
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              h2: ({node, ...props}) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
+                              ul: ({node, ...props}) => <ul className="list-disc pl-4" {...props} />,
+                              li: ({node, ...props}) => <li className="mb-1" {...props} />
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                        <span className="text-xs opacity-70">
+                          {message.timestamp.toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex items-start gap-4">
+                      <Avatar>
+                        <AvatarImage src="/bot-avatar.png" />
+                        <AvatarFallback>AI</AvatarFallback>
+                      </Avatar>
+                      <div className="rounded-lg p-4 bg-muted">
+                        <p>Escribiendo...</p>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              </ScrollArea>
+              <div className="flex gap-2 mt-4">
+                <Input
+                  ref={inputRef}
+                  placeholder="Escribe tu mensaje..."
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSendMessage()
+                    }
+                  }}
+                />
+                <Button onClick={handleSendMessage} disabled={!input.trim() || !isConnected || isLoading}>
+                  <Send className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {whatsappChats.map((chat) => (
-                  <Card key={chat.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarFallback>{chat.name[0]}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{chat.name}</p>
-                          <p className="text-sm text-muted-foreground">{chat.phoneNumber}</p>
-                        </div>
-                      </div>
-                      <Badge variant={chat.status === "online" ? "default" : "secondary"}>
-                        {chat.status}
-                      </Badge>
-                    </div>
-                    <div className="mt-4">
-                      <p className="text-sm text-muted-foreground">{chat.lastMessage}</p>
-                      {chat.unread > 0 && (
-                        <Badge variant="destructive" className="mt-2">
-                          {chat.unread} mensajes nuevos
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="mt-4 flex gap-2">
-                      <Button variant="outline" className="flex-1">
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Ver Chat
-                      </Button>
-                      <Button className="flex-1">
-                        <Bot className="h-4 w-4 mr-2" />
-                        Asistente IA
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </>
-          )}
-        </TabsContent>
-      </Tabs>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   )
 } 

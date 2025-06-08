@@ -10,6 +10,7 @@ import { Table } from "@/lib/api"
 import { PaymentDialog } from "@/components/admin/pos/payment-dialog"
 import { Badge } from "@/components/ui/badge"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface CartItem {
   product: Product
@@ -20,15 +21,23 @@ interface CartProps {
   items: CartItem[]
   onUpdateQuantity: (productId: string, quantity: number) => void
   onRemoveItem: (productId: string) => void
-  orderType: "table" | "takeout"
+  orderType: "table" | "takeout" | "delivery"
   selectedTable: string | null
   tables: Table[]
-  onOrderTypeChange: (type: "table" | "takeout") => void
+  onOrderTypeChange: (type: "table" | "takeout" | "delivery") => void
   onTableSelect: (tableId: string) => void
   onSubmit: () => void
   loading?: boolean
   customerName: string
   onCustomerNameChange: (name: string) => void
+  deliveryAddress: string
+  onDeliveryAddressChange: (address: string) => void
+  neighborhood: string
+  onNeighborhoodChange: (neighborhood: string) => void
+  phone: string
+  onPhoneChange: (phone: string) => void
+  paymentMethod: "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER"
+  onPaymentMethodChange: (method: "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER") => void
   currentOrders: {
     id: string
     status: string
@@ -58,6 +67,14 @@ export function Cart({
   loading = false,
   customerName,
   onCustomerNameChange,
+  deliveryAddress,
+  onDeliveryAddressChange,
+  neighborhood,
+  onNeighborhoodChange,
+  phone,
+  onPhoneChange,
+  paymentMethod,
+  onPaymentMethodChange,
   currentOrders = [],
 }: CartProps) {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
@@ -155,6 +172,14 @@ export function Cart({
                 >
                   Mesa
                 </Button>
+                <Button
+                  variant={orderType === "delivery" ? "default" : "outline"}
+                  onClick={() => onOrderTypeChange("delivery")}
+                  disabled={isProcessing}
+                  size="sm"
+                >
+                  Domicilio
+                </Button>
               </div>
 
               {orderType === "takeout" && (
@@ -165,6 +190,53 @@ export function Cart({
                   disabled={isProcessing}
                   className="h-8"
                 />
+              )}
+
+              {orderType === "delivery" && (
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Nombre del cliente"
+                    value={customerName}
+                    onChange={(e) => onCustomerNameChange(e.target.value)}
+                    disabled={isProcessing}
+                    className="h-8"
+                  />
+                  <Input
+                    placeholder="Dirección de entrega"
+                    value={deliveryAddress}
+                    onChange={(e) => onDeliveryAddressChange(e.target.value)}
+                    disabled={isProcessing}
+                    className="h-8"
+                  />
+                  <Input
+                    placeholder="Barrio (opcional)"
+                    value={neighborhood}
+                    onChange={(e) => onNeighborhoodChange(e.target.value)}
+                    disabled={isProcessing}
+                    className="h-8"
+                  />
+                  <Input
+                    placeholder="Teléfono"
+                    value={phone}
+                    onChange={(e) => onPhoneChange(e.target.value)}
+                    disabled={isProcessing}
+                    className="h-8"
+                  />
+                  <Select
+                    value={paymentMethod}
+                    onValueChange={(value: "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER") => onPaymentMethodChange(value)}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Método de pago" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CASH">Efectivo</SelectItem>
+                      <SelectItem value="CREDIT_CARD">Tarjeta de Crédito</SelectItem>
+                      <SelectItem value="DEBIT_CARD">Tarjeta de Débito</SelectItem>
+                      <SelectItem value="TRANSFER">Transferencia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
 
               {orderType === "table" && (
@@ -341,6 +413,7 @@ export function Cart({
                     items.length === 0 ||
                     (orderType === "table" && !selectedTable) ||
                     (orderType === "takeout" && !customerName.trim()) ||
+                    (orderType === "delivery" && (!customerName.trim() || !deliveryAddress.trim() || !phone.trim() || !paymentMethod)) ||
                     isProcessing ||
                     loading
                   }

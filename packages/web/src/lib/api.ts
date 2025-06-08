@@ -463,7 +463,7 @@ export async function createOrder(data: {
   tableId?: string;
   locationId: string;
   userId?: string;
-  type: 'TABLE' | 'TAKEOUT';
+  type: 'TABLE' | 'TAKEOUT' | 'DELIVERY';
   items: Array<{
     productId: string;
     quantity: number;
@@ -471,6 +471,10 @@ export async function createOrder(data: {
   status?: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'DELIVERED' | 'CANCELLED';
   isPaid?: boolean;
   customerName?: string;
+  deliveryAddress?: string;
+  neighborhood?: string;
+  phone?: string;
+  paymentMethod?: 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'TRANSFER';
 }) {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
     method: 'POST',

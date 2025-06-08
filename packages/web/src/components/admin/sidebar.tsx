@@ -183,9 +183,9 @@ export function Sidebar({ isMobile }: SidebarProps) {
             <Image
               src="/assets/blondie-logo.png"
               alt="Blondie Logo"
-              width={isCollapsed ? 50 : 150}
-              height={isCollapsed ? 50 : 150}
-              className="object-contain"
+              width={150}
+              height={150}
+              priority
             />
           </div>
           <div className="space-y-1">

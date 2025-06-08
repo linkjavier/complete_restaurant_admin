@@ -48,6 +48,7 @@ model Location {
   inventoryItems InventoryItem[]
   ingredients    Ingredient[]
   orders         Order[]
+  whatsappMessages WhatsappMessage[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 }
@@ -145,6 +146,12 @@ model InventoryItem {
   @@unique([ingredientId, locationId])
 }
 
+enum OrderType {
+  TABLE
+  TAKEOUT
+  DELIVERY
+}
+
 model Order {
   id            String       @id @default(uuid())
   createdAt     DateTime     @default(now())
@@ -159,13 +166,20 @@ model Order {
   user          User?        @relation(fields: [userId], references: [id])
   userId        String?
   customerName  String?
+  deliveryAddress String?
+  neighborhood   String?
+  phone         String?
+  paymentMethod PaymentMethod?
   items         OrderItem[]
   payments      Payment[]
 }
 
-enum OrderType {
-  TABLE
-  TAKEOUT
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  READY
+  DELIVERED
+  CANCELLED
 }
 
 model OrderItem {
@@ -178,14 +192,6 @@ model OrderItem {
   status    OrderItemStatus @default(PENDING)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
-}
-
-enum OrderStatus {
-  PENDING
-  IN_PROGRESS
-  READY
-  DELIVERED
-  CANCELLED
 }
 
 enum OrderItemStatus {
@@ -212,6 +218,7 @@ enum PaymentMethod {
   CREDIT_CARD
   DEBIT_CARD
   QR
+  TRANSFER
 }
 
 enum PaymentStatus {
@@ -246,4 +253,27 @@ model ProductionLog {
   productId  String
   quantity   Float
   createdAt  DateTime  @default(now())
+}
+
+model WhatsappMessage {
+  id         String   @id @default(cuid())
+  from       String
+  body       String
+  timestamp  DateTime
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+  isFromAI   Boolean  @default(false)
+
+  @@index([locationId])
+  @@index([from])
+  @@index([timestamp])
+}
+
+model Settings {
+  id        String   @id @default(cuid())
+  aiName    String   @default("Sandra")
+  aiGender  String   @default("female")
+  aiEnabled Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

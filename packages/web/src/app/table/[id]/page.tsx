@@ -68,10 +68,10 @@ export default function TablePage() {
           <div className="flex relative w-[280px] h-[120px]">
             <Image
               src="/assets/blondie-logo.png"
-              alt="Blondie Restaurant"
-              fill
+              alt="Blondie Logo"
+              width={200}
+              height={200}
               priority
-              className="object-contain"
             />
           </div>
         </div>
