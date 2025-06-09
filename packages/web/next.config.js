@@ -18,7 +18,7 @@ const nextConfig = {
       '@': require('path').resolve(__dirname, 'src'),
     };
     return config;
-  },
+  }
 };
 
 module.exports = nextConfig; 
