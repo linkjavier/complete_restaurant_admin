@@ -40,7 +40,13 @@ export function useAuth() {
   const login = async (email: string, password: string) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      const response = await fetch('/api/auth/login', {
+      if (!process.env.NEXT_PUBLIC_API_URL) {
+        throw new Error('API URL is not configured');
+      }
+
+      console.log('Attempting login to:', `${process.env.NEXT_PUBLIC_API_URL}/auth/login`);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -72,7 +78,11 @@ export function useAuth() {
   const logout = async () => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      await fetch('/api/auth/logout', { 
+      if (!process.env.NEXT_PUBLIC_API_URL) {
+        throw new Error('API URL is not configured');
+      }
+
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, { 
         method: 'POST',
         credentials: 'include',
       });
