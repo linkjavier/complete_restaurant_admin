@@ -40,36 +40,29 @@ export function useAuth() {
   const login = async (email: string, password: string) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      if (!process.env.NEXT_PUBLIC_API_URL) {
-        throw new Error('API URL is not configured');
-      }
-
-      console.log('Attempting login to:', `${process.env.NEXT_PUBLIC_API_URL}/auth/login`);
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+      console.log("Login use-auth")
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
-        credentials: 'include',
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Login failed:", errorData);
-        throw new Error(errorData.error || 'Login failed');
+        const error = await response.json();
+        console.error("Login failed: ", error); // Log para ver el error
+        throw new Error(error.message || 'Login failed');
       }
 
       const data = await response.json();
+      // Guardar el token en localStorage
       localStorage.setItem('token', data.access_token);
       setState({ user: data.user, isLoading: false, error: null });
       return data;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Login failed';
-      console.error("Login error:", errorMessage);
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: errorMessage,
+        error: error instanceof Error ? error.message : 'Login failed',
       }));
       throw error;
     }
@@ -78,24 +71,16 @@ export function useAuth() {
   const logout = async () => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      if (!process.env.NEXT_PUBLIC_API_URL) {
-        throw new Error('API URL is not configured');
-      }
-
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, { 
-        method: 'POST',
-        credentials: 'include',
-      });
+      await fetch('/api/auth/logout', { method: 'POST' });
+      // Limpiar el token de localStorage
       localStorage.removeItem('token');
       setState({ user: null, isLoading: false, error: null });
       router.push('/auth/login');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Logout failed';
-      console.error("Logout error:", errorMessage);
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: errorMessage,
+        error: error instanceof Error ? error.message : 'Logout failed',
       }));
     }
   };

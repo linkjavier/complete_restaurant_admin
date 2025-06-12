@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -20,17 +20,11 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  useEffect(() => {
-    console.log('API URL:', process.env.NEXT_PUBLIC_API_URL);
-    console.log('Current URL:', window.location.href);
-  }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      console.log('Submitting login with API URL:', process.env.NEXT_PUBLIC_API_URL);
       const data = await login(email, password);
       
       toast({
@@ -59,7 +53,6 @@ export default function LoginPage() {
           router.push('/');
       }
     } catch (error) {
-      console.error('Login error:', error);
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'An error occurred',
