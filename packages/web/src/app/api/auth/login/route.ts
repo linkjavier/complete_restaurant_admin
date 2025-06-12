@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
+  console.log("En route", process.env.NEXT_PUBLIC_API_URL)
   try {
     const body = await request.json();
     const { email, password } = body;
