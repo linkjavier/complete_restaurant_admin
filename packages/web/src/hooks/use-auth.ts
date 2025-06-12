@@ -40,29 +40,30 @@ export function useAuth() {
   const login = async (email: string, password: string) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      console.log("Login use-auth")
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        credentials: 'include',
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error("Login failed: ", error); // Log para ver el error
-        throw new Error(error.message || 'Login failed');
+        const errorData = await response.json();
+        console.error("Login failed:", errorData);
+        throw new Error(errorData.error || 'Login failed');
       }
 
       const data = await response.json();
-      // Guardar el token en localStorage
       localStorage.setItem('token', data.access_token);
       setState({ user: data.user, isLoading: false, error: null });
       return data;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      console.error("Login error:", errorMessage);
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Login failed',
+        error: errorMessage,
       }));
       throw error;
     }
@@ -71,16 +72,20 @@ export function useAuth() {
   const logout = async () => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      // Limpiar el token de localStorage
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include',
+      });
       localStorage.removeItem('token');
       setState({ user: null, isLoading: false, error: null });
       router.push('/auth/login');
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Logout failed';
+      console.error("Logout error:", errorMessage);
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Logout failed',
+        error: errorMessage,
       }));
     }
   };
