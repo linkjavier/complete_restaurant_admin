@@ -145,40 +145,41 @@ export function Sidebar({ isMobile }: SidebarProps) {
 
   return (
     <div className={cn(
-      "flex h-full flex-col bg-[#111827] text-white",
-      isCollapsed ? "w-[70px]" : "w-[280px]"
+      "flex h-full flex-col bg-[#111827] text-white relative",
+      isCollapsed ? "w-[70px]" : "w-[280px]",
+      isMobile ? "overflow-y-auto" : "overflow-hidden"
     )}>
       <div className="space-y-4 py-4 flex flex-col h-full">
         <div className="px-3 py-2 flex-1">
-          <div className="flex items-center justify-between pl-3 mb-4">
-            {!isCollapsed ? (
-              <Link href="/admin/dashboard">
-                <h1 className="text-2xl font-bold">
-                  Admin Panel
-                </h1>
-              </Link>
-            ) : null}
+          <div className="flex items-center justify-between pl-3 mb-4 sticky top-0 bg-[#111827] z-10">
+            <div className="flex items-center gap-3">
+              {!isCollapsed && (
+                <>
+                  <div className="md:hidden">
+                    <Image
+                      src="/assets/blondie-logo.png"
+                      alt="Blondie Logo"
+                      width={40}
+                      height={40}
+                      priority
+                    />
+                  </div>
+                  <Link href="/admin/dashboard">
+                    <h1 className="text-2xl font-bold">
+                      Admin Panel
+                    </h1>
+                  </Link>
+                </>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <ThemeSwitch />
-              <div className="md:block hidden">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-zinc-200 dark:hover:bg-white/10 active:bg-zinc-300 dark:active:bg-white/20"
-                  onClick={() => setIsCollapsed(!isCollapsed)}
-                >
-                  {isCollapsed ? (
-                    <ChevronRight className="h-4 w-4 text-white" />
-                  ) : (
-                    <ChevronLeft className="h-4 w-4 text-white" />
-                  )}
-                </Button>
-              </div>
             </div>
           </div>
           <div className={cn(
             "flex justify-center mb-10 transition-all duration-300",
-            isCollapsed ? "px-2" : "px-4"
+            isCollapsed ? "px-2" : "px-4",
+            "hidden md:flex"
           )}>
             <Image
               src="/assets/blondie-logo.png"
@@ -188,7 +189,7 @@ export function Sidebar({ isMobile }: SidebarProps) {
               priority
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 pb-4">
             {routes.filter(route => !route.roles || route.roles.includes(user.role)).map((route) => {
               const linkContent = (
                 <div
@@ -205,22 +206,16 @@ export function Sidebar({ isMobile }: SidebarProps) {
                 </div>
               );
 
-              const link = (
-                <Link href={route.href}>{linkContent}</Link>
-              );
-
               return (
                 <TooltipProvider key={route.href} delayDuration={100}>
                   <Tooltip open={isCollapsed ? undefined : false}>
                     <TooltipTrigger asChild>
                       {isMobile ? (
-                        <SheetClose asChild>
-                          <Link href={route.href}>
-                            {linkContent}
-                          </Link>
-                        </SheetClose>
+                        <Link href={route.href}>
+                          {linkContent}
+                        </Link>
                       ) : (
-                        link
+                        <Link href={route.href}>{linkContent}</Link>
                       )}
                     </TooltipTrigger>
                     <TooltipContent side="right" className="bg-[#111827] text-white border-none">
@@ -231,8 +226,39 @@ export function Sidebar({ isMobile }: SidebarProps) {
               );
             })}
           </div>
+          {/* Collapse button for desktop */}
+          {!isMobile && (
+            <div className="mt-auto pb-4 flex justify-center">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full bg-gray-800 hover:bg-gray-700 active:bg-gray-600 relative z-[9999]"
+                onClick={() => setIsCollapsed(!isCollapsed)}
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-white" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4 text-white" />
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
+      {/* Mobile close button */}
+      {isMobile && (
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 md:hidden">
+          <SheetClose asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
+            >
+              <ChevronLeft className="h-6 w-6 text-white" />
+            </Button>
+          </SheetClose>
+        </div>
+      )}
     </div>
   )
 }
