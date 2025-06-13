@@ -2,6 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  overflow-x: hidden;
+  position: relative;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+#__next {
+  overflow-x: hidden;
+  position: relative;
+  width: 100%;
+}
+
+/* Prevent horizontal scroll on iOS */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection where needed */
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
