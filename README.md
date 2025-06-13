@@ -1,229 +1,368 @@
-# Blondie Restaurante Bar - Sistema de Gestión Integral
+# Blondie Restaurant Bar - Comprehensive Management System
 
 ![Blondie Logo](https://res.cloudinary.com/djegujdt1/image/upload/v1746047136/blondie-logo.png)
 
-Sistema web full stack para la gestión integral de restaurante y panadería con servicio a la mesa, pedidos inteligentes con QR, módulo de cocina, inventario por ingredientes, reportes y analíticas multi-sede.
+Full-stack web system for comprehensive restaurant and bakery management with table service, smart QR ordering, kitchen module, ingredient-based inventory, multi-location reports, and analytics.
 
-## 📋 Tabla de Contenidos
+## 📋 Table of Contents
 
-- [Características Principales](#-características-principales)
-- [Stack Tecnológico](#-stack-tecnológico)
-- [Arquitectura del Sistema](#-arquitectura-del-sistema)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
-- [Instalación y Configuración](#-instalación-y-configuración)
-- [Desarrollo](#-desarrollo)
-- [Despliegue](#-despliegue)
-- [Contribución](#-contribución)
-- [Licencia](#-licencia)
+- [Main Features](#-main-features)
+- [Tech Stack](#-tech-stack)
+- [System Architecture](#-system-architecture)
+- [Project Structure](#-project-structure)
+- [Installation and Configuration](#-installation-and-configuration)
+- [Development](#-development)
+- [Deployment](#-deployment)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-## 🚀 Características Principales
+## 🚀 Main Features
 
-### Gestión Multi-sede
-- Control centralizado de múltiples ubicaciones
-- Gestión de inventario por sede
-- Reportes consolidados y por ubicación
-- Roles y permisos específicos por sede
+### Multi-location Management
+- Centralized control of multiple locations
+- Location-specific inventory management
+- Consolidated and location-specific reports
+- Location-specific roles and permissions
 
-### Sistema de Pedidos
-- Pedidos desde mesa vía Código QR
-- Interfaz intuitiva para clientes
-- Carrito de compras en tiempo real
-- Historial de pedidos por cliente
+### Order System
+- Table orders via QR Code
+- Intuitive customer interface
+- Real-time shopping cart
+- Customer order history
+- Colas implementadas con bull
 
-### Módulo de Cocina
-- Dashboard en tiempo real para cocina
-- Notificaciones instantáneas de pedidos
-- Gestión de órdenes por prioridad
-- Integración con impresoras de cocina
+### Kitchen Module
+- Real-time kitchen dashboard (Comunicación Websocket con Nest.js)
+- Instant order notifications
+- Priority-based order management
+- Kitchen printer integration
 
-### POS y Gestión de Caja
-- Sistema de punto de venta completo
-- Múltiples métodos de pago
-- Gestión de caja por turno
-- Reportes financieros detallados
+### POS and Cash Management
+- Complete point of sale system
+- Multiple payment methods
+- Shift-based cash management
+- Detailed financial reports
 
-### Inventario Avanzado
-- Control de stock por ingredientes
-- Alertas de inventario bajo
-- Historial de movimientos
-- Integración con proveedores
+### Advanced Inventory
+- Ingredient-based stock control
+- Low inventory alerts
+- Movement history
+- Supplier integration
 
-### Dashboard y Reportes
-- Métricas en tiempo real
-- Reportes personalizables
-- Exportación de datos
-- Análisis predictivo
+### Dashboard and Reports
+- Real-time metrics
+- Customizable reports
+- Data export
+- Predictive analysis
 
-### Sistema de Pagos
-- Integración con múltiples pasarelas
-- Pagos en línea seguros
-- Facturación electrónica
-- Conciliación automática
+### Payment System
+- Multiple payment gateway integration
+- Secure online payments
+- Electronic invoicing
+- Automatic reconciliation
 
-### Gamificación y Fidelización
-- Programa de puntos
-- Recompensas personalizadas
-- Campañas promocionales
-- Análisis de comportamiento del cliente
+### Gamification and Loyalty
+- Points program
+- Personalized rewards
+- Promotional campaigns
+- Customer behavior analysis
 
-## 🛠️ Stack Tecnológico
+## 🛠️ Tech Stack
 
 ### Frontend
-- **Framework**: Next.js 14 (App Router)
-- **Lenguaje**: TypeScript
-- **Estilos**: TailwindCSS + Shadcn/ui
-- **Estado**: React Query + Zustand
-- **Formularios**: React Hook Form + Zod
-- **Gráficos**: Recharts
-- **Almacenamiento**: Cloudinary
-- **Autenticación**: NextAuth.js
+- **Framework**: Next.js 15
+- **Language**: TypeScript
+- **Styling**: TailwindCSS + Shadcn/ui
+- **State Management**: React Query
+- **Forms**: React Hook Form + Zod
+- **Charts**: Recharts
+- **Storage**: Cloudinary
+- **Authentication**: NextAuth.js
 
 ### Backend
 - **Framework**: NestJS
-- **Lenguaje**: TypeScript
+- **Language**: TypeScript
 - **ORM**: Prisma
-- **Base de Datos**: PostgreSQL
+- **Database**: PostgreSQL
 - **WebSockets**: Socket.io
-- **Autenticación**: JWT
-- **Documentación**: Swagger/OpenAPI
+- **Authentication**: JWT
+- **Documentation**: Swagger/OpenAPI
 - **Testing**: Jest + Supertest
 
-### Infraestructura
-- **Contenedores**: Docker
-- **Orquestación**: Kubernetes
-- **CI/CD**: GitHub Actions
-- **Monitoreo**: Prometheus + Grafana
-- **Logging**: ELK Stack
+### Infrastructure
+- **Containers**: Docker
+- **Orchestration**: ----
+- **CI/CD**: ----
+- **Monitoring**: -----
+- **Logging**: -----
 
-### Servicios Externos
-- **Almacenamiento**: Cloudinary
-- **Pagos**: Stripe
-- **Notificaciones**: WebSockets
+### External Services
+- **Storage**: Cloudinary
+- **Payments**: Stripe
+- **Notifications**: WebSockets
 - **Analytics**: Google Analytics
 
-## 🏗️ Arquitectura del Sistema
+## 🏗️ System Architecture
 
-### Patrones de Diseño
+### Design Patterns
 - Clean Architecture
 - Domain-Driven Design (DDD)
 - Event-Driven Architecture
-- Microservicios
+- Microservices
 
-### Componentes Principales
+### Main Components
 - **API Gateway**: NestJS
-- **Servicio de Autenticación**: JWT + NextAuth
-- **Servicio de Pedidos**: WebSockets
-- **Servicio de Inventario**: PostgreSQL
-- **Servicio de Pagos**: Stripe
-- **Servicio de Notificaciones**: WebSockets
+- **Authentication Service**: JWT + NextAuth
+- **Order Service**: WebSockets
+- **Inventory Service**: PostgreSQL
+- **Queue Service**: Redis (Bull)
+- **Payment Service**: Stripe
+- **Notification Service**: WebSockets
 
-## 📦 Estructura del Proyecto
+## 📦 Project Structure
 
 ```
 blondie-restaurant-bar/
 ├── packages/
 │   ├── api/                    # Backend NestJS
 │   │   ├── src/
-│   │   │   ├── auth/          # Autenticación y autorización
-│   │   │   ├── products/      # Gestión de productos
-│   │   │   ├── orders/        # Gestión de pedidos
-│   │   │   ├── inventory/     # Gestión de inventario
-│   │   │   ├── payments/      # Integración de pagos
-│   │   │   ├── reports/       # Generación de reportes
-│   │   │   └── websocket/     # Comunicación en tiempo real
-│   │   └── prisma/            # Esquema de base de datos
+│   │   │   ├── auth/          # Authentication and authorization
+│   │   │   ├── products/      # Product management
+│   │   │   ├── orders/        # Order management
+│   │   │   ├── inventory/     # Inventory management
+│   │   │   ├── payments/      # Payment integration
+│   │   │   ├── reports/       # Report generation
+│   │   │   └── websocket/     # Real-time communication
+│   │   └── prisma/            # Database schema
 │   ├── web/                    # Frontend Next.js
 │   │   ├── src/
-│   │   │   ├── app/           # Rutas y páginas
-│   │   │   ├── components/    # Componentes reutilizables
-│   │   │   ├── lib/           # Utilidades y configuraciones
-│   │   │   └── styles/        # Estilos globales
-│   └── shared/                 # Tipos y utilidades compartidas
-├── docker/                     # Configuraciones de Docker
-├── docs/                       # Documentación
-└── scripts/                    # Scripts de utilidad
+│   │   │   ├── app/           # Routes and pages
+│   │   │   ├── components/    # Reusable components
+│   │   │   ├── lib/           # Utilities and configurations
+│   │   │   └── styles/        # Global styles
+│   └── shared/                 # Shared types and utilities
+├── docker/                     # Docker configurations
+├── docs/                       # Documentation
+└── scripts/                    # Utility scripts
 ```
 
-## 🚀 Instalación y Configuración
+## 🚀 Installation and Configuration
 
-### Requisitos Previos
+### Prerequisites
 - Node.js 18+
 - PostgreSQL 14+
-- Docker y Docker Compose
-- pnpm (recomendado)
+- Docker and Docker Compose
+- pnpm (recommended)
 
-### Configuración Inicial
+### Initial Setup (New instance or Amazon Linux 2 server)
 
-1. Clonar el repositorio:
-   ```bash
-   git clone https://github.com/linkjavier/blondie-restaurant-bar.git
-   cd blondie-restaurant-bar
-   ```
+1. **Connect to your EC2 instance via SSH**
+```bash
+ssh -i your-key.pem ec2-user@your-public-ip
+```
 
-2. Instalar dependencias:
-   ```bash
-   pnpm install
-   ```
+2. **Install GIT**
+```bash
+sudo yum update -y
+sudo yum install git -y
+git --version
+```
 
-3. Configurar variables de entorno:
-   ```bash
-   cp .env.example .env
-   ```
+3. **Install Docker**
+```bash
+sudo amazon-linux-extras enable docker
+sudo yum install docker -y
+```
 
-4. Configurar la base de datos:
-   ```bash
-   docker-compose up -d postgres
-   ```
+4. **Install Docker Compose**
+```bash
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+-o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+```
 
-5. Ejecutar migraciones:
-   ```bash
-   cd packages/api
-   pnpm prisma migrate dev
-   ```
+5. **Generate new SSH key in the Instance**
+```bash
+ssh-keygen -t ed25519 -C "javiercharria@gmail.com"
+cat ~/.ssh/id_ed25519.pub
+```
 
-## 💻 Desarrollo
+6. **Install Puppeteer dependencies**
+```bash
+sudo yum install -y \
+    alsa-lib \
+    atk \
+    cups-libs \
+    gtk3 \
+    ipa-gothic-fonts \
+    libXcomposite \
+    libXcursor \
+    libXdamage \
+    libXext \
+    libXi \
+    libXrandr \
+    libXScrnSaver \
+    libXtst \
+    pango \
+    xorg-x11-fonts-100dpi \
+    xorg-x11-fonts-75dpi \
+    xorg-x11-fonts-cyrillic \
+    xorg-x11-fonts-misc \
+    xorg-x11-fonts-Type1 \
+    xorg-x11-utils
+```
 
-### Iniciar el Proyecto
+7. **Clone the repository**
+```bash
+git clone git@github.com:linkjavier/complete_restaurant_admin.git
+cd complete_restaurant_admin.git
+```
 
-1. Iniciar las bases de datos:
-   ```bash
-   docker-compose up postgres
-   ```
-   ```bash
-   docker-compose up redis
-   ```
+8. **Install dependencies**
+```bash
+npm install
+```
 
-2. Iniciar el backend:
-   ```bash
-   cd packages/api
-   pnpm start
-   ```
+9. **Configure environment variables**
+```bash
+cp .env.example .env
+```
 
-3. Iniciar el frontend:
-   ```bash
-   cd packages/web
-   pnpm dev
-   ```
+10. **Configure the databases**
+```bash
+docker-compose up -d postgres
+```
+```bash
+docker-compose up -d redis
+```
 
-4. Exponer el backend para testing:
-   ```bash
-   ngrok http http://localhost:3001
-   ```
+11. **Run migrations**
+```bash
+cd packages/api
+npx prisma migrate dev
+```
 
-### Comandos Útiles
+### NGINX and SSL Setup
 
-#### Autenticación
+1. **Install NGINX**
+```bash
+sudo yum update -y
+sudo amazon-linux-extras enable nginx1
+sudo yum install nginx -y
+```
+
+2. **Start and enable NGINX**
+```bash
+sudo systemctl start nginx
+sudo systemctl enable nginx
+```
+
+3. **Install Certbot and dependencies**
+```bash
+sudo yum install -y epel-release
+sudo yum install -y certbot python3-certbot-nginx
+```
+
+4. **Configure NGINX as proxy for Nest.js**
+```bash
+sudo nano /etc/nginx/conf.d/blondieapp.conf
+```
+
+Add the following content:
+```nginx
+server {
+    listen 80;
+    server_name blondieapp.xyz www.blondieapp.xyz;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+5. **Verify and reload NGINX**
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+6. **Install HTTPS with Certbot**
+```bash
+sudo certbot --nginx -d blondieapp.xyz -d www.blondieapp.xyz
+```
+
+7. **Verify the setup**
+Open in browser: https://blondieapp.xyz
+
+## 💻 Development
+
+### Start the Project
+
+1. **Install Node.js**
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+sudo yum install -y nodejs
+```
+
+2. **Configure environment**
+- Modify `main.ts` to include:
+```typescript
+await app.listen(port, '0.0.0.0');
+```
+
+3. **Open port 3000 in EC2 Security Group**
+- Go to AWS Console
+- EC2 → Instances → Select your instance
+- Security tab → Click associated Security Group
+- Inbound rules → Edit inbound rules
+- Add new rule:
+  - Type: Custom TCP
+  - Port range: 3000
+  - Source: 0.0.0.0/0 (for public access) or Vercel IP if restricted
+- Save changes
+
+4. **Start databases**
+```bash
+docker-compose up postgres
+docker-compose up redis
+```
+
+5. **Start backend**
+```bash
+cd packages/api
+pnpm start
+```
+
+6. **Start frontend**
+```bash
+cd packages/web
+pnpm dev
+```
+
+7. **Expose backend for testing**
+```bash
+ngrok http http://localhost:3001
+```
+
+### Useful Commands
+
+#### Authentication
 ```bash
 # Login
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "javier@test.com", "password": "12345678"}'
 
-# Obtener información del usuario
+# Get user information
 curl -X GET http://localhost:3000/auth/me \
   -H "Authorization: Bearer YOUR_TOKEN"
 
-# Crear usuario
+# Create user
 curl -X POST http://localhost:3000/auth/register \
   -H "Content-Type: application/json" \
   -d '{
@@ -235,50 +374,50 @@ curl -X POST http://localhost:3000/auth/register \
   }'
 ```
 
-# Limpiar la base de datos
+#### Database Management
 ```bash
+# Reset database
 npx prisma db push --force-reset
-```
 
-# Alimentar la base de datos
-```bash
+# Seed database
 chmod +x ./scripts/seed-database.sh && ./scripts/seed-database.sh
 
+# Seed database with images
 chmod +x ./scripts/seed-database-with-images.sh && ./scripts/seed-database-with-images.sh
 ```
 
-## 🚀 Despliegue
+## 🚀 Deployment
 
-### Requisitos de Producción
-- Servidor con Ubuntu 20.04+
-- Docker y Docker Compose
-- Certificado SSL
-- Dominio configurado
+### Production Requirements
+- Ubuntu 20.04+ server
+- Docker and Docker Compose
+- SSL certificate
+- Configured domain
 
-### Pasos de Despliegue
-1. Configurar variables de entorno de producción
-2. Construir imágenes Docker
-3. Configurar base de datos de producción
-4. Ejecutar migraciones - npx prisma migrate dev --name init
-5. Iniciar servicios
+### Deployment Steps
+1. Configure production environment variables
+2. Build Docker images
+3. Configure production database
+4. Run migrations
+5. Start services
 
-## 🤝 Contribución
+## 🤝 Contributing
 
-1. Fork el proyecto
-2. Crear una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abrir un Pull Request
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## 📝 Licencia
+## 📝 License
 
-Este proyecto está bajo la Licencia MIT. Ver el archivo [LICENSE](LICENSE) para más detalles.
+This project is under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## 👨‍💻 Autor
+## 👨‍💻 Author
 
 - **Javier Charria Gómez** - [GitHub](https://github.com/linkjavier)
-- **Email**: javier@test.com
+- **Email**: javier@gmail.com
 
 ---
 
-Desarrollado con ❤️ por Javier Charria Gómez
+Developed with ❤️ by Javier Charria Gómez
