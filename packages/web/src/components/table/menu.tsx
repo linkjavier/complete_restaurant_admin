@@ -17,7 +17,34 @@ interface MenuProps {
   customerName: string
 }
 
+// Custom hook for mobile viewport height
+function useMobileViewportHeight() {
+  const [vh, setVh] = useState('100vh');
+
+  useEffect(() => {
+    const updateHeight = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+      setVh(`${window.innerHeight}px`);
+    };
+
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    window.addEventListener('orientationchange', updateHeight);
+    window.addEventListener('scroll', updateHeight);
+
+    return () => {
+      window.removeEventListener('resize', updateHeight);
+      window.removeEventListener('orientationchange', updateHeight);
+      window.removeEventListener('scroll', updateHeight);
+    };
+  }, []);
+
+  return vh;
+}
+
 export function Menu({ locationId, tableId, customerName }: MenuProps) {
+  const vh = useMobileViewportHeight();
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [cart, setCart] = useState<Record<string, number>>({})
   const [searchTerm, setSearchTerm] = useState("")
@@ -31,26 +58,26 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const handleScroll = () => {
-    if (!cartRef.current) return
+    if (!cartRef.current) return;
 
-    const cartRect = cartRef.current.getBoundingClientRect()
-    const windowHeight = window.innerHeight
-    const documentHeight = document.documentElement.scrollHeight
-    const scrollTop = window.scrollY || document.documentElement.scrollTop
+    const cartRect = cartRef.current.getBoundingClientRect();
+    const windowHeight = window.innerHeight;
+    const documentHeight = document.documentElement.scrollHeight;
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
 
     // Check if we're at the cart section or at the bottom of the page
-    const isAtCart = cartRect.top <= windowHeight * 0.8
-    const isAtBottom = windowHeight + scrollTop >= documentHeight - 100
+    const isAtCart = cartRect.top <= windowHeight * 0.8;
+    const isAtBottom = windowHeight + scrollTop >= documentHeight - 100;
 
-    setIsCartVisible(isAtCart || isAtBottom)
-  }
+    setIsCartVisible(isAtCart || isAtBottom);
+  };
 
   useEffect(() => {
-    window.addEventListener('scroll', handleScroll)
+    window.addEventListener('scroll', handleScroll);
     // Check initial position
-    handleScroll()
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -199,9 +226,19 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
     };
   }, [locationId]);
 
+  // Filtrar productos basado en categoría y término de búsqueda
+  const filteredProducts = products.filter((product) => {
+    const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory;
+    const matchesSearch = searchTerm === "" || 
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesCategory && matchesSearch;
+  });
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[calc(var(--vh,1vh)*100)] w-full overflow-x-hidden">
         <div className="text-center space-y-2">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
           <p className="text-muted-foreground">Cargando menú y órdenes...</p>
@@ -212,7 +249,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[calc(var(--vh,1vh)*100)] w-full overflow-x-hidden">
         <div className="text-center space-y-4">
           <div className="text-red-500">
             <p className="font-medium">Error al cargar los datos</p>
@@ -231,7 +268,10 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div 
+      className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[100vh] min-h-[calc(var(--vh,1vh)*100)] w-full overflow-x-hidden"
+      style={{ minHeight: vh }}
+    >
       {/* Floating Cart Button - Only visible on mobile */}
       {totalItems > 0 && !isCartVisible && (
         <div className="fixed bottom-6 right-6 md:hidden z-50">
@@ -249,7 +289,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
       )}
 
       <div className="md:col-span-2">
-        <div className="space-y-4">
+        <div className="space-y-4 pb-20 md:pb-4">
           {/* Welcome Message with Logo */}
           <Card>
             <CardContent className="pt-2">
@@ -281,7 +321,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                 className="flex items-center gap-2"
               >
                 <Clock className="h-4 w-4" />
-                Órdenes Activas
+                Tus órdenes
               </Button>
             </div>
           </div>
@@ -300,15 +340,10 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                 </Button>
               </div>
               <Card>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <CardTitle>Órdenes Activas</CardTitle>
-                  </div>
-                </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {activeOrders.length === 0 ? (
-                      <p className="text-center text-muted-foreground">No hay órdenes activas</p>
+                      <p className="text-center text-muted-foreground">No tienes órdenes</p>
                     ) : (
                       activeOrders.map((order) => (
                         <div key={order.id} className="border rounded-lg p-4">
@@ -378,18 +413,18 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {products.map((product) => (
+                {filteredProducts.map((product) => (
                   <Card 
                     key={product.id}
                     className={`${
                       cart[product.id] ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950' : ''
                     }`}
                   >
-                    <CardHeader>
-                      <CardTitle>{product.name}</CardTitle>
+                    <CardHeader className="pb-1 pt-2">
+                      <CardTitle className="text-base">{product.name}</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
+                    <CardContent className="pt-0">
+                      <div className="space-y-2">
                         {product.image && (
                           <div className="relative w-full h-40">
                             <img
@@ -399,28 +434,32 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                             />
                           </div>
                         )}
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <p className="text-sm text-muted-foreground">
                             {product.description}
                           </p>
-                          <p className="font-bold">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => handleRemoveFromCart(product.id)}
-                              disabled={!cart[product.id]}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <span>{cart[product.id] || 0}</span>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => handleAddToCart(product.id)}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
+                          <div className="flex items-center justify-between">
+                            <p className="font-bold">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleRemoveFromCart(product.id)}
+                                disabled={!cart[product.id]}
+                                className="h-8 w-8"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="w-6 text-center">{cart[product.id] || 0}</span>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleAddToCart(product.id)}
+                                className="h-8 w-8"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>

@@ -55,31 +55,31 @@ export default function TablePage() {
   }
 
   return (
-    <div className="container mx-auto py-3">
-      <div className="mb-3">
+    <div className="container mx-auto">
+      <div className="py-2 pb-0 md:pb-2">
         <div className="flex justify-between items-center">
-          <div className="flex flex-col space-y-2">
+          <div className="flex flex-col space-y-1">
             <h1 className="text-2xl font-bold">Mesa {table.number}</h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Ubicación: {table.location?.name || "Sin ubicación"}
             </p>
           </div>
           
-          <div className="flex relative w-[280px] h-[120px]">
+          <div className="flex relative w-[100px] h-[100px]">
             <Image
               src="/assets/blondie-logo.png"
               alt="Blondie Logo"
-              width={200}
-              height={200}
+              width={100}
+              height={100}
               priority
+              className="object-contain"
             />
           </div>
         </div>
       </div>
 
-
       {!isOrderStarted ? (
-        <div className="max-w-md mx-auto space-y-4">
+        <div className="max-w-md mx-auto space-y-4 mt-2 md:mt-4">
           <div>
             <label htmlFor="customerName" className="block text-sm font-medium mb-2">
               Tu Nombre
