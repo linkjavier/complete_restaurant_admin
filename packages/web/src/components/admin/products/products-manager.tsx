@@ -301,13 +301,22 @@ export function ProductsManager() {
                 <Input
                   id="price"
                   type="number"
+                  min="0"
                   placeholder="Ingresa el precio"
                   value={editingProduct ? editingProduct.price : newProduct.price}
-                  onChange={(e) =>
-                    editingProduct
-                      ? setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) })
-                      : setNewProduct({ ...newProduct, price: parseFloat(e.target.value) })
-                  }
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? 0 : Number(e.target.value);
+                    if (editingProduct) {
+                      setEditingProduct({ ...editingProduct, price: value });
+                    } else {
+                      setNewProduct({ ...newProduct, price: value });
+                    }
+                  }}
+                  onFocus={(e) => {
+                    if (e.target.value === '0') {
+                      e.target.value = '';
+                    }
+                  }}
                 />
               </div>
               <div className="grid gap-2">

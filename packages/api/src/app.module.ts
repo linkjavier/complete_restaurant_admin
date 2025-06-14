@@ -21,6 +21,7 @@ import { KitchenModule } from './kitchen/kitchen.module';
 import { AIModule } from './ai/ai.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { SettingsModule } from './settings/settings.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { SettingsModule } from './settings/settings.module';
     AIModule,
     WhatsappModule,
     SettingsModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

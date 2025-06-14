@@ -43,28 +43,19 @@ export function ImageUpload({ onImageUploaded, currentImage }: ImageUploadProps)
       setUploading(true)
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('upload_preset', 'blondie')
 
-      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-      if (!cloudName) {
-        throw new Error('El cloud name no está configurado. Por favor, configura NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME en el archivo .env')
-      }
-
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      )
+      const response = await fetch('/api/upload/image', {
+        method: 'POST',
+        body: formData,
+      })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error?.message || 'Error al subir la imagen')
+        throw new Error(errorData.message || 'Error al subir la imagen')
       }
 
       const data = await response.json()
-      onImageUploaded(data.secure_url)
+      onImageUploaded(data.url)
       
       toast({
         title: "Éxito",
