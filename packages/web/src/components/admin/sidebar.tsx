@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { SheetClose } from "@/components/ui/sheet"
@@ -35,6 +35,7 @@ import { ThemeSwitch } from "@/components/theme-switch"
 
 interface SidebarProps {
   isMobile?: boolean
+  onClose?: () => void
 }
 
 const routes = [
@@ -112,8 +113,9 @@ const routes = [
   },
 ]
 
-export function Sidebar({ isMobile }: SidebarProps) {
+export function Sidebar({ isMobile, onClose }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { user } = useAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -143,6 +145,13 @@ export function Sidebar({ isMobile }: SidebarProps) {
     return null
   }
 
+  const handleNavigation = (href: string) => {
+    if (isMobile && onClose) {
+      onClose()
+    }
+    router.push(href)
+  }
+
   return (
     <div className={cn(
       "flex h-full flex-col bg-[#111827] text-white relative",
@@ -164,11 +173,14 @@ export function Sidebar({ isMobile }: SidebarProps) {
                       priority
                     />
                   </div>
-                  <Link href="/admin/dashboard">
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => handleNavigation('/admin/dashboard')}
+                  >
                     <h1 className="text-2xl font-bold">
                       Admin Panel
                     </h1>
-                  </Link>
+                  </div>
                 </>
               )}
             </div>
@@ -191,13 +203,23 @@ export function Sidebar({ isMobile }: SidebarProps) {
           </div>
           <div className="space-y-1 pb-4">
             {routes.filter(route => !route.roles || route.roles.includes(user.role)).map((route) => {
+              const isActive = pathname === route.href || 
+                (route.href === '/admin/pos' && pathname.startsWith('/admin/pos/')) ||
+                (route.href === '/admin/orders' && pathname.startsWith('/admin/orders/')) ||
+                (route.href === '/admin/tables' && pathname.startsWith('/admin/tables/')) ||
+                (route.href === '/admin/products' && pathname.startsWith('/admin/products/')) ||
+                (route.href === '/admin/categories' && pathname.startsWith('/admin/categories/')) ||
+                (route.href === '/admin/users' && pathname.startsWith('/admin/users/')) ||
+                (route.href === '/admin/settings' && pathname.startsWith('/admin/settings/'));
+
               const linkContent = (
                 <div
                   className={cn(
                     "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
-                    pathname === route.href ? "text-white bg-white/10" : "text-zinc-400",
+                    isActive ? "text-white bg-white/10" : "text-zinc-400",
                     isCollapsed ? "justify-center" : ""
                   )}
+                  onClick={() => handleNavigation(route.href)}
                 >
                   <div className="flex items-center">
                     <route.icon className="h-5 w-5" />
@@ -210,13 +232,7 @@ export function Sidebar({ isMobile }: SidebarProps) {
                 <TooltipProvider key={route.href} delayDuration={100}>
                   <Tooltip open={isCollapsed ? undefined : false}>
                     <TooltipTrigger asChild>
-                      {isMobile ? (
-                        <Link href={route.href}>
-                          {linkContent}
-                        </Link>
-                      ) : (
-                        <Link href={route.href}>{linkContent}</Link>
-                      )}
+                      {linkContent}
                     </TooltipTrigger>
                     <TooltipContent side="right" className="bg-[#111827] text-white border-none">
                       {route.label}

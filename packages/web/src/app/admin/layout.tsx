@@ -16,6 +16,8 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
+  const [isOpen, setIsOpen] = useState(false)
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="h-full">
@@ -27,7 +29,7 @@ export default function AdminLayout({
         {/* Mobile Header with Menu Button */}
         <div className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-width)] h-16 bg-background border-b border-border z-40 flex items-center px-4 transition-all duration-300">
           <div className="md:hidden">
-            <Sheet>
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="mr-2">
                   <Menu className="h-5 w-5" />
@@ -35,7 +37,7 @@ export default function AdminLayout({
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-72">
                 <SheetTitle className="sr-only">Menú de Navegación</SheetTitle>
-                <Sidebar isMobile />
+                <Sidebar isMobile onClose={() => setIsOpen(false)} />
               </SheetContent>
             </Sheet>
           </div>

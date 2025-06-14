@@ -310,8 +310,8 @@ export function TablesManager() {
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
+    <div className="space-y-4 w-full">
+      <Card className="w-full">
         <CardHeader className="border-b">
           <div className="flex items-center justify-between">
             <CardTitle>
@@ -417,7 +417,7 @@ export function TablesManager() {
         )}
       </Card>
 
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Mesas Existentes</CardTitle>
         </CardHeader>
@@ -429,16 +429,16 @@ export function TablesManager() {
               return (
                 <div
                   key={table.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/50 gap-4"
                 >
                   <div
-                    className="cursor-pointer flex-1"
+                    className="cursor-pointer flex-1 min-w-0"
                     onClick={() => {
                       setTableDetailsOpen(table.id);
                       fetchTableOrders(table.id);
                     }}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium">Mesa {table.number}</p>
                       <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
                         ID: {table.id.substring(0, 8)}
@@ -459,7 +459,7 @@ export function TablesManager() {
                       Ubicación: {table.location?.name}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -627,7 +627,7 @@ export function TablesManager() {
               <Card key={order.id} className="overflow-hidden">
                 <CardContent className="p-0">
                   <div className="bg-muted p-4">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-wrap justify-between items-center gap-2">
                       <div>
                         <p className="text-sm text-muted-foreground">
                           Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
@@ -647,7 +647,7 @@ export function TablesManager() {
                   <div className="p-4">
                     <div className="space-y-4">
                       {order.items.map((item) => (
-                        <div key={item.id} className="flex justify-between items-center">
+                        <div key={item.id} className="flex flex-wrap justify-between items-center gap-2">
                           <div>
                             <p className="font-medium">{item.product.name}</p>
                             <p className="text-sm text-muted-foreground">
