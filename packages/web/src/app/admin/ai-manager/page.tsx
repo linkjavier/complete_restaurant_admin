@@ -59,6 +59,7 @@ export default function AIManagerPage() {
   const [aiEnabled, setAiEnabled] = useState(false)
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [showChatView, setShowChatView] = useState(false)
+  const [activeTab, setActiveTab] = useState("whatsapp")
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -498,10 +499,10 @@ export default function AIManagerPage() {
   }, [])
 
   return (
-    <div className="h-full p-8 space-y-8 w-full">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="h-[calc(100vh-4rem)] overflow-hidden p-4 md:p-8 w-full flex flex-col">
+      <div className="flex-none flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Inteligencia Artificial</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Inteligencia Artificial 2</h1>
           <Button
             variant={isWhatsAppConnected ? "default" : "outline"}
             onClick={handleWhatsAppConnect}
@@ -513,7 +514,7 @@ export default function AIManagerPage() {
             </span>
           </Button>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           <div className="flex items-center space-x-2">
             <Switch
               id="ai-enabled"
@@ -535,51 +536,58 @@ export default function AIManagerPage() {
       </div>
 
       {isAuthLoading ? (
-        <div className="text-center">Cargando...</div>
+        <div className="flex-1 flex items-center justify-center">Cargando...</div>
       ) : !user ? (
-        <div className="text-center">Redirigiendo al inicio de sesión...</div>
+        <div className="flex-1 flex items-center justify-center">Redirigiendo al inicio de sesión...</div>
       ) : !user.locationId ? (
-        <Card className="p-4">
+        <Card className="flex-1 flex items-center justify-center p-4">
           <div className="text-center text-red-500">
             <p className="font-medium">No tienes una ubicación asignada</p>
             <p className="text-sm mt-2">Por favor, contacta al administrador para que te asigne una ubicación.</p>
           </div>
         </Card>
       ) : (
-        <Tabs defaultValue="whatsapp" className="space-y-4">
-          <div className="flex items-center justify-between">
+        <Tabs 
+          defaultValue="whatsapp" 
+          className="flex-1 flex flex-col min-h-0"
+          onValueChange={(value) => setActiveTab(value)}
+        >
+          <div className="flex-none flex items-center justify-between">
             <TabsList>
               <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
               <TabsTrigger value="chat">Chat IA</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="whatsapp" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 relative">
-              <AnimatePresence mode="sync">
-                {(!showChatView || window.innerWidth >= 768) && (
-                  <motion.div
-                    key="chats"
-                    initial={{ x: -300, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    exit={{ x: -300, opacity: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="col-span-1 md:col-span-4"
-                  >
-                    <Card className="p-4">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h2 className="text-lg font-semibold">Chats</h2>
+          
+          {activeTab === "whatsapp" && (
+            <TabsContent value="whatsapp" className="flex-1 flex flex-col min-h-0">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 relative h-full">
+                <AnimatePresence mode="sync">
+                  {(!showChatView || window.innerWidth >= 768) && (
+                    <motion.div
+                      key="chats"
+                      initial={{ x: -300, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: -300, opacity: 0 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                      className="col-span-1 md:col-span-4 h-full"
+                    >
+                      <Card className="h-full flex flex-col">
+                        <div className="flex-none p-4 border-b">
+                          <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold">Chats</h2>
+                          </div>
+
+                          {showQR && qrCode && (
+                            <div className="flex flex-col items-center gap-4 p-4 border rounded-lg mt-4">
+                              <p className="text-sm text-center">Escanea el código QR con WhatsApp</p>
+                              <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
+                            </div>
+                          )}
                         </div>
 
-                        {showQR && qrCode && (
-                          <div className="flex flex-col items-center gap-4 p-4 border rounded-lg">
-                            <p className="text-sm text-center">Escanea el código QR con WhatsApp</p>
-                            <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
-                          </div>
-                        )}
-
-                        <ScrollArea className="h-[600px]">
-                          <div className="space-y-2">
+                        <div className="h-[calc(100vh-16rem)] md:h-[calc(100vh-20rem)] overflow-y-auto">
+                          <div className="p-4 space-y-2">
                             {isLoadingChats ? (
                               <div className="flex items-center justify-center p-4">
                                 <p className="text-muted-foreground">Cargando chats...</p>
@@ -618,218 +626,223 @@ export default function AIManagerPage() {
                               ))
                             )}
                           </div>
-                        </ScrollArea>
-                      </div>
-                    </Card>
-                  </motion.div>
-                )}
+                        </div>
+                      </Card>
+                    </motion.div>
+                  )}
 
-                {(showChatView || window.innerWidth >= 768) && (
-                  <motion.div
-                    key="chat"
-                    initial={{ x: 300, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    exit={{ x: 300, opacity: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="col-span-1 md:col-span-8"
-                  >
-                    <Card className="p-4">
-                      {selectedChat ? (
-                        <div className="flex flex-col h-[600px]">
-                          <div className="flex items-center gap-2 mb-4 md:hidden">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={handleBackToChats}
-                              className="md:hidden"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="h-5 w-5"
+                  {(showChatView || window.innerWidth >= 768) && (
+                    <motion.div
+                      key="chat"
+                      initial={{ x: 300, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: 300, opacity: 0 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                      className="col-span-1 md:col-span-8 h-full"
+                    >
+                      <Card className="h-full flex flex-col">
+                        {selectedChat ? (
+                          <div className="flex flex-col h-full">
+                            <div className="flex-none flex items-center gap-2 p-4 border-b md:hidden">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleBackToChats}
+                                className="md:hidden"
                               >
-                                <path d="m15 18-6-6 6-6" />
-                              </svg>
-                            </Button>
-                            <h2 className="text-lg font-semibold">
-                              {whatsappChats.find(chat => chat.id === selectedChat)?.name}
-                            </h2>
-                          </div>
-                          <ScrollArea className="flex-1 pr-4">
-                            <div className="space-y-4">
-                              {isLoadingMessages ? (
-                                <div className="flex items-center justify-center h-full">
-                                  <p className="text-muted-foreground">Cargando mensajes...</p>
-                                </div>
-                              ) : chatMessages.length === 0 ? (
-                                <div className="flex items-center justify-center h-full">
-                                  <p className="text-muted-foreground">No hay mensajes en este chat</p>
-                                </div>
-                              ) : (
-                                <>
-                                  {chatMessages.map((message) => (
-                                    <div
-                                      key={`${message.role === "assistant" ? 'ai' : 'user'}_${message.id}`}
-                                      className={cn(
-                                        "flex items-start gap-4",
-                                        message.role === "assistant" ? "flex-row" : "flex-row-reverse"
-                                      )}
-                                    >
-                                      <Avatar>
-                                        <AvatarImage
-                                          src={message.role === "assistant" 
-                                            ? "/bot-avatar.png" 
-                                            : user?.avatar || "/user-avatar.png"} 
-                                        />
-                                        <AvatarFallback>
-                                          {message.role === "assistant" ? "AI" : "U"}
-                                        </AvatarFallback>
-                                      </Avatar>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="24"
+                                  height="24"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="h-5 w-5"
+                                >
+                                  <path d="m15 18-6-6 6-6" />
+                                </svg>
+                              </Button>
+                              <h2 className="text-lg font-semibold">
+                                {whatsappChats.find(chat => chat.id === selectedChat)?.name}
+                              </h2>
+                            </div>
+                            <div className="h-[calc(100vh-16rem)] md:h-[calc(100vh-20rem)] overflow-y-auto">
+                              <div className="p-4 space-y-4">
+                                {isLoadingMessages ? (
+                                  <div className="flex items-center justify-center h-full">
+                                    <p className="text-muted-foreground">Cargando mensajes...</p>
+                                  </div>
+                                ) : chatMessages.length === 0 ? (
+                                  <div className="flex items-center justify-center h-full">
+                                    <p className="text-muted-foreground">No hay mensajes en este chat</p>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {chatMessages.map((message) => (
                                       <div
+                                        key={`${message.role === "assistant" ? 'ai' : 'user'}_${message.id}`}
                                         className={cn(
-                                          "rounded-lg p-4 max-w-[80%]",
-                                          message.role === "assistant"
-                                            ? "bg-muted"
-                                            : "bg-primary text-primary-foreground"
+                                          "flex items-start gap-4",
+                                          message.role === "assistant" ? "flex-row" : "flex-row-reverse"
                                         )}
                                       >
-                                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                            {message.content}
-                                          </ReactMarkdown>
+                                        <Avatar>
+                                          <AvatarImage
+                                            src={message.role === "assistant" 
+                                              ? "/bot-avatar.png" 
+                                              : user?.avatar || "/user-avatar.png"} 
+                                          />
+                                          <AvatarFallback>
+                                            {message.role === "assistant" ? "AI" : "U"}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div
+                                          className={cn(
+                                            "rounded-lg p-4 max-w-[80%]",
+                                            message.role === "assistant"
+                                              ? "bg-muted"
+                                              : "bg-primary text-primary-foreground"
+                                          )}
+                                        >
+                                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                              {message.content}
+                                            </ReactMarkdown>
+                                          </div>
+                                          <span className="text-xs opacity-70">
+                                            {message.timestamp.toLocaleTimeString()}
+                                          </span>
                                         </div>
-                                        <span className="text-xs opacity-70">
-                                          {message.timestamp.toLocaleTimeString()}
-                                        </span>
                                       </div>
-                                    </div>
-                                  ))}
-                                  <div ref={chatMessagesEndRef} />
-                                </>
-                              )}
+                                    ))}
+                                    <div ref={chatMessagesEndRef} />
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </ScrollArea>
 
-                          <div className="mt-4 flex gap-2">
-                            <Input
-                              ref={inputRef}
-                              value={input}
-                              onChange={(e) => setInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && !e.shiftKey) {
-                                  e.preventDefault();
-                                  handleSendWhatsAppMessage(input);
-                                  setInput("");
-                                }
-                              }}
-                              placeholder="Escribe un mensaje..."
-                              className="flex-1"
-                            />
-                            <Button
-                              onClick={() => {
-                                handleSendWhatsAppMessage(input);
-                                setInput("");
-                              }}
-                              disabled={!input.trim()}
-                            >
-                              <Send className="h-4 w-4" />
-                            </Button>
+                            <div className="flex-none p-4 border-t">
+                              <div className="flex gap-2">
+                                <Input
+                                  ref={inputRef}
+                                  value={input}
+                                  onChange={(e) => setInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                      e.preventDefault();
+                                      handleSendWhatsAppMessage(input);
+                                      setInput("");
+                                    }
+                                  }}
+                                  placeholder="Escribe un mensaje..."
+                                  className="flex-1"
+                                />
+                                <Button
+                                  onClick={() => {
+                                    handleSendWhatsAppMessage(input);
+                                    setInput("");
+                                  }}
+                                  disabled={!input.trim()}
+                                >
+                                  <Send className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="h-[600px] flex items-center justify-center text-muted-foreground">
-                          Selecciona un chat para comenzar
-                        </div>
-                      )}
-                    </Card>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="chat" className="space-y-4 w-full">
-            <Card className="p-4 w-full">
-              <ScrollArea className="h-[600px] pr-4">
-                <div className="space-y-4">
-                  {messages.map((message) => (
-                    <div
-                      key={`${message.role === "assistant" ? 'ai' : 'user'}_${message.id}`}
-                      className={cn(
-                        "flex items-start gap-4",
-                        message.role === "assistant" ? "flex-row" : "flex-row-reverse"
-                      )}
-                    >
-                      <Avatar>
-                        <AvatarImage 
-                          src={message.role === "assistant" 
-                            ? "/bot-avatar.png" 
-                            : user?.avatar || "/user-avatar.png"} 
-                        />
-                        <AvatarFallback>{message.role === "assistant" ? "AI" : "U"}</AvatarFallback>
-                      </Avatar>
-                      <div className={cn(
-                        "rounded-lg p-4 max-w-[80%]",
-                        message.role === "assistant" ? "bg-muted" : "bg-primary text-primary-foreground"
-                      )}>
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                          <ReactMarkdown 
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              h2: ({node, ...props}) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
-                              ul: ({node, ...props}) => <ul className="list-disc pl-4" {...props} />,
-                              li: ({node, ...props}) => <li className="mb-1" {...props} />
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
-                        </div>
-                        <span className="text-xs opacity-70">
-                          {message.timestamp.toLocaleTimeString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {isLoading && (
-                    <div className="flex items-start gap-4">
-                      <Avatar>
-                        <AvatarImage src="/bot-avatar.png" />
-                        <AvatarFallback>AI</AvatarFallback>
-                      </Avatar>
-                      <div className="rounded-lg p-4 bg-muted">
-                        <p>Escribiendo...</p>
-                      </div>
-                    </div>
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-muted-foreground">
+                            Selecciona un chat para comenzar
+                          </div>
+                        )}
+                      </Card>
+                    </motion.div>
                   )}
-                  <div ref={messagesEndRef} />
-                </div>
-              </ScrollArea>
-              <div className="flex gap-2 mt-4">
-                <Input
-                  ref={inputRef}
-                  placeholder="Escribe tu mensaje..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSendMessage()
-                    }
-                  }}
-                />
-                <Button onClick={handleSendMessage} disabled={!input.trim() || !isConnected || isLoading}>
-                  <Send className="h-4 w-4" />
-                </Button>
+                </AnimatePresence>
               </div>
-            </Card>
-          </TabsContent>
+            </TabsContent>
+          )}
+
+          {activeTab === "chat" && (
+            <TabsContent value="chat" className="flex-1 flex flex-col min-h-0">
+              <Card className="h-full flex flex-col">
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-4">
+                    {messages.map((message) => (
+                      <div
+                        key={`${message.role === "assistant" ? 'ai' : 'user'}_${message.id}`}
+                        className={cn(
+                          "flex items-start gap-4",
+                          message.role === "assistant" ? "flex-row" : "flex-row-reverse"
+                        )}
+                      >
+                        <Avatar>
+                          <AvatarImage 
+                            src={message.role === "assistant" 
+                              ? "/bot-avatar.png" 
+                              : user?.avatar || "/user-avatar.png"} 
+                          />
+                          <AvatarFallback>{message.role === "assistant" ? "AI" : "U"}</AvatarFallback>
+                        </Avatar>
+                        <div className={cn(
+                          "rounded-lg p-4 max-w-[80%]",
+                          message.role === "assistant" ? "bg-muted" : "bg-primary text-primary-foreground"
+                        )}>
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown 
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                h2: ({node, ...props}) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
+                                ul: ({node, ...props}) => <ul className="list-disc pl-4" {...props} />,
+                                li: ({node, ...props}) => <li className="mb-1" {...props} />
+                              }}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                          </div>
+                          <span className="text-xs opacity-70">
+                            {message.timestamp.toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {isLoading && (
+                      <div className="flex items-start gap-4">
+                        <Avatar>
+                          <AvatarImage src="/bot-avatar.png" />
+                          <AvatarFallback>AI</AvatarFallback>
+                        </Avatar>
+                        <div className="rounded-lg p-4 bg-muted">
+                          <p>Escribiendo...</p>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                </ScrollArea>
+                <div className="flex-none p-4 flex gap-2">
+                  <Input
+                    ref={inputRef}
+                    placeholder="Escribe tu mensaje..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSendMessage()
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleSendMessage} disabled={!input.trim() || !isConnected || isLoading}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       )}
     </div>
