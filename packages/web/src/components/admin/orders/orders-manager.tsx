@@ -436,210 +436,238 @@ export function OrdersManager() {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="active">Activas</TabsTrigger>
-              <TabsTrigger value="completed">Completadas</TabsTrigger>
-              <TabsTrigger value="paid">Pagadas</TabsTrigger>
-              <TabsTrigger value="cancelled">Canceladas</TabsTrigger>
-            </TabsList>
+          <div className="space-y-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2">
+                <TabsTrigger 
+                  value="active" 
+                  className="flex items-center justify-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                >
+                  <Clock className="h-4 w-4" />
+                  <span>Activas</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="completed" 
+                  className="flex items-center justify-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Completadas</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="paid" 
+                  className="flex items-center justify-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  <span>Pagadas</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="cancelled" 
+                  className="flex items-center justify-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                >
+                  <XCircle className="h-4 w-4" />
+                  <span>Canceladas</span>
+                </TabsTrigger>
+              </TabsList>
 
-            {loading ? (
-              <div className="text-center py-8">Cargando órdenes...</div>
-            ) : error ? (
-              <div className="text-center text-red-500 py-8">
-                {error}
-                <div className="mt-4">
-                  <Button onClick={fetchOrders}>Reintentar</Button>
-                </div>
-              </div>
-            ) : (
-              <TabsContent value={activeTab} className="space-y-4">
-                {filteredOrders.length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8">
-                    No hay órdenes en esta categoría
+              {loading ? (
+                <div className="text-center py-8">Cargando órdenes...</div>
+              ) : error ? (
+                <div className="text-center text-red-500 py-8">
+                  {error}
+                  <div className="mt-4">
+                    <Button onClick={fetchOrders}>Reintentar</Button>
                   </div>
-                ) : (
-                  filteredOrders.map((order) => (
-                    <Card key={order.id} className="overflow-hidden">
-                      <CardContent className="p-0">
-                        <div className="bg-muted p-4">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h3 className="font-bold text-lg">
-                                {order.type === "DELIVERY" ? (
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <span>Domicilio</span>
-                                      {getStatusBadge(order.status)}
-                                    </div>
-                                    <div className="text-sm space-y-1 mt-1">
-                                      <p className="font-medium text-primary">
-                                        Cliente: {order.customerName}
-                                      </p>
-                                      <p className="text-muted-foreground">
-                                        Dirección: {order.deliveryAddress}
-                                      </p>
-                                      {order.neighborhood && (
-                                        <p className="text-muted-foreground">
-                                          Barrio: {order.neighborhood}
-                                        </p>
-                                      )}
-                                      <p className="text-muted-foreground">
-                                        Teléfono: {order.phone}
-                                      </p>
-                                    </div>
-                                  </div>
-                                ) : order.table?.number ? (
-                                  `Mesa #${order.table.number}`
-                                ) : (
-                                  'Para Llevar'
-                                )}
-                              </h3>
-                              {order.type !== "DELIVERY" && order.customerName && (
-                                <p className="text-sm font-medium text-primary">
-                                  Cliente: {order.customerName}
-                                </p>
-                              )}
-                              <p className="text-sm text-muted-foreground">
-                                Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
-                              </p>
-                              {order.paymentMethod && (
-                                <p className="text-sm font-medium text-primary mt-1">
-                                  Método de pago: {
-                                    order.paymentMethod === "CASH" ? "Efectivo" :
-                                    order.paymentMethod === "CARD" ? "Tarjeta" :
-                                    order.paymentMethod === "TRANSFER" ? "Transferencia" :
-                                    "Otro"
-                                  }
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {getStatusBadge(order.status)}
-                              {order.paymentMethod && getPaymentMethodIcon(order.paymentMethod)}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="p-4">
-                          <div className="space-y-4">
-                            {order.items.map((item) => (
-                              <div key={item.id} className="flex justify-between items-center">
+                </div>
+              ) : (
+                <TabsContent value={activeTab} className="mt-16 md:mt-8">
+                  <div className="space-y-4">
+                    {filteredOrders.length === 0 ? (
+                      <div className="text-center text-muted-foreground py-8">
+                        No hay órdenes en esta categoría
+                      </div>
+                    ) : (
+                      filteredOrders.map((order) => (
+                        <Card key={order.id} className="overflow-hidden">
+                          <CardContent className="p-0">
+                            <div className="bg-muted p-4">
+                              <div className="flex justify-between items-center">
                                 <div>
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-medium">{item.product.name}</p>
-                                    {getItemStatusBadge(item.status)}
-                                  </div>
+                                  <h3 className="font-bold text-lg">
+                                    {order.type === "DELIVERY" ? (
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <span>Domicilio</span>
+                                          {getStatusBadge(order.status)}
+                                        </div>
+                                        <div className="text-sm space-y-1 mt-1">
+                                          <p className="font-medium text-primary">
+                                            Cliente: {order.customerName}
+                                          </p>
+                                          <p className="text-muted-foreground">
+                                            Dirección: {order.deliveryAddress}
+                                          </p>
+                                          {order.neighborhood && (
+                                            <p className="text-muted-foreground">
+                                              Barrio: {order.neighborhood}
+                                            </p>
+                                          )}
+                                          <p className="text-muted-foreground">
+                                            Teléfono: {order.phone}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ) : order.table?.number ? (
+                                      `Mesa #${order.table.number}`
+                                    ) : (
+                                      'Para Llevar'
+                                    )}
+                                  </h3>
+                                  {order.type !== "DELIVERY" && order.customerName && (
+                                    <p className="text-sm font-medium text-primary">
+                                      Cliente: {order.customerName}
+                                    </p>
+                                  )}
                                   <p className="text-sm text-muted-foreground">
-                                    {item.quantity} x ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                    Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                                   </p>
-                                  {item.notes && (
-                                    <p className="text-sm text-muted-foreground">
-                                      Notas: {item.notes}
+                                  {order.paymentMethod && (
+                                    <p className="text-sm font-medium text-primary mt-1">
+                                      Método de pago: {
+                                        order.paymentMethod === "CASH" ? "Efectivo" :
+                                        order.paymentMethod === "CARD" ? "Tarjeta" :
+                                        order.paymentMethod === "TRANSFER" ? "Transferencia" :
+                                        "Otro"
+                                      }
                                     </p>
                                   )}
                                 </div>
-                                <Badge variant="outline">
-                                  ${(item.product.price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  {getStatusBadge(order.status)}
+                                  {order.paymentMethod && getPaymentMethodIcon(order.paymentMethod)}
+                                </div>
                               </div>
-                            ))}
-                          </div>
-
-                          <div className="mt-4 pt-4 border-t">
-                            <div className="flex justify-between items-center">
-                              <span className="font-bold">Total:</span>
-                              <span className="font-bold">
-                                ${calculateOrderTotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                              </span>
                             </div>
-                            {order.status === "READY" && (
-                              <div className="mt-2 flex items-center gap-2">
-                                <Badge variant={order.isPaid ? "success" : "warning"}>
-                                  {order.isPaid ? (
-                                    <div className="flex items-center gap-1">
-                                      <CheckCircle2 className="h-3 w-3" />
-                                      Pagada
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-1">
-                                      <AlertCircle className="h-3 w-3" />
-                                      Pendiente de Pago
-                                    </div>
-                                  )}
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="mt-4 flex justify-end gap-2">
-                            {order.status === "PENDING" && (
-                              <>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => handleUpdateOrderStatus(order.id, "IN_PROGRESS")}
-                                >
-                                  Iniciar Preparación
-                                </Button>
-                                <Button 
-                                  variant="destructive" 
-                                  size="sm"
-                                  onClick={() => handleUpdateOrderStatus(order.id, "CANCELLED")}
-                                >
-                                  Cancelar Orden
-                                </Button>
-                              </>
-                            )}
                             
-                            {order.status === "IN_PROGRESS" && (
-                              <Button 
-                                variant="default" 
-                                size="sm"
-                                onClick={() => handleUpdateOrderStatus(order.id, "READY")}
-                              >
-                                Marcar como Completada
-                              </Button>
-                            )}
-
-                            {order.status === "READY" && !order.paymentMethod && (
-                              <div className="flex gap-2">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => handleProcessPayment(order.id, "CASH")}
-                                >
-                                  Pago en Efectivo
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => handleProcessPayment(order.id, "CARD")}
-                                >
-                                  Pago con Tarjeta
-                                </Button>
+                            <div className="p-4">
+                              <div className="space-y-4">
+                                {order.items.map((item) => (
+                                  <div key={item.id} className="flex justify-between items-center">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-medium">{item.product.name}</p>
+                                        {getItemStatusBadge(item.status)}
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">
+                                        {item.quantity} x ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                      </p>
+                                      {item.notes && (
+                                        <p className="text-sm text-muted-foreground">
+                                          Notas: {item.notes}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <Badge variant="outline">
+                                      ${(item.product.price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                    </Badge>
+                                  </div>
+                                ))}
                               </div>
-                            )}
 
-                            {order.status === "PAID" && (
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handlePrintReceipt(order.id)}
-                              >
-                                Imprimir Ticket
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </TabsContent>
-            )}
-          </Tabs>
+                              <div className="mt-4 pt-4 border-t">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-bold">Total:</span>
+                                  <span className="font-bold">
+                                    ${calculateOrderTotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
+                                {order.status === "READY" && (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <Badge variant={order.isPaid ? "success" : "warning"}>
+                                      {order.isPaid ? (
+                                        <div className="flex items-center gap-1">
+                                          <CheckCircle2 className="h-3 w-3" />
+                                          Pagada
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-1">
+                                          <AlertCircle className="h-3 w-3" />
+                                          Pendiente de Pago
+                                        </div>
+                                      )}
+                                    </Badge>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="mt-4 flex justify-end gap-2">
+                                {order.status === "PENDING" && (
+                                  <>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => handleUpdateOrderStatus(order.id, "IN_PROGRESS")}
+                                    >
+                                      Iniciar Preparación
+                                    </Button>
+                                    <Button 
+                                      variant="destructive" 
+                                      size="sm"
+                                      onClick={() => handleUpdateOrderStatus(order.id, "CANCELLED")}
+                                    >
+                                      Cancelar Orden
+                                    </Button>
+                                  </>
+                                )}
+                                
+                                {order.status === "IN_PROGRESS" && (
+                                  <Button 
+                                    variant="default" 
+                                    size="sm"
+                                    onClick={() => handleUpdateOrderStatus(order.id, "READY")}
+                                  >
+                                    Marcar como Completada
+                                  </Button>
+                                )}
+
+                                {order.status === "READY" && !order.paymentMethod && (
+                                  <div className="flex gap-2">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => handleProcessPayment(order.id, "CASH")}
+                                    >
+                                      Pago en Efectivo
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => handleProcessPayment(order.id, "CARD")}
+                                    >
+                                      Pago con Tarjeta
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {order.status === "PAID" && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => handlePrintReceipt(order.id)}
+                                  >
+                                    Imprimir Ticket
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </TabsContent>
+              )}
+            </Tabs>
+          </div>
         </CardContent>
       </Card>
     </div>
