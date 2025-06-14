@@ -429,43 +429,54 @@ export function TablesManager() {
               return (
                 <div
                   key={table.id}
-                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/50 gap-4"
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-lg hover:bg-muted/50 gap-2"
+                  onClick={() => {
+                    setTableDetailsOpen(table.id);
+                    fetchTableOrders(table.id);
+                  }}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    setTableDetailsOpen(table.id);
+                    fetchTableOrders(table.id);
+                  }}
                 >
-                  <div
-                    className="cursor-pointer flex-1 min-w-0"
-                    onClick={() => {
-                      setTableDetailsOpen(table.id);
-                      fetchTableOrders(table.id);
-                    }}
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">Mesa {table.number}</p>
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                        ID: {table.id.substring(0, 8)}
-                      </span>
-                      <Badge variant={isActive ? "default" : "secondary"}>
-                        {isActive ? "Activa" : "Libre"}
-                      </Badge>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="font-medium">Mesa {table.number}</p>
+                        <Badge variant={isActive ? "default" : "secondary"} className="h-5">
+                          {isActive ? "Activa" : "Libre"}
+                        </Badge>
+                      </div>
                       {lastOrderDate && (
-                        <Badge variant="outline">
-                          Última orden: {getTimeElapsed(lastOrderDate)}
+                        <Badge variant="outline" className="h-5 text-xs">
+                          <span className="text-[10px] text-muted-foreground mr-1">Últ. orden:</span>
+                          {getTimeElapsed(lastOrderDate)}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {table.seats} asientos
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Ubicación: {table.location?.name}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-sm text-muted-foreground">
+                        {table.seats} asientos
+                      </p>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <p className="text-sm text-muted-foreground">
+                        {table.location?.name}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div 
+                    className="flex gap-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  >
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             variant="outline"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={(e) => {
                               e.stopPropagation();
                               setQrDialogOpen(table.id);
@@ -480,42 +491,13 @@ export function TablesManager() {
                       </Tooltip>
                     </TooltipProvider>
 
-                    <Dialog open={qrDialogOpen === table.id} onOpenChange={(open) => setQrDialogOpen(open ? table.id : null)}>
-                      <DialogContent 
-                        className="sm:max-w-md"
-                        onPointerDownOutside={(e) => e.preventDefault()}
-                      >
-                        <DialogHeader>
-                          <DialogTitle>Código QR - Mesa {table.number}</DialogTitle>
-                        </DialogHeader>
-                        <div className="flex flex-col items-center gap-4 py-4">
-                          <QRCodeSVG
-                            id={`qr-${table.id}`}
-                            value={`${qrUrl}/table/${table.id}`}
-                            size={200}
-                            level="H"
-                            includeMargin
-                          />
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDownloadQR(table.id);
-                            }}
-                            className="flex items-center gap-2"
-                          >
-                            <Download className="h-4 w-4" />
-                            Descargar QR
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             variant="outline"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditingTable(table);
@@ -536,6 +518,7 @@ export function TablesManager() {
                           <Button
                             variant="destructive"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteTable(table.id);
@@ -556,6 +539,7 @@ export function TablesManager() {
                           <Button
                             variant="outline"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={(e) => {
                               e.stopPropagation();
                               window.open(`/table/${table.id}`, '_blank');
@@ -579,56 +563,79 @@ export function TablesManager() {
 
       <Dialog 
         open={!!tableDetailsOpen} 
-        onOpenChange={(open) => !open && setTableDetailsOpen(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTableDetailsOpen(null);
+          }
+        }}
       >
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-[51]">
+        <DialogContent 
+          className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col mx-auto w-[calc(100%-2rem)] md:w-[90%] lg:w-[80%] xl:w-[70%]"
+          onPointerDownOutside={(e) => {
+            e.preventDefault();
+            setTableDetailsOpen(null);
+          }}
+          onEscapeKeyDown={(e) => {
+            e.preventDefault();
+            setTableDetailsOpen(null);
+          }}
+        >
+          <DialogClose 
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-[51]"
+            onClick={(e) => {
+              e.preventDefault();
+              setTableDetailsOpen(null);
+            }}
+          >
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogClose>
 
-          <div className="relative">
-            <DialogHeader className="pb-4 border-b">
-              <DialogTitle>
+          <div className="sticky top-0 bg-background z-10 border-b">
+            <DialogHeader className="pb-2">
+              <DialogTitle className="text-lg">
                 {tables.find(t => t.id === tableDetailsOpen)?.number 
-                  ? `Detalles de Mesa ${tables.find(t => t.id === tableDetailsOpen)?.number}`
+                  ? `Mesa ${tables.find(t => t.id === tableDetailsOpen)?.number}`
                   : 'Detalles de Mesa'}
               </DialogTitle>
             </DialogHeader>
 
             {/* Información de la mesa */}
             {tableDetailsOpen && (
-              <div className="py-4 border-b">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">Ubicación:</p>
-                  <span className="text-sm text-muted-foreground">
-                    {tables.find(t => t.id === tableDetailsOpen)?.location?.name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">Asientos:</p>
-                  <span className="text-sm text-muted-foreground">
-                    {tables.find(t => t.id === tableDetailsOpen)?.seats}
-                  </span>
-                </div>
-                {lastOrders[tableDetailsOpen] && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="outline">
-                      Última orden: {getTimeElapsed(lastOrders[tableDetailsOpen])}
-                    </Badge>
+              <div className="py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">Ubicación:</p>
+                      <span className="text-sm text-muted-foreground">
+                        {tables.find(t => t.id === tableDetailsOpen)?.location?.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">Asientos:</p>
+                      <span className="text-sm text-muted-foreground">
+                        {tables.find(t => t.id === tableDetailsOpen)?.seats}
+                      </span>
+                    </div>
                   </div>
-                )}
+                  {lastOrders[tableDetailsOpen] && (
+                    <Badge variant="outline" className="h-6 text-xs">
+                      <span className="text-[10px] text-muted-foreground mr-1">Últ. orden:</span>
+                      {getTimeElapsed(lastOrders[tableDetailsOpen])}
+                    </Badge>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          <div className="p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {tableOrders.map((order) => (
               <Card key={order.id} className="overflow-hidden">
                 <CardContent className="p-0">
-                  <div className="bg-muted p-4">
+                  <div className="bg-muted p-3">
                     <div className="flex flex-wrap justify-between items-center gap-2">
-                      <div>
+                      <div className="space-y-0.5">
                         <p className="text-sm text-muted-foreground">
                           Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                         </p>
@@ -644,11 +651,11 @@ export function TablesManager() {
                     </div>
                   </div>
                   
-                  <div className="p-4">
-                    <div className="space-y-4">
+                  <div className="p-3">
+                    <div className="space-y-3">
                       {order.items.map((item) => (
                         <div key={item.id} className="flex flex-wrap justify-between items-center gap-2">
-                          <div>
+                          <div className="space-y-0.5">
                             <p className="font-medium">{item.product.name}</p>
                             <p className="text-sm text-muted-foreground">
                               {item.quantity} x ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
@@ -658,7 +665,7 @@ export function TablesManager() {
                                 Notas: {item.notes}
                               </p>
                             )}
-                            <Badge variant="outline" className="mt-1">
+                            <Badge variant="outline" className="mt-0.5">
                               {item.status}
                             </Badge>
                           </div>
@@ -669,7 +676,7 @@ export function TablesManager() {
                       ))}
                     </div>
 
-                    <div className="mt-4 pt-4 border-t">
+                    <div className="mt-3 pt-3 border-t">
                       <div className="flex justify-between items-center">
                         <span className="font-bold">Total:</span>
                         <span className="font-bold">
@@ -685,7 +692,7 @@ export function TablesManager() {
             ))}
 
             {tableOrders.length === 0 && (
-              <div className="text-center text-muted-foreground py-8">
+              <div className="text-center text-muted-foreground py-6">
                 No hay órdenes para esta mesa
               </div>
             )}

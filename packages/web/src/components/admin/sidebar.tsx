@@ -70,12 +70,6 @@ const routes = [
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
-    label: "Ubicaciones",
-    icon: MapPin,
-    href: "/admin/locations",
-    roles: ['SUPER_ADMIN', 'ADMIN'],
-  },
-  {
     label: "Cocina",
     icon: ChefHat,
     href: "/admin/kitchen-manager",
@@ -98,6 +92,12 @@ const routes = [
     icon: Utensils,
     href: "/admin/ingredients",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF'],
+  },
+  {
+    label: "Ubicaciones",
+    icon: MapPin,
+    href: "/admin/locations",
+    roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
     label: "Usuarios",
