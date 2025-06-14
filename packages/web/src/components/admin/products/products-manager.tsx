@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +22,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { ImageUpload } from "./image-upload"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 
 export function ProductsManager() {
   const [products, setProducts] = useState<Product[]>([])
@@ -32,6 +33,7 @@ export function ProductsManager() {
   const [error, setError] = useState<string | null>(null)
   const [isCreateFormVisible, setIsCreateFormVisible] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
+  const editFormRef = useRef<HTMLDivElement>(null)
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
@@ -52,6 +54,7 @@ export function ProductsManager() {
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const { toast } = useToast()
+  const [productToDelete, setProductToDelete] = useState<{ id: string, name: string } | null>(null)
 
   useEffect(() => {
     fetchProducts()
@@ -239,19 +242,27 @@ export function ProductsManager() {
     }
   }
 
+  const handleEditClick = (product: Product) => {
+    setEditingProduct(product)
+    setIsCreateFormVisible(true)
+    setTimeout(() => {
+      editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  }
+
   return (
-    <div className="space-y-4">
-      <Card>
+    <div className="space-y-4 w-full max-w-full overflow-x-hidden">
+      <Card ref={editFormRef} className="w-full">
         <CardHeader className="border-b">
-          <div className="flex items-center justify-between">
-            <CardTitle>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <CardTitle className="text-lg sm:text-xl">
               {editingProduct ? "Editar Producto" : "Crear Nuevo Producto"}
             </CardTitle>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIsCreateFormVisible(!isCreateFormVisible)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 w-full sm:w-auto"
             >
               {isCreateFormVisible ? (
                 <>
@@ -268,21 +279,118 @@ export function ProductsManager() {
           </div>
         </CardHeader>
         {(isCreateFormVisible || editingProduct) && (
-          <CardContent className="pt-4">
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Nombre del Producto</Label>
-                <Input
-                  id="name"
-                  placeholder="Ingresa el nombre del producto"
-                  value={editingProduct ? editingProduct.name : newProduct.name}
-                  onChange={(e) =>
-                    editingProduct
-                      ? setEditingProduct({ ...editingProduct, name: e.target.value })
-                      : setNewProduct({ ...newProduct, name: e.target.value })
-                  }
-                />
+          <CardContent className="pt-4 w-full">
+            <div className="grid gap-4 w-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Nombre del Producto</Label>
+                  <Input
+                    id="name"
+                    placeholder="Ingresa el nombre del producto"
+                    value={editingProduct ? editingProduct.name : newProduct.name}
+                    onChange={(e) =>
+                      editingProduct
+                        ? setEditingProduct({ ...editingProduct, name: e.target.value })
+                        : setNewProduct({ ...newProduct, name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="price">Precio</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    min="0"
+                    placeholder="Ingresa el precio"
+                    value={editingProduct ? editingProduct.price : newProduct.price}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? 0 : Number(e.target.value);
+                      if (editingProduct) {
+                        setEditingProduct({ ...editingProduct, price: value });
+                      } else {
+                        setNewProduct({ ...newProduct, price: value });
+                      }
+                    }}
+                    onFocus={(e) => {
+                      if (e.target.value === '0') {
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="categoryId">Categoría</Label>
+                  <Select
+                    value={editingProduct ? editingProduct.categoryId : newProduct.categoryId}
+                    onValueChange={(value) =>
+                      editingProduct
+                        ? setEditingProduct({ ...editingProduct, categoryId: value })
+                        : setNewProduct({ ...newProduct, categoryId: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="locationId">Ubicación</Label>
+                  <Select
+                    value={editingProduct ? editingProduct.locationId : newProduct.locationId}
+                    onValueChange={(value) =>
+                      editingProduct
+                        ? setEditingProduct({ ...editingProduct, locationId: value })
+                        : setNewProduct({ ...newProduct, locationId: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una ubicación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="quantity">Stock Actual</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    min="0"
+                    placeholder="Ingresa el stock actual"
+                    value={editingProduct ? editingProduct.quantity || 0 : newProduct.quantity}
+                    onChange={(e) =>
+                      editingProduct
+                        ? setEditingProduct({ ...editingProduct, quantity: parseFloat(e.target.value) })
+                        : setNewProduct({ ...newProduct, quantity: parseFloat(e.target.value) })
+                    }
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="isActive"
+                    checked={editingProduct ? editingProduct.isActive : newProduct.isActive}
+                    onCheckedChange={(checked) =>
+                      editingProduct
+                        ? setEditingProduct({ ...editingProduct, isActive: checked })
+                        : setNewProduct({ ...newProduct, isActive: checked })
+                    }
+                  />
+                  <Label htmlFor="isActive">Producto Activo</Label>
+                </div>
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="description">Descripción</Label>
                 <Textarea
@@ -296,29 +404,7 @@ export function ProductsManager() {
                   }
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="price">Precio</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  min="0"
-                  placeholder="Ingresa el precio"
-                  value={editingProduct ? editingProduct.price : newProduct.price}
-                  onChange={(e) => {
-                    const value = e.target.value === '' ? 0 : Number(e.target.value);
-                    if (editingProduct) {
-                      setEditingProduct({ ...editingProduct, price: value });
-                    } else {
-                      setNewProduct({ ...newProduct, price: value });
-                    }
-                  }}
-                  onFocus={(e) => {
-                    if (e.target.value === '0') {
-                      e.target.value = '';
-                    }
-                  }}
-                />
-              </div>
+
               <div className="grid gap-2">
                 <Label>Imagen del Producto</Label>
                 <ImageUpload
@@ -332,83 +418,13 @@ export function ProductsManager() {
                   currentImage={editingProduct ? editingProduct.image : newProduct.image}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="categoryId">Categoría</Label>
-                <Select
-                  value={editingProduct ? editingProduct.categoryId : newProduct.categoryId}
-                  onValueChange={(value) =>
-                    editingProduct
-                      ? setEditingProduct({ ...editingProduct, categoryId: value })
-                      : setNewProduct({ ...newProduct, categoryId: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="locationId">Ubicación</Label>
-                <Select
-                  value={editingProduct ? editingProduct.locationId : newProduct.locationId}
-                  onValueChange={(value) =>
-                    editingProduct
-                      ? setEditingProduct({ ...editingProduct, locationId: value })
-                      : setNewProduct({ ...newProduct, locationId: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una ubicación" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {location.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="isActive"
-                  checked={editingProduct ? editingProduct.isActive : newProduct.isActive}
-                  onCheckedChange={(checked) =>
-                    editingProduct
-                      ? setEditingProduct({ ...editingProduct, isActive: checked })
-                      : setNewProduct({ ...newProduct, isActive: checked })
-                  }
-                />
-                <Label htmlFor="isActive">Producto Activo</Label>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="quantity">Stock Actual</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min="0"
-                  placeholder="Ingresa el stock actual"
-                  value={editingProduct ? editingProduct.quantity || 0 : newProduct.quantity}
-                  onChange={(e) =>
-                    editingProduct
-                      ? setEditingProduct({ ...editingProduct, quantity: parseFloat(e.target.value) })
-                      : setNewProduct({ ...newProduct, quantity: parseFloat(e.target.value) })
-                  }
-                />
-              </div>
+
               <div className="grid gap-2">
                 <Label>Ingredientes</Label>
-                <div className="space-y-4">
+                <div className="space-y-4 w-full">
                   {(editingProduct ? editingProduct.ingredients : newProduct.ingredients)?.map((ingredient, index) => (
-                    <div key={index} className="flex gap-2 items-end">
-                      <div className="flex-1">
+                    <div key={index} className="flex flex-col sm:flex-row gap-2 items-end w-full">
+                      <div className="w-full sm:flex-1">
                         <Label>Ingrediente</Label>
                         <Select
                           value={ingredient.ingredientId}
@@ -424,7 +440,7 @@ export function ProductsManager() {
                             }
                           }}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Selecciona un ingrediente" />
                           </SelectTrigger>
                           <SelectContent>
@@ -436,7 +452,7 @@ export function ProductsManager() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="flex-1">
+                      <div className="w-full sm:w-32">
                         <Label>Cantidad</Label>
                         <Input
                           type="number"
@@ -457,6 +473,7 @@ export function ProductsManager() {
                       <Button
                         variant="destructive"
                         size="icon"
+                        className="w-full sm:w-10"
                         onClick={() => {
                           if (editingProduct) {
                             const newIngredients = [...editingProduct.ingredients || []]
@@ -500,16 +517,18 @@ export function ProductsManager() {
                         setNewProduct({ ...newProduct, ingredients: newIngredients })
                       }
                     }}
+                    className="w-full sm:w-auto"
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Agregar Ingrediente
                   </Button>
                 </div>
               </div>
-              <div className="flex gap-2">
+
+              <div className="flex flex-col sm:flex-row gap-2 w-full">
                 {editingProduct ? (
                   <>
-                    <Button onClick={handleUpdateProduct}>
+                    <Button onClick={handleUpdateProduct} className="w-full sm:w-auto">
                       <Pencil className="mr-2 h-4 w-4" />
                       Actualizar Producto
                     </Button>
@@ -519,12 +538,13 @@ export function ProductsManager() {
                         setEditingProduct(null);
                         setIsCreateFormVisible(false);
                       }}
+                      className="w-full sm:w-auto"
                     >
                       Cancelar
                     </Button>
                   </>
                 ) : (
-                  <Button onClick={handleCreateProduct}>
+                  <Button onClick={handleCreateProduct} className="w-full sm:w-auto">
                     <Plus className="mr-2 h-4 w-4" />
                     Crear Producto
                   </Button>
@@ -535,16 +555,16 @@ export function ProductsManager() {
         )}
       </Card>
 
-      <Card>
+      <Card className="w-full">
         <CardHeader className="border-b">
-          <div className="flex items-center justify-between">
-            <CardTitle>Productos Existentes</CardTitle>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <CardTitle className="text-lg sm:text-xl">Productos Existentes</CardTitle>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button
                 variant={viewMode === 'list' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('list')}
-                className="flex items-center gap-2"
+                className="flex-1 sm:flex-none"
               >
                 <List className="h-4 w-4" />
                 Lista
@@ -553,7 +573,7 @@ export function ProductsManager() {
                 variant={viewMode === 'grid' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('grid')}
-                className="flex items-center gap-2"
+                className="flex-1 sm:flex-none"
               >
                 <Grid className="h-4 w-4" />
                 Grid
@@ -561,7 +581,7 @@ export function ProductsManager() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="w-full">
           {loading ? (
             <div className="text-center">Cargando productos...</div>
           ) : error ? (
@@ -578,15 +598,15 @@ export function ProductsManager() {
                   No hay productos creados
                 </div>
               ) : viewMode === 'list' ? (
-                <div className="grid gap-4">
+                <div className="grid gap-4 w-full">
                   {products.map((product) => (
                     <div
                       key={product.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4 w-full"
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
                         {product.image && (
-                          <div className="relative w-20 h-20">
+                          <div className="relative w-20 h-20 flex-shrink-0">
                             <img
                               src={product.image}
                               alt={product.name}
@@ -594,54 +614,58 @@ export function ProductsManager() {
                             />
                           </div>
                         )}
-                        <div>
-                          <p className="font-medium">{product.name}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{product.name}</p>
                           {product.description && (
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm text-muted-foreground line-clamp-2">
                               {product.description}
                             </p>
                           )}
-                          <p className="text-sm text-muted-foreground">
-                            Precio: ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Categoría: {product.category?.name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Ubicación: {locations.find(loc => loc.id === product.locationId)?.name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Estado: {product.isActive ? "Activo" : "Inactivo"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Stock actual: {product.quantity || 0}
-                          </p>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                            <p className="text-sm text-muted-foreground">
+                              Precio: ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Categoría: {product.category?.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Ubicación: {locations.find(loc => loc.id === product.locationId)?.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Estado: {product.isActive ? "Activo" : "Inactivo"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Stock: {product.quantity || 0}
+                            </p>
+                          </div>
                           {product.ingredients && product.ingredients.length > 0 && (
                             <div className="mt-2">
                               <p className="text-sm font-medium">Ingredientes:</p>
-                              <ul className="text-sm text-muted-foreground">
+                              <div className="flex flex-wrap gap-1 mt-1">
                                 {product.ingredients.map((pi, index) => (
-                                  <li key={index}>
+                                  <Badge key={index} variant="outline" className="text-xs">
                                     {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
-                                  </li>
+                                  </Badge>
                                 ))}
-                              </ul>
+                              </div>
                             </div>
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 w-full sm:w-auto">
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => setEditingProduct(product)}
+                          onClick={() => handleEditClick(product)}
+                          className="flex-1 sm:flex-none"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="destructive"
                           size="icon"
-                          onClick={() => handleDeleteProduct(product.id)}
+                          onClick={() => setProductToDelete({ id: product.id, name: product.name })}
+                          className="flex-1 sm:flex-none"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -650,9 +674,9 @@ export function ProductsManager() {
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
                   {products.map((product) => (
-                    <Card key={product.id} className="overflow-hidden">
+                    <Card key={product.id} className="overflow-hidden w-full">
                       <CardContent className="p-0">
                         <div className="relative">
                           {product.image ? (
@@ -673,15 +697,15 @@ export function ProductsManager() {
                               variant="outline"
                               size="icon"
                               className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
-                              onClick={() => setEditingProduct(product)}
+                              onClick={() => handleEditClick(product)}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="destructive"
                               size="icon"
-                              className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
-                              onClick={() => handleDeleteProduct(product.id)}
+                              className="h-8 w-8 hover:bg-destructive/90"
+                              onClick={() => setProductToDelete({ id: product.id, name: product.name })}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -689,8 +713,8 @@ export function ProductsManager() {
                         </div>
                         <div className="p-4 space-y-2">
                           <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h3 className="font-semibold">{product.name}</h3>
+                            <div className="min-w-0">
+                              <h3 className="font-semibold truncate">{product.name}</h3>
                               {product.description && (
                                 <p className="text-sm text-muted-foreground line-clamp-2">
                                   {product.description}
@@ -711,11 +735,11 @@ export function ProductsManager() {
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-muted-foreground">Categoría:</span>
-                              <span>{product.category?.name}</span>
+                              <span className="truncate">{product.category?.name}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-muted-foreground">Ubicación:</span>
-                              <span>{locations.find(loc => loc.id === product.locationId)?.name}</span>
+                              <span className="truncate">{locations.find(loc => loc.id === product.locationId)?.name}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-muted-foreground">Stock:</span>
@@ -745,6 +769,38 @@ export function ProductsManager() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <DialogContent className="sm:max-w-md w-[calc(100%-2rem)] mx-auto">
+          <DialogHeader className="text-center">
+            <DialogTitle>Confirmar Eliminación</DialogTitle>
+            <DialogDescription className="pt-2 text-center">
+              ¿Estás seguro que deseas eliminar el producto <span className="font-bold">{productToDelete?.name}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 justify-center">
+            <Button
+              variant="outline"
+              onClick={() => setProductToDelete(null)}
+              className="w-full sm:w-auto"
+            >
+              No, mantener
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (productToDelete) {
+                  handleDeleteProduct(productToDelete.id)
+                  setProductToDelete(null)
+                }
+              }}
+              className="w-full sm:w-auto"
+            >
+              Sí, eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
