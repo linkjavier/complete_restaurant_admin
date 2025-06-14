@@ -46,13 +46,18 @@ export function TablesManager() {
     locationId: "",
   })
   const [editingTable, setEditingTable] = useState<Table | null>(null)
-  const [qrDialogOpen, setQrDialogOpen] = useState<string | null>(null)
+  const [showQrDialog, setShowQrDialog] = useState(false)
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null)
   const [qrUrl, setQrUrl] = useState<string>("")
   const [tableDetailsOpen, setTableDetailsOpen] = useState<string | null>(null)
   const [tableOrders, setTableOrders] = useState<any[]>([])
   const [isCreateFormVisible, setIsCreateFormVisible] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const { toast } = useToast()
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
+  const TOUCH_THRESHOLD = 10; // pixels
+  const TOUCH_TIME_THRESHOLD = 200; // milliseconds
 
   const getTimeElapsed = (date: Date) => {
     const now = new Date();
@@ -301,6 +306,31 @@ export function TablesManager() {
     img.src = "data:image/svg+xml;base64," + btoa(svgData)
   }
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartY(e.touches[0].clientY);
+    setTouchStartTime(Date.now());
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent, tableId: string) => {
+    if (!touchStartY || !touchStartTime) return;
+
+    const touchEndY = e.changedTouches[0].clientY;
+    const touchEndTime = Date.now();
+    const deltaY = Math.abs(touchEndY - touchStartY);
+    const deltaTime = touchEndTime - touchStartTime;
+
+    // Solo abrir el Dialog si:
+    // 1. El movimiento vertical es menor al umbral (no es scroll)
+    // 2. El tiempo del toque es menor al umbral (es un toque rápido)
+    if (deltaY < TOUCH_THRESHOLD && deltaTime < TOUCH_TIME_THRESHOLD) {
+      setTableDetailsOpen(tableId);
+      fetchTableOrders(tableId);
+    }
+
+    setTouchStartY(null);
+    setTouchStartTime(null);
+  };
+
   if (loading) {
     return <div className="text-center">Cargando mesas...</div>
   }
@@ -430,12 +460,9 @@ export function TablesManager() {
                 <div
                   key={table.id}
                   className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-lg hover:bg-muted/50 gap-2"
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={(e) => handleTouchEnd(e, table.id)}
                   onClick={() => {
-                    setTableDetailsOpen(table.id);
-                    fetchTableOrders(table.id);
-                  }}
-                  onTouchStart={(e) => {
-                    e.stopPropagation();
                     setTableDetailsOpen(table.id);
                     fetchTableOrders(table.id);
                   }}
@@ -478,8 +505,10 @@ export function TablesManager() {
                             size="icon"
                             className="h-8 w-8"
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
-                              setQrDialogOpen(table.id);
+                              setSelectedTableId(table.id);
+                              setShowQrDialog(true);
                             }}
                           >
                             <QrCode className="h-4 w-4" />
@@ -696,6 +725,43 @@ export function TablesManager() {
                 No hay órdenes para esta mesa
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para el código QR */}
+      <Dialog 
+        open={showQrDialog} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowQrDialog(false);
+            setSelectedTableId(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm mx-auto w-[calc(100%-2rem)] md:w-[90%] lg:w-[80%] xl:w-[70%]">
+          <DialogHeader>
+            <DialogTitle>Código QR de la Mesa</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-4">
+            <div className="bg-white p-4 rounded-lg">
+              {selectedTableId && (
+                <QRCodeSVG
+                  id={`qr-${selectedTableId}`}
+                  value={`${qrUrl}/table/${selectedTableId}`}
+                  size={200}
+                  level="H"
+                  includeMargin={false}
+                />
+              )}
+            </div>
+            <Button
+              onClick={() => selectedTableId && handleDownloadQR(selectedTableId)}
+              className="w-full"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Descargar QR
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
