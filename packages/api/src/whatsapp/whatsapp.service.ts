@@ -1,9 +1,10 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Client, LocalAuth } from 'whatsapp-web.js';
+import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AIGateway } from '../ai/ai.gateway';
+import { STTService } from '../stt/stt.service';
 
 @Injectable()
 export class WhatsappService {
@@ -24,6 +25,7 @@ export class WhatsappService {
     private eventEmitter: EventEmitter2,
     @Inject(forwardRef(() => AIGateway))
     private aiGateway: AIGateway,
+    private sttService: STTService,
   ) {
     // No inicializar en el constructor
   }
@@ -187,10 +189,105 @@ export class WhatsappService {
                 }
               }
 
-              // Guardar el mensaje entrante en la base de datos
+              // Check if the message is a voice note
+              if (message.hasMedia && message.type === 'ptt') {
+                try {
+                  // Download the voice note
+                  const media = await message.downloadMedia();
+                  if (media && media.data) {
+                    // Convert base64 to buffer
+                    const audioBuffer = Buffer.from(media.data, 'base64');
+                    
+                    // Transcribe the audio
+                    const transcribedText = await this.sttService.transcribeAudio(audioBuffer);
+                    this.logger.log(`Transcribed voice note: ${transcribedText}`);
+
+                    // Save the transcribed message in the database
+                    await this.prisma.whatsappMessage.create({
+                      data: {
+                        from: message.from,
+                        body: transcribedText,
+                        timestamp: new Date(message.timestamp * 1000),
+                        location: {
+                          connect: {
+                            id: this.locationId
+                          }
+                        },
+                        isFromAI: false,
+                        isVoiceNote: true,
+                      }
+                    });
+
+                    // Process the transcribed text with AI
+                    const aiResponse = await this.aiGateway.handleTextInput({
+                      text: transcribedText,
+                      locationId: this.locationId,
+                      chatType: 'whatsapp',
+                      chatId: message.from,
+                    });
+
+                    // Save the AI response
+                    await this.prisma.whatsappMessage.create({
+                      data: {
+                        from: message.from,
+                        body: aiResponse,
+                        timestamp: new Date(),
+                        location: {
+                          connect: {
+                            id: this.locationId
+                          }
+                        },
+                        isFromAI: true,
+                      }
+                    });
+
+                    // Send the AI response
+                    await this.client.sendMessage(message.from, aiResponse);
+
+                    // Emit events for frontend updates
+                    this.eventEmitter.emit('whatsapp.message', {
+                      from: message.from,
+                      body: transcribedText,
+                      timestamp: message.timestamp,
+                      isVoiceNote: true,
+                    });
+
+                    this.eventEmitter.emit('whatsapp.message', {
+                      from: message.from,
+                      body: aiResponse,
+                      timestamp: Date.now() / 1000,
+                      fromMe: true,
+                    });
+
+                    return;
+                  }
+                } catch (error) {
+                  this.logger.error(`Error processing voice note: ${error.message}`);
+                  try {
+                    await this.client.sendMessage(
+                      message.from,
+                      'Lo siento, hubo un error al procesar tu nota de voz. Por favor, intenta de nuevo o envía un mensaje de texto.'
+                    );
+                  } catch (sendError) {
+                    this.logger.error(`Error sending error message: ${sendError.message}`);
+                  }
+                  return;
+                }
+              }
+
+              // Handle regular text messages
+              const existingMessage = await this.prisma.whatsappMessage.findUnique({
+                where: { id: message.id._serialized }
+              });
+
+              if (existingMessage) {
+                this.logger.log(`Message ${message.id._serialized} already exists, skipping...`);
+                return;
+              }
+
+              // Save the message in the database
               await this.prisma.whatsappMessage.create({
                 data: {
-                  id: message.id._serialized,
                   from: message.from,
                   body: message.body,
                   timestamp: new Date(message.timestamp * 1000),
@@ -198,8 +295,9 @@ export class WhatsappService {
                     connect: {
                       id: this.locationId
                     }
-                  }
-                },
+                  },
+                  isFromAI: false,
+                }
               });
 
               // Verificar si la IA está habilitada
@@ -241,7 +339,7 @@ export class WhatsappService {
                     }
                   },
                   isFromAI: true,
-                },
+                }
               });
 
               // Enviar la respuesta de la IA
@@ -573,7 +671,89 @@ export class WhatsappService {
     try {
       this.logger.log(`Received message from ${message.from}: ${message.body}`);
 
-      // Verificar si el mensaje ya existe en la base de datos
+      // Check if the message is a voice note
+      if (message.hasMedia && message.type === 'ptt') {
+        try {
+          // Download the voice note
+          const media = await message.downloadMedia();
+          if (media && media.data) {
+            // Convert base64 to buffer
+            const audioBuffer = Buffer.from(media.data, 'base64');
+            
+            // Transcribe the audio
+            const transcribedText = await this.sttService.transcribeAudio(audioBuffer);
+            this.logger.log(`Transcribed voice note: ${transcribedText}`);
+
+            // Process the transcribed text with AI
+            const aiResponse = await this.aiGateway.handleTextInput({
+              text: transcribedText,
+              locationId: this.locationId,
+              chatType: 'whatsapp',
+              chatId: message.from,
+            });
+
+            // Save the transcribed message in the database
+            await this.prisma.whatsappMessage.create({
+              data: {
+                from: message.from,
+                body: transcribedText,
+                timestamp: new Date(message.timestamp * 1000),
+                location: {
+                  connect: {
+                    id: this.locationId
+                  }
+                },
+                isFromAI: false,
+                isVoiceNote: true,
+              }
+            });
+
+            // Save the AI response
+            await this.prisma.whatsappMessage.create({
+              data: {
+                from: message.from,
+                body: aiResponse,
+                timestamp: new Date(),
+                location: {
+                  connect: {
+                    id: this.locationId
+                  }
+                },
+                isFromAI: true,
+              }
+            });
+
+            // Send the AI response
+            await this.sendMessage(message.from, aiResponse);
+
+            // Emit events for frontend updates
+            this.eventEmitter.emit('whatsapp.message', {
+              from: message.from,
+              body: transcribedText,
+              timestamp: message.timestamp,
+              isVoiceNote: true,
+            });
+
+            this.eventEmitter.emit('whatsapp.message', {
+              from: message.from,
+              body: aiResponse,
+              timestamp: Date.now() / 1000,
+              fromMe: true,
+            });
+
+            return;
+          }
+        } catch (error) {
+          this.logger.error(`Error processing voice note: ${error.message}`);
+          await this.sendMessage(
+            message.from,
+            'Lo siento, hubo un error al procesar tu nota de voz. Por favor, intenta de nuevo o envía un mensaje de texto.'
+          );
+          return;
+        }
+      }
+
+      // Handle regular text messages
       const existingMessage = await this.prisma.whatsappMessage.findUnique({
         where: { id: message.id._serialized }
       });
@@ -583,39 +763,42 @@ export class WhatsappService {
         return;
       }
 
-      // Guardar el mensaje entrante en la base de datos
+      // Save the message in the database
       await this.prisma.whatsappMessage.create({
         data: {
-          id: message.id._serialized,
           from: message.from,
           body: message.body,
           timestamp: new Date(message.timestamp * 1000),
-          locationId: this.locationId,
-          isFromAI: false
+          location: {
+            connect: {
+              id: this.locationId
+            }
+          },
+          isFromAI: false,
         }
       });
 
-      // Procesar el mensaje con IA si está habilitada
+      // Process the message with AI if enabled
       if (this.aiEnabled) {
         try {
           const aiResponse = await this.processMessageWithAI(message);
           
-          // Generar un ID único para el mensaje de IA
-          const aiMessageId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          
-          // Guardar la respuesta de la IA en la base de datos
+          // Save the AI response
           await this.prisma.whatsappMessage.create({
             data: {
-              id: aiMessageId,
               from: message.from,
               body: aiResponse,
               timestamp: new Date(),
-              locationId: this.locationId,
-              isFromAI: true
+              location: {
+                connect: {
+                  id: this.locationId
+                }
+              },
+              isFromAI: true,
             }
           });
 
-          // Enviar la respuesta de la IA
+          // Send the AI response
           await this.sendMessage(message.from, aiResponse);
         } catch (error) {
           this.logger.error(`Error processing message with AI: ${error.message}`);

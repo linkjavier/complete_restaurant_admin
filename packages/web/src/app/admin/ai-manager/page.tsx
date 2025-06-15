@@ -502,7 +502,7 @@ export default function AIManagerPage() {
     <div className="h-[calc(100vh-4rem)] overflow-hidden p-4 md:p-8 w-full flex flex-col">
       <div className="flex-none flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl md:text-3xl font-bold">Inteligencia Artificial 2</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Inteligencia Artificial v.3.0</h1>
           <Button
             variant={isWhatsAppConnected ? "default" : "outline"}
             onClick={handleWhatsAppConnect}

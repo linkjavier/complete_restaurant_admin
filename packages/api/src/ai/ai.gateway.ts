@@ -148,7 +148,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
 IMPORTANT: You can only create ONE order per conversation. After creating an order, you must inform the customer that the conversation is complete and they need to start a new conversation if they want to place another order.
 
-1. First, help them select items from the menu
+1. First, help them select items from the menu (Send the menu with all items)
 2. Then ask for the customer's information. Start with the name.
 3. Then ask for their delivery address
 4. Then ask for their phone number
@@ -286,7 +286,7 @@ For delivery orders:
 
 IMPORTANT: You can only create ONE order per conversation. After creating an order, you must inform the customer that the conversation is complete and they need to start a new conversation if they want to place another order.
 
-1. First, help them select items from the menu
+1. First, help them select items from the menu (Send the menu with all items)
 2. Then ask for the customer's information. Start with the name.
 3. Then ask for their delivery address
 4. Then ask for their phone number

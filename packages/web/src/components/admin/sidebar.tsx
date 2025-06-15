@@ -91,7 +91,7 @@ const routes = [
     label: "Ingredientes",
     icon: Utensils,
     href: "/admin/ingredients",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF'],
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "Ubicaciones",
