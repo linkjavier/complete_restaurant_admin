@@ -20,6 +20,32 @@ import { cn } from "@/lib/utils"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
+// Custom hook for mobile viewport height
+function useMobileViewportHeight() {
+  const [vh, setVh] = useState('100vh');
+
+  useEffect(() => {
+    const updateHeight = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+      setVh(`${window.innerHeight}px`);
+    };
+
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    window.addEventListener('orientationchange', updateHeight);
+    window.addEventListener('scroll', updateHeight);
+
+    return () => {
+      window.removeEventListener('resize', updateHeight);
+      window.removeEventListener('orientationchange', updateHeight);
+      window.removeEventListener('scroll', updateHeight);
+    };
+  }, []);
+
+  return vh;
+}
+
 interface Message {
   id: string
   content: string
@@ -36,6 +62,7 @@ export function UserNav() {
   const [mainSocket, setMainSocket] = useState<Socket | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const vh = useMobileViewportHeight()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -121,12 +148,28 @@ export function UserNav() {
             <Brain className="h-5 w-5" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-2xl h-[600px] flex flex-col">
-          <DialogHeader>
+        <DialogContent 
+          className={cn(
+            "max-w-2xl flex flex-col",
+            "h-[600px] md:h-[600px]",
+            "h-[calc(var(--vh,1vh)*90)] md:h-[600px]",
+            "w-[calc(100%-2rem)] md:w-auto",
+            "mx-auto md:mx-0",
+            "top-[50%] md:top-[50%]",
+            "translate-y-[-50%] md:translate-y-[-50%]",
+            "rounded-lg md:rounded-lg",
+            "p-0 md:p-6"
+          )}
+          style={{ 
+            maxHeight: 'calc(var(--vh, 1vh) * 90)',
+            height: 'calc(var(--vh, 1vh) * 90)'
+          }}
+        >
+          <DialogHeader className="p-4 md:p-0 border-b">
             <DialogTitle>Asistente Administrativo</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-4">
+          <ScrollArea className="flex-1 p-4 md:p-0">
+            <div className="space-y-4">
               {messages.map((message) => (
                 <div
                   key={`${message.role === "assistant" ? 'ai' : 'user'}_${message.id}`}
@@ -138,7 +181,7 @@ export function UserNav() {
                   <Avatar>
                     <AvatarImage 
                       src={message.role === "assistant" 
-                        ? "/admin-bot-avatar.png" 
+                        ? "/bot-avatar.png" 
                         : user?.avatar || "/user-avatar.png"} 
                     />
                     <AvatarFallback>{message.role === "assistant" ? "AI" : "U"}</AvatarFallback>
@@ -172,7 +215,7 @@ export function UserNav() {
               {isLoading && (
                 <div className="flex items-start gap-4">
                   <Avatar>
-                    <AvatarImage src="/admin-bot-avatar.png" />
+                    <AvatarImage src="/bot-avatar.png" />
                     <AvatarFallback>AI</AvatarFallback>
                   </Avatar>
                   <div className="rounded-lg p-4 bg-muted">
@@ -195,7 +238,11 @@ export function UserNav() {
                   handleSendMessage()
                 }
               }}
-              className="flex-1"
+              className="flex-1 text-base"
+              style={{ 
+                fontSize: '16px', // Prevents zoom on iOS
+                WebkitTextSizeAdjust: '100%'
+              }}
             />
             <Button onClick={handleSendMessage} disabled={!input.trim() || !isConnected || isLoading}>
               <Send className="h-4 w-4" />
