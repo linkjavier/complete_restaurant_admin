@@ -16,6 +16,10 @@ import { getRestaurantAssistantRole } from './roles/restaurant-assistant.role';
 import { getAdminAssistantRole } from './roles/admin-assistant.role';
 import { restaurantAssistantFunctions } from './functions/restaurant-assistant.functions';
 import { adminAssistantFunctions } from './functions/admin-assistant.functions';
+import { STTService } from '../stt/stt.service';
+import os from 'os';
+import path from 'path';
+import fs from 'fs';
 
 @WebSocketGateway({
   cors: {
@@ -38,6 +42,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @Inject(forwardRef(() => OrdersService))
     private ordersService: OrdersService,
     private settingsService: SettingsService,
+    private sttService: STTService,
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
@@ -420,6 +425,20 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return {
           message: `Unknown function: ${functionName}`
         };
+    }
+  }
+
+  @SubscribeMessage('transcribe_audio')
+  async handleAudioTranscription(client: Socket, payload: { audio: Buffer, mimeType: string }): Promise<void> {
+    try {
+      const transcription = await this.sttService.transcribeAudio(payload.audio);
+      client.emit('transcription_result', { text: transcription });
+    } catch (error) {
+      console.error('Error transcribing audio:', error);
+      client.emit('error', {
+        message: 'Error transcribing audio',
+        details: error.message
+      });
     }
   }
 } 

@@ -25,18 +25,17 @@ export class STTService {
     try {
       // Create a temporary file to store the audio
       const tempDir = os.tmpdir();
-      const tempFilePath = path.join(tempDir, `voice-note-${Date.now()}.ogg`);
+      const tempFilePath = path.join(tempDir, `voice-note-${Date.now()}.webm`);
       
       // Write the buffer to a temporary file
       await fs.promises.writeFile(tempFilePath, audioBuffer);
 
-      // Create a file object for OpenAI
-      const file = await fs.promises.readFile(tempFilePath);
-      const audioFile = new File([file], 'voice-note.ogg', { type: 'audio/ogg' });
+      // Create a file stream for OpenAI
+      const fileStream = fs.createReadStream(tempFilePath);
 
       // Transcribe the audio using Whisper
       const transcription = await this.openai.audio.transcriptions.create({
-        file: audioFile,
+        file: fileStream,
         model: 'whisper-1',
         language: 'es', // Assuming Spanish language
       });

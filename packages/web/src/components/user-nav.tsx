@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Brain, Send } from "lucide-react"
+import { Bell, Brain, Send, Mic, Check } from "lucide-react"
 import { UserMenu } from "./user-menu"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,7 @@ import { io, Socket } from "socket.io-client"
 import { cn } from "@/lib/utils"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { toast } from "sonner"
 
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
@@ -59,10 +60,18 @@ export function UserNav() {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
   const [mainSocket, setMainSocket] = useState<Socket | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
   const vh = useMobileViewportHeight()
+  const [audioLevel, setAudioLevel] = useState(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number>();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -71,6 +80,105 @@ export function UserNav() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      
+      // Set up audio analysis
+      audioContextRef.current = new AudioContext();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+      analyserRef.current.fftSize = 256;
+      
+      // Start animation
+      const updateAudioLevel = () => {
+        if (!analyserRef.current) return;
+        
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+        
+        // Calculate average volume
+        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        setAudioLevel(average / 128); // Normalize to 0-1
+        
+        animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
+      };
+      
+      updateAudioLevel();
+      
+      // Check for supported MIME types
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType,
+        audioBitsPerSecond: 128000
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        try {
+          setIsTranscribing(true);
+          const audioBlob = new Blob(audioChunksRef.current, { 
+            type: mimeType 
+          });
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+
+          if (mainSocket && isConnected) {
+            mainSocket.emit('transcribe_audio', { 
+              audio: buffer,
+              mimeType
+            });
+          }
+        } catch (error) {
+          console.error('Error processing audio:', error);
+          toast.error('Error al procesar el audio');
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      toast.error('Error al acceder al micrófono');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+      
+      // Clean up audio analysis
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+      setAudioLevel(0);
+    }
+  };
 
   useEffect(() => {
     if (!user?.locationId) return
@@ -110,9 +218,17 @@ export function UserNav() {
       setIsLoading(false)
     })
 
+    socketInstance.on('transcription_result', ({ text }) => {
+      setInput(text);
+      inputRef.current?.focus();
+      setIsTranscribing(false);
+    })
+
     socketInstance.on('error', ({ message, details }) => {
       console.error('Socket error:', message, details)
       setIsLoading(false)
+      setIsTranscribing(false)
+      toast.error(message || 'Error en la transcripción');
     })
 
     setMainSocket(socketInstance)
@@ -121,6 +237,18 @@ export function UserNav() {
       socketInstance.disconnect()
     }
   }, [user])
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
 
   const handleSendMessage = () => {
     if (!input.trim() || !mainSocket || !isConnected || isLoading) return
@@ -227,25 +355,72 @@ export function UserNav() {
             </div>
           </ScrollArea>
           <div className="flex-none p-4 flex gap-2 border-t">
-            <Input
-              ref={inputRef}
-              placeholder="Consulta reportes, métricas o análisis..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSendMessage()
-                }
-              }}
-              className="flex-1 text-base"
-              style={{ 
-                fontSize: '16px', // Prevents zoom on iOS
-                WebkitTextSizeAdjust: '100%'
-              }}
-            />
-            <Button onClick={handleSendMessage} disabled={!input.trim() || !isConnected || isLoading}>
-              <Send className="h-4 w-4" />
+            <div className="flex-1 relative">
+              <Input
+                ref={inputRef}
+                placeholder={isRecording ? "Escuchando..." : "Consulta reportes, métricas o análisis..."}
+                value={isRecording ? "" : input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendMessage()
+                  }
+                }}
+                className={cn(
+                  "text-base pr-8",
+                  isRecording && "bg-muted"
+                )}
+                style={{ 
+                  fontSize: '16px',
+                  WebkitTextSizeAdjust: '100%'
+                }}
+                disabled={isRecording}
+              />
+              {isRecording && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {[...Array(4)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-1 bg-primary rounded-full"
+                      style={{
+                        height: `${Math.max(4, audioLevel * 20)}px`,
+                        transition: 'height 0.1s ease-in-out',
+                        animation: 'wave 1s ease-in-out infinite',
+                        animationDelay: `${i * 0.1}s`
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+            {!isRecording && (
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={startRecording}
+                disabled={isTranscribing}
+                className={cn(
+                  "transition-colors",
+                  isTranscribing && "opacity-50"
+                )}
+              >
+                <Mic className="h-4 w-4" />
+              </Button>
+            )}
+            <Button 
+              onClick={isRecording ? stopRecording : handleSendMessage} 
+              disabled={(!input.trim() && !isRecording) || !isConnected || isLoading}
+              className={cn(
+                "transition-colors",
+                isRecording && "bg-primary text-primary-foreground"
+              )}
+            >
+              {isRecording ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </DialogContent>
@@ -269,3 +444,15 @@ export function UserNav() {
     </div>
   )
 }
+
+// Add this to your global CSS or create a new style block
+const styles = `
+@keyframes wave {
+  0%, 100% {
+    transform: scaleY(0.5);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+`;
