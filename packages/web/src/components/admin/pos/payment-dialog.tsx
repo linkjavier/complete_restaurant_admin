@@ -90,10 +90,6 @@ export function PaymentDialog({
       if (isPrePayment) {
         // Para pre-pagos, solo notificar que el pago fue procesado
         // La orden se creará después
-        toast({
-          title: "Éxito",
-          description: "Pago procesado correctamente",
-        })
         if (onPaymentProcessed) {
           onPaymentProcessed()
         }
@@ -101,10 +97,6 @@ export function PaymentDialog({
       } else {
         // Proceso normal de pago para órdenes existentes
         await processPayment(orderId, parseFloat(amount), paymentMethod)
-        toast({
-          title: "Éxito",
-          description: "Pago procesado correctamente",
-        })
         await loadPaymentDetails()
         if (onPaymentProcessed) {
           onPaymentProcessed()

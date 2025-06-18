@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Overview } from "@/components/admin/overview"
 import { Button } from "@/components/ui/button"
-import { Building2, Users, Utensils, DollarSign, Package, ShoppingCart, CheckCircle2, XCircle, TrendingUp, Calendar, Clock, AlertTriangle, AlertCircle, Bell, QrCode, ShoppingBag, MessageCircle, ArrowRight } from "lucide-react"
+import { Building2, Users, Utensils, DollarSign, Package, ShoppingCart, CheckCircle2, XCircle, TrendingUp, Calendar, Clock, AlertTriangle, AlertCircle, Bell, QrCode, ShoppingBag, MessageCircle, ArrowRight, CreditCard } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart, Rectangle, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
@@ -149,6 +149,9 @@ export default function AdminDashboard() {
   const [conversionFunnel, setConversionFunnel] = useState<ConversionFunnel[]>([])
   const [menuSections, setMenuSections] = useState<MenuSection[]>([])
   const [cartAbandonment, setCartAbandonment] = useState<CartAbandonment[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
+  const [totalSales, setTotalSales] = useState<number>(0)
+  const [unpaidOrders, setUnpaidOrders] = useState<{ count: number; total: number }>({ count: 0, total: 0 })
 
   const calculateOrderTotal = (order: Order) => {
     if (!order?.items?.length) return 0
@@ -195,6 +198,20 @@ export default function AdminDashboard() {
       }
 
       const orders: Order[] = await response.json()
+      setOrders(orders)
+      
+      // Calculate total sales (excluding cancelled orders)
+      const totalSales = orders
+        .filter(order => order.status !== "CANCELLED")
+        .reduce((total, order) => total + calculateOrderTotal(order), 0)
+      
+      // Calculate unpaid orders (excluding cancelled orders)
+      const unpaidOrdersData = {
+        count: orders.filter(order => !order.isPaid && order.status !== "CANCELLED").length,
+        total: orders
+          .filter(order => !order.isPaid && order.status !== "CANCELLED")
+          .reduce((total, order) => total + calculateOrderTotal(order), 0)
+      }
       
       const stats: OrderStats = {
         activeOrders: {
@@ -219,6 +236,10 @@ export default function AdminDashboard() {
 
       setOrderStats(stats)
       setTopProducts(calculateTopProducts(orders))
+      
+      // Store total sales for use in the UI
+      setTotalSales(totalSales)
+      setUnpaidOrders(unpaidOrdersData)
     } catch (error) {
       console.error('Error fetching order stats:', error)
     }
@@ -515,6 +536,20 @@ export default function AdminDashboard() {
     }
   }
 
+  // Contadores de órdenes por canal
+  const countBySource = (src: string) =>
+    orders.filter(order => (order as any).source === src).length
+  const countMeseros = () =>
+    orders.filter(order => !(order as any).source || !['POS','WHATSAPP','QR','DIDDI','RAPPI'].includes((order as any).source)).length
+  // Total de ventas por canal
+  const totalBySource = (src: string) =>
+    orders.filter(order => (order as any).source === src).reduce((sum, order) => sum + calculateOrderTotal(order), 0)
+  const totalMeseros = () =>
+    orders.filter(order => !(order as any).source || !['POS','WHATSAPP','QR','DIDDI','RAPPI'].includes((order as any).source)).reduce((sum, order) => sum + calculateOrderTotal(order), 0)
+
+  // Utilidad para pluralizar 'órden/órdenes'
+  const ordenesLabel = (count: number) => `${count} ${count === 1 ? 'órden' : 'órdenes'}`
+
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
@@ -530,7 +565,7 @@ export default function AdminDashboard() {
           <TabsTrigger value="reports">Reportes</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -539,7 +574,7 @@ export default function AdminDashboard() {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">$45,231.89</div>
+                <div className="text-2xl font-bold">${totalSales.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</div>
                 <p className="text-xs text-muted-foreground">
                   +20.1% desde el mes pasado
                 </p>
@@ -576,6 +611,20 @@ export default function AdminDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
+                  Pedidos sin Pagar
+                </CardTitle>
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{unpaidOrders.count}</div>
+                <p className="text-xs text-muted-foreground">
+                  Total: ${unpaidOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
                   Pedidos Cancelados
                 </CardTitle>
                 <XCircle className="h-4 w-4 text-muted-foreground" />
@@ -588,6 +637,96 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Canales de Pedido - ORDEN PERSONALIZADO */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Canales de Pedido</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                {/* POS */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">POS</CardTitle>
+                      <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-bold text-primary">${totalBySource('POS').toLocaleString('es-CO', { maximumFractionDigits: 0 })}</div>
+                    <p className="text-xs text-muted-foreground">{ordenesLabel(countBySource('POS'))}</p>
+                  </CardContent>
+                </Card>
+                {/* IA WHATSAPP */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">IA WhatsApp</CardTitle>
+                      <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-bold text-primary">${totalBySource('WHATSAPP').toLocaleString('es-CO', { maximumFractionDigits: 0 })}</div>
+                    <p className="text-xs text-muted-foreground">{ordenesLabel(countBySource('WHATSAPP'))}</p>
+                  </CardContent>
+                </Card>
+                {/* QR MESAS */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">QR Mesas</CardTitle>
+                      <QrCode className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-bold text-primary">${totalBySource('QR').toLocaleString('es-CO', { maximumFractionDigits: 0 })}</div>
+                    <p className="text-xs text-muted-foreground">{ordenesLabel(countBySource('QR'))}</p>
+                  </CardContent>
+                </Card>
+                {/* MESEROS */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">Meseros</CardTitle>
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-bold text-primary">${totalMeseros().toLocaleString('es-CO', { maximumFractionDigits: 0 })}</div>
+                    <p className="text-xs text-muted-foreground">{ordenesLabel(countMeseros())}</p>
+                  </CardContent>
+                </Card>
+                {/* DIDDI */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">Diddi</CardTitle>
+                      <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-bold text-primary">${totalBySource('DIDDI').toLocaleString('es-CO', { maximumFractionDigits: 0 })}</div>
+                    <p className="text-xs text-muted-foreground">{ordenesLabel(countBySource('DIDDI'))}</p>
+                  </CardContent>
+                </Card>
+                {/* RAPPI */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">Rappi</CardTitle>
+                      <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-bold text-primary">${totalBySource('RAPPI').toLocaleString('es-CO', { maximumFractionDigits: 0 })}</div>
+                    <p className="text-xs text-muted-foreground">{ordenesLabel(countBySource('RAPPI'))}</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
             <Card className="col-span-4">
               <CardHeader>
@@ -1127,81 +1266,6 @@ export default function AdminDashboard() {
                           </CardContent>
                         </Card>
                       </div>
-
-                      {/* Order Channels */}
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Canales de Pedido</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-4 gap-4">
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <div className="flex items-center justify-between">
-                                  <CardTitle className="text-sm font-medium">
-                                    QR en Mesas
-                                  </CardTitle>
-                                  <QrCode className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="text-2xl font-bold">45%</div>
-                                <p className="text-xs text-muted-foreground">
-                                  +5% desde la semana pasada
-                                </p>
-                              </CardContent>
-                            </Card>
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <div className="flex items-center justify-between">
-                                  <CardTitle className="text-sm font-medium">
-                                    Rappi
-                                  </CardTitle>
-                                  <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="text-2xl font-bold">30%</div>
-                                <p className="text-xs text-muted-foreground">
-                                  +2% desde la semana pasada
-                                </p>
-                              </CardContent>
-                            </Card>
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <div className="flex items-center justify-between">
-                                  <CardTitle className="text-sm font-medium">
-                                    Didi
-                                  </CardTitle>
-                                  <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="text-2xl font-bold">15%</div>
-                                <p className="text-xs text-muted-foreground">
-                                  +1% desde la semana pasada
-                                </p>
-                              </CardContent>
-                            </Card>
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <div className="flex items-center justify-between">
-                                  <CardTitle className="text-sm font-medium">
-                                    WhatsApp
-                                  </CardTitle>
-                                  <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="text-2xl font-bold">10%</div>
-                                <p className="text-xs text-muted-foreground">
-                                  +3% desde la semana pasada
-                                </p>
-                              </CardContent>
-                            </Card>
-                          </div>
-                        </CardContent>
-                      </Card>
                     </div>
                   </CardContent>
                 </Card>

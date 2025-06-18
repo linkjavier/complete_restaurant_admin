@@ -543,7 +543,11 @@ export function OrdersManager() {
                                   )}
                                   {order.source && (
                                     <p className="text-xs mt-1">
-                                      <span className="font-semibold">Origen:</span> <span className="inline-block px-2 py-0.5 rounded bg-gray-200 text-gray-700 text-xs uppercase tracking-wide">{order.source}</span>
+                                      <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${
+                                        order.source === 'WHATSAPP' 
+                                          ? 'bg-green-200 text-green-700' 
+                                          : 'bg-gray-200 text-gray-700'
+                                      }`}>{order.source}</span>
                                     </p>
                                   )}
                                 </div>

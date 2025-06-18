@@ -39,6 +39,7 @@ export function KitchenManager() {
         toast({
           title: "Atención",
           description: "Interactúa con la página para habilitar las notificaciones de sonido",
+          duration: 3000
         });
       }
     }
@@ -135,6 +136,7 @@ export function KitchenManager() {
             toast({
               title: "Orden Completada",
               description: "La orden se eliminará en 5 segundos",
+              duration: 3000
             })
             
             setTimeout(() => {
@@ -155,7 +157,19 @@ export function KitchenManager() {
 
       toast({
         title: "Éxito",
-        description: `Estado del item actualizado a ${status}`,
+        description: (
+          <span>
+            Estado del item actualizado a{' '}
+            <span className="font-bold uppercase">
+              {status === "PENDING" ? "Pendiente" :
+               status === "IN_PROGRESS" ? "En preparación" :
+               status === "READY" ? "Completado" :
+               status === "CANCELLED" ? "Cancelado" :
+               status}
+            </span>
+          </span>
+        ),
+        duration: 3000
       })
     } catch (err: any) {
       console.error('Error updating item status:', err)
@@ -168,6 +182,7 @@ export function KitchenManager() {
           title: "Error de autenticación",
           description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
           variant: "destructive",
+          duration: 3000
         })
         
         // Redirect to login after a short delay
@@ -179,6 +194,7 @@ export function KitchenManager() {
           title: "Error",
           description: "Error al actualizar el estado del item. Por favor, intenta de nuevo.",
           variant: "destructive",
+          duration: 3000
         })
       }
     }
@@ -190,6 +206,7 @@ export function KitchenManager() {
       toast({
         title: "Éxito",
         description: "Ticket enviado a la impresora",
+        duration: 3000
       })
     } catch (err: any) {
       console.error('Error printing ticket:', err)
@@ -202,6 +219,7 @@ export function KitchenManager() {
           title: "Error de autenticación",
           description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
           variant: "destructive",
+          duration: 3000
         })
         
         // Redirect to login after a short delay
@@ -213,6 +231,7 @@ export function KitchenManager() {
           title: "Error",
           description: "Error al imprimir el ticket. Por favor, intenta de nuevo.",
           variant: "destructive",
+          duration: 3000
         })
       }
     }
@@ -245,6 +264,7 @@ export function KitchenManager() {
       toast({
         title: "Éxito",
         description: "Orden iniciada correctamente",
+        duration: 3000
       });
     } catch (err: any) {
       console.error('Error starting order:', err);
@@ -252,6 +272,7 @@ export function KitchenManager() {
         title: "Error",
         description: "Error al iniciar la orden",
         variant: "destructive",
+        duration: 3000
       });
     }
   };
@@ -339,6 +360,7 @@ export function KitchenManager() {
           toast({
             title: "Orden Completada",
             description: "La orden se eliminará en 5 segundos",
+            duration: 3000
           })
           
           setTimeout(() => {

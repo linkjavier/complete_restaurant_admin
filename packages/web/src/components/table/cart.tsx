@@ -4,9 +4,9 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Minus, Users } from "lucide-react"
+import { Plus, Minus, Users, CheckCircle2 } from "lucide-react"
 import { OrderItem, Product, getAuthToken } from "@/lib/api"
-import { toast } from "sonner"
+import { useToast } from "@/components/ui/use-toast"
 import { io } from "socket.io-client"
 
 interface CartProps {
@@ -21,6 +21,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
   const [splitBill, setSplitBill] = useState(false)
   const [splitNames, setSplitNames] = useState<string[]>([customerName])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
 
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
@@ -89,11 +90,28 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
         socket.disconnect();
       });
 
-      toast.success('Pedido enviado correctamente');
+      toast({
+        title: "Éxito",
+        description: (
+          <span className="flex items-center justify-between text-green-600">
+            <span>Pedido enviado correctamente</span>
+            <CheckCircle2 className="ml-4" style={{ width: '60px', height: '60px' }} />
+          </span>
+        ),
+        variant: "default",
+        duration: 5000
+      });
       onItemsChange([]); // Limpiar el carrito
+      
+      // Scroll to top of the page
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       console.error('Error:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al enviar el pedido');
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Error al enviar el pedido',
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }

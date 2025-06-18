@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search } from "lucide-react"
+import { Search, CheckCircle2 } from "lucide-react"
 import { 
   getProducts, 
   Product, 
@@ -228,7 +228,13 @@ export default function PosPage() {
 
       toast({
         title: "Éxito",
-        description: "Pedido creado correctamente",
+        description: (
+          <span className="flex items-center justify-between text-green-600">
+            <span>Pedido creado correctamente</span>
+            <CheckCircle2 className="ml-4" style={{ width: '60px', height: '60px' }} />
+          </span>
+        ),
+        variant: "default"
       })
     } catch (err) {
       console.error('Error creating order:', err)
