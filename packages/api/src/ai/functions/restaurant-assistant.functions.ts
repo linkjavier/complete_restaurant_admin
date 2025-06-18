@@ -1,19 +1,148 @@
 export const restaurantAssistantFunctions = [
   {
-    name: 'create_order',
-    description: 'Create a new delivery order with specified items',
+    name: 'search_products_by_name',
+    description: 'Search for products by name to get the correct product ID',
+    parameters: {
+      type: 'object',
+      properties: {
+        productName: {
+          type: 'string',
+          description: 'Name or partial name of the product to search for',
+        },
+        locationId: {
+          type: 'string',
+          description: 'ID of the location to search products in',
+        },
+      },
+      required: ['productName', 'locationId'],
+    },
+  },
+  {
+    name: 'calculate_order_subtotal',
+    description: 'Calculate the subtotal for a list of items with their quantities',
     parameters: {
       type: 'object',
       properties: {
         items: {
           type: 'array',
-          description: 'List of items to order',
+          description: 'List of items with product names and quantities',
+          items: {
+            type: 'object',
+            properties: {
+              productName: {
+                type: 'string',
+                description: 'Name of the product (will be matched to get correct ID)',
+              },
+              quantity: {
+                type: 'integer',
+                description: 'Quantity of the product',
+                minimum: 1,
+              },
+              notes: {
+                type: 'string',
+                description: 'Optional notes for the order item',
+              },
+            },
+            required: ['productName', 'quantity'],
+          },
+        },
+        locationId: {
+          type: 'string',
+          description: 'ID of the location to get product prices from',
+        },
+      },
+      required: ['items', 'locationId'],
+    },
+  },
+  {
+    name: 'validate_order_before_creation',
+    description: 'Validate the complete order with customer information and calculated totals before creating it',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'List of validated items with correct product IDs and calculated subtotals',
           items: {
             type: 'object',
             properties: {
               productId: {
                 type: 'string',
-                description: 'ID of the product to order',
+                description: 'Validated product ID',
+              },
+              productName: {
+                type: 'string',
+                description: 'Name of the product for display',
+              },
+              quantity: {
+                type: 'integer',
+                description: 'Quantity of the product',
+                minimum: 1,
+              },
+              unitPrice: {
+                type: 'number',
+                description: 'Unit price of the product',
+              },
+              subtotal: {
+                type: 'number',
+                description: 'Calculated subtotal for this item',
+              },
+              notes: {
+                type: 'string',
+                description: 'Optional notes for the order item',
+              },
+            },
+            required: ['productId', 'productName', 'quantity', 'unitPrice', 'subtotal'],
+          },
+        },
+        totalAmount: {
+          type: 'number',
+          description: 'Total calculated amount for the entire order',
+        },
+        customerName: {
+          type: 'string',
+          description: 'Name of the customer',
+        },
+        deliveryAddress: {
+          type: 'string',
+          description: 'Delivery address for the order',
+        },
+        phone: {
+          type: 'string',
+          description: 'Customer phone number',
+        },
+        neighborhood: {
+          type: 'string',
+          description: 'Customer neighborhood',
+        },
+        paymentMethod: {
+          type: 'string',
+          description: 'Payment method for the order',
+          enum: ['CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'TRANSFER'],
+        },
+        locationId: {
+          type: 'string',
+          description: 'ID of the location where the order is being placed',
+        },
+      },
+      required: ['items', 'totalAmount', 'customerName', 'deliveryAddress', 'phone', 'neighborhood', 'paymentMethod', 'locationId'],
+    },
+  },
+  {
+    name: 'create_order',
+    description: 'Create a new delivery order with validated items and calculated totals',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'List of validated items with correct product IDs',
+          items: {
+            type: 'object',
+            properties: {
+              productId: {
+                type: 'string',
+                description: 'Validated product ID',
               },
               quantity: {
                 type: 'integer',
