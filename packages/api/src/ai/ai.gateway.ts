@@ -514,6 +514,30 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         try {
           const { items, totalAmount, customerName, deliveryAddress, phone, neighborhood, paymentMethod, locationId: validateLocationId } = functionArgs;
           
+          // Reconstruir los datos completos de los productos si faltan
+          let enrichedItems = items;
+          if (
+            items.length > 0 &&
+            (!items[0].productName || !items[0].unitPrice || !items[0].subtotal)
+          ) {
+            const menu = await this.productsService.findAll({ locationId: validateLocationId });
+            enrichedItems = items.map(item => {
+              const product = menu.find(p => p.id === item.productId);
+              if (!product) {
+                throw new Error(`Producto no encontrado para ID: ${item.productId}`);
+              }
+              const subtotal = product.price * item.quantity;
+              return {
+                productId: product.id,
+                productName: product.name,
+                quantity: item.quantity,
+                unitPrice: product.price,
+                subtotal,
+                notes: item.notes || ''
+              };
+            });
+          }
+
           // Validar que todos los campos requeridos estén presentes
           if (!customerName || !deliveryAddress || !phone || !neighborhood || !paymentMethod) {
             return {
@@ -522,14 +546,14 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           }
 
           // Validar que los items tengan la estructura correcta
-          if (!items || items.length === 0) {
+          if (!enrichedItems || enrichedItems.length === 0) {
             return {
               message: `🚨 *Orden vacía*\n\n❌ No hay productos en la orden. Por favor, selecciona al menos un producto.`
             };
           }
 
           // Validar que los cálculos sean correctos
-          const calculatedTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+          const calculatedTotal = enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
           if (Math.abs(calculatedTotal - totalAmount) > 0.01) {
             return {
               message: `🚨 *Error en cálculos*\n\n❌ Error en los cálculos. Total calculado: $${calculatedTotal}, Total proporcionado: $${totalAmount}. Por favor, recalcula la orden.`
@@ -537,11 +561,11 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           }
 
           // Crear resumen final para confirmación con formato mejorado
-          const itemsSummary = items.map((item, index) => 
+          const itemsSummary = enrichedItems.map((item, index) => 
             `${index + 1}. *${item.productName}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
           ).join('\n');
 
-          const formattedTotal = totalAmount.toLocaleString('es-CO', { 
+          const formattedTotal = calculatedTotal.toLocaleString('es-CO', { 
             minimumFractionDigits: 0, 
             maximumFractionDigits: 0 
           });
@@ -564,10 +588,10 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           const customerInfo = `👤 *Datos del Cliente*\n━━━━━━━━━━━━━━━━━━━━━━━━\n• *Nombre:* ${customerName}\n• *Dirección:* ${deliveryAddress}\n• *Teléfono:* ${phone}\n• *Barrio:* ${neighborhood}\n• *Método de pago:* ${paymentEmojis[paymentMethod]} ${paymentDisplay[paymentMethod]}`;
 
           return {
-            message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *"Sí"* o *"Confirmo"* para proceder con la orden.`,
+            message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *\"Sí\"* o *\"Confirmo\"* para proceder con la orden.`,
             validated: true,
             orderData: {
-              items: items.map(item => ({
+              items: enrichedItems.map(item => ({
                 productId: item.productId,
                 quantity: item.quantity,
                 notes: item.notes
