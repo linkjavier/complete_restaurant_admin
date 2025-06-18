@@ -15,6 +15,12 @@ export enum PaymentMethod {
   TRANSFER = 'TRANSFER'
 }
 
+export enum OrderSource {
+  POS = 'POS',
+  QR = 'QR',
+  WHATSAPP = 'WHATSAPP'
+}
+
 class OrderItemDto {
   @IsString()
   @IsNotEmpty()
@@ -68,6 +74,9 @@ export class CreateOrderDto {
   @IsBoolean()
   @IsOptional()
   isPaid?: boolean;
+
+  @IsEnum(OrderSource)
+  source: OrderSource;
 
   @IsArray()
   @ValidateNested({ each: true })

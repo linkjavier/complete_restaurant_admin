@@ -152,6 +152,12 @@ enum OrderType {
   DELIVERY
 }
 
+enum OrderSource {
+  POS
+  QR
+  WHATSAPP
+}
+
 model Order {
   id            String       @id @default(uuid())
   createdAt     DateTime     @default(now())
@@ -170,6 +176,7 @@ model Order {
   neighborhood   String?
   phone         String?
   paymentMethod PaymentMethod?
+  source        OrderSource
   items         OrderItem[]
   payments      Payment[]
 }

@@ -56,6 +56,7 @@ interface Order {
   deliveryAddress?: string
   neighborhood?: string
   phone?: string
+  source?: string
 }
 
 export function OrdersManager() {
@@ -538,6 +539,11 @@ export function OrdersManager() {
                                         order.paymentMethod === "TRANSFER" ? "Transferencia" :
                                         "Otro"
                                       }
+                                    </p>
+                                  )}
+                                  {order.source && (
+                                    <p className="text-xs mt-1">
+                                      <span className="font-semibold">Origen:</span> <span className="inline-block px-2 py-0.5 rounded bg-gray-200 text-gray-700 text-xs uppercase tracking-wide">{order.source}</span>
                                     </p>
                                   )}
                                 </div>

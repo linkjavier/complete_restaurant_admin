@@ -197,7 +197,8 @@ export default function PosPage() {
         paymentMethod: orderType === "delivery" ? paymentMethod : undefined,
         items: orderItems,
         status: orderType === "takeout" ? "IN_PROGRESS" as const : "PENDING" as const,
-        isPaid: orderType === "takeout" ? true : false
+        isPaid: orderType === "takeout" ? true : false,
+        source: 'POS',
       }
 
       const createdOrder = await createOrder(orderData)

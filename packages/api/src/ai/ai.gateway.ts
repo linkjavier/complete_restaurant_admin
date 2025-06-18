@@ -643,37 +643,24 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
             locationId,
             type: 'DELIVERY', // Always set to DELIVERY for AI orders
             status: 'PENDING',
-            tableId: undefined // Ensure tableId is not set for delivery orders
+            tableId: undefined, // Ensure tableId is not set for delivery orders
+            source: 'WHATSAPP',
           });
 
           return {
             message: `🎉 *¡Orden Creada Exitosamente!*\n\n📋 *Orden #${order.id}*\n👤 Cliente: *${functionArgs.customerName}*\n📍 Dirección: ${functionArgs.deliveryAddress}\n📞 Teléfono: ${functionArgs.phone}\n\n✅ Tu pedido ha sido recibido y está siendo procesado.\n\n¡Gracias por tu compra! 😊`
           };
         } catch (error) {
-          console.error('Error in create_order function:', error);
+          console.error('Error in create_order:', error);
           return {
-            message: `Error creating order: ${error.message}`
+            message: `❌ Error creando la orden: ${error.message}`
           };
         }
 
       default:
         return {
-          message: `Unknown function: ${functionName}`
+          message: `Función no implementada: ${functionName}`
         };
     }
   }
-
-  @SubscribeMessage('transcribe_audio')
-  async handleAudioTranscription(client: Socket, payload: { audio: Buffer, mimeType: string }): Promise<void> {
-    try {
-      const transcription = await this.sttService.transcribeAudio(payload.audio);
-      client.emit('transcription_result', { text: transcription });
-    } catch (error) {
-      console.error('Error transcribing audio:', error);
-      client.emit('error', {
-        message: 'Error transcribing audio',
-        details: error.message
-      });
-    }
-  }
-} 
+}

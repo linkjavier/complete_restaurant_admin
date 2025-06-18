@@ -242,6 +242,11 @@ cd packages/api
 npx prisma migrate dev
 ```
 
+12. **Regenerate Prisma Client**
+```bash
+npx prisma generate --schema=packages/api/prisma/schema.prisma
+```
+
 ### NGINX and SSL Setup
 
 1. **Install NGINX**

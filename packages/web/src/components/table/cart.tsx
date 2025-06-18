@@ -52,7 +52,8 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
         items: items.map(item => ({
           productId: item.product.id,
           quantity: item.quantity,
-        }))
+        })),
+        source: 'QR',
       };
       
       // Solo añadir splitBill si es necesario
