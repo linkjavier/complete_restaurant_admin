@@ -52,6 +52,7 @@ export function ProductsManager() {
       updatedAt: string;
     }[],
     variants: [] as {
+      id: string;
       name: string;
       price?: number;
       image?: string;
@@ -131,7 +132,10 @@ export function ProductsManager() {
         isActive: newProduct.isActive,
         quantity: newProduct.quantity,
         ingredients: newProduct.ingredients,
-        variants: newProduct.variants,
+        variants: newProduct.variants.map(v => ({
+          ...v,
+          id: v.id || `temp-${Date.now()}-${Math.random()}`
+        })),
       })
 
       toast({
@@ -189,7 +193,10 @@ export function ProductsManager() {
           ingredientId: pi.ingredientId,
           quantity: pi.quantity,
         })) || [],
-        variants: editingProduct.variants,
+        variants: editingProduct.variants.map(v => ({
+          ...v,
+          id: v.id || `temp-${Date.now()}-${Math.random()}`
+        })),
       })
 
       toast({
@@ -637,11 +644,11 @@ export function ProductsManager() {
                     onClick={() => {
                       if (editingProduct) {
                         const newVariants = [...editingProduct.variants || []]
-                        newVariants.push({ name: '', price: undefined, image: '', isActive: true })
+                        newVariants.push({ id: `temp-${Date.now()}`, name: '', price: undefined, image: '', isActive: true })
                         setEditingProduct({ ...editingProduct, variants: newVariants })
                       } else {
                         const newVariants = [...newProduct.variants]
-                        newVariants.push({ name: '', price: undefined, image: '', isActive: true })
+                        newVariants.push({ id: `temp-${Date.now()}`, name: '', price: undefined, image: '', isActive: true })
                         setNewProduct({ ...newProduct, variants: newVariants })
                       }
                     }}
