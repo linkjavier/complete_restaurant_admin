@@ -186,4 +186,18 @@ export const restaurantAssistantFunctions = [
       required: ['items', 'locationId', 'customerName', 'deliveryAddress', 'phone', 'neighborhood', 'paymentMethod'],
     },
   },
+  {
+    name: 'get_menu',
+    description: 'Devuelve el menú completo del restaurante, con productos enumerados, nombre y precio, agrupados por categoría. El formato debe ser bonito y fácil de leer para el cliente.',
+    parameters: {
+      type: 'object',
+      properties: {
+        locationId: {
+          type: 'string',
+          description: 'ID de la ubicación para obtener el menú',
+        },
+      },
+      required: ['locationId'],
+    },
+  },
 ]; 

@@ -103,6 +103,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Cacerola con todo",
     "description": "Huevos con jamón, maíz tierno, pollo, tocineta, maduro, salchicha, champiñones y queso mozzarella.",
     "price": 19700,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750307441/restaurant/usp6baqltapovxlgszyv.jpg",
     "categoryId": "'$DESAYUNOS_ESPECIALES_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -115,6 +116,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Napoliqueso",
     "description": "Huevos con jamón, rodajas de tomate, cebolla, pimentón, y salsa de queso.",
     "price": 15200,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750307677/restaurant/v9nr332wpighzkfxr76t.png",
     "categoryId": "'$DESAYUNOS_ESPECIALES_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -127,6 +129,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Huevos Nidando",
     "description": "Huevos con papas a la francesa, salchicha y queso parmesano.",
     "price": 16200,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750307711/restaurant/ikjd14tb87eowhjow3o2.jpg",
     "categoryId": "'$DESAYUNOS_ESPECIALES_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -140,6 +143,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Calentado Berraco",
     "description": "Arroz, maduro, frijoles, carne, chicharrón, arepa frita, huevo y bebida caliente (Café negro o en leche) o bebida fría (Jugo del día).",
     "price": 19200,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750308310/restaurant/sxdsayg2add3ttpmin4x.webp",
     "categoryId": "'$CALENTADOS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -152,6 +156,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Calentado Calidoso",
     "description": "Arroz, carne, arepa frita, papa, huevo y bebida caliente (Café negro o en leche) o bebida fría (Jugo del día).",
     "price": 19200,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750308331/restaurant/nv0dzovxnztjb7k6q7qv.png",
     "categoryId": "'$CALENTADOS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -164,6 +169,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Calentado Paisa",
     "description": "Arroz, frijoles, arepa frita, chicharrón, aguacate, huevo y bebida caliente (Café negro o en leche) o bebida fría (Jugo del día).",
     "price": 19200,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750308346/restaurant/g74qmbigzgrx4ygzbaeq.png",
     "categoryId": "'$CALENTADOS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -176,6 +182,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Calentado de Carne",
     "description": "Carne asada o en bistec, arroz, frijoles, arepa frita, guiso.",
     "price": 16200,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750308368/restaurant/xe9jbml1byeichkkrod6.jpg",
     "categoryId": "'$CALENTADOS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -188,6 +195,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Calentado Huevos",
     "description": "Arroz, frijoles, huevos (en cacerola, pericos o revueltos), arepa frita, guiso.",
     "price": 13700,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750308420/restaurant/vpbaltvlaikdn7ynac4g.png",
     "categoryId": "'$CALENTADOS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -201,6 +209,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Omelette Promo 2x1",
     "description": "Huevos con jamón y queso o pollo con maicitos. (No incluye bebida) (Promoción aplica de lunes a viernes)",
     "price": 18900,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750308463/restaurant/okg37f1zuzx39mexlnxi.jpg",
     "categoryId": "'$OMELETTES_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -213,6 +222,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Omelette Samba",
     "description": "Huevos con maíz, maduro y tocineta.",
     "price": 16400,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750312428/restaurant/uxa6yg9kpnhwq7saxbgn.png",
     "categoryId": "'$OMELETTES_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -225,6 +235,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Omelette Vegetariano",
     "description": "Huevos con espinaca, brócoli, habichuela, pimentón, zanahoria, champiñones, arveja y queso.",
     "price": 13900,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750312533/restaurant/io4eobsoc52ztdivx9en.png",
     "categoryId": "'$OMELETTES_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -237,6 +248,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Omelette Ibérico",
     "description": "Huevos con papas al vapor, cebollín, pimentón, cebolla, aderezo y chorizo riojano.",
     "price": 13900,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750312636/restaurant/lftp32x6rhqmpxmvlkqf.png",
     "categoryId": "'$OMELETTES_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -249,6 +261,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Omelette Paola",
     "description": "Huevos con carne desmechada, jamón, champiñones, espinaca, maíz tierno, cebolla y tocineta.",
     "price": 16400,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750312676/restaurant/ybvoj0im3z1ln6rjkopb.jpg",
     "categoryId": "'$OMELETTES_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -261,6 +274,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Omelette Hawaiano",
     "description": "Huevos con jamón, queso y piña.",
     "price": 13900,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750312926/restaurant/rqmuxyd0fcuby1hhopkz.jpg",
     "categoryId": "'$OMELETTES_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -274,6 +288,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Desayuno Jamón",
     "description": "Huevos revueltos con jamón, arroz, pan y bebida caliente (Café negro o en leche) o bebida fría (Jugo del día).",
     "price": 12200,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750316648/restaurant/uz35gt1xnpiqstm7dube.png",
     "categoryId": "'$DESAYUNOS_BASICOS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -286,6 +301,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Desayuno Ranchero",
     "description": "Huevos revueltos con salchicha ranchera, arroz, pan y bebida caliente (Café negro o en leche) o bebida fría (Jugo del día).",
     "price": 13200,
+    "image": null,
     "categoryId": "'$DESAYUNOS_BASICOS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -298,6 +314,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Desayuno Revuelto",
     "description": "Huevos revueltos, arroz, pan y bebida caliente (Café negro o en leche) o bebida fría (Jugo del día).",
     "price": 11800,
+    "image": null,
     "categoryId": "'$DESAYUNOS_BASICOS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -310,6 +327,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Desayuno Pericos",
     "description": "Huevos pericos, arroz, pan y bebida caliente (Café negro o en leche) o bebida fría (Jugo del día).",
     "price": 12700,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750313390/restaurant/fv97af3dlo64ittrqb7l.png",
     "categoryId": "'$DESAYUNOS_BASICOS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -323,6 +341,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Pandebono",
     "description": "Pandebono tradicional colombiano",
     "price": 2500,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750313121/restaurant/oy8parz8qpcnnlir9ayi.png",
     "categoryId": "'$PANADERIA_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -335,6 +354,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Buñuelo",
     "description": "Buñuelo de yuca tradicional",
     "price": 2500,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750313142/restaurant/dc63lq1b3jsenfudjlq1.png",
     "categoryId": "'$PANADERIA_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -347,6 +367,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Almojábana",
     "description": "Almojábana de queso tradicional",
     "price": 3400,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750316988/restaurant/g4f3fubzqsjp6prsrorb.webp",
     "categoryId": "'$PANADERIA_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -359,6 +380,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Arepa de Horno",
     "description": "Arepa de horno tradicional",
     "price": 2500,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750313424/restaurant/deqj0qw5elxspy05fh4j.jpg",
     "categoryId": "'$PANADERIA_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -371,6 +393,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Esponjado",
     "description": "Esponjado de queso",
     "price": 4100,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750315354/restaurant/anlpwqpfhyzujyssalgx.png",
     "categoryId": "'$PANADERIA_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -383,6 +406,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Pan Queso",
     "description": "Pan de queso tradicional",
     "price": 2300,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750316263/restaurant/u9yiutlezcjhm4agmhae.jpg",
     "categoryId": "'$PANADERIA_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -395,6 +419,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Pastel Hawaiano",
     "description": "Pastel con piña y jamón",
     "price": 4600,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750313483/restaurant/pkrq559jitzq19gwbfcp.jpg",
     "categoryId": "'$PANADERIA_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -407,6 +432,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Pastel de Pollo",
     "description": "Pastel relleno de pollo",
     "price": 5600,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750316002/restaurant/pgogpz3yytfuswkucmg1.jpg",
     "categoryId": "'$PANADERIA_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -419,6 +445,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Chicharrón Dulce",
     "description": "Chicharrón dulce tradicional",
     "price": 2900,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750315162/restaurant/kjyhzrtmk2fv5nzcr7vc.jpg",
     "categoryId": "'$PANADERIA_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -432,6 +459,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Avena casera",
     "description": "Avena casera tradicional",
     "price": 6700,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750314945/restaurant/qerm2p3vmocuzzsnce7j.png",
     "categoryId": "'$BEBIDAS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -444,6 +472,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Café con leche",
     "description": "Café con leche tradicional",
     "price": 5000,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750315799/restaurant/qqpbxbfnotxdr4dr3bcp.jpg",
     "categoryId": "'$BEBIDAS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -456,6 +485,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Chocolate",
     "description": "Chocolate caliente tradicional",
     "price": 6600,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750315826/restaurant/yl2vmwxddzthgnhpboje.jpg",
     "categoryId": "'$BEBIDAS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -468,6 +498,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Milo (Frio o Caliente)",
     "description": "Milo servido frío o caliente",
     "price": 6500,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750316170/restaurant/gbe4ygvufk9cvpdqn00r.jpg",
     "categoryId": "'$BEBIDAS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -480,6 +511,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Jugo de naranja",
     "description": "Jugo de naranja natural",
     "price": 5900,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750316863/restaurant/aduggqnkq26wume593zv.jpg",
     "categoryId": "'$BEBIDAS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -492,6 +524,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Jugo del día",
     "description": "Jugo natural del día",
     "price": 4500,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750315142/restaurant/f6d1dxofcdtjlqdspyi9.png",
     "categoryId": "'$BEBIDAS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true
@@ -504,6 +537,7 @@ curl -X POST http://localhost:3000/products \
     "name": "Capuchino",
     "description": "Capuchino tradicional",
     "price": 6800,
+    "image": "https://res.cloudinary.com/djegujdt1/image/upload/v1750314916/restaurant/iipja7jftimiupe727gu.jpg",
     "categoryId": "'$BEBIDAS_ID'",
     "locationId": "'$LOCATION_ID'",
     "isActive": true

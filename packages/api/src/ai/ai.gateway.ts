@@ -171,6 +171,81 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return 'Error: Missing required parameters';
     }
 
+    // Detectar frases clave para mostrar el menú directamente
+    const menuKeywords = [
+      'domicilio',
+      'menú',
+      'menu',
+      'carta',
+      'pedido',
+      'ordenar',
+      'orden',
+      'pedir',
+      'ver menu',
+      'ver menú',
+      'ver carta',
+      'quiero',
+    ];
+    const normalizedText = text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    if (
+      chatType !== 'admin' &&
+      menuKeywords.some(k => normalizedText.includes(k))
+    ) {
+      // Responder directamente con el menú
+      try {
+        const menu = await this.productsService.findAll({ locationId });
+        if (!menu || menu.length === 0) {
+          if ('emit' in client) {
+            client.emit('ai_response', {
+              type: 'text',
+              content: 'No se encontró ningún producto en el menú para esta ubicación.'
+            });
+          }
+          return 'No se encontró ningún producto en el menú para esta ubicación.';
+        }
+        // Agrupar productos por categoría
+        const categories = {};
+        menu.forEach(product => {
+          const catId = product.category.id;
+          if (!categories[catId]) {
+            categories[catId] = { name: product.category.name, products: [] };
+          }
+          categories[catId].products.push(product);
+        });
+        let menuText = 'Te comparto el 🍽️ *Menú del Restaurante*\n';
+        let prodCount = 1;
+        const allCategories = Object.values(categories) as { name: string; products: any[] }[];
+        const bebidas = allCategories.filter(cat => cat.name.toLowerCase().includes('bebida'));
+        const otras = allCategories.filter(cat => !cat.name.toLowerCase().includes('bebida'));
+        const orderedCategories = [...otras, ...bebidas];
+        for (const cat of orderedCategories) {
+          menuText += `\n\n**${cat.name}**\n\n`;
+          for (const product of cat.products) {
+            const price = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            menuText += `${prodCount}. *${product.name}* - $${price}\n\n`;
+            prodCount++;
+          }
+          menuText += '\n';
+        }
+        menuText += '\n¿Te gustaría pedir algo? 😊';
+        if ('emit' in client) {
+          client.emit('ai_response', {
+            type: 'text',
+            content: menuText
+          });
+        }
+        return menuText;
+      } catch (error) {
+        if ('emit' in client) {
+          client.emit('ai_response', {
+            type: 'text',
+            content: `❌ Error obteniendo el menú: ${error.message}`
+          });
+        }
+        return `❌ Error obteniendo el menú: ${error.message}`;
+      }
+    }
+
     // Verificar si la IA está habilitada
     try {
       const aiSettings = await this.settingsService.getAISettings();
@@ -685,6 +760,46 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           return {
             message: `❌ Error creando la orden: ${error.message}`
           };
+        }
+
+      case 'get_menu':
+        try {
+          const { locationId: menuLocationId } = functionArgs;
+          const menu = await this.productsService.findAll({ locationId: menuLocationId });
+          if (!menu || menu.length === 0) {
+            return { message: 'No se encontró ningún producto en el menú para esta ubicación.' };
+          }
+
+          // Agrupar productos por categoría
+          const categories: Record<string, { name: string; products: any[] }> = {};
+          menu.forEach(product => {
+            const catId = product.category.id;
+            if (!categories[catId]) {
+              categories[catId] = { name: product.category.name, products: [] };
+            }
+            categories[catId].products.push(product);
+          });
+
+          let menuText = 'Te comparto el 🍽️ *Menú del Restaurante*\n';
+          let prodCount = 1;
+          const allCategories = Object.values(categories) as { name: string; products: any[] }[];
+          const bebidas = allCategories.filter(cat => cat.name.toLowerCase().includes('bebida'));
+          const otras = allCategories.filter(cat => !cat.name.toLowerCase().includes('bebida'));
+          const orderedCategories = [...otras, ...bebidas];
+          for (const cat of orderedCategories) {
+            menuText += `\n\n**${cat.name}**\n\n`;
+            for (const product of cat.products) {
+              const price = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+              menuText += `${prodCount}. *${product.name}* - $${price}\n\n`;
+              prodCount++;
+            }
+            menuText += '\n';
+          }
+          menuText += '\n¿Te gustaría pedir algo? 😊';
+          return { message: menuText };
+        } catch (error) {
+          console.error('Error in get_menu:', error);
+          return { message: `❌ Error obteniendo el menú: ${error.message}` };
         }
 
       default:
