@@ -1,19 +1,25 @@
 "use client"
 
-import { Product } from "@/lib/api"
+import { useState } from "react"
+import { Product, ProductVariant } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import Image from "next/image"
 import { ImageIcon } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 
 interface ProductGridProps {
   products: Product[]
-  onAddToCart: (productId: string) => void
+  onAddToCart: (product: Product, variant?: ProductVariant) => void
   cart: Record<string, number>
 }
 
 export function ProductGrid({ products, onAddToCart, cart }: ProductGridProps) {
+  const [variantModal, setVariantModal] = useState<{ product: Product, open: boolean }>({ product: null, open: false })
+  const [selectedVariantIdx, setSelectedVariantIdx] = useState<number>(0)
+
   return (
     <div className="space-y-2">
       <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
@@ -58,7 +64,14 @@ export function ProductGrid({ products, onAddToCart, cart }: ProductGridProps) {
                     <div className="flex-none">
                       <Button
                         size="lg"
-                        onClick={() => onAddToCart(product.id)}
+                        onClick={() => {
+                          if (product.variants && product.variants.length > 0) {
+                            setVariantModal({ product, open: true })
+                            setSelectedVariantIdx(0)
+                          } else {
+                            onAddToCart(product)
+                          }
+                        }}
                         className="h-12 w-12 p-0 rounded-full"
                       >
                         <Plus className="h-6 w-6" />
@@ -71,6 +84,48 @@ export function ProductGrid({ products, onAddToCart, cart }: ProductGridProps) {
           )
         })}
       </div>
+      {/* Modal de selección de variante */}
+      <Dialog open={variantModal.open} onOpenChange={open => setVariantModal({ product: variantModal.product, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Selecciona una variante</DialogTitle>
+          </DialogHeader>
+          {variantModal.product && variantModal.product.variants && (
+            <div className="space-y-2">
+              {variantModal.product.variants.map((variant, idx) => (
+                <Button
+                  key={idx}
+                  variant={selectedVariantIdx === idx ? 'default' : 'outline'}
+                  className="w-full flex items-center gap-2 justify-start"
+                  onClick={() => setSelectedVariantIdx(idx)}
+                >
+                  {variant.image && (
+                    <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
+                  )}
+                  <span className="font-medium text-xs">{variant.name}</span>
+                  {typeof variant.price === 'number' && !isNaN(variant.price) && (
+                    <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                  )}
+                  <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                </Button>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (variantModal.product && variantModal.product.variants) {
+                  onAddToCart(variantModal.product, variantModal.product.variants[selectedVariantIdx])
+                  setVariantModal({ product: null, open: false })
+                }
+              }}
+              disabled={!variantModal.product}
+            >
+              Agregar al carrito
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

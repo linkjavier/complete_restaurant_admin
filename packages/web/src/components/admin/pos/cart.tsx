@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Product } from "@/lib/api"
+import { Product, ProductVariant } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,13 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 interface CartItem {
   product: Product
+  variant?: ProductVariant
   quantity: number
 }
 
 interface CartProps {
   items: CartItem[]
-  onUpdateQuantity: (productId: string, quantity: number) => void
-  onRemoveItem: (productId: string) => void
+  onUpdateQuantity: (key: string, quantity: number) => void
+  onRemoveItem: (key: string) => void
   orderType: "table" | "takeout" | "delivery"
   selectedTable: string | null
   tables: Table[]
@@ -324,24 +325,38 @@ export function Cart({
                 <div className="border rounded-lg p-2">
                   <h3 className="font-medium text-sm mb-2">Carrito Actual</h3>
                   <div className="space-y-1">
-                    {items.map((item) => (
+                    {items.map((item, idx) => (
                       <div
-                        key={item.product.id}
+                        key={item.product.id + (item.variant ? `__${item.variant.name}` : '')}
                         className="flex flex-col p-1 border rounded-md"
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{item.product.name}</p>
+                          {item.variant && (
+                            <div className="flex items-center gap-2 mt-1">
+                              {item.variant.image && (
+                                <img src={item.variant.image} alt={item.variant.name} className="w-6 h-6 object-cover rounded" />
+                              )}
+                              <span className="text-xs font-medium">{item.variant.name}</span>
+                              {typeof item.variant.price === 'number' && !isNaN(item.variant.price) && (
+                                <span className="text-xs text-muted-foreground">${item.variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center justify-between mt-1">
                           <p className="text-xs text-muted-foreground">
-                            ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })} x {item.quantity}
+                            ${typeof item.variant?.price === 'number' && !isNaN(item.variant.price)
+                              ? item.variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })
+                              : item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })
+                            } x {item.quantity}
                           </p>
                           <div className="flex items-center gap-1 flex-none">
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() =>
-                                onUpdateQuantity(item.product.id, item.quantity - 1)
+                                onUpdateQuantity(item.product.id + (item.variant ? `__${item.variant.name}` : ''), item.quantity - 1)
                               }
                               disabled={item.quantity <= 1 || isProcessing}
                               className="h-6 w-6 p-0"
@@ -353,7 +368,7 @@ export function Cart({
                               min="1"
                               value={item.quantity}
                               onChange={(e) =>
-                                onUpdateQuantity(item.product.id, parseInt(e.target.value))
+                                onUpdateQuantity(item.product.id + (item.variant ? `__${item.variant.name}` : ''), parseInt(e.target.value))
                               }
                               className="w-12 h-6 text-center text-xs"
                               disabled={isProcessing}
@@ -362,7 +377,7 @@ export function Cart({
                               size="sm"
                               variant="outline"
                               onClick={() =>
-                                onUpdateQuantity(item.product.id, item.quantity + 1)
+                                onUpdateQuantity(item.product.id + (item.variant ? `__${item.variant.name}` : ''), item.quantity + 1)
                               }
                               disabled={isProcessing}
                               className="h-6 w-6 p-0"
@@ -372,7 +387,7 @@ export function Cart({
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => onRemoveItem(item.product.id)}
+                              onClick={() => onRemoveItem(item.product.id + (item.variant ? `__${item.variant.name}` : ''))}
                               disabled={isProcessing}
                               className="h-6 w-6 p-0"
                             >

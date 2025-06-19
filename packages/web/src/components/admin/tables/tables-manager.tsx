@@ -686,8 +686,19 @@ export function TablesManager() {
                         <div key={item.id} className="flex flex-wrap justify-between items-center gap-2">
                           <div className="space-y-0.5">
                             <p className="font-medium">{item.product.name}</p>
+                            {item.productVariant && (
+                              <div className="flex items-center gap-2 mt-1">
+                                {item.productVariant.image && (
+                                  <img src={item.productVariant.image} alt={item.productVariant.name} className="w-6 h-6 object-cover rounded" />
+                                )}
+                                <span className="text-xs font-medium">{item.productVariant.name}</span>
+                                {typeof item.productVariant.price === 'number' && !isNaN(item.productVariant.price) && (
+                                  <span className="text-xs text-muted-foreground">${item.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                                )}
+                              </div>
+                            )}
                             <p className="text-sm text-muted-foreground">
-                              {item.quantity} x ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                              {item.quantity} x ${item.productVariant?.price ? item.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 }) : item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                             </p>
                             {item.notes && (
                               <p className="text-sm text-muted-foreground">
@@ -699,7 +710,7 @@ export function TablesManager() {
                             </Badge>
                           </div>
                           <Badge variant="secondary">
-                            ${(item.product.price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                            ${((item.productVariant?.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                           </Badge>
                         </div>
                       ))}

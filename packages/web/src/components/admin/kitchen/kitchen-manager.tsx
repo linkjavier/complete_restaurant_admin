@@ -528,9 +528,18 @@ export function KitchenManager() {
                                     <div className="space-y-0.5">
                                       <div className="flex items-center gap-1">
                                         <p className="font-medium text-sm">{item.product.name}</p>
-                                        <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
-                                          x{item.quantity}
-                                        </span>
+                                        {item.productVariant && (
+                                          <>
+                                            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">{item.productVariant.name}</span>
+                                            {item.productVariant.image && (
+                                              <img src={item.productVariant.image} alt={item.productVariant.name} className="w-6 h-6 object-cover rounded" />
+                                            )}
+                                            {typeof item.productVariant.price === 'number' && !isNaN(item.productVariant.price) && (
+                                              <span className="text-xs text-muted-foreground">${item.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                                            )}
+                                          </>
+                                        )}
+                                        <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">x{item.quantity}</span>
                                       </div>
                                       <p className="text-xs text-gray-500">
                                         {item.status === "PENDING" ? "Pendiente" : 

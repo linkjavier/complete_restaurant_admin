@@ -37,6 +37,11 @@ interface OrderItem {
   quantity: number
   status: OrderStatus
   notes?: string
+  productVariant?: {
+    name: string
+    image?: string
+    price: number
+  }
 }
 
 interface Order {
@@ -565,10 +570,21 @@ export function OrdersManager() {
                                     <div>
                                       <div className="flex items-center gap-2">
                                         <p className="font-medium">{item.product.name}</p>
+                                        {item.productVariant && (
+                                          <>
+                                            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">{item.productVariant.name}</span>
+                                            {item.productVariant.image && (
+                                              <img src={item.productVariant.image} alt={item.productVariant.name} className="w-6 h-6 object-cover rounded" />
+                                            )}
+                                            {typeof item.productVariant.price === 'number' && !isNaN(item.productVariant.price) && (
+                                              <span className="text-xs text-muted-foreground">${item.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                                            )}
+                                          </>
+                                        )}
                                         {getItemStatusBadge(item.status)}
                                       </div>
                                       <p className="text-sm text-muted-foreground">
-                                        {item.quantity} x ${item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {item.quantity} x ${item.productVariant?.price ? item.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 }) : item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </p>
                                       {item.notes && (
                                         <p className="text-sm text-muted-foreground">
@@ -577,7 +593,7 @@ export function OrdersManager() {
                                       )}
                                     </div>
                                     <Badge variant="outline">
-                                      ${(item.product.price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                      ${((item.productVariant?.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                     </Badge>
                                   </div>
                                 ))}

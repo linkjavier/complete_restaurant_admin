@@ -196,6 +196,8 @@ model OrderItem {
   orderId   String
   product   Product        @relation(fields: [productId], references: [id])
   productId String
+  productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])
+  productVariantId String?
   quantity  Int
   status    OrderItemStatus @default(PENDING)
   createdAt DateTime       @default(now())
@@ -299,6 +301,7 @@ model ProductVariant {
   isActive  Boolean  @default(true)
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId String
+  orderItems OrderItem[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

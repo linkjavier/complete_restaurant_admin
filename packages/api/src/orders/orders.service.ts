@@ -33,6 +33,7 @@ export class OrdersService {
         items: {
           include: {
             product: true,
+            productVariant: true,
           },
         },
         payments: true,
@@ -61,6 +62,7 @@ export class OrdersService {
         items: {
           include: {
             product: true,
+            productVariant: true,
           },
         },
         payments: true,
@@ -83,6 +85,7 @@ export class OrdersService {
             productId: item.productId,
             quantity: item.quantity,
             status: 'PENDING',
+            ...(item.productVariantId ? { productVariantId: item.productVariantId } : {}),
           })),
         }
       };
@@ -100,6 +103,7 @@ export class OrdersService {
             items: {
               include: {
                 product: true,
+                productVariant: true,
               },
             },
             table: true,
@@ -170,6 +174,7 @@ export class OrdersService {
         items: {
           include: {
             product: true,
+            productVariant: true,
           },
         },
         payments: true,
@@ -188,6 +193,7 @@ export class OrdersService {
           items: {
             include: {
               product: true,
+              productVariant: true,
             },
           },
           table: true,
@@ -230,6 +236,7 @@ export class OrdersService {
           items: {
             include: {
               product: true,
+              productVariant: true,
             },
           },
           table: true,
@@ -261,6 +268,7 @@ export class OrdersService {
           items: {
             include: {
               product: true,
+              productVariant: true,
             }
           },
           location: true,

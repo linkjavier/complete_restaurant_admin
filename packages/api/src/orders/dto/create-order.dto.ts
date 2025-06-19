@@ -28,6 +28,10 @@ class OrderItemDto {
 
   @IsNotEmpty()
   quantity: number;
+
+  @IsString()
+  @IsOptional()
+  productVariantId?: string;
 }
 
 export class CreateOrderDto {

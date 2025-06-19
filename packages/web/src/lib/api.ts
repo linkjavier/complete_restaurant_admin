@@ -4,7 +4,7 @@ console.log(process.env.NEXT_PUBLIC_API_URL)
 console.log(API_URL)
 
 export interface ProductVariant {
-  id?: string;
+  id: string;
   name: string;
   price?: number;
   image?: string;
@@ -481,6 +481,7 @@ export async function createOrder(data: {
   items: Array<{
     productId: string;
     quantity: number;
+    productVariantId?: string;
   }>;
   status?: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'DELIVERED' | 'CANCELLED';
   isPaid?: boolean;
@@ -489,6 +490,7 @@ export async function createOrder(data: {
   neighborhood?: string;
   phone?: string;
   paymentMethod?: 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'TRANSFER';
+  source?: 'POS' | 'QR' | 'WHATSAPP';
 }) {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
     method: 'POST',

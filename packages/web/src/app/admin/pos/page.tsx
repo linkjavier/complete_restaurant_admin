@@ -8,6 +8,7 @@ import { Search, CheckCircle2 } from "lucide-react"
 import { 
   getProducts, 
   Product, 
+  ProductVariant, 
   Category, 
   getTables, 
   Table, 
@@ -33,7 +34,7 @@ export default function PosPage() {
   const [tables, setTables] = useState<Table[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
-  const [cart, setCart] = useState<Record<string, number>>({})
+  const [cart, setCart] = useState<Record<string, { product: Product, variant?: ProductVariant, quantity: number }>>({})
   const [orderType, setOrderType] = useState<"table" | "takeout" | "delivery">("takeout")
   const [selectedTable, setSelectedTable] = useState<string>("")
   const [customerName, setCustomerName] = useState("")
@@ -106,20 +107,47 @@ export default function PosPage() {
     }
   }
 
-  const handleAddToCart = (productId: string) => {
-    setCart(prev => ({
-      ...prev,
-      [productId]: (prev[productId] || 0) + 1
-    }))
+  // Nueva función para generar la clave del carrito
+  function getCartKey(product: Product, variant?: ProductVariant) {
+    if (variant) {
+      return `${product.id}__${variant.name}`
+    }
+    return product.id
   }
 
-  const handleRemoveFromCart = (productId: string) => {
+  // Actualizar handleAddToCart
+  const handleAddToCart = (product: Product, variant?: ProductVariant) => {
+    // Si hay variante, asegurar que tiene id
+    if (variant && !variant.id) {
+      toast({
+        title: "Error",
+        description: "La variante seleccionada no tiene un ID válido.",
+        variant: "destructive",
+      })
+      return
+    }
+    const key = getCartKey(product, variant)
+    setCart(prev => {
+      const prevItem = prev[key]
+      return {
+        ...prev,
+        [key]: {
+          product,
+          variant,
+          quantity: prevItem ? prevItem.quantity + 1 : 1
+        }
+      }
+    })
+  }
+
+  // Actualizar handleRemoveFromCart
+  const handleRemoveFromCart = (key: string) => {
     setCart(prev => {
       const newCart = { ...prev }
-      if (newCart[productId] > 1) {
-        newCart[productId] -= 1
+      if (newCart[key].quantity > 1) {
+        newCart[key].quantity -= 1
       } else {
-        delete newCart[productId]
+        delete newCart[key]
       }
       return newCart
     })
@@ -175,10 +203,16 @@ export default function PosPage() {
         return
       }
 
-      const orderItems = Object.entries(cart).map(([productId, quantity]) => ({
-        productId,
-        quantity
-      }))
+      const orderItems = Object.values(cart).map(item => {
+        if (item.variant && !item.variant.id) {
+          throw new Error("La variante seleccionada no tiene un ID válido.")
+        }
+        return {
+          productId: item.product.id,
+          quantity: item.quantity,
+          ...(item.variant ? { productVariantId: item.variant.id } : {})
+        }
+      })
 
       // Si es para llevar o domicilio, usar el locationId de cualquier mesa disponible
       const locationId = orderType === "table" 
@@ -198,7 +232,7 @@ export default function PosPage() {
         items: orderItems,
         status: orderType === "takeout" ? "IN_PROGRESS" as const : "PENDING" as const,
         isPaid: orderType === "takeout" ? true : false,
-        source: 'POS',
+        source: 'POS' as const,
       }
 
       const createdOrder = await createOrder(orderData)
@@ -328,7 +362,7 @@ export default function PosPage() {
             <ProductGrid
               products={filteredProducts}
               onAddToCart={handleAddToCart}
-              cart={cart}
+              cart={Object.fromEntries(Object.entries(cart).map(([key, item]) => [key, item.quantity]))}
             />
           </CardContent>
         </Card>
@@ -336,24 +370,25 @@ export default function PosPage() {
       <div className="lg:col-span-1 h-full">
         <div className="sticky top-4">
           <Cart
-            items={Object.entries(cart).map(([productId, quantity]) => ({
-              product: products.find(p => p.id === productId)!,
-              quantity
-            }))}
-            onUpdateQuantity={(productId, quantity) => {
-              if (quantity <= 0) {
-                const newCart = { ...cart }
-                delete newCart[productId]
-                setCart(newCart)
-              } else {
-                setCart(prev => ({ ...prev, [productId]: quantity }))
-              }
+            items={Object.values(cart)}
+            onUpdateQuantity={(key, quantity) => {
+              setCart(prev => {
+                if (quantity <= 0) {
+                  const newCart = { ...prev }
+                  delete newCart[key]
+                  return newCart
+                } else {
+                  return {
+                    ...prev,
+                    [key]: {
+                      ...prev[key],
+                      quantity
+                    }
+                  }
+                }
+              })
             }}
-            onRemoveItem={(productId) => {
-              const newCart = { ...cart }
-              delete newCart[productId]
-              setCart(newCart)
-            }}
+            onRemoveItem={handleRemoveFromCart}
             orderType={orderType}
             selectedTable={selectedTable}
             tables={tables}
