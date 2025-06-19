@@ -518,21 +518,17 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 message: `❌ Error: Cada producto debe tener un nombre y cantidad válidos.`
               };
             }
-            
-            // Verificar que la cantidad sea un número válido y positivo
             if (typeof item.quantity !== 'number' || item.quantity <= 0) {
               console.error(`[AI Gateway] calculate_order_subtotal: Invalid quantity for ${item.productName}:`, item.quantity);
               return {
                 message: `❌ Error: La cantidad para "${item.productName}" debe ser un número mayor a 0.`
               };
             }
-            
-            // Log para cantidades grandes (para debugging)
             if (item.quantity > 10) {
               console.log(`[AI Gateway] calculate_order_subtotal: Large quantity detected for ${item.productName}: ${item.quantity}`);
             }
           }
-          
+
           console.log(`[AI Gateway] calculate_order_subtotal: Fetching menu from database...`);
           const menu = await this.productsService.findAll({ locationId: calcLocationId });
           console.log(`[AI Gateway] calculate_order_subtotal: Found ${menu.length} products in menu`);
@@ -547,6 +543,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           const validatedItems = [];
           let totalAmount = 0;
           const errors = [];
+          const variantRequests = [];
 
           for (const item of items) {
             console.log(`[AI Gateway] calculate_order_subtotal: Processing item:`, item);
@@ -567,10 +564,38 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
             }
 
             const product = matchingProducts[0];
+            // Si el producto tiene variantes
+            if (product.variants && product.variants.length > 0) {
+              // Si el usuario no especificó la variante
+              if (!item.variantName) {
+                const variantNames = product.variants.map(v => v.name).join(', ');
+                variantRequests.push(`El producto *${product.name}* tiene variantes. Por favor, indícanos cuál prefieres. Opciones: ${variantNames}`);
+                continue;
+              }
+              // Buscar la variante
+              const variant = product.variants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
+              if (!variant) {
+                const variantNames = product.variants.map(v => v.name).join(', ');
+                errors.push(`❌ La variante "${item.variantName}" no existe para el producto *${product.name}*. Opciones válidas: ${variantNames}`);
+                continue;
+              }
+              const price = variant.price ?? product.price;
+              const subtotal = price * item.quantity;
+              totalAmount += subtotal;
+              validatedItems.push({
+                productId: product.id,
+                productName: product.name,
+                quantity: item.quantity,
+                unitPrice: price,
+                subtotal: subtotal,
+                variantName: variant.name,
+                notes: item.notes || ''
+              });
+              continue;
+            }
+            // Producto sin variantes
             const subtotal = product.price * item.quantity;
             totalAmount += subtotal;
-            console.log(`[AI Gateway] calculate_order_subtotal: Product "${product.name}" - ${item.quantity} × $${product.price} = $${subtotal}`);
-
             validatedItems.push({
               productId: product.id,
               productName: product.name,
@@ -581,17 +606,30 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
             });
           }
 
-          console.log(`[AI Gateway] calculate_order_subtotal: Processing complete. Errors: ${errors.length}, Validated items: ${validatedItems.length}, Total: $${totalAmount}`);
+          // Si hay productos que requieren selección de variante
+          if (variantRequests.length > 0) {
+            return {
+              message: `🚨 *Falta seleccionar variante:*
+
+${variantRequests.join('\n')}
+
+Por favor, responde indicando la variante deseada para cada producto.`
+            };
+          }
 
           if (errors.length > 0) {
             return {
-              message: `🚨 *Errores encontrados:*\n\n${errors.join('\n')}\n\nPor favor, corrige los nombres de los productos y vuelve a intentar.`
+              message: `🚨 *Errores encontrados:*
+
+${errors.join('\n')}
+
+Por favor, corrige los nombres de los productos y vuelve a intentar.`
             };
           }
 
           // Crear resumen de la orden con formato mejorado
           const itemsSummary = validatedItems.map((item, index) => 
-            `${index + 1}. *${item.productName}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
+            `${index + 1}. *${item.productName}${item.variantName ? ' (' + item.variantName + ')' : ''}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
           ).join('\n');
 
           const formattedTotal = totalAmount.toLocaleString('es-CO', { 
@@ -618,7 +656,45 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       case 'validate_order_before_creation':
         try {
           const { items, totalAmount, customerName, deliveryAddress, phone, neighborhood, paymentMethod, locationId: validateLocationId } = functionArgs;
-          
+          const menu = await this.productsService.findAll({ locationId: validateLocationId });
+
+          // Validar variantes en los items
+          const missingVariants = [];
+          const invalidVariants = [];
+          for (const item of items) {
+            const product = menu.find(p => p.id === item.productId);
+            if (product && product.variants && product.variants.length > 0) {
+              if (!item.variantName) {
+                const variantNames = product.variants.map(v => v.name).join(', ');
+                missingVariants.push(`El producto *${product.name}* requiere que selecciones una variante. Opciones: ${variantNames}`);
+                continue;
+              }
+              const variant = product.variants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
+              if (!variant) {
+                const variantNames = product.variants.map(v => v.name).join(', ');
+                invalidVariants.push(`La variante "${item.variantName}" no existe para el producto *${product.name}*. Opciones válidas: ${variantNames}`);
+              }
+            }
+          }
+          if (missingVariants.length > 0) {
+            return {
+              message: `🚨 *Falta seleccionar variante:*
+
+${missingVariants.join('\n')}
+
+Por favor, responde indicando la variante deseada para cada producto.`
+            };
+          }
+          if (invalidVariants.length > 0) {
+            return {
+              message: `🚨 *Errores de variante:*
+
+${invalidVariants.join('\n')}
+
+Por favor, corrige las variantes y vuelve a intentar.`
+            };
+          }
+
           // Reconstruir los datos completos de los productos si faltan
           let enrichedItems = items;
           if (
@@ -631,13 +707,24 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
               if (!product) {
                 throw new Error(`Producto no encontrado para ID: ${item.productId}`);
               }
-              const subtotal = product.price * item.quantity;
+              // Si el producto tiene variantes y el item tiene variantName, usar el precio de la variante
+              let unitPrice = product.price;
+              let variantName = undefined;
+              if (product.variants && product.variants.length > 0 && item.variantName) {
+                const variant = product.variants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
+                if (variant) {
+                  unitPrice = variant.price ?? product.price;
+                  variantName = variant.name;
+                }
+              }
+              const subtotal = unitPrice * item.quantity;
               return {
                 productId: product.id,
                 productName: product.name,
                 quantity: item.quantity,
-                unitPrice: product.price,
+                unitPrice,
                 subtotal,
+                variantName: variantName || item.variantName,
                 notes: item.notes || ''
               };
             });
@@ -667,7 +754,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
           // Crear resumen final para confirmación con formato mejorado
           const itemsSummary = enrichedItems.map((item, index) => 
-            `${index + 1}. *${item.productName}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
+            `${index + 1}. *${item.productName}${item.variantName ? ' (' + item.variantName + ')' : ''}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
           ).join('\n');
 
           const formattedTotal = calculatedTotal.toLocaleString('es-CO', { 
@@ -699,6 +786,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
               items: enrichedItems.map(item => ({
                 productId: item.productId,
                 quantity: item.quantity,
+                variantName: item.variantName,
                 notes: item.notes
               })),
               customerName,
@@ -719,21 +807,33 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       case 'create_order':
         try {
           console.log('Creating order with args:', functionArgs);
-          
           // Ensure locationId is present
           if (!locationId) {
             throw new Error('No location ID found for this client');
           }
-
-          // Ensure customerName is present
           if (!functionArgs.customerName) {
             throw new Error('Customer name is required');
           }
-
-          // Validate product IDs
           const menu = await this.productsService.findAll({ locationId });
           const validProductIds = new Set(menu.map(product => product.id));
-          
+
+          // Validar variantes en los items
+          for (const item of functionArgs.items) {
+            const product = menu.find(p => p.id === item.productId);
+            if (product && product.variants && product.variants.length > 0) {
+              if (!item.variantName) {
+                const variantNames = product.variants.map(v => v.name).join(', ');
+                throw new Error(`El producto *${product.name}* requiere que selecciones una variante. Opciones: ${variantNames}`);
+              }
+              const variant = product.variants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
+              if (!variant) {
+                const variantNames = product.variants.map(v => v.name).join(', ');
+                throw new Error(`La variante "${item.variantName}" no existe para el producto *${product.name}*. Opciones válidas: ${variantNames}`);
+              }
+            }
+          }
+
+          // Validate product IDs
           const invalidProducts = functionArgs.items.filter(
             item => !validProductIds.has(item.productId)
           );

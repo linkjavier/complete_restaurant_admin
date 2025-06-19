@@ -5,6 +5,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrdersGateway } from './orders.gateway';
 import { OrdersQueueService } from './orders-workers/orders-queue.service';
+import { ProductsService } from '../products/products.service';
 
 @Injectable()
 export class OrdersService {
@@ -15,6 +16,7 @@ export class OrdersService {
     @Inject(forwardRef(() => OrdersGateway))
     private ordersGateway: OrdersGateway,
     private ordersQueueService: OrdersQueueService,
+    private productsService: ProductsService,
   ) {
     // Log to verify gateway is injected
     this.logger.log(`OrdersService initialized with OrdersGateway: ${!!this.ordersGateway}`);
@@ -76,12 +78,29 @@ export class OrdersService {
       
       const { userId, items, ...orderData } = createOrderDto;
 
+      // Map variantName to productVariantId if present
+      const itemsWithVariantId = await Promise.all(items.map(async (item: any) => {
+        if (item.variantName && typeof item.variantName === 'string' && item.variantName.trim() !== '') {
+          const product = await this.productsService.findOne(item.productId) as any;
+          if (product && Array.isArray(product.variants) && product.variants.length > 0) {
+            const variant = product.variants.find((v: any) => v.name.toLowerCase() === item.variantName.toLowerCase());
+            if (variant) {
+              return {
+                ...item,
+                productVariantId: variant.id,
+              };
+            }
+          }
+        }
+        return item;
+      }));
+
       const orderCreateData: any = {
         ...orderData,
         status: orderData.status || 'PENDING',
         isPaid: orderData.isPaid || false,
         items: {
-          create: items.map(item => ({
+          create: itemsWithVariantId.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
             status: 'PENDING',

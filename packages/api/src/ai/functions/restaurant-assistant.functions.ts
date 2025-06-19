@@ -19,13 +19,13 @@ export const restaurantAssistantFunctions = [
   },
   {
     name: 'calculate_order_subtotal',
-    description: 'Calculate the subtotal for a list of items with their quantities',
+    description: 'Calculate the subtotal for a list of items with their quantities. If a product has variants, the variantName field is required for that item.',
     parameters: {
       type: 'object',
       properties: {
         items: {
           type: 'array',
-          description: 'List of items with product names and quantities',
+          description: 'List of items with product names, quantities, and (if applicable) variantName.',
           items: {
             type: 'object',
             properties: {
@@ -37,6 +37,10 @@ export const restaurantAssistantFunctions = [
                 type: 'integer',
                 description: 'Quantity of the product',
                 minimum: 1,
+              },
+              variantName: {
+                type: 'string',
+                description: 'Name of the variant (required if the product has variants)',
               },
               notes: {
                 type: 'string',
@@ -56,13 +60,13 @@ export const restaurantAssistantFunctions = [
   },
   {
     name: 'validate_order_before_creation',
-    description: 'Validate the complete order with customer information and calculated totals before creating it',
+    description: 'Validate the complete order with customer information and calculated totals before creating it. If a product has variants, the variantName field is required for that item.',
     parameters: {
       type: 'object',
       properties: {
         items: {
           type: 'array',
-          description: 'List of validated items with correct product IDs and calculated subtotals',
+          description: 'List of validated items with correct product IDs, calculated subtotals, and (if applicable) variantName.',
           items: {
             type: 'object',
             properties: {
@@ -86,6 +90,10 @@ export const restaurantAssistantFunctions = [
               subtotal: {
                 type: 'number',
                 description: 'Calculated subtotal for this item',
+              },
+              variantName: {
+                type: 'string',
+                description: 'Name of the variant (required if the product has variants)',
               },
               notes: {
                 type: 'string',
@@ -130,13 +138,13 @@ export const restaurantAssistantFunctions = [
   },
   {
     name: 'create_order',
-    description: 'Create a new delivery order with validated items and calculated totals',
+    description: 'Create a new delivery order with validated items and calculated totals. If a product has variants, the variantName field is required for that item.',
     parameters: {
       type: 'object',
       properties: {
         items: {
           type: 'array',
-          description: 'List of validated items with correct product IDs',
+          description: 'List of validated items with correct product IDs and (if applicable) variantName.',
           items: {
             type: 'object',
             properties: {
@@ -148,6 +156,10 @@ export const restaurantAssistantFunctions = [
                 type: 'integer',
                 description: 'Quantity of the product',
                 minimum: 1,
+              },
+              variantName: {
+                type: 'string',
+                description: 'Name of the variant (required if the product has variants)',
               },
               notes: {
                 type: 'string',

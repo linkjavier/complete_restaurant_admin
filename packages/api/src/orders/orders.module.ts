@@ -7,10 +7,12 @@ import { BullModule } from '@nestjs/bull';
 import { OrdersProcessor } from './orders.processor';
 import { OrdersQueueService } from './orders-workers/orders-queue.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ProductsModule } from '../products/products.module';
 
 @Module({
   imports: [
     PrismaModule,
+    ProductsModule,
     BullModule.registerQueue(
       {
         name: 'orders',

@@ -32,6 +32,10 @@ class OrderItemDto {
   @IsString()
   @IsOptional()
   productVariantId?: string;
+
+  @IsString()
+  @IsOptional()
+  variantName?: string;
 }
 
 export class CreateOrderDto {
