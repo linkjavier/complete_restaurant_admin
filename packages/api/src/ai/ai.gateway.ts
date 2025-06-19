@@ -159,6 +159,22 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return 'Error: Missing required parameters';
     }
 
+    // Verificar si la IA está habilitada
+    try {
+      const aiSettings = await this.settingsService.getAISettings();
+      // Solo verificar el switch para WhatsApp, otros tipos de chat funcionan siempre
+      if (chatType === 'whatsapp' && !aiSettings?.enabled) {
+        console.log(`[AI Gateway] AI is disabled for WhatsApp, not processing message`);
+        return ''; // Retornar string vacío para indicar que no se debe enviar respuesta
+      }
+    } catch (error) {
+      console.error('Error checking AI settings:', error);
+      // En caso de error, solo bloquear WhatsApp, permitir otros tipos
+      if (chatType === 'whatsapp') {
+        return ''; // En caso de error, no procesar WhatsApp
+      }
+    }
+
     const conversationId = `${locationId}:${chatType}:${chatId}`;
     let conversation = this.conversations.get(conversationId);
 

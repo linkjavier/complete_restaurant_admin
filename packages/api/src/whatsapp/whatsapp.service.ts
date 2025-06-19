@@ -226,50 +226,50 @@ export class WhatsappService {
                       chatId: message.from,
                     });
 
-                    // Save the AI response
-                    await this.prisma.whatsappMessage.create({
-                      data: {
+                    // Solo procesar si hay una respuesta de IA
+                    if (aiResponse && aiResponse.trim()) {
+                      // Save the AI response
+                      await this.prisma.whatsappMessage.create({
+                        data: {
+                          from: message.from,
+                          body: aiResponse,
+                          timestamp: new Date(),
+                          location: {
+                            connect: {
+                              id: this.locationId
+                            }
+                          },
+                          isFromAI: true,
+                        }
+                      });
+
+                      // Send the AI response
+                      await this.client.sendMessage(message.from, aiResponse);
+
+                      // Emit events for frontend updates
+                      this.eventEmitter.emit('whatsapp.message', {
                         from: message.from,
                         body: aiResponse,
-                        timestamp: new Date(),
-                        location: {
-                          connect: {
-                            id: this.locationId
-                          }
-                        },
-                        isFromAI: true,
-                      }
-                    });
-
-                    // Send the AI response
-                    await this.client.sendMessage(message.from, aiResponse);
-
-                    // Emit events for frontend updates
-                    this.eventEmitter.emit('whatsapp.message', {
-                      from: message.from,
-                      body: transcribedText,
-                      timestamp: message.timestamp,
-                      isVoiceNote: true,
-                    });
-
-                    this.eventEmitter.emit('whatsapp.message', {
-                      from: message.from,
-                      body: aiResponse,
-                      timestamp: Date.now() / 1000,
-                      fromMe: true,
-                    });
+                        timestamp: Date.now() / 1000,
+                        fromMe: true,
+                      });
+                    }
 
                     return;
                   }
                 } catch (error) {
                   this.logger.error(`Error processing voice note: ${error.message}`);
-                  try {
-                    await this.client.sendMessage(
-                      message.from,
-                      'Lo siento, hubo un error al procesar tu nota de voz. Por favor, intenta de nuevo o envía un mensaje de texto.'
-                    );
-                  } catch (sendError) {
-                    this.logger.error(`Error sending error message: ${sendError.message}`);
+                  // Solo enviar mensaje de error si la IA está habilitada para WhatsApp
+                  const aiSettings = await this.prisma.settings.findFirst();
+                  if (aiSettings?.aiEnabled) {
+                    try {
+                      await this.client.sendMessage(
+                        message.from,
+                        'Lo siento, hubo un error al procesar tu nota de voz. Por favor, intenta de nuevo o envía un mensaje de texto.'
+                      );
+                    } catch (sendError) {
+                      this.logger.error(`Error sending error message: ${sendError.message}`);
+                    }
                   }
                   return;
                 }
@@ -300,10 +300,57 @@ export class WhatsappService {
                 }
               });
 
-              // Verificar si la IA está habilitada
-              const aiSettings = await this.prisma.settings.findFirst();
-              if (!aiSettings?.aiEnabled) {
-                // Si la IA está deshabilitada, solo actualizar la caché de chats y salir
+              // Procesar el mensaje con la IA
+              const aiResponse = await this.aiGateway.handleTextInput({
+                text: message.body,
+                locationId: this.locationId,
+                chatType: 'whatsapp',
+                chatId: message.from,
+              });
+
+              // Solo procesar si hay una respuesta de IA
+              if (aiResponse && aiResponse.trim()) {
+                // Guardar la respuesta de la IA en la base de datos
+                await this.prisma.whatsappMessage.create({
+                  data: {
+                    from: message.from,
+                    body: aiResponse,
+                    timestamp: new Date(),
+                    location: {
+                      connect: {
+                        id: this.locationId
+                      }
+                    },
+                    isFromAI: true,
+                  }
+                });
+
+                // Enviar la respuesta de la IA
+                await this.client.sendMessage(message.from, aiResponse);
+
+                // Emitir eventos para actualizar el frontend
+                this.eventEmitter.emit('whatsapp.message', {
+                  from: message.from,
+                  body: aiResponse,
+                  timestamp: Date.now() / 1000,
+                  fromMe: true,
+                });
+
+                // Actualizar la caché de chats
+                if (this.cachedChats.length > 0) {
+                  const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
+                  if (chatIndex !== -1) {
+                    this.cachedChats[chatIndex] = {
+                      ...this.cachedChats[chatIndex],
+                      lastMessage: aiResponse,
+                      timestamp: Date.now() / 1000,
+                    };
+                    this.lastChatsUpdate = Date.now();
+                    this.eventEmitter.emit('whatsapp:chats', { chats: this.cachedChats });
+                  }
+                }
+              } else {
+                // Si no hay respuesta de IA (switch apagado), solo actualizar la caché de chats
                 if (this.cachedChats.length > 0) {
                   const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
                   if (chatIndex !== -1) {
@@ -316,73 +363,21 @@ export class WhatsappService {
                     this.eventEmitter.emit('whatsapp:chats', { chats: this.cachedChats });
                   }
                 }
-                return;
-              }
-
-              // Procesar el mensaje con la IA
-              const aiResponse = await this.aiGateway.handleTextInput({
-                text: message.body,
-                locationId: this.locationId,
-                chatType: 'whatsapp',
-                chatId: message.from,
-              });
-
-              // Guardar la respuesta de la IA en la base de datos
-              await this.prisma.whatsappMessage.create({
-                data: {
-                  from: message.from,
-                  body: aiResponse,
-                  timestamp: new Date(),
-                  location: {
-                    connect: {
-                      id: this.locationId
-                    }
-                  },
-                  isFromAI: true,
-                }
-              });
-
-              // Enviar la respuesta de la IA
-              await this.client.sendMessage(message.from, aiResponse);
-
-              // Emitir eventos para actualizar el frontend
-              this.eventEmitter.emit('whatsapp.message', {
-                from: message.from,
-                body: message.body,
-                timestamp: message.timestamp,
-              });
-
-              this.eventEmitter.emit('whatsapp.message', {
-                from: message.from,
-                body: aiResponse,
-                timestamp: Date.now() / 1000,
-                fromMe: true,
-              });
-
-              // Actualizar la caché de chats
-              if (this.cachedChats.length > 0) {
-                const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
-                if (chatIndex !== -1) {
-                  this.cachedChats[chatIndex] = {
-                    ...this.cachedChats[chatIndex],
-                    lastMessage: aiResponse,
-                    timestamp: Date.now() / 1000,
-                  };
-                  this.lastChatsUpdate = Date.now();
-                  this.eventEmitter.emit('whatsapp:chats', { chats: this.cachedChats });
-                }
               }
 
             } catch (error) {
               this.logger.error(`Error processing message with AI: ${error.message}`);
-              // Enviar mensaje de error al usuario
-              try {
-                await this.client.sendMessage(
-                  message.from,
-                  'Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.'
-                );
-              } catch (sendError) {
-                this.logger.error(`Error sending error message: ${sendError.message}`);
+              // Solo enviar mensaje de error si la IA está habilitada para WhatsApp
+              const aiSettings = await this.prisma.settings.findFirst();
+              if (aiSettings?.aiEnabled) {
+                try {
+                  await this.client.sendMessage(
+                    message.from,
+                    'Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo más tarde.'
+                  );
+                } catch (sendError) {
+                  this.logger.error(`Error sending error message: ${sendError.message}`);
+                }
               }
             }
           });
@@ -684,14 +679,6 @@ export class WhatsappService {
             const transcribedText = await this.sttService.transcribeAudio(audioBuffer);
             this.logger.log(`Transcribed voice note: ${transcribedText}`);
 
-            // Process the transcribed text with AI
-            const aiResponse = await this.aiGateway.handleTextInput({
-              text: transcribedText,
-              locationId: this.locationId,
-              chatType: 'whatsapp',
-              chatId: message.from,
-            });
-
             // Save the transcribed message in the database
             await this.prisma.whatsappMessage.create({
               data: {
@@ -706,6 +693,14 @@ export class WhatsappService {
                 isFromAI: false,
                 isVoiceNote: true,
               }
+            });
+
+            // Process the transcribed text with AI
+            const aiResponse = await this.aiGateway.handleTextInput({
+              text: transcribedText,
+              locationId: this.locationId,
+              chatType: 'whatsapp',
+              chatId: message.from,
             });
 
             // Save the AI response
@@ -745,10 +740,18 @@ export class WhatsappService {
           }
         } catch (error) {
           this.logger.error(`Error processing voice note: ${error.message}`);
-          await this.sendMessage(
-            message.from,
-            'Lo siento, hubo un error al procesar tu nota de voz. Por favor, intenta de nuevo o envía un mensaje de texto.'
-          );
+          // Solo enviar mensaje de error si la IA está habilitada para WhatsApp
+          const aiSettings = await this.prisma.settings.findFirst();
+          if (aiSettings?.aiEnabled) {
+            try {
+              await this.client.sendMessage(
+                message.from,
+                'Lo siento, hubo un error al procesar tu nota de voz. Por favor, intenta de nuevo o envía un mensaje de texto.'
+              );
+            } catch (sendError) {
+              this.logger.error(`Error sending error message: ${sendError.message}`);
+            }
+          }
           return;
         }
       }
