@@ -25,6 +25,7 @@ export function KitchenManager() {
   const { subscribe, connected, socket, emit } = useOrderSocket()
   const { user } = useAuth()
   const router = useRouter()
+  const [orderJustCompleted, setOrderJustCompleted] = useState<string | null>(null)
 
   const playSound = async () => {
     if (!soundEnabled || !audioRef.current) return;
@@ -133,17 +134,7 @@ export function KitchenManager() {
           
           // If status is READY and all items are ready, keep the order for 5 seconds
           if (status === "READY" && updatedItems.every(i => i.status === "READY" || i.status === "CANCELLED")) {
-            toast({
-              title: "Orden Completada",
-              description: "La orden se eliminará en 5 segundos",
-              duration: 3000
-            })
-            
-            setTimeout(() => {
-              setOrders(currentOrders => 
-                currentOrders.filter(o => o.id !== order.id)
-              )
-            }, 5000)
+            setOrderJustCompleted(order.id)
           }
           
           return {
@@ -357,19 +348,7 @@ export function KitchenManager() {
 
         // Si todos los ítems están en estado READY, esperar 5 segundos antes de filtrar
         if (updatedOrder.items.every(i => i.status === "READY" || i.status === "CANCELLED")) {
-          toast({
-            title: "Orden Completada",
-            description: "La orden se eliminará en 5 segundos",
-            duration: 3000
-          })
-          
-          setTimeout(() => {
-            setOrders(currentOrders => 
-              currentOrders.filter(o => o.id !== updatedOrder.id)
-            )
-          }, 5000)
-          
-          return updatedOrders
+          setOrderJustCompleted(order.id)
         }
         
         return updatedOrders.filter(order => 
@@ -419,6 +398,24 @@ export function KitchenManager() {
       Reconectando...
     </div>
   )
+
+  // Efecto secundario para mostrar el toast y eliminar la orden después de 5 segundos
+  useEffect(() => {
+    if (orderJustCompleted) {
+      toast({
+        title: "Orden Completada",
+        description: "La orden se eliminará en 5 segundos",
+        duration: 3000
+      })
+      const timeout = setTimeout(() => {
+        setOrders(currentOrders => 
+          currentOrders.filter(o => o.id !== orderJustCompleted)
+        )
+        setOrderJustCompleted(null)
+      }, 5000)
+      return () => clearTimeout(timeout)
+    }
+  }, [orderJustCompleted, toast])
 
   return (
     <div className="w-full h-full flex flex-col space-y-4">
