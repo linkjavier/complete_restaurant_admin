@@ -3,6 +3,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 console.log(process.env.NEXT_PUBLIC_API_URL)
 console.log(API_URL)
 
+export interface ProductVariant {
+  id?: string;
+  name: string;
+  price?: number;
+  image?: string;
+  isActive?: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -17,6 +25,7 @@ export interface Product {
   createdAt?: string;
   updatedAt?: string;
   quantity: number;
+  variants?: ProductVariant[];
 }
 
 export interface Table {
@@ -395,6 +404,7 @@ export async function createProduct(data: {
     ingredientId: string
     quantity: number
   }[]
+  variants?: ProductVariant[]
 }): Promise<Product> {
   const response = await fetch(`${API_URL}/products`, {
     method: "POST",
@@ -423,6 +433,7 @@ export async function updateProduct(id: string, data: {
     ingredientId: string
     quantity: number
   }[]
+  variants?: ProductVariant[]
 }): Promise<Product> {
   const response = await fetch(`${API_URL}/products/${id}`, {
     method: "PATCH",

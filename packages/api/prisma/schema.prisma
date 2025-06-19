@@ -89,6 +89,7 @@ model Product {
   ingredients ProductIngredient[]
   orderItems  OrderItem[]
   productions ProductionLog[]
+  variants    ProductVariant[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 }
@@ -288,4 +289,16 @@ model Settings {
   businessLogo String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model ProductVariant {
+  id        String   @id @default(cuid())
+  name      String
+  price     Float?
+  image     String?
+  isActive  Boolean  @default(true)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

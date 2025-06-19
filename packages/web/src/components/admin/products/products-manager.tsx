@@ -51,6 +51,12 @@ export function ProductsManager() {
       createdAt: string;
       updatedAt: string;
     }[],
+    variants: [] as {
+      name: string;
+      price?: number;
+      image?: string;
+      isActive?: boolean;
+    }[],
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const { toast } = useToast()
@@ -125,6 +131,7 @@ export function ProductsManager() {
         isActive: newProduct.isActive,
         quantity: newProduct.quantity,
         ingredients: newProduct.ingredients,
+        variants: newProduct.variants,
       })
 
       toast({
@@ -142,6 +149,7 @@ export function ProductsManager() {
         isActive: true,
         quantity: 0,
         ingredients: [],
+        variants: [],
       })
 
       fetchProducts()
@@ -181,6 +189,7 @@ export function ProductsManager() {
           ingredientId: pi.ingredientId,
           quantity: pi.quantity,
         })) || [],
+        variants: editingProduct.variants,
       })
 
       toast({
@@ -525,6 +534,125 @@ export function ProductsManager() {
                 </div>
               </div>
 
+              <div className="grid gap-2">
+                <Label>Variantes</Label>
+                <div className="space-y-4 w-full">
+                  {(editingProduct ? editingProduct.variants : newProduct.variants)?.map((variant, index) => (
+                    <div key={index} className="flex flex-col sm:flex-row gap-2 items-end w-full border p-2 rounded-md bg-muted/30">
+                      <div className="w-full sm:flex-1">
+                        <Label>Nombre de la Variante</Label>
+                        <Input
+                          value={variant.name}
+                          onChange={e => {
+                            if (editingProduct) {
+                              const newVariants = [...editingProduct.variants || []]
+                              newVariants[index].name = e.target.value
+                              setEditingProduct({ ...editingProduct, variants: newVariants })
+                            } else {
+                              const newVariants = [...newProduct.variants]
+                              newVariants[index].name = e.target.value
+                              setNewProduct({ ...newProduct, variants: newVariants })
+                            }
+                          }}
+                          placeholder="Ej: Fresa, Frío, Grande, etc."
+                        />
+                      </div>
+                      <div className="w-full sm:w-32">
+                        <Label>Precio</Label>
+                        <Input
+                          type="number"
+                          value={variant.price ?? ''}
+                          onChange={e => {
+                            const value = e.target.value === '' ? undefined : Number(e.target.value)
+                            if (editingProduct) {
+                              const newVariants = [...editingProduct.variants || []]
+                              newVariants[index].price = value
+                              setEditingProduct({ ...editingProduct, variants: newVariants })
+                            } else {
+                              const newVariants = [...newProduct.variants]
+                              newVariants[index].price = value
+                              setNewProduct({ ...newProduct, variants: newVariants })
+                            }
+                          }}
+                          placeholder="Opcional"
+                        />
+                      </div>
+                      <div className="w-full sm:w-48">
+                        <Label>Imagen</Label>
+                        <ImageUpload
+                          onImageUploaded={url => {
+                            if (editingProduct) {
+                              const newVariants = [...editingProduct.variants || []]
+                              newVariants[index].image = url
+                              setEditingProduct({ ...editingProduct, variants: newVariants })
+                            } else {
+                              const newVariants = [...newProduct.variants]
+                              newVariants[index].image = url
+                              setNewProduct({ ...newProduct, variants: newVariants })
+                            }
+                          }}
+                          currentImage={variant.image || ''}
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id={`variant-active-${index}`}
+                          checked={variant.isActive ?? true}
+                          onCheckedChange={checked => {
+                            if (editingProduct) {
+                              const newVariants = [...editingProduct.variants || []]
+                              newVariants[index].isActive = checked
+                              setEditingProduct({ ...editingProduct, variants: newVariants })
+                            } else {
+                              const newVariants = [...newProduct.variants]
+                              newVariants[index].isActive = checked
+                              setNewProduct({ ...newProduct, variants: newVariants })
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`variant-active-${index}`}>Activa</Label>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="w-full sm:w-10"
+                        onClick={() => {
+                          if (editingProduct) {
+                            const newVariants = [...editingProduct.variants || []]
+                            newVariants.splice(index, 1)
+                            setEditingProduct({ ...editingProduct, variants: newVariants })
+                          } else {
+                            const newVariants = [...newProduct.variants]
+                            newVariants.splice(index, 1)
+                            setNewProduct({ ...newProduct, variants: newVariants })
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (editingProduct) {
+                        const newVariants = [...editingProduct.variants || []]
+                        newVariants.push({ name: '', price: undefined, image: '', isActive: true })
+                        setEditingProduct({ ...editingProduct, variants: newVariants })
+                      } else {
+                        const newVariants = [...newProduct.variants]
+                        newVariants.push({ name: '', price: undefined, image: '', isActive: true })
+                        setNewProduct({ ...newProduct, variants: newVariants })
+                      }
+                    }}
+                    className="w-full sm:w-auto"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Agregar Variante
+                  </Button>
+                </div>
+              </div>
+
               <div className="flex flex-col sm:flex-row gap-2 w-full">
                 {editingProduct ? (
                   <>
@@ -650,6 +778,25 @@ export function ProductsManager() {
                               </div>
                             </div>
                           )}
+                          {product.variants && product.variants.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-sm font-medium">Variantes:</p>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {product.variants.map((variant, vIdx) => (
+                                  <div key={vIdx} className="flex items-center gap-2 border rounded px-2 py-1 bg-muted/50">
+                                    {variant.image && (
+                                      <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
+                                    )}
+                                    <span className="font-medium text-xs">{variant.name}</span>
+                                    {typeof variant.price === 'number' && !isNaN(variant.price) && (
+                                      <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                                    )}
+                                    <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-2 w-full sm:w-auto">
@@ -755,6 +902,25 @@ export function ProductsManager() {
                                   <Badge key={index} variant="outline" className="text-xs">
                                     {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
                                   </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {product.variants && product.variants.length > 0 && (
+                            <div className="pt-2 border-t">
+                              <p className="text-sm font-medium mb-1">Variantes:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {product.variants.map((variant, vIdx) => (
+                                  <div key={vIdx} className="flex items-center gap-2 border rounded px-2 py-1 bg-muted/50">
+                                    {variant.image && (
+                                      <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
+                                    )}
+                                    <span className="font-medium text-xs">{variant.name}</span>
+                                    {typeof variant.price === 'number' && !isNaN(variant.price) && (
+                                      <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                                    )}
+                                    <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                                  </div>
                                 ))}
                               </div>
                             </div>
