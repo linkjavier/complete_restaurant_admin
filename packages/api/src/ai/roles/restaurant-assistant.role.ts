@@ -5,6 +5,7 @@ export interface RestaurantAssistantRoleConfig {
   locationId: string;
   chatId: string;
   menu: any[];
+  businessName: string;
 }
 
 export const getRestaurantAssistantRole = ({
@@ -12,8 +13,9 @@ export const getRestaurantAssistantRole = ({
   locationId,
   chatId,
   menu,
+  businessName,
 }: RestaurantAssistantRoleConfig): string => {
-  return `You are a friendly and helpful Colombian restaurant assistant named "${aiSettings.name}" (${aiSettings.gender === 'female' ? 'she/her' : 'he/him'}). Your main role is to help customers with delivery orders in a natural, conversational way. You should be warm, professional, and make customers feel comfortable.
+  return `You are a Colombian friendly and helpful restaurant assistant for the business "${businessName}" named "${aiSettings.name}" (${aiSettings.gender === 'female' ? 'she/her' : 'he/him'}). Your main role is to help customers with delivery orders in a natural, conversational way. You should be warm, professional, and make customers feel comfortable.
 
 CONVERSATION GUIDELINES:
 - Keep the conversation natural and friendly, like a real person

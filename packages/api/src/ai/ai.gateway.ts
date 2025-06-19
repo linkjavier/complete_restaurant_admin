@@ -78,6 +78,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       // Get AI settings
       const aiSettings = await this.settingsService.getAISettings();
+      const businessSettings = await this.settingsService.getBusinessSettings();
+      const businessName = businessSettings.name;
 
       // Create a unique conversation ID combining location, chat type and chat ID
       const conversationId = `${locationId}:${chatType}:${chatId}`;
@@ -94,6 +96,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
               aiSettings,
               locationId,
               chatId,
+              businessName,
             }),
           };
         } else {
@@ -108,6 +111,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
               locationId,
               chatId,
               menu,
+              businessName,
             }),
           };
         }
@@ -116,9 +120,17 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // Send welcome message
+      let welcomeMessage = '';
+      if (chatType === 'admin') {
+        welcomeMessage = `👋 ¡Hola! Soy *${aiSettings.name}*, tu asistente administrativo.` +
+          `\n\n🔧 Estoy aquí para ayudarte con las tareas administrativas del restaurante.\n\n¿En qué puedo ayudarte hoy? 😊`;
+      } else {
+        welcomeMessage = `👋 ¡Hola! Bienvenido a *${businessName}*. Mi nombre es *${aiSettings.name}*.` +
+          `\n\n🍽️ Estoy aquí para ayudarte con tu pedido a domicilio.\n\n¿En qué puedo ayudarte hoy? 😊`;
+      }
       client.emit('ai_response', {
         type: 'text',
-        content: `👋 ¡Hola! Soy *${aiSettings.name}*, tu asistente ${chatType === 'admin' ? 'administrativo' : 'virtual'}.\n\n${chatType === 'admin' ? '🔧 Estoy aquí para ayudarte con las tareas administrativas del restaurante.' : '🍽️ Estoy aquí para ayudarte con tu pedido a domicilio.'}\n\n¿En qué puedo ayudarte hoy? 😊`,
+        content: welcomeMessage,
       });
     } catch (error) {
       console.error('Error in handleConnection:', error);
@@ -184,6 +196,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         console.log(`[AI Gateway] Initializing new conversation for: ${conversationId}`);
         // Get AI settings
         const aiSettings = await this.settingsService.getAISettings();
+        const businessSettings = await this.settingsService.getBusinessSettings();
+        const businessName = businessSettings.name;
 
         // Initialize conversation with system message
         if (chatType === 'admin') {
@@ -194,13 +208,12 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 aiSettings,
                 locationId,
                 chatId,
+                businessName,
               }),
             },
           ];
         } else {
-          const menu = await this.productsService.findAll({
-            locationId,
-          });
+          const menu = await this.productsService.findAll({ locationId });
           conversation = [
             {
               role: 'system',
@@ -209,6 +222,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 locationId,
                 chatId,
                 menu,
+                businessName,
               }),
             },
           ];

@@ -53,6 +53,22 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const vh = useMobileViewportHeight();
+  const [businessIcon, setBusinessIcon] = useState<string>("");
+  const [businessName, setBusinessName] = useState<string>("Blondie Restaurant App");
+
+  useEffect(() => {
+    const fetchBusiness = async () => {
+      try {
+        const res = await fetch("/api/settings/business");
+        if (res.ok) {
+          const data = await res.json();
+          setBusinessIcon(data.logo || "");
+          setBusinessName(data.name || "Blondie Restaurant App");
+        }
+      } catch {}
+    };
+    fetchBusiness();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,14 +145,14 @@ export default function LoginPage() {
             <CardHeader className="space-y-1">
               <div className="flex justify-center mb-6">
                 <Image
-                  src="/assets/blondie-logo.png"
-                  alt="Blondie Logo"
-                  width={150}
-                  height={150}
+                  src={businessIcon || "/assets/blondie-logo.png"}
+                  alt="Logo Negocio"
+                  width={120}
+                  height={120}
                   priority
                 />
               </div>
-              <CardTitle className="text-2xl">Welcome back</CardTitle>
+              <CardTitle className="text-2xl">{businessName}</CardTitle>
               <CardDescription>
                 Enter your email to sign in to your account
               </CardDescription>

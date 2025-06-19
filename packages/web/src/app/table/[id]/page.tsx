@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { getTable, Table } from "@/lib/api"
 import { Menu } from "@/components/table/menu"
@@ -16,6 +16,8 @@ export default function TablePage() {
   const [error, setError] = useState<string | null>(null)
   const [customerName, setCustomerName] = useState("")
   const [isOrderStarted, setIsOrderStarted] = useState(false)
+  const [businessIcon, setBusinessIcon] = useState<string>("")
+  const [businessName, setBusinessName] = useState<string>("Blondie Restaurant App")
 
   useEffect(() => {
     const fetchTable = async () => {
@@ -31,7 +33,19 @@ export default function TablePage() {
       }
     }
 
+    const fetchBusiness = async () => {
+      try {
+        const res = await fetch("/api/settings/business")
+        if (res.ok) {
+          const data = await res.json()
+          setBusinessIcon(data.logo || "")
+          setBusinessName(data.name || "Blondie Restaurant App")
+        }
+      } catch {}
+    }
+
     fetchTable()
+    fetchBusiness()
   }, [params.id])
 
   const handleStartOrder = () => {
@@ -59,7 +73,7 @@ export default function TablePage() {
       <div className="py-2 pb-0 md:pb-2">
         <div className="flex justify-between items-center">
           <div className="flex flex-col space-y-1">
-            <h1 className="text-2xl font-bold">Mesa {table.number}</h1>
+            <h1 className="text-2xl font-bold">{businessName}</h1>
             <p className="text-muted-foreground text-sm">
               Ubicación: {table.location?.name || "Sin ubicación"}
             </p>
@@ -67,8 +81,8 @@ export default function TablePage() {
           
           <div className="flex relative w-[100px] h-[100px]">
             <Image
-              src="/assets/blondie-logo.png"
-              alt="Blondie Logo"
+              src={businessIcon || "/assets/blondie-logo.png"}
+              alt="Logo Negocio"
               width={100}
               height={100}
               priority

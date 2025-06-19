@@ -75,8 +75,8 @@ DESAYUNOS_BASICOS_ID=$(curl -X POST http://localhost:3000/categories \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
-    "name": "Desayunos Básicos",
-    "description": "Desayunos básicos y tradicionales"
+    "name": "Desayunos",
+    "description": "Desayunos tradicionales"
   }' | jq -r '.id')
 
 PANADERIA_ID=$(curl -X POST http://localhost:3000/categories \
@@ -266,7 +266,7 @@ curl -X POST http://localhost:3000/products \
     "isActive": true
   }'
 
-# Crear productos de Desayunos Básicos
+# Crear productos de Desayunos
 curl -X POST http://localhost:3000/products \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \

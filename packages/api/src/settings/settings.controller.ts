@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Get } from '@nestjs/common';
-import { SettingsService } from './settings.service';
+import { SettingsService, BusinessSettings } from './settings.service';
 import { AISettings } from './types';
 
 @Controller('settings')
@@ -14,5 +14,15 @@ export class SettingsController {
   @Get('ai')
   async getAISettings(): Promise<AISettings> {
     return this.settingsService.getAISettings();
+  }
+
+  @Get('business')
+  async getBusinessSettings(): Promise<BusinessSettings> {
+    return this.settingsService.getBusinessSettings();
+  }
+
+  @Post('business')
+  async updateBusinessSettings(@Body() settings: BusinessSettings): Promise<BusinessSettings> {
+    return this.settingsService.updateBusinessSettings(settings);
   }
 } 

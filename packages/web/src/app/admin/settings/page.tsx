@@ -1,46 +1,91 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { toast } from "sonner"
+import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
+import { ImageUpload } from "@/components/admin/products/image-upload"
 
 export default function SettingsPage() {
+  const [businessName, setBusinessName] = useState("")
+  const [businessIcon, setBusinessIcon] = useState<string>("")
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [aiName, setAiName] = useState("")
   const [aiGender, setAiGender] = useState("")
   const [aiEnabled, setAiEnabled] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+
+  const { toast } = useToast()
 
   useEffect(() => {
     loadSettings()
   }, [])
 
   const loadSettings = async () => {
+    setIsLoading(true)
     try {
-      const response = await fetch("/api/settings/ai")
-      if (!response.ok) {
-        throw new Error("Failed to load settings")
+      // Cargar configuración del negocio
+      const businessRes = await fetch("/api/settings/business")
+      if (businessRes.ok) {
+        const data = await businessRes.json()
+        setBusinessName(data.name || "")
+        setBusinessIcon(data.logo || "")
       }
-      const data = await response.json()
-      setAiName(data.name)
-      setAiGender(data.gender)
-      setAiEnabled(data.enabled)
+      // Cargar configuración de IA
+      const aiRes = await fetch("/api/settings/ai")
+      if (aiRes.ok) {
+        const data = await aiRes.json()
+        setAiName(data.name)
+        setAiGender(data.gender)
+        setAiEnabled(data.enabled)
+      }
     } catch (error) {
-      toast.error("Error al cargar la configuración")
+      toast({
+        title: "Error",
+        description: "Error al cargar la configuración",
+        variant: "destructive"
+      })
     } finally {
       setIsLoading(false)
     }
   }
 
+  const handleSaveBusiness = async () => {
+    setIsSaving(true)
+    try {
+      const response = await fetch("/api/settings/business", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: businessName, logo: businessIcon })
+      })
+      if (!response.ok) throw new Error("Error al guardar la configuración del negocio")
+      toast({
+        title: "Éxito",
+        description: "Configuración del negocio guardada exitosamente"
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error al guardar la configuración del negocio",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleSave = async () => {
     if (!aiName.trim()) {
-      toast.error("El nombre del asistente es requerido")
+      toast({
+        title: "Error",
+        description: "El nombre del asistente es requerido",
+        variant: "destructive"
+      })
       return
     }
 
@@ -62,9 +107,16 @@ export default function SettingsPage() {
         throw new Error("Failed to save settings")
       }
 
-      toast.success("Configuración guardada exitosamente")
+      toast({
+        title: "Éxito",
+        description: "Configuración del Asistente IA guardada exitosamente"
+      })
     } catch (error) {
-      toast.error("Error al guardar la configuración")
+      toast({
+        title: "Error",
+        description: "Error al guardar la configuración",
+        variant: "destructive"
+      })
     } finally {
       setIsSaving(false)
     }
@@ -82,7 +134,60 @@ export default function SettingsPage() {
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6">Configuración</h1>
       
-      <div className="grid gap-6">
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Sección de Configuración del negocio */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Configuración del negocio</CardTitle>
+            <CardDescription>
+              Personaliza la información y apariencia general de tu negocio
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="business-name">Nombre del Negocio</Label>
+              <Input
+                id="business-name"
+                value={businessName}
+                onChange={e => setBusinessName(e.target.value)}
+                placeholder="Ingresa el nombre del negocio"
+                disabled={isSaving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Icono del Negocio</Label>
+              {businessIcon && (
+                <div className="flex items-center mb-2">
+                  <img
+                    src={businessIcon}
+                    alt="Logo del negocio"
+                    className="w-20 h-20 rounded-lg object-cover border"
+                  />
+                </div>
+              )}
+              <ImageUpload
+                onImageUploaded={setBusinessIcon}
+                currentImage={undefined}
+                buttonText={businessIcon ? "Cambiar Logo" : "Subir Logo"}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Recomendado: PNG cuadrado, 256x256px o superior, fondo transparente.
+              </p>
+            </div>
+            <Button onClick={handleSaveBusiness} disabled={isSaving} className="w-full">
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                "Guardar Cambios"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Sección de Configuración del Asistente IA */}
         <Card>
           <CardHeader>
             <CardTitle>Configuración del Asistente IA</CardTitle>

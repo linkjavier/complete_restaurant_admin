@@ -119,6 +119,8 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
   const { user } = useAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [businessIcon, setBusinessIcon] = useState<string>("")
+  const [businessName, setBusinessName] = useState<string>("Admin Panel")
 
   useEffect(() => {
     setMounted(true)
@@ -127,6 +129,18 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     if (savedState !== null) {
       setIsCollapsed(JSON.parse(savedState))
     }
+    // Obtener logo y nombre del negocio desde la API
+    const fetchBusiness = async () => {
+      try {
+        const res = await fetch("/api/settings/business")
+        if (res.ok) {
+          const data = await res.json()
+          setBusinessIcon(data.logo || "")
+          setBusinessName(data.name || "Admin Panel")
+        }
+      } catch {}
+    }
+    fetchBusiness()
   }, [])
 
   useEffect(() => {
@@ -166,8 +180,8 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                 <>
                   <div className="md:hidden">
                     <Image
-                      src="/assets/blondie-logo.png"
-                      alt="Blondie Logo"
+                      src={businessIcon || "/assets/blondie-logo.png"}
+                      alt="Logo Negocio"
                       width={40}
                       height={40}
                       priority
@@ -178,7 +192,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                     onClick={() => handleNavigation('/admin/dashboard')}
                   >
                     <h1 className="text-2xl font-bold">
-                      Admin Panel
+                      {businessName}
                     </h1>
                   </div>
                 </>
@@ -194,8 +208,8 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
             "hidden md:flex"
           )}>
             <Image
-              src="/assets/blondie-logo.png"
-              alt="Blondie Logo"
+              src={businessIcon || "/assets/blondie-logo.png"}
+              alt="Logo Negocio"
               width={150}
               height={150}
               priority

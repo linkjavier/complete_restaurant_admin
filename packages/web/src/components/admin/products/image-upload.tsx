@@ -9,9 +9,10 @@ import { useToast } from "@/components/ui/use-toast"
 interface ImageUploadProps {
   onImageUploaded: (url: string) => void
   currentImage?: string
+  buttonText?: string
 }
 
-export function ImageUpload({ onImageUploaded, currentImage }: ImageUploadProps) {
+export function ImageUpload({ onImageUploaded, currentImage, buttonText }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const { toast } = useToast()
 
@@ -100,7 +101,7 @@ export function ImageUpload({ onImageUploaded, currentImage }: ImageUploadProps)
           onClick={() => document.getElementById('image-upload')?.click()}
         >
           <Upload className="h-4 w-4" />
-          {uploading ? "Subiendo..." : "Subir Imagen"}
+          {uploading ? "Subiendo..." : buttonText || "Subir Imagen"}
         </Button>
       </div>
     </div>
