@@ -409,6 +409,22 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage('transcribe_audio')
+  async handleTranscribeAudio(client: Socket, data: { audio: Buffer, mimeType?: string }) {
+    try {
+      if (!data.audio) {
+        client.emit('error', { message: 'No audio data received' });
+        return;
+      }
+      // Procesar el audio con el servicio de STT
+      const text = await this.sttService.transcribeAudio(data.audio);
+      client.emit('transcription_result', { text });
+    } catch (error) {
+      console.error('Error transcribing audio:', error);
+      client.emit('error', { message: 'Error transcribing audio', details: error.message });
+    }
+  }
+
   private async executeFunction(functionName: string, functionArgs: any, locationId: string, chatType: string): Promise<{ message: string; validatedItems?: any[]; totalAmount?: number; validated?: boolean; orderData?: any }> {
     console.log(`[AI Gateway] executeFunction called:`, { functionName, chatType, locationId });
     

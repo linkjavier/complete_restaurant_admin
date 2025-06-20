@@ -247,6 +247,39 @@ npx prisma migrate dev
 npx prisma generate --schema=packages/api/prisma/schema.prisma
 ```
 
+12. **Configuración de auto start**
+```bash
+sudo nano /etc/systemd/system/nest-backend.service
+```
+```bash
+[Unit]
+Description=Nest Backend Service
+After=docker.service
+Requires=docker.service
+
+[Service]
+User=ec2-user
+WorkingDirectory=/home/ec2-user
+ExecStart=/home/ec2-user/start.sh
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+```
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable nest-backend.service
+sudo systemctl start nest-backend.service
+
+```
+Para ver el log console actual del NEST
+journalctl -u nest-backend.service -f
+
+Ver los ultimos 100 registros
+journalctl -u nest-backend.service -n 100
+
 ### NGINX and SSL Setup
 
 1. **Install NGINX**
