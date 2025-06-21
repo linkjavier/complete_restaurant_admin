@@ -32,17 +32,23 @@ fi
 echo "Token obtenido: $TOKEN"
 
 # Crear ubicación
-LOCATION_ID=$(curl -s -X POST http://localhost:3000/locations \
+echo "Creando ubicación..."
+LOCATION_RESPONSE=$(curl -s -X POST http://localhost:3000/locations \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
     "name": "Paola",
     "address": "Calle Falsa 123",
     "phone": "3001234567"
-  }' | jq -r '.id')
+  }')
+
+echo "Respuesta de creación de ubicación: $LOCATION_RESPONSE"
+
+LOCATION_ID=$(echo "$LOCATION_RESPONSE" | jq -r '.id')
 
 if [ -z "$LOCATION_ID" ] || [ "$LOCATION_ID" == "null" ]; then
   echo "Error: no se pudo crear la ubicación"
+  echo "Respuesta completa: $LOCATION_RESPONSE"
   exit 1
 fi
 
