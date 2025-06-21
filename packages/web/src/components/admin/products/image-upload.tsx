@@ -55,16 +55,23 @@ export function ImageUpload({ onImageUploaded, currentImage, buttonText }: Image
       if (!response.ok) {
         let errorMessage = 'Error al subir la imagen';
         try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          // La respuesta no es JSON, usar el texto de la respuesta si está disponible
+          // Leer la respuesta como texto una sola vez
           const textError = await response.text();
-          if (textError) {
-            errorMessage = textError;
-          } else {
-             errorMessage = `Error: ${response.status} ${response.statusText}`;
+          try {
+            // Intentar parsear el texto como JSON
+            const errorData = JSON.parse(textError);
+            errorMessage = errorData.message || errorMessage;
+          } catch (e) {
+            // Si no es JSON, usar el texto directamente si tiene contenido
+            if (textError) {
+              errorMessage = textError;
+            } else {
+              errorMessage = `Error: ${response.status} ${response.statusText}`;
+            }
           }
+        } catch (e) {
+            // Fallback si hay problemas leyendo el cuerpo de la respuesta
+            errorMessage = `Error: ${response.status} ${response.statusText}`;
         }
         throw new Error(errorMessage);
       }
