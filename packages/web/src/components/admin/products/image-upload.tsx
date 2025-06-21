@@ -20,7 +20,7 @@ export function ImageUpload({ onImageUploaded, currentImage, buttonText }: Image
     const file = e.target.files?.[0]
     if (!file) return
 
-    console.log(`[Frontend] Received image: ${file.name}, type: ${file.type}`);
+    console.log(`[Frontend] Received image: ${file.name}, type: ${file.type}, size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
 
     // Validar tipo de archivo
     if (!file.type.startsWith('image/')) {
