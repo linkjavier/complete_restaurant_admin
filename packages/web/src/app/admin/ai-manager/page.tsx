@@ -290,36 +290,19 @@ export default function AIManagerPage() {
         setChatMessages(prev => {
           console.log('Previous chat messages:', prev);
           
-          // Verificar si el mensaje ya existe para evitar duplicados
-          const messageTimestamp = message.timestamp * 1000;
-          const messageExists = prev.some(msg => {
-            const msgTimestamp = msg.timestamp.getTime();
-            const timeDiff = Math.abs(msgTimestamp - messageTimestamp);
-            const contentMatch = msg.content === message.body;
-            
-            console.log('Checking duplicate:', {
-              contentMatch,
-              timeDiff,
-              msgContent: msg.content,
-              newContent: message.body,
-              msgTime: msgTimestamp,
-              newTime: messageTimestamp
-            });
-            
-            // Si el contenido es igual y la diferencia de tiempo es menor a 10 segundos, es un duplicado
-            return contentMatch && timeDiff < 10000;
-          });
+          // FIX: Usar el ID del mensaje del backend para evitar duplicados.
+          const messageExists = prev.some(msg => msg.id === message.id);
           
           if (messageExists) {
-            console.log('❌ Message already exists, skipping...');
+            console.log(`❌ Message with ID ${message.id} already exists, skipping...`);
             return prev;
           }
           
           const newMessage: Message = {
-            id: `msg_${messageTimestamp}_${Math.random()}`,
+            id: message.id, // Usar el ID del backend
             content: message.body,
             role: message.fromMe ? "assistant" : "user" as "user" | "assistant",
-            timestamp: new Date(messageTimestamp)
+            timestamp: new Date(message.timestamp * 1000)
           };
           
           console.log('✅ Adding new message to chat:', newMessage);
@@ -468,10 +451,20 @@ export default function AIManagerPage() {
     setChatMessages([]);
     setIsLoadingMessages(true);
 
-    // Usar el socket principal para obtener los mensajes del chat
+    // Actualización optimista: marcar el chat como leído en la UI inmediatamente
+    setWhatsappChats(prevChats =>
+      prevChats.map(chat =>
+        chat.id === chatId ? { ...chat, unreadCount: 0 } : chat
+      )
+    );
+
+    // Usar el socket principal para obtener los mensajes y notificar que se leyó el chat
     if (mainSocket && isConnected) {
       console.log('Requesting chat messages for:', chatId);
       mainSocket.emit('whatsapp:getChatMessages', { chatId });
+
+      console.log('Marking chat as read:', chatId);
+      mainSocket.emit('whatsapp:markChatAsRead', { chatId });
     }
   }
 
@@ -819,15 +812,22 @@ export default function AIManagerPage() {
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between gap-2">
                                         <p className="font-medium truncate">{chat.name}</p>
+                                        {chat.timestamp && (
+                                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                                            {new Date(chat.timestamp * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center justify-between mt-1">
+                                        <p className="text-sm text-muted-foreground truncate">
+                                          {chat.lastMessage || 'Sin mensajes'}
+                                        </p>
                                         {chat.unreadCount > 0 && (
-                                          <Badge variant="secondary" className="flex-shrink-0">
+                                          <Badge variant="secondary" className="flex-shrink-0 ml-2">
                                             {chat.unreadCount}
                                           </Badge>
                                         )}
                                       </div>
-                                      <p className="text-sm text-muted-foreground truncate mt-1">
-                                        {chat.lastMessage || 'Sin mensajes'}
-                                      </p>
                                     </div>
                                   </div>
                                 </div>

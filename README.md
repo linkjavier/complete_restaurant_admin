@@ -280,6 +280,9 @@ journalctl -u nest-backend.service -f
 Ver los ultimos 100 registros
 journalctl -u nest-backend.service -n 100
 
+# Reinciiar el servicio
+sudo systemctl restart nest-backend.service
+
 ### NGINX and SSL Setup
 
 1. **Install NGINX**
@@ -319,6 +322,7 @@ server {
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
+        client_max_body_size 20M;
     }
 }
 ```
