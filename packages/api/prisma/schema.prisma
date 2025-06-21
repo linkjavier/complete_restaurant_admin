@@ -14,18 +14,18 @@ datasource db {
 
 model User {
   id            String         @id @default(uuid())
-  email         String        @unique
+  email         String         @unique
   password      String
   firstName     String
   lastName      String
   role          UserRole
   avatar        String?
-  location      Location?     @relation(fields: [locationId], references: [id])
+  location      Location?      @relation(fields: [locationId], references: [id])
   locationId    String?
   orders        Order[]
   notifications Notification[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 enum UserRole {
@@ -40,17 +40,22 @@ enum UserRole {
 }
 
 model Location {
-  id             String          @id @default(uuid())
-  name           String
-  users          User[]
-  tables         Table[]
-  products       Product[]
-  inventoryItems InventoryItem[]
-  ingredients    Ingredient[]
-  orders         Order[]
+  id               String            @id @default(uuid())
+  name             String
+  address          String
+  phone            String
+  orders           Order[]
+  users            User[]
+  products         Product[]
+  tables           Table[]
   whatsappMessages WhatsappMessage[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  whatsappChats    WhatsappChat[]
+  inventoryItems   InventoryItem[]
+  ingredients      Ingredient[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@map("locations")
 }
 
 model Table {
@@ -58,7 +63,7 @@ model Table {
   number     Int
   seats      Int
   status     TableStatus @default(AVAILABLE)
-  qrCode     String?     @unique 
+  qrCode     String?     @unique
   location   Location    @relation(fields: [locationId], references: [id])
   locationId String
   orders     Order[]
@@ -74,24 +79,24 @@ enum TableStatus {
 }
 
 model Product {
-  id          String             @id @default(cuid())
+  id          String              @id @default(cuid())
   name        String
   description String?
   price       Float
   image       String?
-  category    Category          @relation(fields: [categoryId], references: [id])
+  category    Category            @relation(fields: [categoryId], references: [id])
   categoryId  String
-  isActive    Boolean           @default(true)
-  isFinal     Boolean           @default(false)  // true if it's a processed product
-  quantity    Float             @default(0)      // current stock quantity
-  location    Location          @relation(fields: [locationId], references: [id])
+  isActive    Boolean             @default(true)
+  isFinal     Boolean             @default(false) // true if it's a processed product
+  quantity    Float               @default(0) // current stock quantity
+  location    Location            @relation(fields: [locationId], references: [id])
   locationId  String
   ingredients ProductIngredient[]
   orderItems  OrderItem[]
   productions ProductionLog[]
   variants    ProductVariant[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 }
 
 model Category {
@@ -104,18 +109,18 @@ model Category {
 }
 
 model Ingredient {
-  id          String             @id @default(cuid())
+  id          String              @id @default(cuid())
   name        String
   description String?
   quantity    Float
   unit        String
   minQuantity Float
-  location    Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  location    Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
   locationId  String
   products    ProductIngredient[]
   inventory   InventoryItem[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   @@index([locationId])
 }
@@ -160,26 +165,26 @@ enum OrderSource {
 }
 
 model Order {
-  id            String       @id @default(uuid())
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  location      Location?    @relation(fields: [locationId], references: [id])
-  locationId    String?
-  table         Table?       @relation(fields: [tableId], references: [id])
-  tableId       String?
-  type          OrderType    @default(TABLE)
-  status        OrderStatus  @default(PENDING)
-  isPaid        Boolean      @default(false)
-  user          User?        @relation(fields: [userId], references: [id])
-  userId        String?
-  customerName  String?
+  id              String         @id @default(uuid())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  location        Location?      @relation(fields: [locationId], references: [id])
+  locationId      String?
+  table           Table?         @relation(fields: [tableId], references: [id])
+  tableId         String?
+  type            OrderType      @default(TABLE)
+  status          OrderStatus    @default(PENDING)
+  isPaid          Boolean        @default(false)
+  user            User?          @relation(fields: [userId], references: [id])
+  userId          String?
+  customerName    String?
   deliveryAddress String?
-  neighborhood   String?
-  phone         String?
-  paymentMethod PaymentMethod?
-  source        OrderSource
-  items         OrderItem[]
-  payments      Payment[]
+  neighborhood    String?
+  phone           String?
+  paymentMethod   PaymentMethod?
+  source          OrderSource
+  items           OrderItem[]
+  payments        Payment[]
 }
 
 enum OrderStatus {
@@ -191,17 +196,17 @@ enum OrderStatus {
 }
 
 model OrderItem {
-  id        String          @id @default(cuid())
-  order     Order          @relation(fields: [orderId], references: [id])
-  orderId   String
-  product   Product        @relation(fields: [productId], references: [id])
-  productId String
-  productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])
+  id               String          @id @default(cuid())
+  order            Order           @relation(fields: [orderId], references: [id])
+  orderId          String
+  product          Product         @relation(fields: [productId], references: [id])
+  productId        String
+  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
   productVariantId String?
-  quantity  Int
-  status    OrderItemStatus @default(PENDING)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  quantity         Int
+  status           OrderItemStatus @default(PENDING)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 enum OrderItemStatus {
@@ -214,13 +219,13 @@ enum OrderItemStatus {
 
 model Payment {
   id        String        @id @default(cuid())
-  order     Order        @relation(fields: [orderId], references: [id])
+  order     Order         @relation(fields: [orderId], references: [id])
   orderId   String
   amount    Float
   method    PaymentMethod
   status    PaymentStatus @default(PENDING)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 enum PaymentMethod {
@@ -241,11 +246,11 @@ model Notification {
   id        String           @id @default(cuid())
   type      NotificationType
   message   String
-  read      Boolean         @default(false)
-  user      User           @relation(fields: [userId], references: [id])
+  read      Boolean          @default(false)
+  user      User             @relation(fields: [userId], references: [id])
   userId    String
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 }
 
 enum NotificationType {
@@ -258,11 +263,11 @@ enum NotificationType {
 }
 
 model ProductionLog {
-  id         String    @id @default(cuid())
-  product    Product   @relation(fields: [productId], references: [id])
-  productId  String
-  quantity   Float
-  createdAt  DateTime  @default(now())
+  id        String   @id @default(cuid())
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Float
+  createdAt DateTime @default(now())
 }
 
 model WhatsappMessage {
@@ -282,6 +287,17 @@ model WhatsappMessage {
   @@index([timestamp])
 }
 
+model WhatsappChat {
+  id         String   @id @unique // The chat ID from WhatsApp (e.g., 'xxxxxxxxxxx@c.us')
+  aiEnabled  Boolean  @default(true)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([locationId])
+}
+
 model Settings {
   id           String   @id @default(cuid())
   aiName       String   @default("Sandra")
@@ -294,14 +310,14 @@ model Settings {
 }
 
 model ProductVariant {
-  id        String   @id @default(cuid())
-  name      String
-  price     Float?
-  image     String?
-  isActive  Boolean  @default(true)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId String
+  id         String      @id @default(cuid())
+  name       String
+  price      Float?
+  image      String?
+  isActive   Boolean     @default(true)
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  String
   orderItems OrderItem[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 }

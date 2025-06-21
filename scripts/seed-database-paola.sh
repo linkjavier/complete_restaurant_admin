@@ -32,7 +32,9 @@ LOCATION_RESPONSE=$(curl -X POST http://localhost:3000/locations \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
-    "name": "Paola"
+    "name": "Paola",
+    "address": "Calle Falsa 123",
+    "phone": "3001234567"
   }')
 
 LOCATION_ID=$(echo $LOCATION_RESPONSE | jq -r '.id')

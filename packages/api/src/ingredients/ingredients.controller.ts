@@ -7,15 +7,18 @@ import {
   Param,
   Delete,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { IngredientsService } from './ingredients.service';
 import { Ingredient as IngredientModel, Prisma } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('ingredients')
 @Controller('ingredients')
+@UseGuards(JwtAuthGuard)
 export class IngredientsController {
   constructor(private readonly ingredientsService: IngredientsService) {}
 

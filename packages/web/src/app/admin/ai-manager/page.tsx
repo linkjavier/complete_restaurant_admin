@@ -34,6 +34,7 @@ interface WhatsAppChat {
   lastMessage: string
   timestamp: number | null
   unreadCount: number
+  aiEnabled?: boolean
 }
 
 export default function AIManagerPage() {
@@ -44,10 +45,10 @@ export default function AIManagerPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const chatMessagesEndRef = useRef<HTMLDivElement>(null)
+  const selectedChatRef = useRef<string | null>(null);
   const [isWhatsAppConnected, setIsWhatsAppConnected] = useState(false)
   const [showQR, setShowQR] = useState(false)
   const [mainSocket, setMainSocket] = useState<Socket | null>(null)
-  const [chatSocket, setChatSocket] = useState<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [whatsappChats, setWhatsappChats] = useState<WhatsAppChat[]>([])
@@ -58,6 +59,7 @@ export default function AIManagerPage() {
   const [isLoadingChats, setIsLoadingChats] = useState(false)
   const [aiEnabled, setAiEnabled] = useState(false)
   const [isSavingSettings, setIsSavingSettings] = useState(false)
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [showChatView, setShowChatView] = useState(false)
   const [activeTab, setActiveTab] = useState("whatsapp")
   const [isRecording, setIsRecording] = useState(false)
@@ -84,6 +86,10 @@ export default function AIManagerPage() {
   useEffect(() => {
     scrollChatToBottom()
   }, [chatMessages, showChatView])
+
+  useEffect(() => {
+    selectedChatRef.current = selectedChat;
+  }, [selectedChat]);
 
   useEffect(() => {
     if (isAuthLoading) {
@@ -185,17 +191,12 @@ export default function AIManagerPage() {
     socketInstance.on('whatsapp:status', ({ isConnected }) => {
       console.log('Received WhatsApp status:', isConnected);
       setIsWhatsAppConnected(isConnected);
+      setIsAuthenticating(false);
       
       if (isConnected) {
-        console.log('WhatsApp is connected, requesting chats...');
-        socketInstance.emit('whatsapp:getChats');
+        setShowQR(false);
+        setQrCode(null);
       } else {
-        console.log('WhatsApp is not connected, checking if we need to initialize...');
-        // Solo intentar inicializar si no hay un código QR mostrado
-        if (!showQR) {
-          socketInstance.emit('whatsapp:getQR');
-          setShowQR(true);
-        }
         setIsLoadingChats(false);
       }
     });
@@ -208,13 +209,11 @@ export default function AIManagerPage() {
       }
     }, 30000); // Verificar cada 30 segundos
 
-    socketInstance.on('whatsapp:authenticated', () => {
-      console.log('WhatsApp authenticated');
-      setIsWhatsAppConnected(true);
+    socketInstance.on('whatsapp:authenticating', () => {
+      console.log('WhatsApp authenticating...');
+      setIsAuthenticating(true);
       setShowQR(false);
       setQrCode(null);
-      setIsLoadingChats(true);
-      socketInstance.emit('whatsapp:getChats');
     });
 
     socketInstance.on('whatsapp:auth_failure', (error) => {
@@ -235,6 +234,7 @@ export default function AIManagerPage() {
       setIsWhatsAppConnected(true);
       setShowQR(false);
       setQrCode(null);
+      setIsAuthenticating(false);
       setIsLoadingChats(true);
       // Solicitar chats cuando WhatsApp esté listo
       console.log('Requesting chats after ready event');
@@ -249,6 +249,13 @@ export default function AIManagerPage() {
       }
       setWhatsappChats(chats || []);
       setIsLoadingChats(false);
+      
+      // Log some examples for debugging
+      if (chats && chats.length > 0) {
+        chats.slice(0, 3).forEach((chat, index) => {
+          console.log(`Chat ${index + 1}: "${chat.name}" - Last message: "${chat.lastMessage}"`);
+        });
+      }
     });
 
     socketInstance.on('whatsapp:qr', ({ qrCode }) => {
@@ -260,6 +267,12 @@ export default function AIManagerPage() {
 
     socketInstance.on('whatsapp:message', (message) => {
       console.log('Received WhatsApp message:', message);
+      console.log('Current selectedChat:', selectedChatRef.current);
+      console.log('Message from:', message.from);
+      console.log('Message body:', message.body);
+      console.log('Message fromMe:', message.fromMe);
+      
+      // Actualizar la lista de chats
       setWhatsappChats(prevChats => {
         console.log('Previous chats:', prevChats);
         const updatedChats = prevChats.map(chat => 
@@ -271,14 +284,51 @@ export default function AIManagerPage() {
         return updatedChats;
       });
 
-      if (selectedChat === message.from) {
-        console.log('Adding message to selected chat:', message);
-        setChatMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          content: message.body,
-          role: "user",
-          timestamp: new Date(message.timestamp * 1000)
-        }]);
+      // Si estamos en el chat activo, agregar el mensaje a la conversación
+      if (selectedChatRef.current === message.from) {
+        console.log('✅ Chat matches! Adding message to selected chat');
+        setChatMessages(prev => {
+          console.log('Previous chat messages:', prev);
+          
+          // Verificar si el mensaje ya existe para evitar duplicados
+          const messageTimestamp = message.timestamp * 1000;
+          const messageExists = prev.some(msg => {
+            const msgTimestamp = msg.timestamp.getTime();
+            const timeDiff = Math.abs(msgTimestamp - messageTimestamp);
+            const contentMatch = msg.content === message.body;
+            
+            console.log('Checking duplicate:', {
+              contentMatch,
+              timeDiff,
+              msgContent: msg.content,
+              newContent: message.body,
+              msgTime: msgTimestamp,
+              newTime: messageTimestamp
+            });
+            
+            // Si el contenido es igual y la diferencia de tiempo es menor a 10 segundos, es un duplicado
+            return contentMatch && timeDiff < 10000;
+          });
+          
+          if (messageExists) {
+            console.log('❌ Message already exists, skipping...');
+            return prev;
+          }
+          
+          const newMessage: Message = {
+            id: `msg_${messageTimestamp}_${Math.random()}`,
+            content: message.body,
+            role: message.fromMe ? "assistant" : "user" as "user" | "assistant",
+            timestamp: new Date(messageTimestamp)
+          };
+          
+          console.log('✅ Adding new message to chat:', newMessage);
+          const updatedMessages = [...prev, newMessage];
+          console.log('Updated chat messages:', updatedMessages);
+          return updatedMessages;
+        });
+      } else {
+        console.log('❌ Chat does not match. selectedChat:', selectedChatRef.current, 'message.from:', message.from);
       }
     });
 
@@ -298,6 +348,30 @@ export default function AIManagerPage() {
       setIsLoadingMessages(false);
     });
 
+    socketInstance.on('whatsapp:chatUpdated', (updatedChat: WhatsAppChat) => {
+      console.log('EVENT: whatsapp:chatUpdated', updatedChat);
+      setWhatsappChats(prevChats => {
+        console.log('STATE UPDATE: Previous chats:', prevChats.map(c => ({id: c.id, aiEnabled: c.aiEnabled})));
+        const chatToUpdate = prevChats.find(chat => chat.id === updatedChat.id);
+        
+        const newChats = prevChats.map(chat =>
+          chat.id === updatedChat.id
+            ? { ...chat, aiEnabled: updatedChat.aiEnabled }
+            : chat
+        );
+    
+        console.log('STATE UPDATE: New chats:', newChats.map(c => ({id: c.id, aiEnabled: c.aiEnabled})));
+    
+        if (chatToUpdate) {
+          const toastMessage = `IA para ${chatToUpdate.name} ahora está ${updatedChat.aiEnabled ? 'activa' : 'inactiva'}.`;
+          console.log('TOAST:', toastMessage);
+          toast.info(toastMessage);
+        }
+        
+        return newChats;
+      });
+    });
+
     setMainSocket(socketInstance)
 
     return () => {
@@ -315,12 +389,37 @@ export default function AIManagerPage() {
       socketInstance.off('whatsapp:message');
       socketInstance.off('whatsapp:chatMessages');
       socketInstance.off('whatsapp:error');
-      socketInstance.off('whatsapp:authenticated');
+      socketInstance.off('whatsapp:authenticating');
       socketInstance.off('whatsapp:auth_failure');
       socketInstance.off('whatsapp:disconnected');
       socketInstance.off('ai_response');
+      socketInstance.off('whatsapp:chatUpdated');
     }
   }, [user, isAuthLoading, router])
+
+  useEffect(() => {
+    if (mainSocket) {
+      mainSocket.on('whatsapp:chatUpdated', (updatedChat) => {
+        setWhatsappChats(prevChats =>
+          prevChats.map(chat =>
+            chat.id === updatedChat.id
+              ? { ...chat, aiEnabled: updatedChat.aiEnabled }
+              : chat
+          )
+        );
+        toast.info(
+          `IA para el chat con ${
+            whatsappChats.find((c) => c.id === updatedChat.id)?.name ||
+            'un usuario'
+          } ha sido ${updatedChat.aiEnabled ? 'activada' : 'desactivada'}.`,
+        );
+      });
+
+      return () => {
+        mainSocket.off('whatsapp:chatUpdated');
+      };
+    }
+  }, [mainSocket, whatsappChats]);
 
   // Modificar el efecto para la pestaña de WhatsApp
   useEffect(() => {
@@ -369,96 +468,59 @@ export default function AIManagerPage() {
     setChatMessages([]);
     setIsLoadingMessages(true);
 
-    // Disconnect previous chat socket if exists
-    if (chatSocket) {
-      chatSocket.disconnect();
+    // Usar el socket principal para obtener los mensajes del chat
+    if (mainSocket && isConnected) {
+      console.log('Requesting chat messages for:', chatId);
+      mainSocket.emit('whatsapp:getChatMessages', { chatId });
     }
-
-    // Create new socket connection for this chat
-    const newChatSocket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
-      transports: ['websocket'],
-      query: {
-        locationId: user.locationId,
-        chatType: 'whatsapp',
-        chatId: chatId,
-      },
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      timeout: 20000,
-    });
-
-    // Configurar los event listeners para el nuevo socket
-    newChatSocket.on('connect', () => {
-      console.log('Connected to chat socket');
-      // Solicitar los mensajes del chat cuando se conecte
-      newChatSocket.emit('whatsapp:getChatMessages', { chatId });
-    });
-
-    newChatSocket.on('whatsapp:chatMessages', ({ messages }) => {
-      console.log('Received chat messages:', messages);
-      if (!messages || messages.length === 0) {
-        console.log('No messages received or empty array');
-      }
-      const formattedMessages = messages.map(msg => ({
-        id: msg.id,
-        content: msg.body,
-        role: msg.fromMe ? "assistant" : "user",
-        timestamp: new Date(msg.timestamp * 1000)
-      }));
-      console.log('Formatted messages:', formattedMessages);
-      setChatMessages(formattedMessages);
-      setIsLoadingMessages(false);
-    });
-
-    newChatSocket.on('whatsapp:message', (message) => {
-      console.log('Received new WhatsApp message:', message);
-      if (message.from === chatId) {
-        setChatMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          content: message.body,
-          role: "user",
-          timestamp: new Date(message.timestamp * 1000)
-        }]);
-      }
-    });
-
-    newChatSocket.on('error', ({ message, details }) => {
-      console.error('Socket error:', message, details);
-      setIsLoadingMessages(false);
-      toast.error(message || 'Error en la conexión');
-    });
-
-    setChatSocket(newChatSocket);
   }
 
   const handleBackToChats = () => {
     setShowChatView(false);
     setSelectedChat(null);
-    // Desconectar el socket del chat cuando volvemos a la lista
-    if (chatSocket) {
-      chatSocket.disconnect();
-      setChatSocket(null);
-    }
   }
 
   const handleSendWhatsAppMessage = (message: string) => {
-    if (!chatSocket || !selectedChat) return;
+    if (!mainSocket || !selectedChat || !isConnected) return;
 
     const newMessage: Message = {
-      id: Date.now().toString(),
+      id: `msg_${Date.now()}_${Math.random()}`,
       content: message,
       role: "assistant",
       timestamp: new Date()
     };
 
     setChatMessages(prev => [...prev, newMessage]);
+
+    // Actualización optimista de la lista de chats
+    setWhatsappChats(prevChats => {
+      const updatedChats = prevChats.map(chat =>
+        chat.id === selectedChat
+          ? { ...chat, lastMessage: message, timestamp: Date.now() / 1000 }
+          : chat
+      );
+      // Mover el chat actualizado al principio de la lista
+      const currentChat = updatedChats.find(chat => chat.id === selectedChat);
+      if (currentChat) {
+        const otherChats = updatedChats.filter(chat => chat.id !== selectedChat);
+        return [currentChat, ...otherChats];
+      }
+      return updatedChats;
+    });
     
-    chatSocket.emit('whatsapp:sendMessage', {
+    mainSocket.emit('whatsapp:sendMessage', {
       to: selectedChat,
       message
     });
   }
+
+  const handleToggleAIChat = (chatId: string) => {
+    if (!mainSocket || !user?.locationId) return;
+    mainSocket.emit('whatsapp:toggleAIChat', {
+      chatId,
+      locationId: user.locationId,
+    });
+  };
 
   const handleAIToggle = async (checked: boolean) => {
     setIsSavingSettings(true)
@@ -632,6 +694,12 @@ export default function AIManagerPage() {
     };
   }, [mainSocket]);
 
+  const currentChat = selectedChat
+    ? whatsappChats.find(chat => chat.id === selectedChat)
+    : null;
+  // The backend defaults to true if settings don't exist, so `?? true` is correct.
+  const isAIEnabled = currentChat?.aiEnabled ?? true;
+
   return (
     <div className="h-[calc(100vh-4rem)] overflow-hidden p-4 md:p-8 w-full flex flex-col">
       <div className="flex-none flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
@@ -712,7 +780,11 @@ export default function AIManagerPage() {
                             <h2 className="text-lg font-semibold">Chats</h2>
                           </div>
 
-                          {showQR && qrCode && (
+                          {isAuthenticating ? (
+                            <div className="flex flex-col items-center gap-4 p-4 border rounded-lg mt-4">
+                              <p className="text-sm text-center">Conectando, por favor espera...</p>
+                            </div>
+                          ) : showQR && qrCode && (
                             <div className="flex flex-col items-center gap-4 p-4 border rounded-lg mt-4">
                               <p className="text-sm text-center">Escanea el código QR con WhatsApp</p>
                               <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
@@ -740,21 +812,23 @@ export default function AIManagerPage() {
                                     selectedChat === chat.id && "bg-muted"
                                   )}
                                 >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <Avatar>
-                                        <AvatarFallback>{chat.name ? chat.name[0] : '?'}</AvatarFallback>
-                                      </Avatar>
-                                      <div>
-                                        <p className="font-medium">{chat.name}</p>
-                                        <p className="text-sm text-muted-foreground truncate">
-                                          {chat.lastMessage}
-                                        </p>
+                                  <div className="flex items-start gap-3 min-w-0">
+                                    <Avatar className="flex-shrink-0">
+                                      <AvatarFallback>{chat.name ? chat.name[0] : '?'}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="font-medium truncate">{chat.name}</p>
+                                        {chat.unreadCount > 0 && (
+                                          <Badge variant="secondary" className="flex-shrink-0">
+                                            {chat.unreadCount}
+                                          </Badge>
+                                        )}
                                       </div>
+                                      <p className="text-sm text-muted-foreground truncate mt-1">
+                                        {chat.lastMessage || 'Sin mensajes'}
+                                      </p>
                                     </div>
-                                    {chat.unreadCount > 0 && (
-                                      <Badge variant="secondary">{chat.unreadCount}</Badge>
-                                    )}
                                   </div>
                                 </div>
                               ))
@@ -775,33 +849,58 @@ export default function AIManagerPage() {
                       className="col-span-1 md:col-span-8 h-full"
                     >
                       <Card className="h-full flex flex-col">
-                        {selectedChat ? (
+                        {selectedChat && currentChat ? (
                           <div className="flex flex-col h-full">
-                            <div className="flex-none flex items-center gap-2 p-4 border-b md:hidden">
+                            <div className="flex-none flex items-center justify-between gap-2 p-4 border-b">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={handleBackToChats}
+                                  className="md:hidden flex-shrink-0"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="h-5 w-5"
+                                  >
+                                    <path d="m15 18-6-6 6-6" />
+                                  </svg>
+                                </Button>
+                                <h2 className="text-lg font-semibold truncate">
+                                  {currentChat.name}
+                                </h2>
+                              </div>
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                onClick={handleBackToChats}
-                                className="md:hidden"
+                                onClick={() => handleToggleAIChat(selectedChat)}
+                                className={cn(
+                                  "transition-colors flex items-center gap-1 md:gap-2 flex-shrink-0",
+                                  isAIEnabled
+                                    ? "text-green-500 hover:text-green-600"
+                                    : "text-muted-foreground hover:text-foreground"
+                                )}
+                                title={
+                                  isAIEnabled
+                                    ? "Desactivar IA para este chat"
+                                    : "Activar IA para este chat"
+                                }
                               >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="24"
-                                  height="24"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="h-5 w-5"
-                                >
-                                  <path d="m15 18-6-6 6-6" />
-                                </svg>
+                                <Bot className="h-4 w-4 md:h-5 md:w-5" />
+                                <span className="font-semibold text-xs md:text-sm hidden sm:inline">
+                                  {isAIEnabled ? 'IA Activa' : 'IA Inactiva'}
+                                </span>
+                                <span className="font-semibold text-xs sm:hidden">
+                                  {isAIEnabled ? 'ACTIVA' : 'INACTIVA'}
+                                </span>
                               </Button>
-                              <h2 className="text-lg font-semibold">
-                                {whatsappChats.find(chat => chat.id === selectedChat)?.name}
-                              </h2>
                             </div>
                             <div className="h-[calc(100vh-16rem)] md:h-[calc(100vh-20rem)] overflow-y-auto">
                               <div className="p-4 space-y-4">

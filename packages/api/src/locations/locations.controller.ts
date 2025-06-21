@@ -15,6 +15,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CreateLocationDto } from './dto/create-location.dto';
 
 @ApiTags('locations')
 @Controller('locations')
@@ -45,7 +46,7 @@ export class LocationsController {
   @ApiOperation({ summary: 'Crear una nueva ubicación' })
   @ApiResponse({ status: 201, description: 'Ubicación creada exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
-  async create(@Body() data: { name: string }) {
+  async create(@Body() data: CreateLocationDto) {
     return this.locationsService.create(data);
   }
 
@@ -53,7 +54,7 @@ export class LocationsController {
   @ApiOperation({ summary: 'Actualizar una ubicación' })
   @ApiResponse({ status: 200, description: 'Ubicación actualizada exitosamente' })
   @ApiResponse({ status: 404, description: 'Ubicación no encontrada' })
-  async update(@Param('id') id: string, @Body() data: { name: string }) {
+  async update(@Param('id') id: string, @Body() data: CreateLocationDto) {
     const location = await this.locationsService.findOne(id);
     if (!location) {
       throw new NotFoundException(`Ubicación con ID ${id} no encontrada`);

@@ -5,6 +5,7 @@ import * as qrcode from 'qrcode';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AIGateway } from '../ai/ai.gateway';
 import { STTService } from '../stt/stt.service';
+import { WhatsappChat } from '@prisma/client';
 
 @Injectable()
 export class WhatsappService {
@@ -12,8 +13,10 @@ export class WhatsappService {
   private client: Client;
   private qrCode: string | null = null;
   private isConnected = false;
+  private isAuthenticating = false;
   private locationId: string | null = null;
   private initializationPromise: Promise<void> | null = null;
+  private isRestarting = false;
   private cachedChats: any[] = [];
   private lastChatsUpdate: number = 0;
   private readonly CHATS_CACHE_DURATION = 30000; // 30 seconds
@@ -118,15 +121,21 @@ export class WhatsappService {
 
           this.client.on('authenticated', () => {
             this.logger.log('WhatsApp client is authenticated');
-            this.isConnected = true;
+            this.isAuthenticating = true;
+            this.isConnected = false;
             this.qrCode = null;
             this.qrCodePromise = null;
+            
+            // Add a small delay to allow the client to stabilize
+            setTimeout(() => {
             this.eventEmitter.emit('whatsapp.authenticated');
+            }, 1000);
           });
 
           this.client.on('ready', async () => {
             this.logger.log('WhatsApp client is ready!');
             this.isConnected = true;
+            this.isAuthenticating = false;
             this.qrCode = null;
             this.qrCodePromise = null;
             
@@ -142,20 +151,12 @@ export class WhatsappService {
             }
             
             this.eventEmitter.emit('whatsapp.ready');
-            
-            // Automatically fetch and emit chats when ready
-            try {
-              const chats = await this.getChats();
-              this.logger.log(`Emitting ${chats.length} chats after ready event`);
-              this.eventEmitter.emit('whatsapp.chats', { chats });
-            } catch (error) {
-              this.logger.error(`Error fetching chats after ready: ${error.message}`);
-            }
           });
 
           this.client.on('auth_failure', (error) => {
             this.logger.error('WhatsApp authentication failed:', error);
             this.isConnected = false;
+            this.isAuthenticating = false;
             this.initializationPromise = null;
             this.qrCodePromise = null;
             this.eventEmitter.emit('whatsapp.auth_failure', error);
@@ -164,9 +165,27 @@ export class WhatsappService {
           this.client.on('disconnected', (reason) => {
             this.logger.log(`WhatsApp client disconnected: ${reason}`);
             this.isConnected = false;
+            this.isAuthenticating = false;
             this.initializationPromise = null;
             this.qrCodePromise = null;
             this.eventEmitter.emit('whatsapp.disconnected', reason);
+          });
+
+          this.client.on('error', (error) => {
+            this.logger.error(`WhatsApp client error: ${error.message}`);
+            this.isConnected = false;
+            this.initializationPromise = null;
+            this.qrCodePromise = null;
+            if (!this.isRestarting) {
+              this.isRestarting = true;
+              this.logger.log('Attempting to restart WhatsApp client in 5 seconds...');
+              setTimeout(() => {
+                this.isRestarting = false;
+                this.initializeWhatsApp().catch(err => {
+                  this.logger.error(`Failed to restart WhatsApp client: ${err.message}`);
+                });
+              }, 5000);
+            }
           });
 
           // Agregar manejador de mensajes entrantes
@@ -218,6 +237,14 @@ export class WhatsappService {
                       }
                     });
 
+                    // Emitir evento para el mensaje recibido del usuario
+                    this.eventEmitter.emit('whatsapp.message', {
+                      from: message.from,
+                      body: transcribedText,
+                      timestamp: message.timestamp,
+                      fromMe: false,
+                    });
+
                     // Process the transcribed text with AI
                     const aiResponse = await this.aiGateway.handleTextInput({
                       text: transcribedText,
@@ -253,6 +280,36 @@ export class WhatsappService {
                         timestamp: Date.now() / 1000,
                         fromMe: true,
                       });
+
+                      // Actualizar la caché de chats
+                      if (this.cachedChats.length > 0) {
+                        const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
+                        if (chatIndex !== -1) {
+                          this.cachedChats[chatIndex] = {
+                            ...this.cachedChats[chatIndex],
+                            lastMessage: aiResponse,
+                            timestamp: Date.now() / 1000,
+                          };
+                          this.lastChatsUpdate = Date.now();
+                          this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
+                          this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
+                        }
+                      }
+                    } else {
+                      // Si no hay respuesta de IA (switch apagado), solo actualizar la caché de chats
+                      if (this.cachedChats.length > 0) {
+                        const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
+                        if (chatIndex !== -1) {
+                          this.cachedChats[chatIndex] = {
+                            ...this.cachedChats[chatIndex],
+                            lastMessage: message.body,
+                            timestamp: message.timestamp,
+                          };
+                          this.lastChatsUpdate = Date.now();
+                          this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
+                          this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
+                        }
+                      }
                     }
 
                     return;
@@ -271,18 +328,52 @@ export class WhatsappService {
                       this.logger.error(`Error sending error message: ${sendError.message}`);
                     }
                   }
+                  
+                  // Actualizar la caché de chats con el mensaje de error
+                  if (this.cachedChats.length > 0) {
+                    const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
+                    if (chatIndex !== -1) {
+                      this.cachedChats[chatIndex] = {
+                        ...this.cachedChats[chatIndex],
+                        lastMessage: 'Error al procesar nota de voz',
+                        timestamp: Date.now() / 1000,
+                      };
+                      this.lastChatsUpdate = Date.now();
+                      this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
+                      this.logger.log(`Updated chat cache for ${message.from} with message: "${'Error al procesar nota de voz'.substring(0, 30)}..."`);
+                    }
+                  }
+                  
                   return;
                 }
               }
 
               // Handle regular text messages
               const existingMessage = await this.prisma.whatsappMessage.findUnique({
-                where: { id: message.id._serialized }
+                where: { id: message.id._serialized },
               });
 
               if (existingMessage) {
-                this.logger.log(`Message ${message.id._serialized} already exists, skipping...`);
+                this.logger.log(
+                  `Message ${message.id._serialized} already exists, skipping...`,
+                );
                 return;
+              }
+
+              // Find or create chat settings
+              let chatSettings = await this.prisma.whatsappChat.findUnique({
+                where: { id: message.from },
+              });
+
+              if (!chatSettings) {
+                chatSettings = await this.prisma.whatsappChat.create({
+                  data: {
+                    id: message.from,
+                    locationId: this.locationId,
+                    aiEnabled: true, // Default to true
+                  },
+                });
+                this.logger.log(`Created new chat settings for ${message.from}`);
               }
 
               // Save the message in the database
@@ -300,6 +391,22 @@ export class WhatsappService {
                 }
               });
 
+              // Emitir evento para el mensaje recibido del usuario
+              this.eventEmitter.emit('whatsapp.message', {
+                from: message.from,
+                body: message.body,
+                timestamp: message.timestamp,
+                fromMe: false,
+              });
+
+              // Check if AI is enabled for this chat
+              if (!chatSettings.aiEnabled) {
+                this.logger.log(
+                  `AI is disabled for chat ${message.from}, not processing with AI`,
+                );
+                return;
+              }
+
               // Procesar el mensaje con la IA
               const aiResponse = await this.aiGateway.handleTextInput({
                 text: message.body,
@@ -307,6 +414,21 @@ export class WhatsappService {
                 chatType: 'whatsapp',
                 chatId: message.from,
               });
+
+              // Actualizar la caché de chats con el mensaje recibido
+              if (this.cachedChats.length > 0) {
+                const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
+                if (chatIndex !== -1) {
+                  this.cachedChats[chatIndex] = {
+                    ...this.cachedChats[chatIndex],
+                    lastMessage: message.body,
+                    timestamp: message.timestamp,
+                  };
+                  this.lastChatsUpdate = Date.now();
+                  this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
+                  this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
+                }
+              }
 
               // Solo procesar si hay una respuesta de IA
               if (aiResponse && aiResponse.trim()) {
@@ -346,7 +468,8 @@ export class WhatsappService {
                       timestamp: Date.now() / 1000,
                     };
                     this.lastChatsUpdate = Date.now();
-                    this.eventEmitter.emit('whatsapp:chats', { chats: this.cachedChats });
+                    this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
+                    this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
                   }
                 }
               } else {
@@ -360,7 +483,8 @@ export class WhatsappService {
                       timestamp: message.timestamp,
                     };
                     this.lastChatsUpdate = Date.now();
-                    this.eventEmitter.emit('whatsapp:chats', { chats: this.cachedChats });
+                    this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
+                    this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
                   }
                 }
               }
@@ -388,7 +512,7 @@ export class WhatsappService {
               this.logger.error(`Error initializing WhatsApp client: ${error.message}`);
               this.initializationPromise = null;
               this.qrCodePromise = null;
-              throw error;
+              // No relanzar el error para evitar que la aplicación se bloquee
             });
           }, 1000);
         });
@@ -484,6 +608,10 @@ export class WhatsappService {
     }
   }
 
+  async isWhatsAppAuthenticating(): Promise<boolean> {
+    return this.isAuthenticating;
+  }
+
   async isWhatsAppConnected(): Promise<boolean> {
     try {
       await this.initializeWhatsApp();
@@ -552,24 +680,42 @@ export class WhatsappService {
       const chats = await this.client.getChats();
       this.logger.log(`Found ${chats.length} chats`);
       
-      const formattedChats = chats.map(chat => {
+      const chatSettings = await this.prisma.whatsappChat.findMany({
+        where: {
+          locationId: this.locationId,
+          id: { in: chats.map((c) => c.id._serialized) },
+        },
+      });
+
+      const chatSettingsMap = new Map(
+        chatSettings.map((cs) => [cs.id, cs]),
+      );
+
+      const formattedChats = chats.map((chat) => {
+        const settings = chatSettingsMap.get(chat.id._serialized);
         const formatted = {
           id: chat.id._serialized,
           name: chat.name,
           lastMessage: chat.lastMessage?.body || '',
           timestamp: chat.lastMessage?.timestamp || null,
           unreadCount: chat.unreadCount,
+          aiEnabled: settings ? settings.aiEnabled : true, // Default to true if no settings found
         };
         this.logger.debug(`Formatted chat: ${JSON.stringify(formatted)}`);
         return formatted;
       });
 
+      this.logger.log(
+        `Formatted ${formattedChats.length} chats with last messages`,
+      );
+      // Log a few examples for debugging
+      formattedChats.slice(0, 3).forEach((chat, index) => {
+        this.logger.log(`Chat ${index + 1}: "${chat.name}" - Last message: "${chat.lastMessage.substring(0, 50)}${chat.lastMessage.length > 50 ? '...' : ''}"`);
+      });
+
       // Update cache
       this.cachedChats = formattedChats;
       this.lastChatsUpdate = now;
-
-      this.logger.log('Emitting whatsapp:chats event with formatted chats');
-      this.eventEmitter.emit('whatsapp:chats', { chats: formattedChats });
 
       return formattedChats;
     } catch (error) {
@@ -662,167 +808,47 @@ export class WhatsappService {
     }
   }
 
-  async handleIncomingMessage(message: any) {
-    try {
-      this.logger.log(`Received message from ${message.from}: ${message.body}`);
-
-      // Check if the message is a voice note
-      if (message.hasMedia && message.type === 'ptt') {
-        try {
-          // Download the voice note
-          const media = await message.downloadMedia();
-          if (media && media.data) {
-            // Convert base64 to buffer
-            const audioBuffer = Buffer.from(media.data, 'base64');
-            
-            // Transcribe the audio
-            const transcribedText = await this.sttService.transcribeAudio(audioBuffer);
-            this.logger.log(`Transcribed voice note: ${transcribedText}`);
-
-            // Save the transcribed message in the database
-            await this.prisma.whatsappMessage.create({
-              data: {
-                from: message.from,
-                body: transcribedText,
-                timestamp: new Date(message.timestamp * 1000),
-                location: {
-                  connect: {
-                    id: this.locationId
-                  }
-                },
-                isFromAI: false,
-                isVoiceNote: true,
-              }
-            });
-
-            // Process the transcribed text with AI
-            const aiResponse = await this.aiGateway.handleTextInput({
-              text: transcribedText,
-              locationId: this.locationId,
-              chatType: 'whatsapp',
-              chatId: message.from,
-            });
-
-            // Save the AI response
-            await this.prisma.whatsappMessage.create({
-              data: {
-                from: message.from,
-                body: aiResponse,
-                timestamp: new Date(),
-                location: {
-                  connect: {
-                    id: this.locationId
-                  }
-                },
-                isFromAI: true,
-              }
-            });
-
-            // Send the AI response
-            await this.sendMessage(message.from, aiResponse);
-
-            // Emit events for frontend updates
-            this.eventEmitter.emit('whatsapp.message', {
-              from: message.from,
-              body: transcribedText,
-              timestamp: message.timestamp,
-              isVoiceNote: true,
-            });
-
-            this.eventEmitter.emit('whatsapp.message', {
-              from: message.from,
-              body: aiResponse,
-              timestamp: Date.now() / 1000,
-              fromMe: true,
-            });
-
-            return;
-          }
-        } catch (error) {
-          this.logger.error(`Error processing voice note: ${error.message}`);
-          // Solo enviar mensaje de error si la IA está habilitada para WhatsApp
-          const aiSettings = await this.prisma.settings.findFirst();
-          if (aiSettings?.aiEnabled) {
-            try {
-              await this.client.sendMessage(
-                message.from,
-                'Lo siento, hubo un error al procesar tu nota de voz. Por favor, intenta de nuevo o envía un mensaje de texto.'
-              );
-            } catch (sendError) {
-              this.logger.error(`Error sending error message: ${sendError.message}`);
-            }
-          }
-          return;
-        }
-      }
-
-      // Handle regular text messages
-      const existingMessage = await this.prisma.whatsappMessage.findUnique({
-        where: { id: message.id._serialized }
-      });
-
-      if (existingMessage) {
-        this.logger.log(`Message ${message.id._serialized} already exists, skipping...`);
-        return;
-      }
-
-      // Save the message in the database
-      await this.prisma.whatsappMessage.create({
-        data: {
-          from: message.from,
-          body: message.body,
-          timestamp: new Date(message.timestamp * 1000),
-          location: {
-            connect: {
-              id: this.locationId
-            }
-          },
-          isFromAI: false,
-        }
-      });
-
-      // Process the message with AI if enabled
-      if (this.aiEnabled) {
-        try {
-          const aiResponse = await this.processMessageWithAI(message);
-          
-          // Save the AI response
-          await this.prisma.whatsappMessage.create({
-            data: {
-              from: message.from,
-              body: aiResponse,
-              timestamp: new Date(),
-              location: {
-                connect: {
-                  id: this.locationId
-                }
-              },
-              isFromAI: true,
-            }
-          });
-
-          // Send the AI response
-          await this.sendMessage(message.from, aiResponse);
-        } catch (error) {
-          this.logger.error(`Error processing message with AI: ${error.message}`);
-          try {
-            await this.sendMessage(
-              message.from,
-              "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo más tarde."
-            );
-          } catch (sendError) {
-            this.logger.error(`Error sending error message: ${sendError.message}`);
-          }
-        }
-      }
-    } catch (error) {
-      this.logger.error(`Error handling incoming message: ${error.message}`);
+  private updateChatCache(chatId: string, lastMessage: string, timestamp: number) {
+    const chatIndex = this.cachedChats.findIndex(chat => chat.id === chatId);
+    if (chatIndex !== -1) {
+      this.cachedChats[chatIndex] = {
+        ...this.cachedChats[chatIndex],
+        lastMessage,
+        timestamp,
+      };
+      this.lastChatsUpdate = Date.now();
+      this.logger.debug(`Updated chat cache for ${chatId} with message: "${lastMessage.substring(0, 30)}..."`);
     }
   }
 
-  private async processMessageWithAI(message: any) {
-    // Implement the logic to process the message with AI
-    // This is a placeholder and should be replaced with the actual implementation
-    return "This is a placeholder AI response. The actual implementation should be here.";
+  async toggleAIChat(
+    chatId: string,
+    locationId: string,
+  ): Promise<WhatsappChat> {
+    this.logger.log(`Toggling AI for chat ${chatId} in location ${locationId}`);
+    const chat = await this.prisma.whatsappChat.findUnique({
+      where: { id: chatId },
+    });
+
+    if (chat) {
+      const updatedChat = await this.prisma.whatsappChat.update({
+        where: { id: chatId },
+        data: { aiEnabled: !chat.aiEnabled },
+      });
+      this.logger.log(
+        `AI for chat ${chatId} is now ${updatedChat.aiEnabled ? 'enabled' : 'disabled'}`,
+      );
+      return updatedChat;
+    } else {
+      const newChat = await this.prisma.whatsappChat.create({
+        data: {
+          id: chatId,
+          locationId: locationId,
+          aiEnabled: false, // If it doesn't exist, the first toggle disables it
+        },
+      });
+      this.logger.log(`Created new chat settings for ${chatId}, AI disabled`);
+      return newChat;
+    }
   }
 } 
