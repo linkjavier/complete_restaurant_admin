@@ -3,9 +3,6 @@ import {
   Post,
   UseInterceptors,
   UploadedFile,
-  MaxFileSizeValidator,
-  ParseFilePipe,
-  FileTypeValidator,
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -36,6 +33,7 @@ export class UploadController {
   @ApiResponse({ status: 400, description: 'Invalid file' })
   @UseInterceptors(FileInterceptor('file'))
   async uploadImage(@UploadedFile() file: Express.Multer.File) {
+    console.log(`[Backend] Received image: ${file.originalname}, type: ${file.mimetype}`);
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -46,10 +44,10 @@ export class UploadController {
       throw new BadRequestException('Invalid file type. Allowed types: jpg, jpeg, png, gif, webp, avif');
     }
 
-    // Validar el tamaño del archivo (5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB en bytes
+    // Validar el tamaño del archivo (15MB)
+    const maxSize = 15 * 1024 * 1024; // 15MB en bytes
     if (file.size > maxSize) {
-      throw new BadRequestException('File size too large. Maximum size is 5MB');
+      throw new BadRequestException('File size too large. Maximum size is 15MB');
     }
 
     return this.uploadService.uploadImage(file);

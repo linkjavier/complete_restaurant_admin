@@ -20,6 +20,8 @@ export function ImageUpload({ onImageUploaded, currentImage, buttonText }: Image
     const file = e.target.files?.[0]
     if (!file) return
 
+    console.log(`[Frontend] Received image: ${file.name}, type: ${file.type}`);
+
     // Validar tipo de archivo
     if (!file.type.startsWith('image/')) {
       toast({
@@ -30,11 +32,11 @@ export function ImageUpload({ onImageUploaded, currentImage, buttonText }: Image
       return
     }
 
-    // Validar tamaño (máximo 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    // Validar tamaño (máximo 15MB)
+    if (file.size > 15 * 1024 * 1024) {
       toast({
         title: "Error",
-        description: "La imagen no debe superar los 5MB",
+        description: "La imagen no debe superar los 15MB",
         variant: "destructive",
       })
       return
@@ -51,8 +53,20 @@ export function ImageUpload({ onImageUploaded, currentImage, buttonText }: Image
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Error al subir la imagen')
+        let errorMessage = 'Error al subir la imagen';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          // La respuesta no es JSON, usar el texto de la respuesta si está disponible
+          const textError = await response.text();
+          if (textError) {
+            errorMessage = textError;
+          } else {
+             errorMessage = `Error: ${response.status} ${response.statusText}`;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json()

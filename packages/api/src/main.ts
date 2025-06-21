@@ -5,11 +5,17 @@ import { SwaggerModule } from '@nestjs/swagger';
 import { swaggerConfig } from './swagger.config';
 import { ConfigService } from '@nestjs/config';
 import { RedisIoAdapter } from './orders/socket-io-redis.adapter';
+import * as express from 'express';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   try {
     const app = await NestFactory.create(AppModule);
+
+    // Set body size limits
+    app.use(express.json({ limit: '15mb' }));
+    app.use(express.urlencoded({ limit: '15mb', extended: true }));
+    
     const configService = app.get(ConfigService);
 
     // Configure Redis adapter for Socket.IO
