@@ -1,6 +1,6 @@
-# Blondie Restaurant Bar - Comprehensive Management System
+# Kutchen AI - Comprehensive Management System
 
-![Blondie Logo](https://res.cloudinary.com/djegujdt1/image/upload/v1746047136/blondie-logo.png)
+<img src="https://res.cloudinary.com/djegujdt1/image/upload/v1750544639/x1zuo78uvmhfmszfrpha.png" alt="Kutchen Logo" width="300" height="auto" style="max-width: 50%; height: auto;">
 
 Full-stack web system for comprehensive restaurant and bakery management with table service, smart QR ordering, kitchen module, ingredient-based inventory, multi-location reports, and analytics.
 
@@ -122,7 +122,7 @@ Full-stack web system for comprehensive restaurant and bakery management with ta
 ## 📦 Project Structure
 
 ```
-blondie-restaurant-bar/
+kutchen-app/
 ├── packages/
 │   ├── api/                    # Backend NestJS
 │   │   ├── src/
@@ -304,8 +304,9 @@ sudo yum install -y epel-release
 sudo yum install -y certbot python3-certbot-nginx
 ```
 
-4. **Configure NGINX as proxy for Nest.js**
+4. **Configure NGINX as proxy for Nest.js** 
 ```bash
+## We use blondie as example. Use your app name
 sudo nano /etc/nginx/conf.d/blondieapp.conf
 ```
 

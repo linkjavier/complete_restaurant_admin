@@ -180,7 +180,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                 <>
                   <div className="md:hidden">
                     <Image
-                      src={businessIcon || "/assets/blondie-logo.png"}
+                      src={businessIcon || "/assets/kutchen_app_logo.png"}
                       alt="Logo Negocio"
                       width={40}
                       height={40}
@@ -208,7 +208,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
             "hidden md:flex"
           )}>
             <Image
-              src={businessIcon || "/assets/blondie-logo.png"}
+              src={businessIcon || "/assets/kutchen_app_logo.png"}
               alt="Logo Negocio"
               width={150}
               height={150}

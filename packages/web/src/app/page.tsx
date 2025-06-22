@@ -8,7 +8,7 @@ import React, { useEffect, useState } from "react"
 
 export default function HomePage() {
   const [businessIcon, setBusinessIcon] = useState<string>("")
-  const [businessName, setBusinessName] = useState<string>("Blondie Restaurant App")
+  const [businessName, setBusinessName] = useState<string>("Kutchen AI App")
   useEffect(() => {
     const fetchBusiness = async () => {
       try {
@@ -16,7 +16,7 @@ export default function HomePage() {
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")
-          setBusinessName(data.name || "Blondie Restaurant App")
+          setBusinessName(data.name || "Kutchen AI App")
         }
       } catch {}
     }
@@ -30,7 +30,7 @@ export default function HomePage() {
       </div>
       <div className="container flex flex-col items-center justify-center gap-4 px-4 text-center">
         <Image
-          src={businessIcon || "/assets/blondie-logo.png"}
+          src={businessIcon || "/assets/kutchen_app_logo.png"}
           alt="Logo Negocio"
           width={120}
           height={120}

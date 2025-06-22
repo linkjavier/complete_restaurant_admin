@@ -48,7 +48,7 @@ export class SettingsService {
     if (!settings) {
       const defaultSettings = await this.prisma.settings.create({
         data: {
-          businessName: 'Blondie Restaurant App',
+          businessName: 'Kutchen AI App',
           businessLogo: null,
         },
       });

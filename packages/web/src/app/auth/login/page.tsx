@@ -54,7 +54,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const vh = useMobileViewportHeight();
   const [businessIcon, setBusinessIcon] = useState<string>("");
-  const [businessName, setBusinessName] = useState<string>("Blondie Restaurant App");
+  const [businessName, setBusinessName] = useState<string>("Kutchen AI App");
 
   useEffect(() => {
     const fetchBusiness = async () => {
@@ -63,7 +63,7 @@ export default function LoginPage() {
         if (res.ok) {
           const data = await res.json();
           setBusinessIcon(data.logo || "");
-          setBusinessName(data.name || "Blondie Restaurant App");
+          setBusinessName(data.name || "Kutchen AI App");
         }
       } catch {}
     };
@@ -145,7 +145,7 @@ export default function LoginPage() {
             <CardHeader className="space-y-1">
               <div className="flex justify-center mb-6">
                 <Image
-                  src={businessIcon || "/assets/blondie-logo.png"}
+                  src={businessIcon || "/assets/kutchen_app_logo.png"}
                   alt="Logo Negocio"
                   width={120}
                   height={120}

@@ -17,7 +17,7 @@ export default function TablePage() {
   const [customerName, setCustomerName] = useState("")
   const [isOrderStarted, setIsOrderStarted] = useState(false)
   const [businessIcon, setBusinessIcon] = useState<string>("")
-  const [businessName, setBusinessName] = useState<string>("Blondie Restaurant App")
+  const [businessName, setBusinessName] = useState<string>("Kutchen AI App")
 
   useEffect(() => {
     const fetchTable = async () => {
@@ -39,7 +39,7 @@ export default function TablePage() {
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")
-          setBusinessName(data.name || "Blondie Restaurant App")
+          setBusinessName(data.name || "Kutchen AI App")
         }
       } catch {}
     }
@@ -81,7 +81,7 @@ export default function TablePage() {
           
           <div className="flex relative w-[100px] h-[100px]">
             <Image
-              src={businessIcon || "/assets/blondie-logo.png"}
+              src={businessIcon || "/assets/kutchen_app_logo.png"}
               alt="Logo Negocio"
               width={100}
               height={100}
