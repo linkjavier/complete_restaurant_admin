@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Pencil, ChevronUp, List, Grid, Search } from "lucide-react"
+import { Plus, Trash2, Pencil, ChevronUp, List, Grid, Search, Expand, Shrink } from "lucide-react"
 import { getProducts, createProduct, deleteProduct, updateProduct, Product } from "@/lib/api"
 import { getCategories, Category } from "@/lib/api"
 import { getLocations, Location } from "@/lib/api"
@@ -400,12 +400,12 @@ export function ProductsManager() {
       <Card className="w-full">
         <CardHeader className="border-b">
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <CardTitle className="text-lg sm:text-xl">Productos Existentes</CardTitle>
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Button
+            <Button
                   variant="default"
-                  size="sm"
+              size="sm"
                   onClick={() => setIsCreateDialogOpen(true)}
                   className="flex items-center gap-2"
                 >
@@ -429,7 +429,7 @@ export function ProductsManager() {
                 >
                   <Grid className="h-4 w-4" />
                   <span className="hidden md:inline ml-2">Grid</span>
-                </Button>
+            </Button>
               </div>
             </div>
             <div className="flex flex-col md:flex-row gap-4">
@@ -492,7 +492,7 @@ export function ProductsManager() {
                     <div key={categoryId}>
                       <CategoryTitle title={categoryName} />
                       {viewMode === 'list' ? (
-                        <div className="grid gap-4 w-full">
+            <div className="grid gap-4 w-full">
                           {groupProducts.map((product) => (
                             <div
                               key={product.id}
@@ -591,121 +591,125 @@ export function ProductsManager() {
                           ))}
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-                          {groupProducts.map((product) => (
-                            <Card
-                              key={product.id}
-                              ref={el => {
-                                if (el) productRefs.current.set(product.id, el as HTMLElement);
-                                else productRefs.current.delete(product.id);
-                              }}
-                              className="overflow-hidden w-full"
-                            >
-                              <CardContent className="p-0">
-                                <div className="relative">
-                                  {product.image ? (
-                                    <div className="aspect-square w-full overflow-hidden">
-                                      <img
-                                        src={product.image}
-                                        alt={product.name}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    </div>
-                                  ) : (
-                                    <div className="aspect-square w-full bg-muted flex items-center justify-center">
-                                      <span className="text-muted-foreground">Sin imagen</span>
-                                    </div>
-                                  )}
-                                  <div className="absolute top-2 right-2 flex gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
-                                      onClick={() => handleEditClick(product)}
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="destructive"
-                                      size="icon"
-                                      className="h-8 w-8 hover:bg-destructive/90"
-                                      onClick={() => setProductToDelete({ id: product.id, name: product.name })}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                                <div className="p-4 space-y-2">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <h3 className="font-semibold truncate">{product.name}</h3>
-                                      {product.description && (
-                                        <p className="text-sm text-muted-foreground line-clamp-2">
-                                          {product.description}
-                                        </p>
-                                      )}
-                                    </div>
-                                    <Badge variant={product.isActive ? "default" : "secondary"}>
-                                      {product.isActive ? "Activo" : "Inactivo"}
-                                    </Badge>
-                                  </div>
-                                  
-                                  <div className="space-y-1 text-sm">
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-muted-foreground">Precio:</span>
-                                      <span className="font-medium">
-                                        ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-muted-foreground">Categoría:</span>
-                                      <span className="truncate">{product.category?.name}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-muted-foreground">Ubicación:</span>
-                                      <span className="truncate">{locations.find(loc => loc.id === product.locationId)?.name}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-muted-foreground">Stock:</span>
-                                      <span>{product.quantity || 0}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 w-full">
+                          {groupProducts.map((product) => {
+                            return (
+                              <Card
+                                key={product.id}
+                                ref={el => {
+                                  if (el) productRefs.current.set(product.id, el as HTMLElement);
+                                  else productRefs.current.delete(product.id);
+                                }}
+                                className="overflow-hidden w-full flex flex-col"
+                              >
+                                <CardContent className="p-0 flex-1 flex flex-col">
+                                  <div className="relative">
+                                    {product.image ? (
+                                      <div className="aspect-square sm:aspect-video w-full overflow-hidden">
+                                        <img
+                                          src={product.image}
+                                          alt={product.name}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className="aspect-square sm:aspect-video w-full bg-muted flex items-center justify-center">
+                                        <span className="text-muted-foreground">Sin imagen</span>
+                                      </div>
+                                    )}
+                                    <div className="absolute top-2 right-2 flex flex-col gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
+                                        onClick={() => handleEditClick(product)}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="destructive"
+                                        size="icon"
+                                        className="h-8 w-8 hover:bg-destructive/90"
+                                        onClick={() => setProductToDelete({ id: product.id, name: product.name })}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
                                     </div>
                                   </div>
-
-                                  {product.ingredients && product.ingredients.length > 0 && (
-                                    <div className="pt-2 border-t">
-                                      <p className="text-sm font-medium mb-1">Ingredientes:</p>
-                                      <div className="flex flex-wrap gap-1">
-                                        {product.ingredients.map((pi, index) => (
-                                          <Badge key={index} variant="outline" className="text-xs">
-                                            {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
-                                          </Badge>
-                                        ))}
+                                  <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+                                    <div>
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                          <h3 className="font-semibold truncate">{product.name}</h3>
+                                          {product.description && (
+                                            <p className="text-sm text-muted-foreground line-clamp-2">
+                                              {product.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <Badge variant={product.isActive ? "default" : "secondary"}>
+                                          {product.isActive ? "Activo" : "Inactivo"}
+                                        </Badge>
+                                      </div>
+                                      
+                                      <div className="space-y-1 text-sm mt-2">
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-muted-foreground">Precio:</span>
+                                          <span className="font-medium">
+                                            ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-muted-foreground">Categoría:</span>
+                                          <span className="truncate">{product.category?.name}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-muted-foreground">Ubicación:</span>
+                                          <span className="truncate">{locations.find(loc => loc.id === product.locationId)?.name}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-muted-foreground">Stock:</span>
+                                          <span>{product.quantity || 0}</span>
+                                        </div>
                                       </div>
                                     </div>
-                                  )}
-                                  {product.variants && product.variants.length > 0 && (
-                                    <div className="pt-2 border-t">
-                                      <p className="text-sm font-medium mb-1">Variantes:</p>
-                                      <div className="flex flex-wrap gap-2">
-                                        {product.variants.map((variant, vIdx) => (
-                                          <div key={vIdx} className="flex items-center gap-2 border rounded px-2 py-1 bg-muted/50">
-                                            {variant.image && (
-                                              <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
-                                            )}
-                                            <span className="font-medium text-xs">{variant.name}</span>
-                                            {typeof variant.price === 'number' && !isNaN(variant.price) && (
-                                              <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-                                            )}
-                                            <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
-                                          </div>
-                                        ))}
+        
+                                    {product.ingredients && product.ingredients.length > 0 && (
+                                      <div className="pt-2 border-t mt-2">
+                                        <p className="text-sm font-medium mb-1">Ingredientes:</p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {product.ingredients.map((pi, index) => (
+                                            <Badge key={index} variant="outline" className="text-xs">
+                                              {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
+                                            </Badge>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
+                                    )}
+                                    {product.variants && product.variants.length > 0 && (
+                                      <div className="pt-2 border-t mt-2">
+                                        <p className="text-sm font-medium mb-1">Variantes:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                          {product.variants.map((variant, vIdx) => (
+                                            <div key={vIdx} className="flex items-center gap-2 border rounded px-2 py-1 bg-muted/50">
+                                              {variant.image && (
+                                                <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
+                                              )}
+                                              <span className="font-medium text-xs">{variant.name}</span>
+                                              {typeof variant.price === 'number' && !isNaN(variant.price) && (
+                                                <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                                              )}
+                                              <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
@@ -767,7 +771,7 @@ export function ProductsManager() {
                     value={newProduct.price}
                     onChange={(e) => {
                       const value = e.target.value === '' ? 0 : Number(e.target.value);
-                      setNewProduct({ ...newProduct, price: value });
+                        setNewProduct({ ...newProduct, price: value });
                     }}
                     onFocus={(e) => {
                       if (e.target.value === '0') {
@@ -873,9 +877,9 @@ export function ProductsManager() {
                         <Select
                           value={ingredient.ingredientId}
                           onValueChange={(value) => {
-                            const newIngredients = [...newProduct.ingredients]
-                            newIngredients[index].ingredientId = value
-                            setNewProduct({ ...newProduct, ingredients: newIngredients })
+                              const newIngredients = [...newProduct.ingredients]
+                              newIngredients[index].ingredientId = value
+                              setNewProduct({ ...newProduct, ingredients: newIngredients })
                           }}
                         >
                           <SelectTrigger className="w-full">
@@ -896,9 +900,9 @@ export function ProductsManager() {
                           type="number"
                           value={ingredient.quantity}
                           onChange={(e) => {
-                            const newIngredients = [...newProduct.ingredients]
-                            newIngredients[index].quantity = parseFloat(e.target.value)
-                            setNewProduct({ ...newProduct, ingredients: newIngredients })
+                              const newIngredients = [...newProduct.ingredients]
+                              newIngredients[index].quantity = parseFloat(e.target.value)
+                              setNewProduct({ ...newProduct, ingredients: newIngredients })
                           }}
                           style={{ 
                             fontSize: '16px',
@@ -911,9 +915,9 @@ export function ProductsManager() {
                         size="icon"
                         className="w-full lg:w-10"
                         onClick={() => {
-                          const newIngredients = [...newProduct.ingredients]
-                          newIngredients.splice(index, 1)
-                          setNewProduct({ ...newProduct, ingredients: newIngredients })
+                            const newIngredients = [...newProduct.ingredients]
+                            newIngredients.splice(index, 1)
+                            setNewProduct({ ...newProduct, ingredients: newIngredients })
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -923,16 +927,16 @@ export function ProductsManager() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      const newIngredients = [...newProduct.ingredients]
-                      newIngredients.push({
-                        id: `temp-${Date.now()}`,
-                        productId: "",
-                        ingredientId: "",
-                        quantity: 0,
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                      })
-                      setNewProduct({ ...newProduct, ingredients: newIngredients })
+                        const newIngredients = [...newProduct.ingredients]
+                        newIngredients.push({
+                          id: `temp-${Date.now()}`,
+                          productId: "",
+                          ingredientId: "",
+                          quantity: 0,
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString(),
+                        })
+                        setNewProduct({ ...newProduct, ingredients: newIngredients })
                     }}
                     className="w-full sm:w-auto"
                   >
@@ -952,9 +956,9 @@ export function ProductsManager() {
                         <Input
                           value={variant.name}
                           onChange={e => {
-                            const newVariants = [...newProduct.variants]
-                            newVariants[index].name = e.target.value
-                            setNewProduct({ ...newProduct, variants: newVariants })
+                              const newVariants = [...newProduct.variants]
+                              newVariants[index].name = e.target.value
+                              setNewProduct({ ...newProduct, variants: newVariants })
                           }}
                           placeholder="Ej: Fresa, Frío, Grande, etc."
                           style={{ 
@@ -970,9 +974,9 @@ export function ProductsManager() {
                           value={variant.price ?? ''}
                           onChange={e => {
                             const value = e.target.value === '' ? undefined : Number(e.target.value)
-                            const newVariants = [...newProduct.variants]
-                            newVariants[index].price = value
-                            setNewProduct({ ...newProduct, variants: newVariants })
+                              const newVariants = [...newProduct.variants]
+                              newVariants[index].price = value
+                              setNewProduct({ ...newProduct, variants: newVariants })
                           }}
                           placeholder="Opcional"
                           style={{ 
@@ -985,9 +989,9 @@ export function ProductsManager() {
                         <Label>Imagen</Label>
                         <ImageUpload
                           onImageUploaded={url => {
-                            const newVariants = [...newProduct.variants]
-                            newVariants[index].image = url
-                            setNewProduct({ ...newProduct, variants: newVariants })
+                              const newVariants = [...newProduct.variants]
+                              newVariants[index].image = url
+                              setNewProduct({ ...newProduct, variants: newVariants })
                           }}
                           currentImage={variant.image || ''}
                         />
@@ -997,9 +1001,9 @@ export function ProductsManager() {
                           id={`create-variant-active-${index}`}
                           checked={variant.isActive ?? true}
                           onCheckedChange={checked => {
-                            const newVariants = [...newProduct.variants]
-                            newVariants[index].isActive = checked
-                            setNewProduct({ ...newProduct, variants: newVariants })
+                              const newVariants = [...newProduct.variants]
+                              newVariants[index].isActive = checked
+                              setNewProduct({ ...newProduct, variants: newVariants })
                           }}
                         />
                         <Label htmlFor={`create-variant-active-${index}`}>Activa</Label>
@@ -1009,9 +1013,9 @@ export function ProductsManager() {
                         size="icon"
                         className="w-full lg:w-10"
                         onClick={() => {
-                          const newVariants = [...newProduct.variants]
-                          newVariants.splice(index, 1)
-                          setNewProduct({ ...newProduct, variants: newVariants })
+                            const newVariants = [...newProduct.variants]
+                            newVariants.splice(index, 1)
+                            setNewProduct({ ...newProduct, variants: newVariants })
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -1021,9 +1025,9 @@ export function ProductsManager() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      const newVariants = [...newProduct.variants]
-                      newVariants.push({ id: `temp-${Date.now()}`, name: '', price: undefined, image: '', isActive: true })
-                      setNewProduct({ ...newProduct, variants: newVariants })
+                        const newVariants = [...newProduct.variants]
+                        newVariants.push({ id: `temp-${Date.now()}`, name: '', price: undefined, image: '', isActive: true })
+                        setNewProduct({ ...newProduct, variants: newVariants })
                     }}
                     className="w-full sm:w-auto"
                   >
@@ -1036,13 +1040,13 @@ export function ProductsManager() {
           </ScrollArea>
           <div className="flex-none p-4 flex gap-2 border-t">
             <Button variant="outline" onClick={handleCreateDialogClose} className="flex-1">
-              Cancelar
-            </Button>
+                      Cancelar
+                    </Button>
             <Button onClick={handleCreateProduct} className="flex-1">
-              <Plus className="mr-2 h-4 w-4" />
-              Crear Producto
-            </Button>
-          </div>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Crear Producto
+                  </Button>
+              </div>
         </DialogContent>
       </Dialog>
 
@@ -1086,7 +1090,7 @@ export function ProductsManager() {
                         WebkitTextSizeAdjust: '100%'
                       }}
                     />
-                  </div>
+            </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-price">Precio</Label>
                     <Input
@@ -1109,7 +1113,7 @@ export function ProductsManager() {
                         WebkitTextSizeAdjust: '100%'
                       }}
                     />
-                  </div>
+          </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-categoryId">Categoría</Label>
                     <Select
@@ -1127,7 +1131,7 @@ export function ProductsManager() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+              </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-locationId">Ubicación</Label>
                     <Select
@@ -1145,7 +1149,7 @@ export function ProductsManager() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+            </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-quantity">Stock Actual</Label>
                     <Input
@@ -1160,7 +1164,7 @@ export function ProductsManager() {
                         WebkitTextSizeAdjust: '100%'
                       }}
                     />
-                  </div>
+                </div>
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="edit-isActive"
@@ -1168,8 +1172,8 @@ export function ProductsManager() {
                       onCheckedChange={(checked) => setEditingProduct({ ...editingProduct, isActive: checked })}
                     />
                     <Label htmlFor="edit-isActive">Producto Activo</Label>
-                  </div>
-                </div>
+                          </div>
+                          </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="edit-description">Descripción</Label>
@@ -1183,7 +1187,7 @@ export function ProductsManager() {
                       WebkitTextSizeAdjust: '100%'
                     }}
                   />
-                </div>
+                              </div>
 
                 <div className="grid gap-2">
                   <Label>Imagen del Producto</Label>
@@ -1191,7 +1195,7 @@ export function ProductsManager() {
                     onImageUploaded={(url) => setEditingProduct({ ...editingProduct, image: url })}
                     currentImage={editingProduct.image}
                   />
-                </div>
+                            </div>
 
                 <div className="grid gap-2">
                   <Label>Ingredientes</Label>
@@ -1219,7 +1223,7 @@ export function ProductsManager() {
                               ))}
                             </SelectContent>
                           </Select>
-                        </div>
+                              </div>
                         <div className="w-full lg:w-32">
                           <Label>Cantidad</Label>
                           <Input
@@ -1235,7 +1239,7 @@ export function ProductsManager() {
                               WebkitTextSizeAdjust: '100%'
                             }}
                           />
-                        </div>
+                            </div>
                         <Button
                           variant="destructive"
                           size="icon"
@@ -1250,7 +1254,7 @@ export function ProductsManager() {
                         </Button>
                       </div>
                     ))}
-                    <Button
+                        <Button
                       variant="outline"
                       onClick={() => {
                         const newIngredients = [...editingProduct.ingredients || []]
@@ -1268,9 +1272,9 @@ export function ProductsManager() {
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Agregar Ingrediente
-                    </Button>
-                  </div>
-                </div>
+                        </Button>
+                      </div>
+                    </div>
 
                 <div className="grid gap-2">
                   <Label>Variantes</Label>
@@ -1292,7 +1296,7 @@ export function ProductsManager() {
                               WebkitTextSizeAdjust: '100%'
                             }}
                           />
-                        </div>
+                </div>
                         <div className="w-full lg:w-32">
                           <Label>Precio</Label>
                           <Input
@@ -1309,8 +1313,8 @@ export function ProductsManager() {
                               fontSize: '16px',
                               WebkitTextSizeAdjust: '100%'
                             }}
-                          />
-                        </div>
+                              />
+                            </div>
                         <div className="w-full lg:w-48">
                           <Label>Imagen</Label>
                           <ImageUpload
@@ -1321,7 +1325,7 @@ export function ProductsManager() {
                             }}
                             currentImage={variant.image || ''}
                           />
-                        </div>
+                            </div>
                         <div className="flex items-center space-x-2">
                           <Switch
                             id={`edit-variant-active-${index}`}
@@ -1334,19 +1338,19 @@ export function ProductsManager() {
                           />
                           <Label htmlFor={`edit-variant-active-${index}`}>Activa</Label>
                         </div>
-                        <Button
-                          variant="destructive"
-                          size="icon"
+                            <Button
+                              variant="destructive"
+                              size="icon"
                           className="w-full lg:w-10"
                           onClick={() => {
                             const newVariants = [...editingProduct.variants || []]
                             newVariants.splice(index, 1)
                             setEditingProduct({ ...editingProduct, variants: newVariants })
                           }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                     ))}
                     <Button
                       variant="outline"
@@ -1360,9 +1364,9 @@ export function ProductsManager() {
                       <Plus className="mr-2 h-4 w-4" />
                       Agregar Variante
                     </Button>
-                  </div>
-                </div>
-              </div>
+                              </div>
+                            </div>
+                                  </div>
             </ScrollArea>
           )}
           <div className="flex-none p-4 flex gap-2 border-t">
@@ -1373,7 +1377,7 @@ export function ProductsManager() {
               <Pencil className="mr-2 h-4 w-4" />
               Actualizar Producto
             </Button>
-          </div>
+                        </div>
         </DialogContent>
       </Dialog>
 
