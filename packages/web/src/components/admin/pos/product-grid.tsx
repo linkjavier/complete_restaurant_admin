@@ -10,21 +10,78 @@ import { ImageIcon } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 
+interface GroupedProduct {
+  categoryName: string;
+  categoryId: string;
+  products: Product[];
+}
+
 interface ProductGridProps {
-  products: Product[]
+  groupedProducts: GroupedProduct[];
   onAddToCart: (product: Product, variant?: ProductVariant) => void
   cart: Record<string, number>
 }
 
-export function ProductGrid({ products, onAddToCart, cart }: ProductGridProps) {
+export const CategoryTitle = ({ title }: { title: string }) => {
+  const words = title.split(' ')
+  const lastWord = words.pop() || ''
+  const firstPart = words.join(' ')
+
+  return (
+    <div className="text-center my-6">
+      {firstPart && (
+        <h2
+          className="text-3xl"
+          style={{
+            fontFamily: "'Anton', sans-serif",
+            color: '#c83b3b',
+            textTransform: 'uppercase',
+            fontWeight: 400,
+            letterSpacing: '0.05em',
+            lineHeight: 1,
+          }}
+        >
+          {firstPart}
+        </h2>
+      )}
+      <h3
+        className="text-5xl"
+        style={{
+          fontFamily: "'Pacifico', cursive",
+          color: '#e58c3d',
+          lineHeight: 1.2,
+          textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
+        }}
+      >
+        {lastWord}
+      </h3>
+    </div>
+  )
+}
+
+export function ProductGrid({ groupedProducts, onAddToCart, cart }: ProductGridProps) {
   const [variantModal, setVariantModal] = useState<{ product: Product, open: boolean }>({ product: null, open: false })
   const [selectedVariantIdx, setSelectedVariantIdx] = useState<number>(0)
 
+  if (groupedProducts.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">No se encontraron productos.</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-8 pt-4">
+      {groupedProducts.map(({ categoryId, categoryName, products }) => (
+        <div key={categoryId}>
+          <CategoryTitle title={categoryName} />
       <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
         {products.map((product) => {
-          const quantity = cart[product.id] || 0;
+              const cartKeyWithoutVariant = product.id;
+              const cartKeysForProduct = Object.keys(cart).filter(key => key.startsWith(cartKeyWithoutVariant));
+              
+              const quantity = cartKeysForProduct.reduce((total, key) => total + (cart[key] || 0), 0);
           const isInCart = quantity > 0;
 
           return (
@@ -84,6 +141,9 @@ export function ProductGrid({ products, onAddToCart, cart }: ProductGridProps) {
           )
         })}
       </div>
+        </div>
+      ))}
+      
       {/* Modal de selección de variante */}
       <Dialog open={variantModal.open} onOpenChange={open => setVariantModal({ product: variantModal.product, open })}>
         <DialogContent>

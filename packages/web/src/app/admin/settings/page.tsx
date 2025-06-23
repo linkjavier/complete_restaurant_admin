@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { ImageUpload } from "@/components/admin/products/image-upload"
+import { CategoryOrderManager } from "@/components/admin/settings/category-order-manager"
 
 export default function SettingsPage() {
   const [businessName, setBusinessName] = useState("")
@@ -134,7 +135,7 @@ export default function SettingsPage() {
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6">Configuración</h1>
       
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Sección de Configuración del negocio */}
         <Card>
           <CardHeader>
@@ -250,6 +251,9 @@ export default function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
+        
+        {/* Sección de Orden de Categorías */}
+        <CategoryOrderManager />
       </div>
     </div>
   )

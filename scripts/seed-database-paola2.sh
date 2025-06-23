@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CSV_FILE="scripts/productos_completos_20250621_013513.csv"
+CSV_FILE="scripts/productos_completos_20250623_020509.csv"
 
 # Crear usuario si no existe y obtener token
 echo "Registrando usuario..."

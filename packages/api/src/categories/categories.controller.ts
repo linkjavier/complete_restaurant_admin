@@ -6,7 +6,6 @@ import {
   Patch,
   Param,
   Delete,
-  Query,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { Category as CategoryModel, Prisma } from '@prisma/client';
@@ -18,50 +17,40 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
-  async create(@Body() data: Prisma.CategoryCreateInput): Promise<CategoryModel> {
-    return this.categoriesService.createCategory(data);
+  async createCategory(
+    @Body() categoryData: { name: string; description?: string },
+  ): Promise<CategoryModel> {
+    return this.categoriesService.createCategory(categoryData);
+  }
+
+  @Patch('order')
+  updateOrder(@Body() body: { orderedIds: string[] }) {
+    return this.categoriesService.updateOrder(body.orderedIds);
   }
 
   @Get()
-  async findAll(
-    @Query('skip') skip?: string,
-    @Query('take') take?: string,
-    @Query('where') where?: string,
-    @Query('orderBy') orderBy?: string,
-  ): Promise<CategoryModel[]> {
-    const params: {
-      skip?: number;
-      take?: number;
-      where?: Prisma.CategoryWhereInput;
-      orderBy?: Prisma.CategoryOrderByWithRelationInput;
-    } = {};
-
-    if (skip) params.skip = parseInt(skip, 10);
-    if (take) params.take = parseInt(take, 10);
-    if (where) params.where = JSON.parse(where);
-    if (orderBy) params.orderBy = JSON.parse(orderBy);
-
-    return this.categoriesService.categories(params);
+  async getCategories(): Promise<CategoryModel[]> {
+    return this.categoriesService.categories({});
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<CategoryModel | null> {
+  async getCategoryById(@Param('id') id: string): Promise<CategoryModel> {
     return this.categoriesService.category({ id });
   }
 
   @Patch(':id')
-  async update(
+  async updateCategory(
     @Param('id') id: string,
-    @Body() data: Prisma.CategoryUpdateInput,
+    @Body() categoryData: { name?: string; description?: string },
   ): Promise<CategoryModel> {
     return this.categoriesService.updateCategory({
       where: { id },
-      data,
+      data: categoryData,
     });
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string): Promise<CategoryModel> {
+  async deleteCategory(@Param('id') id: string): Promise<CategoryModel> {
     return this.categoriesService.deleteCategory({ id });
   }
 } 

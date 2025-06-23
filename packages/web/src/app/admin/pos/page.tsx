@@ -14,7 +14,8 @@ import {
   Table, 
   createOrder, 
   getActiveOrders,
-  processPayment
+  processPayment,
+  getCategories
 } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -25,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Cart } from "@/components/admin/pos/cart"
-import { ProductGrid } from "@/components/admin/pos/product-grid"
+import { ProductGrid, CategoryTitle } from "@/components/admin/pos/product-grid"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 export default function PosPage() {
@@ -79,21 +80,14 @@ export default function PosPage() {
     try {
       setLoading(true)
       setError(null)
-      const [productsData, tablesData] = await Promise.all([
+      const [productsData, tablesData, categoriesData] = await Promise.all([
         getProducts(),
-        getTables()
+        getTables(),
+        getCategories(),
       ])
-      setProducts(productsData)
+      setProducts([...productsData].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })))
       setTables(tablesData)
-      
-      // Extract unique categories
-      const uniqueCategories = new Map<string, Category>()
-      productsData.forEach(product => {
-        if (product.category) {
-          uniqueCategories.set(product.category.id, product.category)
-        }
-      })
-      setCategories(Array.from(uniqueCategories.values()))
+      setCategories(categoriesData)
     } catch (err) {
       console.error('Error fetching data:', err)
       setError('Error al cargar los datos. Por favor, intente de nuevo.')
@@ -295,6 +289,25 @@ export default function PosPage() {
     return matchesCategory && matchesSearch
   })
 
+  const groupedProducts =
+    selectedCategory === "all"
+      ? categories
+          .map(category => ({
+            categoryName: category.name,
+            categoryId: category.id,
+            products: filteredProducts.filter(p => p.categoryId === category.id),
+          }))
+          .filter(group => group.products.length > 0)
+      : filteredProducts.length > 0
+      ? [
+          {
+            categoryName: categories.find((c) => c.id === selectedCategory)?.name || "",
+            categoryId: selectedCategory,
+            products: filteredProducts,
+          },
+        ]
+      : []
+
   // Get all active orders for selected table
   const currentOrders = activeOrders
 
@@ -360,7 +373,7 @@ export default function PosPage() {
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto">
             <ProductGrid
-              products={filteredProducts}
+              groupedProducts={groupedProducts}
               onAddToCart={handleAddToCart}
               cart={Object.fromEntries(Object.entries(cart).map(([key, item]) => [key, item.quantity]))}
             />

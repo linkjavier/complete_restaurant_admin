@@ -30,16 +30,17 @@ show_help() {
     echo "Uso: $0 [OPCIONES]"
     echo ""
     echo "Opciones:"
-    echo "  -l, --location-id ID    ID de la ubicación (requerido)"
+    echo "  -l, --location-id ID    ID de la ubicación para filtrar (opcional)"
     echo "  -c, --category-id ID    ID de la categoría (opcional)"
     echo "  -s, --search TERM       Término de búsqueda (opcional)"
     echo "  -o, --output FILE       Archivo de salida (default: productos_completos_YYYYMMDD_HHMMSS.csv)"
     echo "  -h, --help              Mostrar esta ayuda"
     echo ""
     echo "Ejemplos:"
-    echo "  $0 -l abc123"
-    echo "  $0 -l abc123 -c def456"
-    echo "  $0 -l abc123 -s 'pizza' -o mis_productos.csv"
+    echo "  $0                          # Exporta todos los productos de todas las ubicaciones"
+    echo "  $0 -l abc123                # Exporta productos solo de la ubicación abc123"
+    echo "  $0 -l abc123 -c def456      # Filtra por ubicación y categoría"
+    echo "  $0 -s 'pizza' -o mis_productos.csv # Busca 'pizza' en todas las ubicaciones"
 }
 
 # Parsear argumentos
@@ -76,14 +77,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# Validar que se proporcione locationId
-if [[ -z "$LOCATION_ID" ]]; then
-    echo -e "${RED}Error: Se requiere el ID de ubicación (-l o --location-id)${NC}"
-    echo ""
-    show_help
-    exit 1
-fi
 
 # Función para limpiar archivos temporales
 cleanup() {
@@ -132,12 +125,23 @@ echo -e "${GREEN}✅ Autenticación exitosa${NC}"
 echo -e "${PURPLE}📋 Paso 2: Obteniendo lista de productos...${NC}"
 
 # Construir URL con parámetros
-URL="${API_URL}/products?locationId=${LOCATION_ID}"
+URL="${API_URL}/products"
+QUERY_PARAMS=""
+
+if [[ -n "$LOCATION_ID" ]]; then
+    QUERY_PARAMS="locationId=${LOCATION_ID}"
+fi
 if [[ -n "$CATEGORY_ID" ]]; then
-    URL="${URL}&categoryId=${CATEGORY_ID}"
+    if [[ -n "$QUERY_PARAMS" ]]; then QUERY_PARAMS="${QUERY_PARAMS}&"; fi
+    QUERY_PARAMS="${QUERY_PARAMS}categoryId=${CATEGORY_ID}"
 fi
 if [[ -n "$SEARCH_TERM" ]]; then
-    URL="${URL}&search=${SEARCH_TERM}"
+    if [[ -n "$QUERY_PARAMS" ]]; then QUERY_PARAMS="${QUERY_PARAMS}&"; fi
+    QUERY_PARAMS="${QUERY_PARAMS}search=${SEARCH_TERM}"
+fi
+
+if [[ -n "$QUERY_PARAMS" ]]; then
+    URL="${URL}?${QUERY_PARAMS}"
 fi
 
 echo -e "${YELLOW}Obteniendo productos de: ${URL}${NC}"

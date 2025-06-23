@@ -155,7 +155,8 @@ export function ProductsManager() {
       setLoading(true)
       setError(null)
       const data = await getProducts()
-      setProducts(data)
+      const sortedData = [...data].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }))
+      setProducts(sortedData)
     } catch (err) {
       console.error('Error fetching products:', err)
       setError("Error al cargar los productos. Por favor, asegúrate de estar autenticado.")
@@ -344,22 +345,13 @@ export function ProductsManager() {
 
   const groupedProducts =
     selectedCategory === "all"
-      ? Object.values(
-          filteredProducts.reduce((acc, product) => {
-            const categoryId = product.categoryId || "uncategorized"
-            const category = categories.find((c) => c.id === product.categoryId)
-
-            if (!acc[categoryId]) {
-              acc[categoryId] = {
-                categoryName: category?.name || "Sin Categoría",
-                categoryId: categoryId,
-                products: [],
-              }
-            }
-            acc[categoryId].products.push(product)
-            return acc
-          }, {} as Record<string, { categoryName: string; categoryId: string; products: Product[] }>)
-        ).sort((a, b) => a.categoryName.localeCompare(b.categoryName))
+      ? categories
+          .map(category => ({
+            categoryName: category.name,
+            categoryId: category.id,
+            products: filteredProducts.filter(p => p.categoryId === category.id),
+          }))
+          .filter(group => group.products.length > 0)
       : filteredProducts.length > 0
       ? [
           {

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Minus, Clock, Package, ShoppingCart, RefreshCw } from "lucide-react"
-import { getProducts, Product, Category, getActiveOrders } from "@/lib/api"
+import { getProducts, Product, Category, getActiveOrders, getCategories } from "@/lib/api"
 import { Cart } from "./cart"
 import Image from "next/image"
 import { toast } from "sonner"
@@ -43,12 +43,50 @@ function useMobileViewportHeight() {
   return vh;
 }
 
+const CategoryTitle = ({ title }: { title: string }) => {
+  const words = title.split(' ')
+  const lastWord = words.pop() || ''
+  const firstPart = words.join(' ')
+
+  return (
+    <div className="text-center my-6">
+      {firstPart && (
+        <h2
+          className="text-3xl"
+          style={{
+            fontFamily: "'Anton', sans-serif",
+            color: '#c83b3b',
+            textTransform: 'uppercase',
+            fontWeight: 400,
+            letterSpacing: '0.05em',
+            lineHeight: 1,
+          }}
+        >
+          {firstPart}
+        </h2>
+      )}
+      <h3
+        className="text-5xl"
+        style={{
+          fontFamily: "'Pacifico', cursive",
+          color: '#e58c3d',
+          lineHeight: 1.2,
+          textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
+        }}
+      >
+        {lastWord}
+      </h3>
+    </div>
+  )
+}
+
 export function Menu({ locationId, tableId, customerName }: MenuProps) {
   const vh = useMobileViewportHeight();
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [cart, setCart] = useState<Record<string, number>>({})
   const [searchTerm, setSearchTerm] = useState("")
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [activeOrders, setActiveOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -82,11 +120,13 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const [productsData, ordersData] = await Promise.all([
+      const [productsData, ordersData, categoriesData] = await Promise.all([
         getProducts(locationId),
-        getActiveOrders(tableId)
+        getActiveOrders(tableId),
+        getCategories()
       ])
-      setProducts(productsData)
+      setProducts([...productsData].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })))
+      setCategories(categoriesData)
       setActiveOrders(ordersData)
       setError(null)
     } catch (err) {
@@ -134,19 +174,6 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
       setIsRefreshing(false)
     }
   }
-
-  // Extraer categorías únicas de los productos
-  const categoriesMap = new Map<string, Category>();
-  
-  // Mapear categorías de productos para generar lista única
-  products.forEach(product => {
-    if (product.category && product.categoryId) {
-      categoriesMap.set(product.categoryId, product.category);
-    }
-  });
-  
-  // Lista final de categorías para el menú
-  const categories = ["all", ...Array.from(categoriesMap.keys())];
 
   const handleAddToCart = (productId: string) => {
     setCart((prev) => ({
@@ -235,6 +262,25 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
     
     return matchesCategory && matchesSearch;
   });
+
+  const groupedProducts =
+    selectedCategory === "all"
+      ? categories
+          .map(category => ({
+            categoryName: category.name,
+            categoryId: category.id,
+            products: filteredProducts.filter(p => p.categoryId === category.id),
+          }))
+          .filter(group => group.products.length > 0)
+      : filteredProducts.length > 0
+      ? [
+          {
+            categoryName: categories.find((c) => c.id === selectedCategory)?.name || "",
+            categoryId: selectedCategory,
+            products: filteredProducts,
+          },
+        ]
+      : []
 
   if (loading) {
     return (
@@ -397,74 +443,86 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                   className="max-w-sm"
                 />
                 <div className="flex flex-wrap gap-2">
-                  {categories.map((categoryId) => (
+                  <Button
+                    key="all"
+                    variant={selectedCategory === "all" ? "default" : "outline"}
+                    onClick={() => setSelectedCategory("all")}
+                    className="whitespace-nowrap"
+                  >
+                    Todos
+                  </Button>
+                  {categories.map((category) => (
                     <Button
-                      key={categoryId}
-                      variant={selectedCategory === categoryId ? "default" : "outline"}
-                      onClick={() => setSelectedCategory(categoryId)}
+                      key={category.id}
+                      variant={selectedCategory === category.id ? "default" : "outline"}
+                      onClick={() => setSelectedCategory(category.id)}
                       className="whitespace-nowrap"
                     >
-                      {categoryId === "all" 
-                        ? "Todos" 
-                        : (categoriesMap.get(categoryId)?.name || categoryId)
-                      }
+                      {category.name}
                     </Button>
                   ))}
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredProducts.map((product) => (
-                  <Card 
-                    key={product.id}
-                    className={`${
-                      cart[product.id] ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950' : ''
-                    }`}
-                  >
-                    <CardHeader className="pb-1 pt-2">
-                      <CardTitle className="text-base">{product.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-2">
-                        {product.image && (
-                          <div className="relative w-full h-40">
-                            <img
-                              src={product.image}
-                              alt={product.name}
-                              className="w-full h-full object-cover rounded-lg"
-                            />
-                          </div>
-                        )}
-                        <div className="space-y-1.5">
-                          <p className="text-sm text-muted-foreground">
-                            {product.description}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <p className="font-bold">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => handleRemoveFromCart(product.id)}
-                                disabled={!cart[product.id]}
-                                className="h-8 w-8"
-                              >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="w-6 text-center">{cart[product.id] || 0}</span>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => handleAddToCart(product.id)}
-                                className="h-8 w-8"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
+              <div className="space-y-8 pt-4">
+                {groupedProducts.map(({ categoryId, categoryName, products: groupProducts }) => (
+                  <div key={categoryId}>
+                    <CategoryTitle title={categoryName} />
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {groupProducts.map((product) => (
+                        <Card 
+                          key={product.id}
+                          className={`${
+                            cart[product.id] ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950' : ''
+                          }`}
+                        >
+                          <CardHeader className="pb-1 pt-2">
+                            <CardTitle className="text-base">{product.name}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="space-y-2">
+                              {product.image && (
+                                <div className="relative w-full h-40">
+                                  <img
+                                    src={product.image}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover rounded-lg"
+                                  />
+                                </div>
+                              )}
+                              <div className="space-y-1.5">
+                                <p className="text-sm text-muted-foreground">
+                                  {product.description}
+                                </p>
+                                <div className="flex items-center justify-between">
+                                  <p className="font-bold">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => handleRemoveFromCart(product.id)}
+                                      disabled={!cart[product.id]}
+                                      className="h-8 w-8"
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </Button>
+                                    <span className="w-6 text-center">{cart[product.id] || 0}</span>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => handleAddToCart(product.id)}
+                                      className="h-8 w-8"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </>

@@ -737,3 +737,15 @@ export async function deleteUser(id: string): Promise<void> {
   })
   if (!response.ok) throw new Error('Failed to delete user')
 }
+
+export async function updateCategoryOrder(orderedIds: string[]) {
+  const response = await fetch(`${API_URL}/categories/order`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ orderedIds }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update category order');
+  }
+  return response.json();
+}
