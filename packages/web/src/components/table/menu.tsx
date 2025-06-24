@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Minus, Clock, Package, ShoppingCart, RefreshCw } from "lucide-react"
+import { Plus, Minus, Clock, Package, ShoppingCart, RefreshCw, Maximize2, X } from "lucide-react"
 import { getProducts, Product, Category, getActiveOrders, getCategories } from "@/lib/api"
 import { Cart } from "./cart"
 import Image from "next/image"
@@ -96,6 +96,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   const cartRef = useRef<HTMLDivElement>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null)
 
   const handleScroll = () => {
     if (!cartRef.current) return;
@@ -339,6 +340,15 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                     alt={selectedProduct.name}
                     className="w-full h-full object-cover rounded-b-none rounded-t-lg"
                   />
+                  <button
+                    type="button"
+                    className="absolute bottom-4 left-4 bg-white/80 rounded-full p-2 shadow transition-opacity"
+                    onClick={() => setFullscreenImage(selectedProduct.image!)}
+                    tabIndex={0}
+                    aria-label="Ver imagen en pantalla completa"
+                  >
+                    <Maximize2 className="h-6 w-6 text-gray-700" />
+                  </button>
                 </div>
               ) : (
                 <div className="relative w-full h-64 md:h-96 flex items-center justify-center bg-muted rounded-b-none rounded-t-lg border border-dashed border-gray-300">
@@ -376,6 +386,23 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Dialog para imagen en pantalla completa */}
+      <Dialog open={!!fullscreenImage} onOpenChange={open => !open && setFullscreenImage(null)}>
+        <DialogContent className="p-0 bg-black max-w-full w-full h-full flex items-center justify-center animate-product-grow" style={{ maxHeight: '100dvh', height: '100dvh' }}>
+          <DialogTitle className="sr-only">Imagen de producto</DialogTitle>
+          <DialogClose asChild>
+            <button className="absolute right-4 top-4 z-10 bg-white/80 rounded-full p-2 shadow hover:bg-white">
+              <X className="h-6 w-6 text-gray-700" />
+              <span className="sr-only">Cerrar imagen</span>
+            </button>
+          </DialogClose>
+          {fullscreenImage && (
+            <img src={fullscreenImage} alt="Producto" className="max-h-[90dvh] max-w-[98vw] object-contain rounded-lg shadow-lg" />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div 
         className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[100vh] min-h-[calc(var(--vh,1vh)*100)] w-full overflow-x-hidden"
         style={{ minHeight: vh }}
@@ -548,6 +575,15 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                                       alt={product.name}
                                       className="w-full h-full object-cover rounded-lg"
                                     />
+                                    <button
+                                      type="button"
+                                      className="absolute bottom-2 left-2 bg-white/80 rounded-full p-1.5 shadow transition-opacity"
+                                      onClick={e => { e.stopPropagation(); setFullscreenImage(product.image!); }}
+                                      tabIndex={0}
+                                      aria-label="Ver imagen en pantalla completa"
+                                    >
+                                      <Maximize2 className="h-5 w-5 text-gray-700" />
+                                    </button>
                                   </div>
                                 ) : (
                                   <div className="relative w-full h-40 flex items-center justify-center bg-muted rounded-lg border border-dashed border-gray-300">
