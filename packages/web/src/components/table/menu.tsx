@@ -10,6 +10,7 @@ import { Cart } from "./cart"
 import Image from "next/image"
 import { toast } from "sonner"
 import { io } from "socket.io-client"
+import { Dialog, DialogContent, DialogClose, DialogTitle } from "@/components/ui/dialog"
 
 interface MenuProps {
   locationId: string
@@ -94,6 +95,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   const [isCartVisible, setIsCartVisible] = useState(false)
   const cartRef = useRef<HTMLDivElement>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
 
   const handleScroll = () => {
     if (!cartRef.current) return;
@@ -314,236 +316,312 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   }
 
   return (
-    <div 
-      className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[100vh] min-h-[calc(var(--vh,1vh)*100)] w-full overflow-x-hidden"
-      style={{ minHeight: vh }}
-    >
-      {/* Floating Cart Button - Only visible on mobile */}
-      {totalItems > 0 && !isCartVisible && (
-        <div className="fixed bottom-6 right-6 md:hidden z-50">
-          <Button
-            size="lg"
-            className="rounded-full w-32 h-14 shadow-lg relative bg-red-500 hover:bg-red-600 flex items-center justify-center"
-            onClick={scrollToCart}
-          >
-            <span className="text-white font-medium">Tu Pedido</span>
-            <span className="absolute -top-2 -right-2 bg-white text-red-500 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold border-2 border-red-500 z-20">
-              {totalItems}
-            </span>
-          </Button>
-        </div>
-      )}
-
-      <div className="md:col-span-2">
-        <div className="space-y-4 pb-20 md:pb-4">
-          {/* Welcome Message with Logo */}
-          <Card>
-            <CardContent className="pt-2">
-              <div className="flex justify-between items-center">
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-bold">¡Hola {customerName}!</h2>
-                  <p className="text-muted-foreground">
-                    Aquí podrás ver nuestro menú, ordenar productos, ver tus pedidos y pagar la cuenta.
-                  </p>
+    <>
+      {/* Dialog de producto ampliado */}
+      <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
+        <DialogContent
+          className="max-w-2xl w-[calc(100vw-2rem)] md:w-[600px] p-0 overflow-hidden animate-product-grow"
+          style={{ maxHeight: 'calc(var(--vh, 1vh) * 95)', height: 'auto' }}
+        >
+          {selectedProduct && (
+            <div className="relative flex flex-col items-center justify-center w-full h-full bg-background">
+              <DialogTitle className="sr-only">{selectedProduct.name}</DialogTitle>
+              <DialogClose asChild>
+                <button className="absolute right-4 top-4 z-10 bg-white/80 rounded-full p-2 shadow hover:bg-white">
+                  <span className="sr-only">Cerrar</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </DialogClose>
+              {selectedProduct.image ? (
+                <div className="relative w-full h-64 md:h-96">
+                  <img
+                    src={selectedProduct.image}
+                    alt={selectedProduct.name}
+                    className="w-full h-full object-cover rounded-b-none rounded-t-lg"
+                  />
+                </div>
+              ) : (
+                <div className="relative w-full h-64 md:h-96 flex items-center justify-center bg-muted rounded-b-none rounded-t-lg border border-dashed border-gray-300">
+                  <span className="text-lg text-gray-400">Producto sin imagen</span>
+                </div>
+              )}
+              <div className="w-full p-6 flex flex-col gap-4">
+                <h2 className="text-3xl font-bold text-center">{selectedProduct.name}</h2>
+                <p className="text-lg text-muted-foreground text-center">{selectedProduct.description}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-2xl font-bold text-primary">${selectedProduct.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleRemoveFromCart(selectedProduct.id)}
+                      disabled={!cart[selectedProduct.id]}
+                      className="h-10 w-10"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="w-8 text-center text-lg">{cart[selectedProduct.id] || 0}</span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleAddToCart(selectedProduct.id)}
+                      className="h-10 w-10"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Tabs and Header */}
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex gap-2">
-              <Button
-                variant={activeTab === 'menu' ? 'default' : 'outline'}
-                onClick={() => setActiveTab('menu')}
-                className="flex items-center gap-2"
-              >
-                <Package className="h-4 w-4" />
-                Menú
-              </Button>
-              <Button
-                variant={activeTab === 'orders' ? 'default' : 'outline'}
-                onClick={() => setActiveTab('orders')}
-                className="flex items-center gap-2"
-              >
-                <Clock className="h-4 w-4" />
-                Tus órdenes
-              </Button>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <div 
+        className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[100vh] min-h-[calc(var(--vh,1vh)*100)] w-full overflow-x-hidden"
+        style={{ minHeight: vh }}
+      >
+        {/* Floating Cart Button - Only visible on mobile */}
+        {totalItems > 0 && !isCartVisible && (
+          <div className="fixed bottom-6 right-6 md:hidden z-50">
+            <Button
+              size="lg"
+              className="rounded-full w-32 h-14 shadow-lg relative bg-red-500 hover:bg-red-600 flex items-center justify-center"
+              onClick={scrollToCart}
+            >
+              <span className="text-white font-medium">Tu Pedido</span>
+              <span className="absolute -top-2 -right-2 bg-white text-red-500 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold border-2 border-red-500 z-20">
+                {totalItems}
+              </span>
+            </Button>
           </div>
+        )}
 
-          {activeTab === 'orders' ? (
-            <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Órdenes Activas</h2>
+        <div className="md:col-span-2">
+          <div className="space-y-4 pb-20 md:pb-4">
+            {/* Welcome Message with Logo */}
+            <Card>
+              <CardContent className="pt-2">
+                <div className="flex justify-between items-center">
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold">¡Hola {customerName}!</h2>
+                    <p className="text-muted-foreground">
+                      Aquí podrás ver nuestro menú, ordenar productos, ver tus pedidos y pagar la cuenta.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tabs and Header */}
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex gap-2">
                 <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
+                  variant={activeTab === 'menu' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('menu')}
+                  className="flex items-center gap-2"
                 >
-                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <Package className="h-4 w-4" />
+                  Menú
+                </Button>
+                <Button
+                  variant={activeTab === 'orders' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('orders')}
+                  className="flex items-center gap-2"
+                >
+                  <Clock className="h-4 w-4" />
+                  Tus órdenes
                 </Button>
               </div>
-              <Card>
-                <CardContent>
-                  <div className="space-y-4">
-                    {activeOrders.length === 0 ? (
-                      <p className="text-center text-muted-foreground">No tienes órdenes</p>
-                    ) : (
-                      activeOrders.map((order) => (
-                        <div key={order.id} className="border rounded-lg p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <p className="font-medium">Orden #{order.id.substring(0, 8)}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {new Date(order.createdAt).toLocaleTimeString()}
-                              </p>
+            </div>
+
+            {activeTab === 'orders' ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold">Órdenes Activas</h2>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+                <Card>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {activeOrders.length === 0 ? (
+                        <p className="text-center text-muted-foreground">No tienes órdenes</p>
+                      ) : (
+                        activeOrders.map((order) => (
+                          <div key={order.id} className="border rounded-lg p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="font-medium">Orden #{order.id.substring(0, 8)}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {new Date(order.createdAt).toLocaleTimeString()}
+                                </p>
+                              </div>
+                              <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded-full">
+                                {order.items.reduce((sum, item) => sum + item.quantity, 0)} items
+                              </span>
                             </div>
-                            <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded-full">
-                              {order.items.reduce((sum, item) => sum + item.quantity, 0)} items
-                            </span>
-                          </div>
-                          <div className="space-y-2">
-                            {order.items.map((item) => (
-                              <div key={item.id} className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm">{item.product.name}</p>
-                                  <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
-                                    x{item.quantity}
+                            <div className="space-y-2">
+                              {order.items.map((item) => (
+                                <div key={item.id} className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm">{item.product.name}</p>
+                                    <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
+                                      x{item.quantity}
+                                    </span>
+                                  </div>
+                                  <span className={`text-sm ${
+                                    item.status === "PENDING" ? "text-yellow-500" :
+                                    item.status === "IN_PROGRESS" ? "text-blue-500" :
+                                    "text-green-500"
+                                  }`}>
+                                    {item.status === "PENDING" ? "Pendiente" :
+                                     item.status === "IN_PROGRESS" ? "En preparación" :
+                                     item.status === "CANCELLED" ? "Cancelada" :
+                                     "Listo"}
                                   </span>
                                 </div>
-                                <span className={`text-sm ${
-                                  item.status === "PENDING" ? "text-yellow-500" :
-                                  item.status === "IN_PROGRESS" ? "text-blue-500" :
-                                  "text-green-500"
-                                }`}>
-                                  {item.status === "PENDING" ? "Pendiente" :
-                                   item.status === "IN_PROGRESS" ? "En preparación" :
-                                   item.status === "CANCELLED" ? "Cancelada" :
-                                   "Listo"}
-                                </span>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-col gap-4">
-                <Input
-                  placeholder="Buscar productos..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="max-w-sm"
-                />
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    key="all"
-                    variant={selectedCategory === "all" ? "default" : "outline"}
-                    onClick={() => setSelectedCategory("all")}
-                    className="whitespace-nowrap"
-                  >
-                    Todos
-                  </Button>
-                  {categories.map((category) => (
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-4">
+                  <Input
+                    placeholder="Buscar productos..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="max-w-sm"
+                  />
+                  <div className="flex flex-wrap gap-2">
                     <Button
-                      key={category.id}
-                      variant={selectedCategory === category.id ? "default" : "outline"}
-                      onClick={() => setSelectedCategory(category.id)}
+                      key="all"
+                      variant={selectedCategory === "all" ? "default" : "outline"}
+                      onClick={() => setSelectedCategory("all")}
                       className="whitespace-nowrap"
                     >
-                      {category.name}
+                      Todos
                     </Button>
-                  ))}
+                    {categories.map((category) => (
+                      <Button
+                        key={category.id}
+                        variant={selectedCategory === category.id ? "default" : "outline"}
+                        onClick={() => setSelectedCategory(category.id)}
+                        className="whitespace-nowrap"
+                      >
+                        {category.name}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-8 pt-4">
-                {groupedProducts.map(({ categoryId, categoryName, products: groupProducts }) => (
-                  <div key={categoryId}>
-                    <CategoryTitle title={categoryName} />
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {groupProducts.map((product) => (
-                        <Card 
-                          key={product.id}
-                          className={`${
-                            cart[product.id] ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950' : ''
-                          }`}
-                        >
-                          <CardHeader className="pb-1 pt-2">
-                            <CardTitle className="text-base">{product.name}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <div className="space-y-2">
-                              {product.image && (
-                                <div className="relative w-full h-40">
-                                  <img
-                                    src={product.image}
-                                    alt={product.name}
-                                    className="w-full h-full object-cover rounded-lg"
-                                  />
-                                </div>
-                              )}
-                              <div className="space-y-1.5">
-                                <p className="text-sm text-muted-foreground">
-                                  {product.description}
-                                </p>
-                                <div className="flex items-center justify-between">
-                                  <p className="font-bold">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      onClick={() => handleRemoveFromCart(product.id)}
-                                      disabled={!cart[product.id]}
-                                      className="h-8 w-8"
-                                    >
-                                      <Minus className="h-3 w-3" />
-                                    </Button>
-                                    <span className="w-6 text-center">{cart[product.id] || 0}</span>
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      onClick={() => handleAddToCart(product.id)}
-                                      className="h-8 w-8"
-                                    >
-                                      <Plus className="h-3 w-3" />
-                                    </Button>
+                <div className="space-y-8 pt-4">
+                  {groupedProducts.map(({ categoryId, categoryName, products: groupProducts }) => (
+                    <div key={categoryId}>
+                      <CategoryTitle title={categoryName} />
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {groupProducts.map((product) => (
+                          <Card 
+                            key={product.id}
+                            className={`cursor-pointer transition-transform hover:scale-[1.03] ${cart[product.id] ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950' : ''}`}
+                            onClick={() => setSelectedProduct(product)}
+                          >
+                            <CardHeader className="pb-1 pt-2">
+                              <CardTitle className="text-base">{product.name}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <div className="space-y-2">
+                                {product.image ? (
+                                  <div className="relative w-full h-40">
+                                    <img
+                                      src={product.image}
+                                      alt={product.name}
+                                      className="w-full h-full object-cover rounded-lg"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="relative w-full h-40 flex items-center justify-center bg-muted rounded-lg border border-dashed border-gray-300">
+                                    <span className="text-xs text-gray-400">Producto sin imagen</span>
+                                  </div>
+                                )}
+                                <div className="space-y-1.5">
+                                  <p className="text-sm text-muted-foreground">
+                                    {product.description}
+                                  </p>
+                                  <div className="flex items-center justify-between">
+                                    <p className="font-bold">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={e => { e.stopPropagation(); handleRemoveFromCart(product.id); }}
+                                        disabled={!cart[product.id]}
+                                        className="h-8 w-8"
+                                      >
+                                        <Minus className="h-3 w-3" />
+                                      </Button>
+                                      <span className="w-6 text-center">{cart[product.id] || 0}</span>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={e => { e.stopPropagation(); handleAddToCart(product.id); }}
+                                        className="h-8 w-8"
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="md:col-span-1" id="cart-section" ref={cartRef}>
+          <Cart
+            customerName={customerName}
+            tableId={tableId}
+            locationId={locationId}
+            items={cartItems}
+            onItemsChange={(newItems) => {
+              const newCart: Record<string, number> = {}
+              newItems.forEach(item => {
+                newCart[item.product.id] = item.quantity
+              })
+              setCart(newCart)
+            }}
+          />
         </div>
       </div>
-      <div className="md:col-span-1" id="cart-section" ref={cartRef}>
-        <Cart
-          customerName={customerName}
-          tableId={tableId}
-          locationId={locationId}
-          items={cartItems}
-          onItemsChange={(newItems) => {
-            const newCart: Record<string, number> = {}
-            newItems.forEach(item => {
-              newCart[item.product.id] = item.quantity
-            })
-            setCart(newCart)
-          }}
-        />
-      </div>
-    </div>
+    </>
   )
 }
+
+// Animación para el dialog de producto
+// Agrega esto a tu CSS global o tailwind.config.js:
+// @layer utilities {
+//   .animate-product-grow {
+//     animation: product-grow 0.25s cubic-bezier(0.4,0,0.2,1);
+//   }
+//   @keyframes product-grow {
+//     0% { transform: scale(0.85); opacity: 0.7; }
+//     100% { transform: scale(1); opacity: 1; }
+//   }
+// }
