@@ -42,6 +42,15 @@ interface OrderItem {
     image?: string
     price: number
   }
+  // Permitir variantes múltiples por compatibilidad con backend
+  variants?: Array<{
+    groupName?: string
+    productVariant?: {
+      name: string
+      image?: string
+      price?: number
+    }
+  }>
 }
 
 interface Order {
