@@ -110,20 +110,18 @@ export function ProductsManager() {
     locationId: "",
     isActive: true,
     quantity: 0,
-    ingredients: [] as {
-      id: string;
-      productId: string;
-      ingredientId: string;
-      quantity: number;
-      createdAt: string;
-      updatedAt: string;
-    }[],
-    variants: [] as {
+    ingredients: [],
+    variantGroups: [] as {
       id: string;
       name: string;
-      price?: number;
-      image?: string;
-      isActive?: boolean;
+      order?: number;
+      variants: {
+        id: string;
+        name: string;
+        price?: number;
+        image?: string;
+        isActive?: boolean;
+      }[];
     }[],
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -203,6 +201,15 @@ export function ProductsManager() {
         return
       }
 
+      // Antes de enviar a la API, asegúrate de que todos los ids existen
+      const variantGroupsWithIds = (newProduct.variantGroups || []).map(group => ({
+        ...group,
+        id: group.id || crypto.randomUUID(),
+        variants: (group.variants || []).map(variant => ({
+          ...variant,
+          id: variant.id || crypto.randomUUID(),
+        }))
+      }))
       await createProduct({
         name: newProduct.name,
         description: newProduct.description || undefined,
@@ -213,17 +220,12 @@ export function ProductsManager() {
         isActive: newProduct.isActive,
         quantity: newProduct.quantity,
         ingredients: newProduct.ingredients,
-        variants: newProduct.variants.map(v => ({
-          ...v,
-          id: v.id || `temp-${Date.now()}-${Math.random()}`
-        })),
+        variantGroups: variantGroupsWithIds,
       })
-
       toast({
         title: "Éxito",
         description: "Producto creado correctamente",
       })
-
       resetNewProductForm()
       setIsCreateDialogOpen(false)
       fetchProducts()
@@ -236,10 +238,8 @@ export function ProductsManager() {
       })
     }
   }
-
   const handleUpdateProduct = async () => {
     if (!editingProduct) return
-
     try {
       if (!editingProduct.name || !editingProduct.price || !editingProduct.categoryId || !editingProduct.locationId) {
         toast({
@@ -249,7 +249,6 @@ export function ProductsManager() {
         })
         return
       }
-
       await updateProduct(editingProduct.id, {
         name: editingProduct.name,
         description: editingProduct.description || undefined,
@@ -263,17 +262,12 @@ export function ProductsManager() {
           ingredientId: pi.ingredientId,
           quantity: pi.quantity,
         })) || [],
-        variants: editingProduct.variants.map(v => ({
-          ...v,
-          id: v.id || `temp-${Date.now()}-${Math.random()}`
-        })),
+        variantGroups: editingProduct.variantGroups,
       })
-
       toast({
         title: "Éxito",
         description: "Producto actualizado correctamente",
       })
-
       setIsEditDialogOpen(false)
       setScrollToProductId(editingProduct.id)
       setEditingProduct(null)
@@ -287,7 +281,6 @@ export function ProductsManager() {
       })
     }
   }
-
   const handleDeleteProduct = async (id: string) => {
     try {
       await deleteProduct(id)
@@ -331,7 +324,10 @@ export function ProductsManager() {
   }
 
   const handleEditClick = (product: Product) => {
-    setEditingProduct(product)
+    setEditingProduct({
+      ...product,
+      variantGroups: product.variantGroups || [],
+    })
     setIsEditDialogOpen(true)
   }
 
@@ -373,7 +369,7 @@ export function ProductsManager() {
       isActive: true,
       quantity: 0,
       ingredients: [],
-      variants: [],
+      variantGroups: [],
     })
   }
 
@@ -385,6 +381,26 @@ export function ProductsManager() {
   const handleEditDialogClose = () => {
     setIsEditDialogOpen(false)
     setEditingProduct(null)
+  }
+
+  // Al agregar una nueva variante a un grupo
+  const addVariantToGroup = (groupIdx: number) => {
+    setNewProduct(prev => {
+      const groups = [...prev.variantGroups]
+      groups[groupIdx].variants.push({ id: crypto.randomUUID(), name: '', price: undefined, image: '', isActive: true })
+      return { ...prev, variantGroups: groups }
+    })
+  }
+
+  // Al agregar un nuevo grupo de variantes
+  const addVariantGroup = () => {
+    setNewProduct(prev => ({
+      ...prev,
+      variantGroups: [
+        ...prev.variantGroups,
+        { id: crypto.randomUUID(), name: '', order: prev.variantGroups.length, variants: [] }
+      ]
+    }))
   }
 
   return (
@@ -534,26 +550,35 @@ export function ProductsManager() {
                                       <div className="flex flex-wrap gap-1 mt-1">
                                         {product.ingredients.map((pi, index) => (
                                           <Badge key={index} variant="outline" className="text-xs">
-                                            {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
+                                            {pi.ingredient?.name}: {pi.ingredient?.unit} {pi.quantity}
                                           </Badge>
                                         ))}
                                       </div>
                                     </div>
                                   )}
-                                  {product.variants && product.variants.length > 0 && (
+                                  {product.variantGroups && product.variantGroups.length > 0 && (
                                     <div className="mt-2">
                                       <p className="text-sm font-medium">Variantes:</p>
-                                      <div className="flex flex-wrap gap-2 mt-1">
-                                        {product.variants.map((variant, vIdx) => (
-                                          <div key={vIdx} className="flex items-center gap-2 border rounded px-2 py-1 bg-muted/50">
-                                            {variant.image && (
-                                              <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
-                                            )}
-                                            <span className="font-medium text-xs">{variant.name}</span>
-                                            {typeof variant.price === 'number' && !isNaN(variant.price) && (
-                                              <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-                                            )}
-                                            <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                                      <div className="space-y-2">
+                                        {product.variantGroups.map((group, gIdx) => (
+                                          <div key={gIdx}>
+                                            <span className="font-semibold text-xs">{group.name}:</span>
+                                            <div className="flex flex-wrap gap-2 mt-1">
+                                              {group.variants.map((variant, vIdx) => (
+                                                <div key={vIdx} className="flex items-center gap-2 border rounded px-2 py-1 bg-muted/50">
+                                                  {variant.image && (
+                                                    <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
+                                                  )}
+                                                  <span className="font-medium text-xs">{variant.name}</span>
+                                                  {typeof variant.price === 'number' && !isNaN(variant.price) && (
+                                                    <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                                                  )}
+                                                  <span className="text-[10px] ml-2">
+                                                    {variant.isActive ? 'Activa' : 'Inactiva'}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
                                           </div>
                                         ))}
                                       </div>
@@ -672,26 +697,33 @@ export function ProductsManager() {
                                         <div className="flex flex-wrap gap-1">
                                           {product.ingredients.map((pi, index) => (
                                             <Badge key={index} variant="outline" className="text-xs">
-                                              {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
+                                              {pi.ingredient?.name}: {pi.ingredient?.unit} {pi.quantity}
                                             </Badge>
                                           ))}
                                         </div>
                                       </div>
                                     )}
-                                    {product.variants && product.variants.length > 0 && (
+                                    {product.variantGroups && product.variantGroups.length > 0 && (
                                       <div className="pt-2 border-t mt-2">
                                         <p className="text-sm font-medium mb-1">Variantes:</p>
                                         <div className="flex flex-wrap gap-2">
-                                          {product.variants.map((variant, vIdx) => (
-                                            <div key={vIdx} className="flex items-center gap-2 border rounded px-2 py-1 bg-muted/50">
-                                              {variant.image && (
-                                                <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
-                                              )}
-                                              <span className="font-medium text-xs">{variant.name}</span>
-                                              {typeof variant.price === 'number' && !isNaN(variant.price) && (
-                                                <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-                                              )}
-                                              <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                                          {product.variantGroups.map((group, gIdx) => (
+                                            <div key={gIdx} className="border rounded p-2 bg-muted/50 w-full">
+                                              <div className="font-medium text-sm mb-1">{group.name}</div>
+                                              <div className="flex flex-wrap gap-2">
+                                                {group.variants.map((variant, vIdx) => (
+                                                  <div key={vIdx} className="flex items-center gap-2 border rounded px-2 py-1 bg-muted/70">
+                                                    {variant.image && (
+                                                      <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
+                                                    )}
+                                                    <span className="font-medium text-xs">{variant.name}</span>
+                                                    {typeof variant.price === 'number' && !isNaN(variant.price) && (
+                                                      <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                                                    )}
+                                                    <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                                                  </div>
+                                                ))}
+                                              </div>
                                             </div>
                                           ))}
                                         </div>
@@ -938,93 +970,103 @@ export function ProductsManager() {
                 </div>
               </div>
 
+              {/* Grupos de variantes */}
               <div className="grid gap-2">
-                <Label>Variantes</Label>
+                <Label>Grupos de Variantes</Label>
                 <div className="space-y-4 w-full">
-                  {newProduct.variants?.map((variant, index) => (
-                    <div key={index} className="flex flex-col lg:flex-row gap-2 items-end w-full border p-2 rounded-md bg-muted/30">
-                      <div className="w-full lg:flex-1">
-                        <Label>Nombre de la Variante</Label>
+                  {(newProduct.variantGroups || []).map((group, groupIdx) => (
+                    <div key={groupIdx} className="border rounded p-2 bg-muted/30">
+                      <div className="flex gap-2 items-center mb-2">
                         <Input
-                          value={variant.name}
+                          value={group.name}
                           onChange={e => {
-                              const newVariants = [...newProduct.variants]
-                              newVariants[index].name = e.target.value
-                              setNewProduct({ ...newProduct, variants: newVariants })
+                            const groups = [...newProduct.variantGroups]
+                            groups[groupIdx].name = e.target.value
+                            setNewProduct({ ...newProduct, variantGroups: groups })
                           }}
-                          placeholder="Ej: Fresa, Frío, Grande, etc."
-                          style={{ 
-                            fontSize: '16px',
-                            WebkitTextSizeAdjust: '100%'
-                          }}
+                          placeholder="Nombre del grupo (ej: Proteína, Sopa)"
                         />
-                      </div>
-                      <div className="w-full lg:w-32">
-                        <Label>Precio</Label>
-                        <Input
-                          type="number"
-                          value={variant.price ?? ''}
-                          onChange={e => {
-                            const value = e.target.value === '' ? undefined : Number(e.target.value)
-                              const newVariants = [...newProduct.variants]
-                              newVariants[index].price = value
-                              setNewProduct({ ...newProduct, variants: newVariants })
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => {
+                            const groups = [...newProduct.variantGroups]
+                            groups.splice(groupIdx, 1)
+                            setNewProduct({ ...newProduct, variantGroups: groups })
                           }}
-                          placeholder="Opcional"
-                          style={{ 
-                            fontSize: '16px',
-                            WebkitTextSizeAdjust: '100%'
-                          }}
-                        />
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <div className="w-full lg:w-48">
-                        <Label>Imagen</Label>
-                        <ImageUpload
-                          onImageUploaded={url => {
-                              const newVariants = [...newProduct.variants]
-                              newVariants[index].image = url
-                              setNewProduct({ ...newProduct, variants: newVariants })
+                      <div className="space-y-2">
+                        {(group.variants || []).map((variant, vIdx) => (
+                          <div key={vIdx} className="flex gap-2 items-end">
+                            <Input
+                              value={variant.name}
+                              onChange={e => {
+                                const groups = [...newProduct.variantGroups]
+                                groups[groupIdx].variants[vIdx].name = e.target.value
+                                setNewProduct({ ...newProduct, variantGroups: groups })
+                              }}
+                              placeholder="Nombre de la variante (ej: Pollo, Carne, Sí, No)"
+                            />
+                            <Input
+                              type="number"
+                              value={variant.price ?? ''}
+                              onChange={e => {
+                                const groups = [...newProduct.variantGroups]
+                                groups[groupIdx].variants[vIdx].price = e.target.value === '' ? undefined : Number(e.target.value)
+                                setNewProduct({ ...newProduct, variantGroups: groups })
+                              }}
+                              placeholder="Precio opcional"
+                            />
+                            <Switch
+                              checked={variant.isActive ?? true}
+                              onCheckedChange={checked => {
+                                const groups = [...newProduct.variantGroups]
+                                groups[groupIdx].variants[vIdx].isActive = checked
+                                setNewProduct({ ...newProduct, variantGroups: groups })
+                              }}
+                            />
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              onClick={() => {
+                                const groups = [...newProduct.variantGroups]
+                                groups[groupIdx].variants.splice(vIdx, 1)
+                                setNewProduct({ ...newProduct, variantGroups: groups })
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            const groups = [...newProduct.variantGroups]
+                            groups[groupIdx].variants.push({ id: crypto.randomUUID(), name: '', price: undefined, image: '', isActive: true })
+                            setNewProduct({ ...newProduct, variantGroups: groups })
                           }}
-                          currentImage={variant.image || ''}
-                        />
+                        >
+                          <Plus className="mr-2 h-4 w-4" /> Agregar Variante
+                        </Button>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id={`create-variant-active-${index}`}
-                          checked={variant.isActive ?? true}
-                          onCheckedChange={checked => {
-                              const newVariants = [...newProduct.variants]
-                              newVariants[index].isActive = checked
-                              setNewProduct({ ...newProduct, variants: newVariants })
-                          }}
-                        />
-                        <Label htmlFor={`create-variant-active-${index}`}>Activa</Label>
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="w-full lg:w-10"
-                        onClick={() => {
-                            const newVariants = [...newProduct.variants]
-                            newVariants.splice(index, 1)
-                            setNewProduct({ ...newProduct, variants: newVariants })
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   ))}
                   <Button
                     variant="outline"
                     onClick={() => {
-                        const newVariants = [...newProduct.variants]
-                        newVariants.push({ id: `temp-${Date.now()}`, name: '', price: undefined, image: '', isActive: true })
-                        setNewProduct({ ...newProduct, variants: newVariants })
+                      setNewProduct({
+                        ...newProduct,
+                        variantGroups: [
+                          ...newProduct.variantGroups,
+                          { id: crypto.randomUUID(), name: '', order: newProduct.variantGroups.length, variants: [] },
+                        ],
+                      })
                     }}
-                    className="w-full sm:w-auto"
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Agregar Variante
+                    <Plus className="mr-2 h-4 w-4" /> Agregar Grupo de Variantes
                   </Button>
                 </div>
               </div>
@@ -1215,7 +1257,7 @@ export function ProductsManager() {
                               ))}
                             </SelectContent>
                           </Select>
-                              </div>
+                        </div>
                         <div className="w-full lg:w-32">
                           <Label>Cantidad</Label>
                           <Input
@@ -1231,7 +1273,7 @@ export function ProductsManager() {
                               WebkitTextSizeAdjust: '100%'
                             }}
                           />
-                            </div>
+                        </div>
                         <Button
                           variant="destructive"
                           size="icon"
@@ -1271,93 +1313,105 @@ export function ProductsManager() {
                 <div className="grid gap-2">
                   <Label>Variantes</Label>
                   <div className="space-y-4 w-full">
-                    {editingProduct.variants?.map((variant, index) => (
-                      <div key={index} className="flex flex-col lg:flex-row gap-2 items-end w-full border p-2 rounded-md bg-muted/30">
-                        <div className="w-full lg:flex-1">
-                          <Label>Nombre de la Variante</Label>
+                    {editingProduct.variantGroups?.map((group, groupIdx) => (
+                      <div key={groupIdx} className="border rounded p-2 bg-muted/30">
+                        <div className="flex gap-2 items-center mb-2">
                           <Input
-                            value={variant.name}
+                            value={group.name}
                             onChange={e => {
-                              const newVariants = [...editingProduct.variants || []]
-                              newVariants[index].name = e.target.value
-                              setEditingProduct({ ...editingProduct, variants: newVariants })
+                              const groups = [...editingProduct.variantGroups]
+                              groups[groupIdx].name = e.target.value
+                              setEditingProduct({ ...editingProduct, variantGroups: groups })
                             }}
-                            placeholder="Ej: Fresa, Frío, Grande, etc."
-                            style={{ 
-                              fontSize: '16px',
-                              WebkitTextSizeAdjust: '100%'
-                            }}
+                            placeholder="Nombre del grupo (ej: Proteína, Sopa)"
                           />
-                </div>
-                        <div className="w-full lg:w-32">
-                          <Label>Precio</Label>
-                          <Input
-                            type="number"
-                            value={variant.price ?? ''}
-                            onChange={e => {
-                              const value = e.target.value === '' ? undefined : Number(e.target.value)
-                              const newVariants = [...editingProduct.variants || []]
-                              newVariants[index].price = value
-                              setEditingProduct({ ...editingProduct, variants: newVariants })
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => {
+                              const groups = [...editingProduct.variantGroups]
+                              groups.splice(groupIdx, 1)
+                              setEditingProduct({ ...editingProduct, variantGroups: groups })
                             }}
-                            placeholder="Opcional"
-                            style={{ 
-                              fontSize: '16px',
-                              WebkitTextSizeAdjust: '100%'
-                            }}
-                              />
-                            </div>
-                        <div className="w-full lg:w-48">
-                          <Label>Imagen</Label>
-                          <ImageUpload
-                            onImageUploaded={url => {
-                              const newVariants = [...editingProduct.variants || []]
-                              newVariants[index].image = url
-                              setEditingProduct({ ...editingProduct, variants: newVariants })
-                            }}
-                            currentImage={variant.image || ''}
-                          />
-                            </div>
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            id={`edit-variant-active-${index}`}
-                            checked={variant.isActive ?? true}
-                            onCheckedChange={checked => {
-                              const newVariants = [...editingProduct.variants || []]
-                              newVariants[index].isActive = checked
-                              setEditingProduct({ ...editingProduct, variants: newVariants })
-                            }}
-                          />
-                          <Label htmlFor={`edit-variant-active-${index}`}>Activa</Label>
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                          className="w-full lg:w-10"
-                          onClick={() => {
-                            const newVariants = [...editingProduct.variants || []]
-                            newVariants.splice(index, 1)
-                            setEditingProduct({ ...editingProduct, variants: newVariants })
-                          }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                        <div className="space-y-2">
+                          {(group.variants || []).map((variant, vIdx) => (
+                            <div key={vIdx} className="flex gap-2 items-end">
+                              <Input
+                                value={variant.name}
+                                onChange={e => {
+                                  const groups = [...editingProduct.variantGroups]
+                                  groups[groupIdx].variants[vIdx].name = e.target.value
+                                  setEditingProduct({ ...editingProduct, variantGroups: groups })
+                                }}
+                                placeholder="Nombre de la variante (ej: Pollo, Carne, Sí, No)"
+                              />
+                              <Input
+                                type="number"
+                                value={variant.price ?? ''}
+                                onChange={e => {
+                                  const value = e.target.value === '' ? undefined : Number(e.target.value)
+                                  const groups = [...editingProduct.variantGroups]
+                                  groups[groupIdx].variants[vIdx].price = value
+                                  setEditingProduct({ ...editingProduct, variantGroups: groups })
+                                }}
+                                placeholder="Precio opcional"
+                              />
+                              <Switch
+                                checked={variant.isActive ?? true}
+                                onCheckedChange={checked => {
+                                  const groups = [...editingProduct.variantGroups]
+                                  groups[groupIdx].variants[vIdx].isActive = checked
+                                  setEditingProduct({ ...editingProduct, variantGroups: groups })
+                                }}
+                              />
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                onClick={() => {
+                                  const groups = [...editingProduct.variantGroups]
+                                  groups[groupIdx].variants.splice(vIdx, 1)
+                                  setEditingProduct({ ...editingProduct, variantGroups: groups })
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              const groups = [...editingProduct.variantGroups]
+                              groups[groupIdx].variants.push({ id: crypto.randomUUID(), name: '', price: undefined, image: '', isActive: true })
+                              setEditingProduct({ ...editingProduct, variantGroups: groups })
+                            }}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Agregar Variante
+                          </Button>
+                        </div>
+                      </div>
                     ))}
                     <Button
                       variant="outline"
                       onClick={() => {
-                        const newVariants = [...editingProduct.variants || []]
-                        newVariants.push({ id: `temp-${Date.now()}`, name: '', price: undefined, image: '', isActive: true })
-                        setEditingProduct({ ...editingProduct, variants: newVariants })
+                        setEditingProduct({
+                          ...editingProduct,
+                          variantGroups: [
+                            ...editingProduct.variantGroups,
+                            { id: crypto.randomUUID(), name: '', order: editingProduct.variantGroups.length, variants: [] },
+                          ],
+                        })
                       }}
-                      className="w-full sm:w-auto"
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Agregar Variante
+                      Agregar Grupo de Variantes
                     </Button>
-                              </div>
-                            </div>
+                  </div>
+                </div>
                                   </div>
             </ScrollArea>
           )}

@@ -18,6 +18,20 @@ export class ProductVariantDto {
   isActive?: boolean;
 }
 
+export class ProductVariantGroupDto {
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsNumber()
+  order?: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantDto)
+  variants: ProductVariantDto[];
+}
+
 export class ProductIngredientDto {
   @IsString()
   ingredientId: string;
@@ -66,6 +80,12 @@ export class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ProductVariantDto)
   variants?: ProductVariantDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantGroupDto)
+  variantGroups?: ProductVariantGroupDto[];
 }
 
 export class UpdateProductDto {
@@ -112,4 +132,10 @@ export class UpdateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ProductVariantDto)
   variants?: ProductVariantDto[];
-} 
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantGroupDto)
+  variantGroups?: ProductVariantGroupDto[];
+}

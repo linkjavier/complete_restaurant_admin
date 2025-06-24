@@ -16,9 +16,13 @@ interface GroupedProduct {
   products: Product[];
 }
 
+interface ProductVariantWithGroup extends ProductVariant {
+  groupName?: string;
+}
+
 interface ProductGridProps {
   groupedProducts: GroupedProduct[];
-  onAddToCart: (product: Product, variant?: ProductVariant) => void
+  onAddToCart: (product: Product, variants?: ProductVariantWithGroup[] | ProductVariant) => void;
   cart: Record<string, number>
 }
 
@@ -60,8 +64,8 @@ export const CategoryTitle = ({ title }: { title: string }) => {
 }
 
 export function ProductGrid({ groupedProducts, onAddToCart, cart }: ProductGridProps) {
-  const [variantModal, setVariantModal] = useState<{ product: Product, open: boolean }>({ product: null, open: false })
-  const [selectedVariantIdx, setSelectedVariantIdx] = useState<number>(0)
+  const [variantModal, setVariantModal] = useState<{ product: Product | null, open: boolean }>({ product: null, open: false })
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({}) // groupId -> variantId or 'single' for simple
 
   if (groupedProducts.length === 0) {
     return (
@@ -122,9 +126,9 @@ export function ProductGrid({ groupedProducts, onAddToCart, cart }: ProductGridP
                       <Button
                         size="lg"
                         onClick={() => {
-                          if (product.variants && product.variants.length > 0) {
+                          if (product.variantGroups && product.variantGroups.length > 0) {
                             setVariantModal({ product, open: true })
-                            setSelectedVariantIdx(0)
+                            setSelectedVariants({})
                           } else {
                             onAddToCart(product)
                           }
@@ -144,42 +148,61 @@ export function ProductGrid({ groupedProducts, onAddToCart, cart }: ProductGridP
         </div>
       ))}
       
-      {/* Modal de selección de variante */}
+      {/* Modal de selección de variantes */}
       <Dialog open={variantModal.open} onOpenChange={open => setVariantModal({ product: variantModal.product, open })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Selecciona una variante</DialogTitle>
+            <DialogTitle>Selecciona las variantes</DialogTitle>
           </DialogHeader>
-          {variantModal.product && variantModal.product.variants && (
-            <div className="space-y-2">
-              {variantModal.product.variants.map((variant, idx) => (
-                <Button
-                  key={idx}
-                  variant={selectedVariantIdx === idx ? 'default' : 'outline'}
-                  className="w-full flex items-center gap-2 justify-start"
-                  onClick={() => setSelectedVariantIdx(idx)}
-                >
-                  {variant.image && (
-                    <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
-                  )}
-                  <span className="font-medium text-xs">{variant.name}</span>
-                  {typeof variant.price === 'number' && !isNaN(variant.price) && (
-                    <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-                  )}
-                  <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
-                </Button>
+          {variantModal.product && variantModal.product.variantGroups && variantModal.product.variantGroups.length > 0 && (
+            <div className="space-y-4">
+              {variantModal.product.variantGroups.map((group) => (
+                <div key={group.id}>
+                  <div className="font-medium text-sm mb-1">{group.name}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {group.variants.map((variant) => (
+                      <Button
+                        key={variant.id}
+                        variant={selectedVariants[group.id] === variant.id ? 'default' : 'outline'}
+                        className="flex items-center gap-2"
+                        onClick={() => setSelectedVariants(prev => ({ ...prev, [group.id]: variant.id }))}
+                      >
+                        {variant.image && (
+                          <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
+                        )}
+                        <span className="font-medium text-xs">{variant.name}</span>
+                        {typeof variant.price === 'number' && !isNaN(variant.price) && (
+                          <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                        )}
+                        <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
           <DialogFooter>
             <Button
               onClick={() => {
-                if (variantModal.product && variantModal.product.variants) {
-                  onAddToCart(variantModal.product, variantModal.product.variants[selectedVariantIdx])
+                if (variantModal.product && variantModal.product.variantGroups && variantModal.product.variantGroups.length > 0) {
+                  // Validar que todas las variantes estén seleccionadas
+                  const allSelected = variantModal.product.variantGroups.every(group => selectedVariants[group.id])
+                  if (!allSelected) return
+                  // Construir array de variantes seleccionadas
+                  const selectedVariantsArr = variantModal.product.variantGroups.map(group => {
+                    const variant = group.variants.find(v => v.id === selectedVariants[group.id])
+                    return variant ? { ...variant, groupName: group.name } : null
+                  }).filter(Boolean)
+                  onAddToCart(variantModal.product, selectedVariantsArr)
                   setVariantModal({ product: null, open: false })
                 }
               }}
-              disabled={!variantModal.product}
+              disabled={
+                variantModal.product && variantModal.product.variantGroups && variantModal.product.variantGroups.length > 0
+                  ? !variantModal.product.variantGroups.every(group => selectedVariants[group.id])
+                  : false
+              }
             >
               Agregar al carrito
             </Button>

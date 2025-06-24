@@ -21,6 +21,12 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 
+// Utilidad para obtener todas las variantes de todos los grupos
+function getAllVariants(product) {
+  if (!product.variantGroups) return [];
+  return product.variantGroups.flatMap(g => g.variants || []);
+}
+
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -580,18 +586,17 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
             }
 
             const product = matchingProducts[0];
-            // Si el producto tiene variantes
-            if (product.variants && product.variants.length > 0) {
-              // Si el usuario no especificó la variante
+            // Obtener todas las variantes de todos los grupos
+            const allVariants = getAllVariants(product);
+            if (allVariants.length > 0) {
               if (!item.variantName) {
-                const variantNames = product.variants.map(v => v.name).join(', ');
+                const variantNames = allVariants.map(v => v.name).join(', ');
                 variantRequests.push(`El producto *${product.name}* tiene variantes. Por favor, indícanos cuál prefieres. Opciones: ${variantNames}`);
                 continue;
               }
-              // Buscar la variante
-              const variant = product.variants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
+              const variant = allVariants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
               if (!variant) {
-                const variantNames = product.variants.map(v => v.name).join(', ');
+                const variantNames = allVariants.map(v => v.name).join(', ');
                 errors.push(`❌ La variante "${item.variantName}" no existe para el producto *${product.name}*. Opciones válidas: ${variantNames}`);
                 continue;
               }
@@ -679,15 +684,16 @@ Por favor, corrige los nombres de los productos y vuelve a intentar.`
           const invalidVariants = [];
           for (const item of items) {
             const product = menu.find(p => p.id === item.productId);
-            if (product && product.variants && product.variants.length > 0) {
+            const allVariants = getAllVariants(product);
+            if (allVariants.length > 0) {
               if (!item.variantName) {
-                const variantNames = product.variants.map(v => v.name).join(', ');
+                const variantNames = allVariants.map(v => v.name).join(', ');
                 missingVariants.push(`El producto *${product.name}* requiere que selecciones una variante. Opciones: ${variantNames}`);
                 continue;
               }
-              const variant = product.variants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
+              const variant = allVariants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
               if (!variant) {
-                const variantNames = product.variants.map(v => v.name).join(', ');
+                const variantNames = allVariants.map(v => v.name).join(', ');
                 invalidVariants.push(`La variante "${item.variantName}" no existe para el producto *${product.name}*. Opciones válidas: ${variantNames}`);
               }
             }
@@ -711,7 +717,7 @@ Por favor, corrige las variantes y vuelve a intentar.`
             };
           }
 
-          // Reconstruir los datos completos de los productos si faltan
+          // Enriquecer items
           let enrichedItems = items;
           if (
             items.length > 0 &&
@@ -723,11 +729,11 @@ Por favor, corrige las variantes y vuelve a intentar.`
               if (!product) {
                 throw new Error(`Producto no encontrado para ID: ${item.productId}`);
               }
-              // Si el producto tiene variantes y el item tiene variantName, usar el precio de la variante
               let unitPrice = product.price;
               let variantName = undefined;
-              if (product.variants && product.variants.length > 0 && item.variantName) {
-                const variant = product.variants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
+              const allVariants = getAllVariants(product);
+              if (allVariants.length > 0 && item.variantName) {
+                const variant = allVariants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
                 if (variant) {
                   unitPrice = variant.price ?? product.price;
                   variantName = variant.name;
@@ -836,14 +842,15 @@ Por favor, corrige las variantes y vuelve a intentar.`
           // Validar variantes en los items
           for (const item of functionArgs.items) {
             const product = menu.find(p => p.id === item.productId);
-            if (product && product.variants && product.variants.length > 0) {
+            const allVariants = getAllVariants(product);
+            if (allVariants.length > 0) {
               if (!item.variantName) {
-                const variantNames = product.variants.map(v => v.name).join(', ');
+                const variantNames = allVariants.map(v => v.name).join(', ');
                 throw new Error(`El producto *${product.name}* requiere que selecciones una variante. Opciones: ${variantNames}`);
               }
-              const variant = product.variants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
+              const variant = allVariants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
               if (!variant) {
-                const variantNames = product.variants.map(v => v.name).join(', ');
+                const variantNames = allVariants.map(v => v.name).join(', ');
                 throw new Error(`La variante "${item.variantName}" no existe para el producto *${product.name}*. Opciones válidas: ${variantNames}`);
               }
             }

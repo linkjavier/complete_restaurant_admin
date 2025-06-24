@@ -12,9 +12,14 @@ import { Badge } from "@/components/ui/badge"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+interface ProductVariantWithGroup extends ProductVariant {
+  groupName?: string;
+}
+
 interface CartItem {
   product: Product
-  variant?: ProductVariant
+  variants?: ProductVariantWithGroup[] // Para productos con grupos de variantes
+  variant?: ProductVariant   // Para productos con una sola variante
   quantity: number
 }
 
@@ -332,7 +337,22 @@ export function Cart({
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{item.product.name}</p>
-                          {item.variant && (
+                          {/* Mostrar todas las variantes seleccionadas si existen grupos de variantes */}
+                          {Array.isArray(item.variants) && item.variants.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {item.variants.map((variant, vIdx) => (
+                                <div key={vIdx} className="flex items-center gap-1 bg-muted/50 rounded px-2 py-1">
+                                  <span className="text-xs font-semibold text-muted-foreground">{variant.groupName}:</span>
+                                  <span className="text-xs font-medium">{variant.name}</span>
+                                  {typeof variant.price === 'number' && !isNaN(variant.price) && (
+                                    <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* Variante simple (sin grupo) */}
+                          {item.variant && !item.variants && (
                             <div className="flex items-center gap-2 mt-1">
                               {item.variant.image && (
                                 <img src={item.variant.image} alt={item.variant.name} className="w-6 h-6 object-cover rounded" />

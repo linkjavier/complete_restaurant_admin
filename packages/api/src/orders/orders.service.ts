@@ -35,7 +35,11 @@ export class OrdersService {
         items: {
           include: {
             product: true,
-            productVariant: true,
+            variants: {
+              include: {
+                productVariant: true,
+              },
+            },
           },
         },
         payments: true,
@@ -64,7 +68,11 @@ export class OrdersService {
         items: {
           include: {
             product: true,
-            productVariant: true,
+            variants: {
+              include: {
+                productVariant: true,
+              },
+            },
           },
         },
         payments: true,
@@ -78,33 +86,21 @@ export class OrdersService {
       
       const { userId, items, ...orderData } = createOrderDto;
 
-      // Map variantName to productVariantId if present
-      const itemsWithVariantId = await Promise.all(items.map(async (item: any) => {
-        if (item.variantName && typeof item.variantName === 'string' && item.variantName.trim() !== '') {
-          const product = await this.productsService.findOne(item.productId) as any;
-          if (product && Array.isArray(product.variants) && product.variants.length > 0) {
-            const variant = product.variants.find((v: any) => v.name.toLowerCase() === item.variantName.toLowerCase());
-            if (variant) {
-              return {
-                ...item,
-                productVariantId: variant.id,
-              };
-            }
-          }
-        }
-        return item;
-      }));
-
       const orderCreateData: any = {
         ...orderData,
         status: orderData.status || 'PENDING',
         isPaid: orderData.isPaid || false,
         items: {
-          create: itemsWithVariantId.map(item => ({
+          create: items.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
             status: 'PENDING',
-            ...(item.productVariantId ? { productVariantId: item.productVariantId } : {}),
+            variants: {
+              create: item.variants?.map(variant => ({
+                productVariantId: variant.productVariantId,
+                groupName: variant.groupName || null,
+              })) || []
+            },
           })),
         }
       };
@@ -122,19 +118,24 @@ export class OrdersService {
             items: {
               include: {
                 product: true,
-                productVariant: true,
+                variants: {
+                  include: {
+                    productVariant: true,
+                  },
+                },
               },
             },
             table: true,
             location: true,
+            user: true,
+            payments: true,
           },
         });
-        
         this.logger.log(`Order created with ID: ${newOrder.id}`);
         return newOrder;
       });
 
-      // Emit WebSocket event for real-time updates
+      // Emit WebSocket event para actualizaciones en tiempo real
       if (order.locationId) {
         try {
           this.logger.log(`Emitting new order event for order ${order.id} to location ${order.locationId}`);
@@ -193,7 +194,11 @@ export class OrdersService {
         items: {
           include: {
             product: true,
-            productVariant: true,
+            variants: {
+              include: {
+                productVariant: true,
+              },
+            },
           },
         },
         payments: true,
@@ -212,7 +217,11 @@ export class OrdersService {
           items: {
             include: {
               product: true,
-              productVariant: true,
+              variants: {
+                include: {
+                  productVariant: true,
+                },
+              },
             },
           },
           table: true,
@@ -255,7 +264,11 @@ export class OrdersService {
           items: {
             include: {
               product: true,
-              productVariant: true,
+              variants: {
+                include: {
+                  productVariant: true,
+                },
+              },
             },
           },
           table: true,
@@ -287,16 +300,22 @@ export class OrdersService {
           items: {
             include: {
               product: true,
-              productVariant: true,
-            }
+              variants: {
+                include: {
+                  productVariant: true,
+                },
+              },
+            },
           },
           location: true,
         },
       });
 
-      if (!order) {
-        this.logger.warn(`Order with ID ${orderId} not found for item status update`);
-        throw new NotFoundException(`Order with ID ${orderId} not found`);
+      // El resultado de order.findUnique puede ser null o no incluir 'items' si no se especifica el include correctamente.
+      // Aseguramos que 'items' está incluido y tipado correctamente.
+      if (!order || !('items' in order) || !Array.isArray(order.items)) {
+        this.logger.warn(`Order with ID ${orderId} not found for item status update, or items not present`);
+        throw new NotFoundException(`Order with ID ${orderId} not found or items missing`);
       }
 
       const item = order.items.find(item => item.id === itemId);

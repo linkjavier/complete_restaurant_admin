@@ -102,17 +102,29 @@ export default function PosPage() {
   }
 
   // Nueva función para generar la clave del carrito
-  function getCartKey(product: Product, variant?: ProductVariant) {
-    if (variant) {
-      return `${product.id}__${variant.name}`
+  function getCartKey(product: Product, variants?: ProductVariant[] | ProductVariant) {
+    if (Array.isArray(variants) && variants.length > 0) {
+      // Clave única por producto y variantes seleccionadas
+      return `${product.id}__${variants.map(v => v.id).join('_')}`
+    } else if (variants && !Array.isArray(variants)) {
+      return `${product.id}__${variants.id}`
     }
     return product.id
   }
 
-  // Actualizar handleAddToCart
-  const handleAddToCart = (product: Product, variant?: ProductVariant) => {
-    // Si hay variante, asegurar que tiene id
-    if (variant && !variant.id) {
+  // Actualizar handleAddToCart para soportar múltiples variantes
+  const handleAddToCart = (product: Product, variantsOrVariant?: ProductVariant[] | ProductVariant) => {
+    // Validar ids
+    if (Array.isArray(variantsOrVariant)) {
+      if (variantsOrVariant.some(v => !v.id)) {
+        toast({
+          title: "Error",
+          description: "Alguna variante seleccionada no tiene un ID válido.",
+          variant: "destructive",
+        })
+        return
+      }
+    } else if (variantsOrVariant && !variantsOrVariant.id) {
       toast({
         title: "Error",
         description: "La variante seleccionada no tiene un ID válido.",
@@ -120,14 +132,18 @@ export default function PosPage() {
       })
       return
     }
-    const key = getCartKey(product, variant)
+    const key = getCartKey(product, variantsOrVariant)
     setCart(prev => {
       const prevItem = prev[key]
       return {
         ...prev,
         [key]: {
           product,
-          variant,
+          ...(Array.isArray(variantsOrVariant)
+            ? { variants: variantsOrVariant }
+            : variantsOrVariant
+              ? { variant: variantsOrVariant }
+              : {}),
           quantity: prevItem ? prevItem.quantity + 1 : 1
         }
       }
@@ -198,13 +214,20 @@ export default function PosPage() {
       }
 
       const orderItems = Object.values(cart).map(item => {
-        if (item.variant && !item.variant.id) {
-          throw new Error("La variante seleccionada no tiene un ID válido.")
+        let variantsArr: { productVariantId: string, groupName?: string }[] = [];
+        // Soporte para múltiples variantes por item
+        if (Array.isArray((item as any).variants) && (item as any).variants.length > 0) {
+          variantsArr = (item as any).variants.map((v: any) => ({
+            productVariantId: v.id,
+            groupName: v.groupName || undefined
+          }))
+        } else if ((item as any).variant) {
+          variantsArr = [{ productVariantId: (item as any).variant.id }]
         }
         return {
           productId: item.product.id,
           quantity: item.quantity,
-          ...(item.variant ? { productVariantId: item.variant.id } : {})
+          variants: variantsArr
         }
       })
 

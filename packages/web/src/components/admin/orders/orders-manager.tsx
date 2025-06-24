@@ -566,33 +566,64 @@ export function OrdersManager() {
                             <div className="p-4">
                               <div className="space-y-4">
                                 {order.items.map((item) => (
-                                  <div key={item.id} className="flex justify-between items-center">
-                                    <div>
+                                  <div key={item.id} className="flex justify-between items-start gap-2 py-2 border-b last:border-b-0">
+                                    <div className="flex-1">
                                       <div className="flex items-center gap-2">
-                                        <p className="font-medium">{item.product.name}</p>
-                                        {item.productVariant && (
-                                          <>
-                                            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">{item.productVariant.name}</span>
-                                            {item.productVariant.image && (
-                                              <img src={item.productVariant.image} alt={item.productVariant.name} className="w-6 h-6 object-cover rounded" />
-                                            )}
-                                            {typeof item.productVariant.price === 'number' && !isNaN(item.productVariant.price) && (
-                                              <span className="text-xs text-muted-foreground">${item.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-                                            )}
-                                          </>
-                                        )}
+                                        <p className="font-medium text-base">{item.product.name}</p>
                                         {getItemStatusBadge(item.status)}
                                       </div>
-                                      <p className="text-sm text-muted-foreground">
-                                        {item.quantity} x ${item.productVariant?.price ? item.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 }) : item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                                      </p>
+                                      {/* Mostrar variantes múltiples si existen */}
+                                      {Array.isArray(item.variants) && item.variants.length > 0 && (
+                                        <div className="ml-4 mt-1 flex flex-col gap-1">
+                                          {item.variants.map((variant, vIdx) => (
+                                            <div key={vIdx} className="flex items-center gap-2 bg-primary/10 rounded px-2 py-1">
+                                              <span className="text-xs font-semibold text-primary">
+                                                {variant.groupName}:
+                                              </span>
+                                              {variant.productVariant?.image && (
+                                                <img src={variant.productVariant.image} alt={variant.productVariant.name} className="w-6 h-6 object-cover rounded border" />
+                                              )}
+                                              <span className="text-xs font-medium">
+                                                {variant.productVariant?.name}
+                                              </span>
+                                              {typeof variant.productVariant?.price === 'number' && !isNaN(variant.productVariant.price) && (
+                                                <span className="text-xs text-muted-foreground">
+                                                  ${variant.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                                </span>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {/* Si solo hay una variante simple */}
+                                      {!item.variants && item.productVariant && (
+                                        <div className="ml-4 mt-1 flex items-center gap-2 bg-primary/5 rounded px-2 py-1">
+                                          {item.productVariant.image && (
+                                            <img src={item.productVariant.image} alt={item.productVariant.name} className="w-7 h-7 object-cover rounded border" />
+                                          )}
+                                          <span className="text-xs font-semibold text-primary">
+                                            Variante: {item.productVariant.name}
+                                          </span>
+                                          {typeof item.productVariant.price === 'number' && !isNaN(item.productVariant.price) && (
+                                            <span className="text-xs text-muted-foreground">
+                                              ${item.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      <div className="ml-4 text-xs text-muted-foreground mt-1">
+                                        {item.quantity} x $
+                                        {item.productVariant?.price
+                                          ? item.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })
+                                          : item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                      </div>
                                       {item.notes && (
-                                        <p className="text-sm text-muted-foreground">
-                                          Notas: {item.notes}
-                                        </p>
+                                        <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
+                                          <span className="font-semibold">Notas:</span> {item.notes}
+                                        </div>
                                       )}
                                     </div>
-                                    <Badge variant="outline">
+                                    <Badge variant="outline" className="mt-2">
                                       ${((item.productVariant?.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                     </Badge>
                                   </div>

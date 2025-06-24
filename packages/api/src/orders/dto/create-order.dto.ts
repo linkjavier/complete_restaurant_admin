@@ -21,6 +21,16 @@ export enum OrderSource {
   WHATSAPP = 'WHATSAPP'
 }
 
+class OrderItemVariantDto {
+  @IsString()
+  @IsNotEmpty()
+  productVariantId: string;
+
+  @IsString()
+  @IsOptional()
+  groupName?: string;
+}
+
 class OrderItemDto {
   @IsString()
   @IsNotEmpty()
@@ -29,13 +39,10 @@ class OrderItemDto {
   @IsNotEmpty()
   quantity: number;
 
-  @IsString()
-  @IsOptional()
-  productVariantId?: string;
-
-  @IsString()
-  @IsOptional()
-  variantName?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderItemVariantDto)
+  variants: OrderItemVariantDto[];
 }
 
 export class CreateOrderDto {
