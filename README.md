@@ -424,7 +424,7 @@ npx prisma db push --force-reset
 # Seed database
 chmod +x ./scripts/seed-database.sh && ./scripts/seed-database.sh
 
-# Seed database (Tambien funciona con paola2)
+# Seed database (Tambien funciona con paola2. Nuevo)
 chmod +x ./scripts/seed-database-paola.sh && ./scripts/seed-database-paola.sh
 
 # Seed database with images
