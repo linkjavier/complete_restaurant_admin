@@ -71,6 +71,7 @@ interface Order {
   neighborhood?: string
   phone?: string
   source?: string
+  deliveryFee?: number
 }
 
 export function OrdersManager() {
@@ -359,8 +360,18 @@ export function OrdersManager() {
     }
   }
 
-  // Helper function to calculate order total
+  // Helper function to calculate order total (productos + deliveryFee si aplica)
   const calculateOrderTotal = (order: Order) => {
+    if (!order?.items?.length) return 0;
+    const itemsTotal = order.items.reduce((total, item) => {
+      if (item.status === "CANCELLED") return total;
+      return total + (item.quantity * (item.product?.price || 0));
+    }, 0);
+    return itemsTotal + (order.deliveryFee || 0);
+  };
+
+  // Helper function to calculate solo el subtotal de productos
+  const calculateOrderSubtotal = (order: Order) => {
     if (!order?.items?.length) return 0;
     return order.items.reduce((total, item) => {
       if (item.status === "CANCELLED") return total;
@@ -640,12 +651,35 @@ export function OrdersManager() {
                               </div>
 
                               <div className="mt-4 pt-4 border-t">
-                                <div className="flex justify-between items-center">
-                                  <span className="font-bold">Total:</span>
-                                  <span className="font-bold">
-                                    ${calculateOrderTotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                                  </span>
-                                </div>
+                                {order.type === "DELIVERY" ? (
+                                  <>
+                                    <div className="flex justify-between items-center text-sm">
+                                      <span className="font-medium">Subtotal:</span>
+                                      <span className="font-medium">
+                                        ${calculateOrderSubtotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm mt-1">
+                                      <span className="font-medium">Domicilio:</span>
+                                      <span className="font-medium">
+                                        ${order.deliveryFee ? order.deliveryFee.toLocaleString('es-CO', { maximumFractionDigits: 0 }) : '0'}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-2">
+                                      <span className="font-bold">Total:</span>
+                                      <span className="font-bold">
+                                        ${calculateOrderTotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                      </span>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="flex justify-between items-center mt-2">
+                                    <span className="font-bold">Total:</span>
+                                    <span className="font-bold">
+                                      ${calculateOrderTotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                    </span>
+                                  </div>
+                                )}
                                 {order.status === "READY" && (
                                   <div className="mt-2 flex items-center gap-2">
                                     <Badge variant={order.isPaid ? "success" : "warning"}>
