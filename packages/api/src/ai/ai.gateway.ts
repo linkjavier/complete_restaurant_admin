@@ -20,11 +20,23 @@ import { STTService } from '../stt/stt.service';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import { CategoriesService } from '../categories/categories.service';
 
 // Utilidad para obtener todas las variantes de todos los grupos
 function getAllVariants(product) {
   if (!product.variantGroups) return [];
   return product.variantGroups.flatMap(g => g.variants || []);
+}
+
+// Utilidad para normalizar nombres (sin tildes, minúsculas, sin espacios extra)
+function normalizeName(str: string) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 @WebSocketGateway({
@@ -49,6 +61,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private ordersService: OrdersService,
     private settingsService: SettingsService,
     private sttService: STTService,
+    private categoriesService: CategoriesService,
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
@@ -193,9 +206,46 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       'quiero',
     ];
     const normalizedText = text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+    // --- NUEVO: Si el último mensaje de la IA fue una pregunta de variantes, NO mostrar menú automático ---
+    const conversationIdMenu = `${locationId}:${chatType}:${chatId}`;
+    let conversationMenu = this.conversations.get(conversationIdMenu);
+    let lastAssistantMessage = '';
+    if (conversationMenu && conversationMenu.length > 0) {
+      for (let i = conversationMenu.length - 1; i >= 0; i--) {
+        if (conversationMenu[i].role === 'assistant' && conversationMenu[i].content) {
+          lastAssistantMessage = conversationMenu[i].content as string;
+          break;
+        }
+      }
+    }
+    const isVariantPrompt = lastAssistantMessage && (
+      lastAssistantMessage.includes('elige una opción para cada grupo') ||
+      lastAssistantMessage.includes('dime tus elecciones') ||
+      lastAssistantMessage.includes('¿Qué opciones prefieres para cada uno de los grupos?')
+    );
+    // --- FIN NUEVO ---
+
+    // --- NUEVO: Verificar si la IA está habilitada antes de responder con el menú ---
+    let aiSettings: any;
+    try {
+      aiSettings = await this.settingsService.getAISettings();
+      if (chatType === 'whatsapp' && !aiSettings?.enabled) {
+        console.log(`[AI Gateway] AI is disabled for WhatsApp, not sending menu or processing message`);
+        return '';
+      }
+    } catch (error) {
+      console.error('Error checking AI settings:', error);
+      if (chatType === 'whatsapp') {
+        return '';
+      }
+    }
+    // --- FIN NUEVO ---
+
     if (
       chatType !== 'admin' &&
-      menuKeywords.some(k => normalizedText.includes(k))
+      menuKeywords.some(k => normalizedText.includes(k)) &&
+      !isVariantPrompt // NUEVO: solo mostrar menú si NO estamos esperando variantes
     ) {
       // Responder directamente con el menú
       try {
@@ -209,26 +259,40 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           }
           return 'No se encontró ningún producto en el menú para esta ubicación.';
         }
+        // Obtener categorías ordenadas
+        const categories = await this.categoriesService.categories({ orderBy: { order: 'asc' } });
         // Agrupar productos por categoría
-        const categories = {};
+        const categoriesMap = {};
+        for (const cat of categories) {
+          categoriesMap[cat.id] = { name: cat.name, products: [] };
+        }
         menu.forEach(product => {
-          const catId = product.category.id;
-          if (!categories[catId]) {
-            categories[catId] = { name: product.category.name, products: [] };
+          const prod: any = product;
+          if (!prod.category) return;
+          const catId = prod.category.id;
+          if (categoriesMap[catId]) {
+            categoriesMap[catId].products.push(product);
           }
-          categories[catId].products.push(product);
         });
         let menuText = 'Te comparto el 🍽️ *Menú del Restaurante*\n';
         let prodCount = 1;
-        const allCategories = Object.values(categories) as { name: string; products: any[] }[];
-        const bebidas = allCategories.filter(cat => cat.name.toLowerCase().includes('bebida'));
-        const otras = allCategories.filter(cat => !cat.name.toLowerCase().includes('bebida'));
-        const orderedCategories = [...otras, ...bebidas];
-        for (const cat of orderedCategories) {
-          menuText += `\n\n**${cat.name}**\n\n`;
-          for (const product of cat.products) {
+        for (const cat of categories) {
+          const group = categoriesMap[cat.id];
+          if (!group || group.products.length === 0) continue;
+          menuText += `\n\n**${group.name}**\n\n`;
+          for (const product of group.products) {
             const price = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-            menuText += `${prodCount}. *${product.name}* - $${price}\n\n`;
+            menuText += `${prodCount}. *${product.name}* - $${price}\n`;
+            // NUEVO: Mostrar variantes si existen
+            const prod: any = product;
+            if (prod.variantGroups && prod.variantGroups.length > 0) {
+              for (const groupVar of prod.variantGroups) {
+                if (groupVar.variants && groupVar.variants.length > 0) {
+                  menuText += `   - ${groupVar.name}: ${groupVar.variants.map(v => v.name).join(', ')}\n`;
+                }
+              }
+            }
+            menuText += '\n';
             prodCount++;
           }
           menuText += '\n';
@@ -249,22 +313,6 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           });
         }
         return `❌ Error obteniendo el menú: ${error.message}`;
-      }
-    }
-
-    // Verificar si la IA está habilitada
-    try {
-      const aiSettings = await this.settingsService.getAISettings();
-      // Solo verificar el switch para WhatsApp, otros tipos de chat funcionan siempre
-      if (chatType === 'whatsapp' && !aiSettings?.enabled) {
-        console.log(`[AI Gateway] AI is disabled for WhatsApp, not processing message`);
-        return ''; // Retornar string vacío para indicar que no se debe enviar respuesta
-      }
-    } catch (error) {
-      console.error('Error checking AI settings:', error);
-      // En caso de error, solo bloquear WhatsApp, permitir otros tipos
-      if (chatType === 'whatsapp') {
-        return ''; // En caso de error, no procesar WhatsApp
       }
     }
 
@@ -586,21 +634,39 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
             }
 
             const product = matchingProducts[0];
-            // Obtener todas las variantes de todos los grupos
-            const allVariants = getAllVariants(product);
-            if (allVariants.length > 0) {
-              if (!item.variantName) {
-                const variantNames = allVariants.map(v => v.name).join(', ');
-                variantRequests.push(`El producto *${product.name}* tiene variantes. Por favor, indícanos cuál prefieres. Opciones: ${variantNames}`);
+            const prod: any = product;
+            const variantGroups = prod.variantGroups || [];
+            let variantSummary = [];
+            if (variantGroups.length > 0) {
+              // Validar que el item.variants sea un array y tenga una selección para cada grupo
+              if (!Array.isArray(item.variants)) item.variants = [];
+              const missingGroups = [];
+              const invalidGroups = [];
+              let price = product.price;
+              for (const group of variantGroups) {
+                const selected = item.variants.find(v => v.groupName && normalizeName(v.groupName) === normalizeName(group.name));
+                if (!selected) {
+                  missingGroups.push(`• *${group.name}*: ${group.variants.map(v => v.name).join(', ')}`);
+                  continue;
+                }
+                const variant = group.variants.find(v => normalizeName(v.name) === normalizeName(selected.variantName));
+                if (!variant) {
+                  invalidGroups.push(`• *${group.name}*: La variante "${selected.variantName}" no existe. Opciones: ${group.variants.map(v => v.name).join(', ')}`);
+                  continue;
+                }
+                price += variant.price ?? 0;
+                variantSummary.push(`${group.name}: ${variant.name}`);
+              }
+              if (missingGroups.length > 0) {
+                variantRequests.push(`El producto *${product.name}* requiere que selecciones una opción para cada grupo:
+${missingGroups.join('\n')}`);
                 continue;
               }
-              const variant = allVariants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
-              if (!variant) {
-                const variantNames = allVariants.map(v => v.name).join(', ');
-                errors.push(`❌ La variante "${item.variantName}" no existe para el producto *${product.name}*. Opciones válidas: ${variantNames}`);
+              if (invalidGroups.length > 0) {
+                errors.push(`Errores en variantes de *${product.name}*:
+${invalidGroups.join('\n')}`);
                 continue;
               }
-              const price = variant.price ?? product.price;
               const subtotal = price * item.quantity;
               totalAmount += subtotal;
               validatedItems.push({
@@ -608,9 +674,10 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 productName: product.name,
                 quantity: item.quantity,
                 unitPrice: price,
-                subtotal: subtotal,
-                variantName: variant.name,
-                notes: item.notes || ''
+                subtotal,
+                variants: item.variants,
+                notes: item.notes || '',
+                variantSummary: variantSummary.join(', ')
               });
               continue;
             }
@@ -623,7 +690,9 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
               quantity: item.quantity,
               unitPrice: product.price,
               subtotal: subtotal,
-              notes: item.notes || ''
+              variants: [],
+              notes: item.notes || '',
+              variantSummary: ''
             });
           }
 
@@ -649,8 +718,8 @@ Por favor, corrige los nombres de los productos y vuelve a intentar.`
           }
 
           // Crear resumen de la orden con formato mejorado
-          const itemsSummary = validatedItems.map((item, index) => 
-            `${index + 1}. *${item.productName}${item.variantName ? ' (' + item.variantName + ')' : ''}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
+          const itemsSummary = validatedItems.map((item, index) =>
+            `${index + 1}. *${item.productName}${item.variantSummary ? ' (' + item.variantSummary + ')' : ''}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
           ).join('\n');
 
           const formattedTotal = totalAmount.toLocaleString('es-CO', { 
@@ -684,18 +753,45 @@ Por favor, corrige los nombres de los productos y vuelve a intentar.`
           const invalidVariants = [];
           for (const item of items) {
             const product = menu.find(p => p.id === item.productId);
-            const allVariants = getAllVariants(product);
-            if (allVariants.length > 0) {
-              if (!item.variantName) {
-                const variantNames = allVariants.map(v => v.name).join(', ');
-                missingVariants.push(`El producto *${product.name}* requiere que selecciones una variante. Opciones: ${variantNames}`);
+            const prod: any = product;
+            const variantGroups = prod.variantGroups || [];
+            if (variantGroups.length > 0) {
+              if (!Array.isArray(item.variants)) item.variants = [];
+              const missingGroups = [];
+              const invalidGroups = [];
+              let price = product.price;
+              let variantSummary = [];
+              for (const group of variantGroups) {
+                const selected = item.variants.find(v => v.groupName && normalizeName(v.groupName) === normalizeName(group.name));
+                if (!selected) {
+                  missingGroups.push(`• *${group.name}*: ${group.variants.map(v => v.name).join(', ')}`);
+                  continue;
+                }
+                const variant = group.variants.find(v => normalizeName(v.name) === normalizeName(selected.variantName));
+                if (!variant) {
+                  invalidGroups.push(`• *${group.name}*: La variante "${selected.variantName}" no existe. Opciones: ${group.variants.map(v => v.name).join(', ')}`);
+                  continue;
+                }
+                price += variant.price ?? 0;
+                variantSummary.push(`${group.name}: ${variant.name}`);
+              }
+              if (missingGroups.length > 0) {
+                missingVariants.push(`El producto *${product.name}* requiere que selecciones una opción para cada grupo:\n${missingGroups.join('\n')}`);
                 continue;
               }
-              const variant = allVariants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
-              if (!variant) {
-                const variantNames = allVariants.map(v => v.name).join(', ');
-                invalidVariants.push(`La variante "${item.variantName}" no existe para el producto *${product.name}*. Opciones válidas: ${variantNames}`);
+              if (invalidGroups.length > 0) {
+                invalidVariants.push(`Errores en variantes de *${product.name}*:\n${invalidGroups.join('\n')}`);
+                continue;
               }
+              // Enriquecer item
+              item.unitPrice = price;
+              item.subtotal = price * item.quantity;
+              item.variantSummary = variantSummary.join(', ');
+            } else {
+              // Producto sin variantes
+              item.unitPrice = product.price;
+              item.subtotal = product.price * item.quantity;
+              item.variants = [];
             }
           }
           if (missingVariants.length > 0) {
@@ -717,41 +813,6 @@ Por favor, corrige las variantes y vuelve a intentar.`
             };
           }
 
-          // Enriquecer items
-          let enrichedItems = items;
-          if (
-            items.length > 0 &&
-            (!items[0].productName || !items[0].unitPrice || !items[0].subtotal)
-          ) {
-            const menu = await this.productsService.findAll({ locationId: validateLocationId });
-            enrichedItems = items.map(item => {
-              const product = menu.find(p => p.id === item.productId);
-              if (!product) {
-                throw new Error(`Producto no encontrado para ID: ${item.productId}`);
-              }
-              let unitPrice = product.price;
-              let variantName = undefined;
-              const allVariants = getAllVariants(product);
-              if (allVariants.length > 0 && item.variantName) {
-                const variant = allVariants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
-                if (variant) {
-                  unitPrice = variant.price ?? product.price;
-                  variantName = variant.name;
-                }
-              }
-              const subtotal = unitPrice * item.quantity;
-              return {
-                productId: product.id,
-                productName: product.name,
-                quantity: item.quantity,
-                unitPrice,
-                subtotal,
-                variantName: variantName || item.variantName,
-                notes: item.notes || ''
-              };
-            });
-          }
-
           // Validar que todos los campos requeridos estén presentes
           if (!customerName || !deliveryAddress || !phone || !neighborhood || !paymentMethod) {
             return {
@@ -760,14 +821,14 @@ Por favor, corrige las variantes y vuelve a intentar.`
           }
 
           // Validar que los items tengan la estructura correcta
-          if (!enrichedItems || enrichedItems.length === 0) {
+          if (!items || items.length === 0) {
             return {
               message: `🚨 *Orden vacía*\n\n❌ No hay productos en la orden. Por favor, selecciona al menos un producto.`
             };
           }
 
           // Validar que los cálculos sean correctos
-          const calculatedTotal = enrichedItems.reduce((sum, item) => sum + item.subtotal, 0);
+          const calculatedTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
           if (Math.abs(calculatedTotal - totalAmount) > 0.01) {
             return {
               message: `🚨 *Error en cálculos*\n\n❌ Error en los cálculos. Total calculado: $${calculatedTotal}, Total proporcionado: $${totalAmount}. Por favor, recalcula la orden.`
@@ -775,8 +836,8 @@ Por favor, corrige las variantes y vuelve a intentar.`
           }
 
           // Crear resumen final para confirmación con formato mejorado
-          const itemsSummary = enrichedItems.map((item, index) => 
-            `${index + 1}. *${item.productName}${item.variantName ? ' (' + item.variantName + ')' : ''}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
+          const itemsSummary = items.map((item, index) =>
+            `${index + 1}. *${item.productName}${item.variantSummary ? ' (' + item.variantSummary + ')' : ''}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
           ).join('\n');
 
           const formattedTotal = calculatedTotal.toLocaleString('es-CO', { 
@@ -805,12 +866,30 @@ Por favor, corrige las variantes y vuelve a intentar.`
             message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *\"Sí\"* o *\"Confirmo\"* para proceder con la orden.`,
             validated: true,
             orderData: {
-              items: enrichedItems.map(item => ({
-                productId: item.productId,
-                quantity: item.quantity,
-                variantName: item.variantName,
-                notes: item.notes
-              })),
+              items: items.map(item => {
+                const product = menu.find(p => p.id === item.productId);
+                const prod: any = product;
+                const variantGroups = prod.variantGroups || [];
+                let variants = [];
+                if (variantGroups.length > 0 && Array.isArray(item.variants)) {
+                  variants = variantGroups.map(group => {
+                    const selected = item.variants.find(v => v.groupName && normalizeName(v.groupName) === normalizeName(group.name));
+                    if (!selected) return null;
+                    const variant = group.variants.find(v => normalizeName(v.name) === normalizeName(selected.variantName));
+                    if (!variant) return null;
+                    return {
+                      productVariantId: variant.id,
+                      groupName: group.name
+                    };
+                  }).filter(Boolean);
+                }
+                return {
+                  productId: item.productId,
+                  quantity: item.quantity,
+                  variants,
+                  notes: item.notes
+                };
+              }),
               customerName,
               deliveryAddress,
               phone,
@@ -842,17 +921,59 @@ Por favor, corrige las variantes y vuelve a intentar.`
           // Validar variantes en los items
           for (const item of functionArgs.items) {
             const product = menu.find(p => p.id === item.productId);
-            const allVariants = getAllVariants(product);
-            if (allVariants.length > 0) {
-              if (!item.variantName) {
-                const variantNames = allVariants.map(v => v.name).join(', ');
-                throw new Error(`El producto *${product.name}* requiere que selecciones una variante. Opciones: ${variantNames}`);
+            const prod: any = product;
+            const variantGroups = prod.variantGroups || [];
+            // NUEVO: Si los variants ya traen productVariantId, no validar por nombre
+            if (Array.isArray(item.variants) && item.variants.length > 0 && item.variants.every(v => v.productVariantId)) {
+              // Validar que todos los IDs existan en el producto
+              for (const v of item.variants) {
+                const group = variantGroups.find(g => normalizeName(g.name) === normalizeName(v.groupName));
+                if (!group) {
+                  return { message: `El grupo de variante "${v.groupName}" no existe para el producto *${product.name}*.` };
+                }
+                const variant = group.variants.find(va => va.id === v.productVariantId);
+                if (!variant) {
+                  return { message: `La variante seleccionada para el grupo "${group.name}" no existe en el producto *${product.name}*.` };
+                }
               }
-              const variant = allVariants.find(v => v.name.toLowerCase() === item.variantName.toLowerCase());
-              if (!variant) {
-                const variantNames = allVariants.map(v => v.name).join(', ');
-                throw new Error(`La variante "${item.variantName}" no existe para el producto *${product.name}*. Opciones válidas: ${variantNames}`);
+              continue;
+            }
+            if (variantGroups.length > 0) {
+              if (!Array.isArray(item.variants)) item.variants = [];
+              const missingGroups = [];
+              let mappedVariants = [];
+              for (const group of variantGroups) {
+                const selected = item.variants.find(v => v.groupName && normalizeName(v.groupName) === normalizeName(group.name));
+                if (!selected || !selected.variantName || !normalizeName(selected.variantName)) {
+                  missingGroups.push({
+                    groupName: group.name,
+                    options: group.variants.map(v => v.name)
+                  });
+                } else {
+                  const variant = group.variants.find(v => normalizeName(v.name) === normalizeName(selected.variantName));
+                  if (!variant) {
+                    return {
+                      message: `La variante \"${selected.variantName}\" no existe para el grupo \"${group.name}\" en el producto *${product.name}*. Opciones válidas: ${group.variants.map(v => v.name).join(', ')}`
+                    };
+                  }
+                  mappedVariants.push({
+                    productVariantId: variant.id,
+                    groupName: group.name
+                  });
+                }
               }
+              if (missingGroups.length > 0) {
+                let askText = `Para *${product.name}* necesito que elijas una opción para cada grupo faltante:\n`;
+                for (const mg of missingGroups) {
+                  askText += `• *${mg.groupName}*: ${mg.options.join(', ')}\n`;
+                }
+                askText += '\nPor favor, dime tus elecciones (por ejemplo: "Ajiaco, Carne en Bistec, Arroz blanco, Mora").';
+                return {
+                  message: askText
+                };
+              }
+              // Asigna los variants mapeados por ID para la creación de la orden
+              item.variants = mappedVariants;
             }
           }
 
@@ -896,9 +1017,11 @@ Por favor, corrige las variantes y vuelve a intentar.`
           // Agrupar productos por categoría
           const categories: Record<string, { name: string; products: any[] }> = {};
           menu.forEach(product => {
-            const catId = product.category.id;
+            const prod: any = product; // Forzar tipado para evitar error de linter
+            if (!prod.category) return; // Omitir productos sin categoría
+            const catId = prod.category.id;
             if (!categories[catId]) {
-              categories[catId] = { name: product.category.name, products: [] };
+              categories[catId] = { name: prod.category.name, products: [] };
             }
             categories[catId].products.push(product);
           });
@@ -913,7 +1036,17 @@ Por favor, corrige las variantes y vuelve a intentar.`
             menuText += `\n\n**${cat.name}**\n\n`;
             for (const product of cat.products) {
               const price = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-              menuText += `${prodCount}. *${product.name}* - $${price}\n\n`;
+              menuText += `${prodCount}. *${product.name}* - $${price}\n`;
+              // NUEVO: Mostrar variantes si existen
+              const prod: any = product;
+              if (prod.variantGroups && prod.variantGroups.length > 0) {
+                for (const groupVar of prod.variantGroups) {
+                  if (groupVar.variants && groupVar.variants.length > 0) {
+                    menuText += `   - ${groupVar.name}: ${groupVar.variants.map(v => v.name).join(', ')}\n`;
+                  }
+                }
+              }
+              menuText += '\n';
               prodCount++;
             }
             menuText += '\n';

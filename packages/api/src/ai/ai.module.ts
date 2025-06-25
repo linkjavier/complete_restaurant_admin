@@ -5,6 +5,7 @@ import { OrdersModule } from '../orders/orders.module';
 import { ConfigModule } from '@nestjs/config';
 import { SettingsModule } from '../settings/settings.module';
 import { STTModule } from '../stt/stt.module';
+import { CategoriesModule } from '../categories/categories.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { STTModule } from '../stt/stt.module';
     forwardRef(() => OrdersModule),
     SettingsModule,
     STTModule,
+    CategoriesModule,
   ],
   providers: [AIGateway],
   exports: [AIGateway],

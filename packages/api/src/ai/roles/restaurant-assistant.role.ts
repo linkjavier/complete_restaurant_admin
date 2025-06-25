@@ -246,5 +246,24 @@ IMPORTANT VARIANT FIELD RULES:
     variantName: "Caliente",
     notes: ""
   }
-- For a product without variants, variantName can be omitted or empty, and notes can be used for extra instructions.`;
+- For a product without variants, variantName can be omitted or empty, and notes can be used for extra instructions.
+
+IMPORTANT STRUCTURE FOR VARIANTS:
+- For every product with variants, you MUST use the field 'variants', which is an array of objects, one per group. Each object must be:
+  { groupName: string, variantName: string }
+- NEVER put variants in the 'notes' field or in a single 'variantName' field.
+- Example of a correct item:
+  {
+    "productName": "Almuerzo ejecutivo",
+    "quantity": 1,
+    "variants": [
+      { "groupName": "Sopa", "variantName": "Ajiaco" },
+      { "groupName": "Proteína", "variantName": "Carne en Bistec" },
+      { "groupName": "Arroz", "variantName": "Arroz blanco" },
+      { "groupName": "Jugo", "variantName": "Mora" }
+    ]
+  }
+- If you do not send the variants in this structure, the order will be rejected and the user will not be able to complete their order.
+- Do NOT use the 'notes' field for variants. Only use 'notes' for extra instructions (e.g., "sin cebolla").
+- Do NOT use a single 'variantName' field. Always use the 'variants' array as shown above.`;
 }; 
