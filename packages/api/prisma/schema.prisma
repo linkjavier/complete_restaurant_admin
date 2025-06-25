@@ -191,6 +191,7 @@ model Order {
   source          OrderSource
   items           OrderItem[]
   payments        Payment[]
+  deliveryFee     Float?         // NUEVO: valor de domicilio por orden
 }
 
 enum OrderStatus {
@@ -319,6 +320,7 @@ model Settings {
   aiEnabled    Boolean  @default(false)
   businessName String   @default("Kutchen AI")
   businessLogo String?
+  deliveryFee  Float?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

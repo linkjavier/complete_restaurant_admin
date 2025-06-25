@@ -113,7 +113,10 @@ export class OrdersService {
 
       const order = await this.prisma.$transaction(async (tx) => {
         const newOrder = await tx.order.create({
-          data: orderCreateData,
+          data: {
+            ...orderCreateData,
+            deliveryFee: createOrderDto.deliveryFee ?? 0,
+          },
           include: {
             items: {
               include: {

@@ -20,6 +20,7 @@ export default function SettingsPage() {
   const [aiName, setAiName] = useState("")
   const [aiGender, setAiGender] = useState("")
   const [aiEnabled, setAiEnabled] = useState(false)
+  const [deliveryFee, setDeliveryFee] = useState<number>(0)
 
   const { toast } = useToast()
 
@@ -44,6 +45,7 @@ export default function SettingsPage() {
         setAiName(data.name)
         setAiGender(data.gender)
         setAiEnabled(data.enabled)
+        setDeliveryFee(data.deliveryFee ?? 0)
       }
     } catch (error) {
       toast({
@@ -101,6 +103,7 @@ export default function SettingsPage() {
           name: aiName,
           gender: aiGender,
           enabled: aiEnabled,
+          deliveryFee,
         }),
       })
 
@@ -233,6 +236,19 @@ export default function SettingsPage() {
                 disabled={isSaving}
               />
               <Label htmlFor="ai-enabled">Activar Asistente IA</Label>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="delivery-fee">Valor de domicilio ($COP)</Label>
+              <Input
+                id="delivery-fee"
+                type="number"
+                min={0}
+                value={deliveryFee}
+                onChange={e => setDeliveryFee(Number(e.target.value))}
+                disabled={isSaving}
+                className="w-32"
+              />
             </div>
 
             <Button 

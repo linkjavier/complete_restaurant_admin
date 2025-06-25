@@ -659,6 +659,12 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           let totalAmount = 0;
           const errors = [];
           const variantRequests = [];
+          let deliveryFee = 0;
+          
+          // Obtener el valor de domicilio desde la configuración
+          if (chatType === 'whatsapp') {
+            deliveryFee = await this.settingsService.getDeliveryFee();
+          }
 
           for (const item of items) {
             console.log(`[AI Gateway] calculate_order_subtotal: Processing item:`, item);
@@ -774,15 +780,20 @@ Por favor, corrige los nombres de los productos y vuelve a intentar.`
             `${index + 1}. *${item.productName}${item.variantSummary ? ' (' + item.variantSummary + ')' : ''}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
           ).join('\n');
 
-          const formattedTotal = totalAmount.toLocaleString('es-CO', { 
+          const formattedTotal = (totalAmount + deliveryFee).toLocaleString('es-CO', { 
             minimumFractionDigits: 0, 
             maximumFractionDigits: 0 
           });
 
+          let deliveryFeeText = '';
+          if (deliveryFee > 0) {
+            deliveryFeeText = `\n🚚 *Domicilio:* $${deliveryFee.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+          }
+
           const result = {
-            message: `📋 *Resumen de tu Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ Todos los productos fueron validados correctamente.\n\n¿Deseas agregar algo más a tu orden o procedemos con tus datos de entrega?`,
+            message: `📋 *Resumen de tu Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ Todos los productos fueron validados correctamente.\n\n¿Deseas agregar algo más a tu orden o procedemos con tus datos de entrega?`,
             validatedItems,
-            totalAmount
+            totalAmount: totalAmount + deliveryFee
           };
 
           console.log(`[AI Gateway] calculate_order_subtotal: Returning result with message length: ${result.message.length}`);
@@ -799,6 +810,9 @@ Por favor, corrige los nombres de los productos y vuelve a intentar.`
         try {
           const { items, totalAmount, customerName, deliveryAddress, phone, neighborhood, paymentMethod, locationId: validateLocationId } = functionArgs;
           const menu = await this.productsService.findAll({ locationId: validateLocationId });
+
+          // Obtener el valor de domicilio desde la configuración
+          const deliveryFee = await this.settingsService.getDeliveryFee();
 
           // Validar variantes en los items
           const missingVariants = [];
@@ -881,21 +895,30 @@ Por favor, corrige las variantes y vuelve a intentar.`
 
           // Validar que los cálculos sean correctos
           const calculatedTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+          // Ahora solo comparo el subtotal de productos
           if (Math.abs(calculatedTotal - totalAmount) > 0.01) {
             return {
-              message: `🚨 *Error en cálculos*\n\n❌ Error en los cálculos. Total calculado: $${calculatedTotal}, Total proporcionado: $${totalAmount}. Por favor, recalcula la orden.`
+              message: `🚨 *Error en cálculos*\n\n❌ Error en los cálculos. Subtotal calculado: $${calculatedTotal}, Subtotal proporcionado: $${totalAmount}. Por favor, recalcula la orden.`
             };
           }
+
+          // El total mostrado y guardado sí suma el domicilio
+          const totalWithDelivery = calculatedTotal + deliveryFee;
 
           // Crear resumen final para confirmación con formato mejorado
           const itemsSummary = items.map((item, index) =>
             `${index + 1}. *${item.productName}${item.variantSummary ? ' (' + item.variantSummary + ')' : ''}*\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`
           ).join('\n');
 
-          const formattedTotal = calculatedTotal.toLocaleString('es-CO', { 
+          const formattedTotal = totalWithDelivery.toLocaleString('es-CO', { 
             minimumFractionDigits: 0, 
             maximumFractionDigits: 0 
           });
+
+          let deliveryFeeText = '';
+          if (deliveryFee > 0) {
+            deliveryFeeText = `\n🚚 *Domicilio:* $${deliveryFee.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+          }
 
           // Mapear métodos de pago a emojis
           const paymentEmojis = {
@@ -915,7 +938,7 @@ Por favor, corrige las variantes y vuelve a intentar.`
           const customerInfo = `👤 *Datos del Cliente*\n━━━━━━━━━━━━━━━━━━━━━━━━\n• *Nombre:* ${customerName}\n• *Dirección:* ${deliveryAddress}\n• *Teléfono:* ${phone}\n• *Barrio:* ${neighborhood}\n• *Método de pago:* ${paymentEmojis[paymentMethod]} ${paymentDisplay[paymentMethod]}`;
 
           return {
-            message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *\"Sí\"* o *\"Confirmo\"* para proceder con la orden.`,
+            message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *\"Sí\"* o *\"Confirmo\"* para proceder con la orden.`,
             validated: true,
             orderData: {
               items: items.map(item => {
@@ -947,7 +970,8 @@ Por favor, corrige las variantes y vuelve a intentar.`
               phone,
               neighborhood,
               paymentMethod,
-              locationId: validateLocationId
+              locationId: validateLocationId,
+              deliveryFee
             }
           };
         } catch (error) {
@@ -967,6 +991,10 @@ Por favor, corrige las variantes y vuelve a intentar.`
           if (!functionArgs.customerName) {
             throw new Error('Customer name is required');
           }
+          
+          // Obtener el valor de domicilio desde la configuración
+          const deliveryFee = await this.settingsService.getDeliveryFee();
+          
           const menu = await this.productsService.findAll({ locationId });
           const validProductIds = new Set(menu.map(product => product.id));
 
@@ -1046,6 +1074,7 @@ Por favor, corrige las variantes y vuelve a intentar.`
             status: 'PENDING',
             tableId: undefined, // Ensure tableId is not set for delivery orders
             source: 'WHATSAPP',
+            deliveryFee, // NUEVO: pasar valor de domicilio
           });
 
           return {
