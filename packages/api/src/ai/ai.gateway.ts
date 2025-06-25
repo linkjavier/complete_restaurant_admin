@@ -52,6 +52,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private conversations: Map<string, OpenAI.Chat.ChatCompletionMessageParam[]> = new Map();
   private locationIds: Map<string, string> = new Map();
   private chatTypes: Map<string, 'whatsapp' | 'ai' | 'admin'> = new Map();
+  private orderState: Map<string, { items: any[]; customerData: any; step: string }> = new Map();
 
   constructor(
     private configService: ConfigService,
@@ -239,6 +240,50 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (chatType === 'whatsapp') {
         return '';
       }
+    }
+    // --- FIN NUEVO ---
+
+    // --- NUEVO: Manejo de estado persistente de orden ---
+    let state = this.orderState.get(conversationIdMenu) || { items: [], customerData: {}, step: 'products' };
+    // Si el usuario agrega productos
+    if (menuKeywords.some(k => normalizedText.includes(k))) {
+      // Aquí deberías parsear el producto del mensaje y agregarlo a state.items
+      // (esto requiere lógica de NLP o confiar en la IA para estructurar el producto)
+      // Por ahora, solo simula que se agregó un producto
+      // state.items.push({ ...nuevoProducto })
+      state.step = 'products';
+      this.orderState.set(conversationIdMenu, state);
+    }
+    // Si el usuario da datos de cliente
+    if (text.toLowerCase().includes('nombre') || text.toLowerCase().includes('dirección') || text.toLowerCase().includes('teléfono') || text.toLowerCase().includes('barrio') || text.toLowerCase().includes('pago')) {
+      // Parsear y guardar los datos en state.customerData
+      // (esto requiere lógica de NLP o confiar en la IA para estructurar los datos)
+      state.customerData = { ...state.customerData, ...{/* datos parseados */} };
+      state.step = 'customerData';
+      this.orderState.set(conversationIdMenu, state);
+    }
+    // Si ya hay datos de cliente y productos, solo pide confirmación
+    if (state.items.length > 0 && Object.keys(state.customerData).length > 0) {
+      state.step = 'confirm';
+      this.orderState.set(conversationIdMenu, state);
+      // Mostrar resumen y pedir confirmación
+      if ('emit' in client) {
+        client.emit('ai_response', {
+          type: 'text',
+          content: 'Aquí tienes el resumen actualizado de tu pedido. ¿Confirmas que todo está correcto?'
+        });
+      }
+      return 'Aquí tienes el resumen actualizado de tu pedido. ¿Confirmas que todo está correcto?';
+    }
+    // Si falta algún dato, solo pide lo que falta
+    if (state.items.length > 0 && state.step === 'products') {
+      if ('emit' in client) {
+        client.emit('ai_response', {
+          type: 'text',
+          content: 'Por favor, proporciona tus datos de entrega para continuar.'
+        });
+      }
+      return 'Por favor, proporciona tus datos de entrega para continuar.';
     }
     // --- FIN NUEVO ---
 
@@ -677,7 +722,14 @@ ${invalidGroups.join('\n')}`);
                 subtotal,
                 variants: item.variants,
                 notes: item.notes || '',
-                variantSummary: variantSummary.join(', ')
+                variantSummary: variantSummary.map(v => {
+                  // Si ya viene en formato 'Grupo: Variante', lo separamos
+                  const parts = v.split(':');
+                  if (parts.length === 2) {
+                    return `**${parts[0].trim()}**: ${parts[1].trim()}`;
+                  }
+                  return v;
+                }).join(', ')
               });
               continue;
             }
