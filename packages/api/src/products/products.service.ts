@@ -1,13 +1,13 @@
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import type { Product } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
   constructor(private prisma: PrismaService) {}
 
-  async create(data: any): Promise<Product> {
+  async create(data: any): Promise<any> {
     try {
       this.logger.debug(`Creating product with data: ${JSON.stringify(data)}`);
       const { ingredients, variantGroups, ...productData } = data;
@@ -93,7 +93,10 @@ export class ProductsService {
         include: {
           category: true,
           variantGroups: {
-            include: { variants: true },
+            where: { isActive: true },
+            include: {
+              variants: { where: { isActive: true } }
+            },
             orderBy: { order: 'asc' }
           },
           ingredients: { include: { ingredient: true } },
@@ -105,7 +108,7 @@ export class ProductsService {
     }
   }
 
-  async findOne(id: string): Promise<Product | null> {
+  async findOne(id: string): Promise<any> {
     try {
       return this.prisma.product.findUnique({
         where: { id },
@@ -113,7 +116,10 @@ export class ProductsService {
           category: true,
           ingredients: { include: { ingredient: true } },
           variantGroups: {
-            include: { variants: true },
+            where: { isActive: true },
+            include: {
+              variants: { where: { isActive: true } }
+            },
             orderBy: { order: 'asc' }
           },
         },
@@ -124,7 +130,7 @@ export class ProductsService {
     }
   }
 
-  async update(id: string, data: any): Promise<Product> {
+  async update(id: string, data: any): Promise<any> {
     try {
       const { ingredients, variantGroups, categoryId, locationId, ...productData } = data;
       if (categoryId) productData.category = { connect: { id: categoryId } };
@@ -147,12 +153,12 @@ export class ProductsService {
         }
         // 3. Grupos de variantes y variantes
         if (variantGroups) {
-          // Eliminar grupos y variantes existentes
+          // Borrado lógico de variantes y grupos de variantes
           const oldGroups = await tx.productVariantGroup.findMany({ where: { productId: id } });
           for (const group of oldGroups) {
-            await tx.productVariant.deleteMany({ where: { groupId: group.id } });
+            await tx.productVariant.updateMany({ where: { groupId: group.id }, data: { isActive: false } });
           }
-          await tx.productVariantGroup.deleteMany({ where: { productId: id } });
+          await tx.productVariantGroup.updateMany({ where: { productId: id }, data: { isActive: false } });
           // Crear nuevos grupos y variantes
           for (const group of variantGroups) {
             const groupRecord = await tx.productVariantGroup.create({
@@ -160,6 +166,7 @@ export class ProductsService {
                 name: group.name,
                 order: group.order ?? 0,
                 productId: product.id,
+                isActive: true,
               },
             });
             if (group.variants && group.variants.length > 0) {
@@ -197,7 +204,7 @@ export class ProductsService {
     }
   }
 
-  async remove(id: string): Promise<Product> {
+  async remove(id: string): Promise<any> {
     try {
       // Obtener el producto antes de eliminarlo
       const product = await this.findOne(id);

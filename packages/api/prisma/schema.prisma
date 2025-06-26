@@ -56,8 +56,8 @@ model Location {
   updatedAt        DateTime          @updatedAt
   order            Int               @default(0)
 
-  @@map("locations")
   @@index([order])
+  @@map("locations")
 }
 
 model Table {
@@ -81,25 +81,25 @@ enum TableStatus {
 }
 
 model Product {
-  id          String              @id @default(cuid())
-  name        String
-  description String?
-  price       Float
-  image       String?
-  category    Category            @relation(fields: [categoryId], references: [id])
-  categoryId  String
-  isActive    Boolean             @default(true)
-  isFinal     Boolean             @default(false) // true if it's a processed product
-  quantity    Float               @default(0) // current stock quantity
-  location    Location            @relation(fields: [locationId], references: [id])
-  locationId  String
-  ingredients ProductIngredient[]
-  orderItems  OrderItem[]
-  productions ProductionLog[]
-  variants    ProductVariant[]
+  id            String                @id @default(cuid())
+  name          String
+  description   String?
+  price         Float
+  image         String?
+  category      Category              @relation(fields: [categoryId], references: [id])
+  categoryId    String
+  isActive      Boolean               @default(true)
+  isFinal       Boolean               @default(false) // true if it's a processed product
+  quantity      Float                 @default(0) // current stock quantity
+  location      Location              @relation(fields: [locationId], references: [id])
+  locationId    String
+  ingredients   ProductIngredient[]
+  orderItems    OrderItem[]
+  productions   ProductionLog[]
+  variants      ProductVariant[]
   variantGroups ProductVariantGroup[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 }
 
 model Category {
@@ -107,9 +107,9 @@ model Category {
   name        String
   description String?
   products    Product[]
-  order       Int         @default(0)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([order])
 }
@@ -203,23 +203,23 @@ enum OrderStatus {
 }
 
 model OrderItem {
-  id               String          @id @default(cuid())
-  order            Order           @relation(fields: [orderId], references: [id])
-  orderId          String
-  product          Product         @relation(fields: [productId], references: [id])
-  productId        String
-  quantity         Int
-  status           OrderItemStatus @default(PENDING)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  variants         OrderItemVariant[]
+  id        String             @id @default(cuid())
+  order     Order              @relation(fields: [orderId], references: [id])
+  orderId   String
+  product   Product            @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Int
+  status    OrderItemStatus    @default(PENDING)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  variants  OrderItemVariant[]
 }
 
 model OrderItemVariant {
-  id               String          @id @default(cuid())
-  orderItem        OrderItem       @relation(fields: [orderItemId], references: [id])
+  id               String         @id @default(cuid())
+  orderItem        OrderItem      @relation(fields: [orderItemId], references: [id])
   orderItemId      String
-  productVariant   ProductVariant  @relation(fields: [productVariantId], references: [id])
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
   productVariantId String
   groupName        String?
 }
@@ -326,29 +326,30 @@ model Settings {
 }
 
 model ProductVariantGroup {
-  id        String          @id @default(cuid())
+  id        String           @id @default(cuid())
   name      String
-  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId String
   variants  ProductVariant[]
-  order     Int             @default(0)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  order     Int              @default(0)
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 }
 
 model ProductVariant {
-  id         String                @id @default(cuid())
-  name       String
-  price      Float?
-  image      String?
-  isActive   Boolean               @default(true)
-  group      ProductVariantGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  groupId    String
-  product    Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId  String
+  id                String              @id @default(cuid())
+  name              String
+  price             Float?
+  image             String?
+  isActive          Boolean             @default(true)
+  group             ProductVariantGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId           String
+  product           Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId         String
   orderItemVariants OrderItemVariant[]
-  createdAt  DateTime              @default(now())
-  updatedAt  DateTime              @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   @@index([groupId])
   @@index([productId])

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CSV_FILE="scripts/productos_completos3_20250625_201409.csv"
+CSV_FILE="scripts/productos_completos3_20250626_012324.csv"
 # CSV_FILE=$(ls -t $CSV_FILE | head -n 1) # Usar el más reciente
 
 # Crear usuario si no existe y obtener token

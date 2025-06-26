@@ -480,32 +480,36 @@ export async function getOrders(locationId?: string) {
   return response.json();
 }
 
-export async function createOrder(data: {
-  tableId?: string;
-  locationId: string;
-  userId?: string;
-  type: 'TABLE' | 'TAKEOUT' | 'DELIVERY';
-  items: Array<{
-    productId: string;
-    quantity: number;
-    productVariantId?: string;
-  }>;
-  status?: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'DELIVERED' | 'CANCELLED';
-  isPaid?: boolean;
-  customerName?: string;
-  deliveryAddress?: string;
-  neighborhood?: string;
-  phone?: string;
-  paymentMethod?: 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'TRANSFER';
-  source?: 'POS' | 'QR' | 'WHATSAPP';
-}) {
+export async function createOrder(data: any) {
+  // Adaptar items con variantes múltiples al formato backend y asegurar que 'variants' siempre es array
+  const items = (data.items || []).map((item: any) => {
+    // Si ya tiene 'variants' como array, transformar
+    if (Array.isArray(item.variants)) {
+      return {
+        ...item,
+        variants: item.variants.map((v: any) => ({
+          productVariantId: v.productVariantId || v.id,
+          groupName: v.groupName || undefined,
+        })),
+      };
+    } else if (item.variant) {
+      // Si tiene solo 'variant', transformar a array
+      return {
+        ...item,
+        variants: [{ productVariantId: item.variant.id, groupName: item.variant.groupName }],
+      };
+    }
+    // Si no tiene variantes, poner variants como array vacío
+    return { ...item, variants: [] };
+  });
+  const payload = { ...data, items };
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
     method: 'POST',
     headers: {
       ...getAuthHeaders(),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     throw new Error('Failed to create order');
