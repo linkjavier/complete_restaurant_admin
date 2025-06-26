@@ -427,6 +427,9 @@ chmod +x ./scripts/seed-database.sh && ./scripts/seed-database.sh
 # Seed database (Tambien funciona con paola2. Nuevo)
 chmod +x ./scripts/seed-database-paola.sh && ./scripts/seed-database-paola.sh
 
+# Script para manejar creación de productos con variantes. Funciona con export 3
+chmod +x ./scripts/seed-database-paola3.sh && ./scripts/seed-database-paola3.sh
+
 # Seed database with images
 chmod +x ./scripts/seed-database-with-images.sh && ./scripts/seed-database-with-images.sh
 ```
