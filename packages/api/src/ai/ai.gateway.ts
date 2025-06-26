@@ -249,8 +249,12 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (menuKeywords.some(k => normalizedText.includes(k))) {
       // Aquí deberías parsear el producto del mensaje y agregarlo a state.items
       // (esto requiere lógica de NLP o confiar en la IA para estructurar el producto)
+      // Si la IA solo envía un producto, suma ese producto a la lista anterior (salvo que el usuario diga explícitamente que quiere reemplazar o eliminar)
       // Por ahora, solo simula que se agregó un producto
       // state.items.push({ ...nuevoProducto })
+      // --- REFORZADO: Siempre mantener la lista acumulada de productos ---
+      // Si el mensaje parece ser "agregar" o "sumar", acumula; si es "cambiar" o "eliminar", reemplaza o elimina
+      // (esto puede mejorarse con NLP, aquí solo se documenta la intención)
       state.step = 'products';
       this.orderState.set(conversationIdMenu, state);
     }
@@ -287,34 +291,52 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     // --- FIN NUEVO ---
 
+    // --- NUEVO: Buscar productos específicos antes de mostrar el menú completo ---
     if (
       chatType !== 'admin' &&
       menuKeywords.some(k => normalizedText.includes(k)) &&
-      !isVariantPrompt // NUEVO: solo mostrar menú si NO estamos esperando variantes
+      !isVariantPrompt
     ) {
-      // Responder directamente con el menú
+      // Intentar buscar productos por el texto del usuario antes de mostrar el menú completo
       try {
         const menu = await this.productsService.findAll({ locationId });
-        if (!menu || menu.length === 0) {
+        // Buscar productos que coincidan con el texto del usuario (nombre parcial)
+        const matchingProducts = menu.filter(product =>
+          product.name.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').includes(normalizedText)
+        );
+        if (matchingProducts.length > 0 && normalizedText.length > 2) {
+          // Si hay coincidencias, responder solo con esos productos
+          let response = '';
+          if (matchingProducts.length === 1) {
+            const product = matchingProducts[0];
+            const formattedPrice = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            response = `✅ *Producto Encontrado*\n\n🍽️ *${product.name}*\n💰 Precio: *$${formattedPrice}*\n🆔 ID: \`${product.id}\`\n\n¡Perfecto! Este producto está disponible.`;
+          } else {
+            const productList = matchingProducts.map((product, index) => {
+              const formattedPrice = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+              return `${index + 1}. *${product.name}*\n   💰 $${formattedPrice} | 🆔 \`${product.id}\``;
+            }).join('\n');
+            response = `🔍 *Búsqueda de Producto*\n\nSe encontraron *${matchingProducts.length}* productos que coinciden con tu búsqueda:\n\n${productList}\n\n¿Te gustaría pedir alguno de estos productos?`;
+          }
           if ('emit' in client) {
             client.emit('ai_response', {
               type: 'text',
-              content: 'No se encontró ningún producto en el menú para esta ubicación.'
+              content: response
             });
           }
-          return 'No se encontró ningún producto en el menú para esta ubicación.';
+          return response;
         }
-        // Obtener categorías ordenadas
+        // Si no hay coincidencias, mostrar el menú completo respetando el orden de categorías
+        // Obtener categorías ordenadas por el campo 'order' (definido por el admin en settings)
         const categories = await this.categoriesService.categories({ orderBy: { order: 'asc' } });
-        // Agrupar productos por categoría
+        // Agrupar productos por categoría usando solo categoryId
         const categoriesMap = {};
         for (const cat of categories) {
           categoriesMap[cat.id] = { name: cat.name, products: [] };
         }
         menu.forEach(product => {
-          const prod: any = product;
-          if (!prod.category) return;
-          const catId = prod.category.id;
+          const catId = product.categoryId;
+          if (!catId) return;
           if (categoriesMap[catId]) {
             categoriesMap[catId].products.push(product);
           }
@@ -328,8 +350,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           for (const product of group.products) {
             const price = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             menuText += `${prodCount}. *${product.name}* - $${price}\n`;
-            // NUEVO: Mostrar variantes si existen
-            const prod: any = product;
+            // Mostrar variantes si existen
+            const prod = product;
             if (prod.variantGroups && prod.variantGroups.length > 0) {
               for (const groupVar of prod.variantGroups) {
                 if (groupVar.variants && groupVar.variants.length > 0) {
@@ -351,13 +373,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
         return menuText;
       } catch (error) {
-        if ('emit' in client) {
-          client.emit('ai_response', {
-            type: 'text',
-            content: `❌ Error obteniendo el menú: ${error.message}`
-          });
-        }
-        return `❌ Error obteniendo el menú: ${error.message}`;
+        // Si hay error, continuar con el flujo normal
+        console.error('Error buscando productos antes de mostrar menú:', error);
       }
     }
 
@@ -1095,31 +1112,32 @@ Por favor, corrige las variantes y vuelve a intentar.`
             return { message: 'No se encontró ningún producto en el menú para esta ubicación.' };
           }
 
-          // Agrupar productos por categoría
+          // Obtener categorías ordenadas por 'order'
+          const categoriesList = await this.categoriesService.categories({ orderBy: { order: 'asc' } });
           const categories: Record<string, { name: string; products: any[] }> = {};
+          for (const cat of categoriesList) {
+            categories[cat.id] = { name: cat.name, products: [] };
+          }
           menu.forEach(product => {
-            const prod: any = product; // Forzar tipado para evitar error de linter
-            if (!prod.category) return; // Omitir productos sin categoría
-            const catId = prod.category.id;
+            const catId = product.categoryId;
+            if (!catId) return;
             if (!categories[catId]) {
-              categories[catId] = { name: prod.category.name, products: [] };
+              categories[catId] = { name: '', products: [] };
             }
             categories[catId].products.push(product);
           });
 
           let menuText = 'Te comparto el 🍽️ *Menú del Restaurante*\n';
           let prodCount = 1;
-          const allCategories = Object.values(categories) as { name: string; products: any[] }[];
-          const bebidas = allCategories.filter(cat => cat.name.toLowerCase().includes('bebida'));
-          const otras = allCategories.filter(cat => !cat.name.toLowerCase().includes('bebida'));
-          const orderedCategories = [...otras, ...bebidas];
-          for (const cat of orderedCategories) {
-            menuText += `\n\n**${cat.name}**\n\n`;
-            for (const product of cat.products) {
+          for (const cat of categoriesList) {
+            const group = categories[cat.id];
+            if (!group || group.products.length === 0) continue;
+            menuText += `\n\n**${group.name}**\n\n`;
+            for (const product of group.products) {
               const price = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
               menuText += `${prodCount}. *${product.name}* - $${price}\n`;
               // NUEVO: Mostrar variantes si existen
-              const prod: any = product;
+              const prod = product;
               if (prod.variantGroups && prod.variantGroups.length > 0) {
                 for (const groupVar of prod.variantGroups) {
                   if (groupVar.variants && groupVar.variants.length > 0) {
