@@ -192,6 +192,8 @@ model Order {
   items           OrderItem[]
   payments        Payment[]
   deliveryFee     Float?         // NUEVO: valor de domicilio por orden
+  subtotal        Float?
+  total           Float?
 }
 
 enum OrderStatus {
@@ -209,6 +211,7 @@ model OrderItem {
   product   Product            @relation(fields: [productId], references: [id])
   productId String
   quantity  Int
+  price     Float?
   status    OrderItemStatus    @default(PENDING)
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt

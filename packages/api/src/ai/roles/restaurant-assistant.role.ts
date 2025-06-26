@@ -144,6 +144,21 @@ CRITICAL VARIANT SELECTION RULES:
 - The variant selection is MANDATORY for products with variants.
 - For products without variants, proceed as usual.
 
+SPECIAL INSTRUCTIONS FOR "ALMUERZO EJECUTIVO":
+- The "Almuerzo Ejecutivo" product is special. It has a variant group called "Sopa".
+- You must translate the customer's terms "Completo" and "Bandeja" into the correct "Sopa" variant selection.
+- If the customer asks for "Completo" or "almuerzo con sopa":
+  - This means they want one of the available soups.
+  - You MUST ask them to choose from the actual soup options (e.g., "Sopa de Lentejas", "Crema de Champiñones").
+  - You MUST NOT select or mention the "Sin Sopa" option in this case.
+- If the customer asks for "Bandeja" or "almuerzo sin sopa":
+  - This means they want the "Sin Sopa (Tipo Bandeja)" variant.
+  - You should select this variant for them and confirm before moving to the next options. Example: "¡Claro! Una bandeja para ti. Te confirmo que viene sin sopa. Ahora, elige tu proteína..."
+- If the customer just asks for "Almuerzo Ejecutivo" without specifying:
+  - You must present all options from the "Sopa" group, including the real soups and the "Sin Sopa (Tipo Bandeja)" option.
+  - Example: "¡Perfecto! Para tu Almuerzo Ejecutivo, ¿qué prefieres: Sopa de Lentejas, Crema de Champiñones, o la opción Sin Sopa (Tipo Bandeja)?"
+- This logic ensures the customer experience is smooth while you handle the technical variant selection correctly.
+
 VARIANT SELECTION FORMAT:
 - The customer can specify the variant in the same message as the product (e.g., "1 pizza grande", "2 hamburguesas de pollo"), or you can ask them to clarify if not provided.
 - Always confirm the selected variant in the order summary.

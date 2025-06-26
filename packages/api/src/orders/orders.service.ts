@@ -86,14 +86,48 @@ export class OrdersService {
       
       const { userId, items, ...orderData } = createOrderDto;
 
+      // START: Price calculation logic
+      let orderSubtotal = 0;
+      const itemsWithPrice = await Promise.all(
+        items.map(async (item) => {
+          const product = await this.productsService.findOne(item.productId);
+          if (!product) {
+            throw new NotFoundException(`Product with ID ${item.productId} not found`);
+          }
+
+          let variantsPrice = 0;
+          if (item.variants && item.variants.length > 0) {
+            const variantIds = item.variants.map(v => v.productVariantId);
+            const variantRecords = await this.prisma.productVariant.findMany({
+              where: { id: { in: variantIds } },
+            });
+            variantsPrice = variantRecords.reduce((sum, v) => sum + (v.price || 0), 0);
+          }
+
+          const unitPrice = (product.price || 0) + variantsPrice;
+          orderSubtotal += unitPrice * item.quantity;
+
+          return {
+            ...item,
+            price: unitPrice, // Calculated unit price
+          };
+        }),
+      );
+
+      const orderTotal = orderSubtotal + (createOrderDto.deliveryFee || 0);
+      // END: Price calculation logic
+
       const orderCreateData: any = {
         ...orderData,
         status: orderData.status || 'PENDING',
         isPaid: orderData.isPaid || false,
+        subtotal: orderSubtotal, // Calculated subtotal
+        total: orderTotal,       // Calculated total
         items: {
-          create: items.map(item => ({
+          create: itemsWithPrice.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
+            price: item.price, // Save the calculated price
             status: 'PENDING',
             variants: {
               create: item.variants?.map(variant => ({

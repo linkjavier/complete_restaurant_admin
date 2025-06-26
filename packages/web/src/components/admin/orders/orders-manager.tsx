@@ -72,6 +72,7 @@ interface Order {
   phone?: string
   source?: string
   deliveryFee?: number
+  subtotal?: number
 }
 
 export function OrdersManager() {
@@ -633,9 +634,7 @@ export function OrdersManager() {
                                       )}
                                       <div className="ml-4 text-xs text-muted-foreground mt-1">
                                         {item.quantity} x $
-                                        {item.productVariant?.price
-                                          ? item.productVariant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })
-                                          : item.product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {(item.price || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </div>
                                       {item.notes && (
                                         <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -644,7 +643,7 @@ export function OrdersManager() {
                                       )}
                                     </div>
                                     <Badge variant="outline" className="mt-2">
-                                      ${((item.productVariant?.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                      ${((item.price || 0) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                     </Badge>
                                   </div>
                                 ))}
@@ -656,7 +655,7 @@ export function OrdersManager() {
                                     <div className="flex justify-between items-center text-sm">
                                       <span className="font-medium">Subtotal:</span>
                                       <span className="font-medium">
-                                        ${calculateOrderSubtotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        ${(order.subtotal || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </span>
                                     </div>
                                     <div className="flex justify-between items-center text-sm mt-1">
@@ -668,7 +667,7 @@ export function OrdersManager() {
                                     <div className="flex justify-between items-center mt-2">
                                       <span className="font-bold">Total:</span>
                                       <span className="font-bold">
-                                        ${calculateOrderTotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        ${(order.total || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </span>
                                     </div>
                                   </>
@@ -676,7 +675,7 @@ export function OrdersManager() {
                                   <div className="flex justify-between items-center mt-2">
                                     <span className="font-bold">Total:</span>
                                     <span className="font-bold">
-                                      ${calculateOrderTotal(order).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                      ${(order.total || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                     </span>
                                   </div>
                                 )}
