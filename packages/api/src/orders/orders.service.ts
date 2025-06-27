@@ -201,7 +201,7 @@ export class OrdersService {
     }
   }
 
-  async findAll(locationId?: string, tableId?: string, kitchen?: boolean) {
+  async findAll(locationId?: string, tableId?: string, kitchen?: boolean, showDeleted = false) {
     const where: Prisma.OrderWhereInput = {};
 
     if (locationId) {
@@ -222,12 +222,23 @@ export class OrdersService {
       };
     }
 
+    // Soft delete filter
+    if (!showDeleted) {
+      where.OR = [
+        { isDeleted: false },
+        { isDeleted: null },
+      ];
+    } else {
+      where.isDeleted = true;
+    }
+
     return this.prisma.order.findMany({
       where,
       include: {
         table: true,
         location: true,
         user: true,
+        deletedBy: true,
         items: {
           include: {
             product: true,
@@ -392,7 +403,7 @@ export class OrdersService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, deletedById?: string) {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id },
@@ -406,11 +417,15 @@ export class OrdersService {
         throw new NotFoundException(`Order with ID ${id} not found`);
       }
 
-      const deletedOrder = await this.prisma.order.delete({
+      const deletedOrder = await this.prisma.order.update({
         where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedById: deletedById || null,
+        },
       });
-      
-      this.logger.log(`Order ${id} deleted successfully`);
+      this.logger.log(`Order ${id} marked as deleted successfully`);
       return deletedOrder;
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -419,5 +434,9 @@ export class OrdersService {
       this.logger.error(`Error removing order ${id}: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  async findDeleted(locationId?: string) {
+    return this.findAll(locationId, undefined, false, true);
   }
 }

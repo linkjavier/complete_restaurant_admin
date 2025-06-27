@@ -9,6 +9,7 @@ import {
   Query,
   BadRequestException,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -16,6 +17,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
+import { Request } from 'express';
 
 
 @ApiTags('orders')
@@ -62,8 +64,19 @@ export class OrdersController {
     return this.ordersService.updateItemStatus(orderId, itemId, status);
   }
 
+  @Patch(':id/delete')
+  removeSoft(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req.user as any)?.id;
+    return this.ordersService.remove(id, userId);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.ordersService.remove(id);
+  }
+
+  @Get('/deleted/list')
+  findDeleted(@Query('locationId') locationId?: string) {
+    return this.ordersService.findDeleted(locationId);
   }
 } 

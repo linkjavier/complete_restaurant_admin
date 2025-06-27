@@ -22,7 +22,8 @@ model User {
   avatar        String?
   location      Location?      @relation(fields: [locationId], references: [id])
   locationId    String?
-  orders        Order[]
+  orders        Order[]        @relation("orderUser")
+  deletedOrders Order[]        @relation("orderDeletedBy")
   notifications Notification[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -181,7 +182,7 @@ model Order {
   type            OrderType      @default(TABLE)
   status          OrderStatus    @default(PENDING)
   isPaid          Boolean        @default(false)
-  user            User?          @relation(fields: [userId], references: [id])
+  user            User?          @relation("orderUser", fields: [userId], references: [id])
   userId          String?
   customerName    String?
   deliveryAddress String?
@@ -194,6 +195,10 @@ model Order {
   deliveryFee     Float?         // NUEVO: valor de domicilio por orden
   subtotal        Float?
   total           Float?
+  isDeleted       Boolean?   @default(false)
+  deletedAt       DateTime?
+  deletedById     String?
+  deletedBy       User?      @relation("orderDeletedBy", fields: [deletedById], references: [id])
 }
 
 enum OrderStatus {

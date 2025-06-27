@@ -21,6 +21,7 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { CategoriesService } from '../categories/categories.service';
+import { OrderType, OrderSource } from '../orders/dto/create-order.dto';
 
 // Utilidad para obtener todas las variantes de todos los grupos
 function getAllVariants(product) {
@@ -52,7 +53,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private conversations: Map<string, OpenAI.Chat.ChatCompletionMessageParam[]> = new Map();
   private locationIds: Map<string, string> = new Map();
   private chatTypes: Map<string, 'whatsapp' | 'ai' | 'admin'> = new Map();
-  private orderState: Map<string, { items: any[]; customerData: any; step: string }> = new Map();
+  private orderState: Map<string, { items: any[]; customerData: any; step: string; validatedOrderData?: any }> = new Map();
 
   constructor(
     private configService: ConfigService,
@@ -191,6 +192,42 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return 'Error: Missing required parameters';
     }
 
+    const normalizedText = text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+    // --- NUEVO: Responder sobre tiempo de domicilio antes de cualquier otro flujo ---
+    const deliveryTimeKeywords = [
+      'cuanto se demora el domicilio',
+      'cuánto se demora el domicilio',
+      'cuanto tarda el domicilio',
+      'cuánto tarda el domicilio',
+      'cuanto tiempo toma el domicilio',
+      'cuánto tiempo toma el domicilio',
+      'tiempo de entrega',
+      'tiempo domicilio',
+      'demora domicilio',
+      'demora del domicilio',
+      'cuanto se demora el pedido',
+      'cuánto se demora el pedido',
+      'cuanto tarda el pedido',
+      'cuánto tarda el pedido',
+      'cuanto tiempo toma el pedido',
+      'cuánto tiempo toma el pedido',
+      'tiempo de entrega del pedido',
+      'tiempo pedido',
+      'demora pedido',
+      'demora del pedido',
+    ];
+    if (deliveryTimeKeywords.some(k => normalizedText.includes(k))) {
+      const response = '¡Por supuesto! Normalmente los domicilios se demoran entre 20 y 30 minutos, pero puede variar según la zona y la demanda. 😊';
+      if ('emit' in client) {
+        client.emit('ai_response', {
+          type: 'text',
+          content: response
+        });
+      }
+      return response;
+    }
+
     // Detectar frases clave para mostrar el menú directamente
     const menuKeywords = [
       'domicilio',
@@ -205,8 +242,9 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       'ver menú',
       'ver carta',
       'quiero',
+      'almuerzo',
+      'almuerzos',
     ];
-    const normalizedText = text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
 
     // --- NUEVO: Si el último mensaje de la IA fue una pregunta de variantes, NO mostrar menú automático ---
     const conversationIdMenu = `${locationId}:${chatType}:${chatId}`;
@@ -291,92 +329,228 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     // --- FIN NUEVO ---
 
-    // --- NUEVO: Buscar productos específicos antes de mostrar el menú completo ---
-    if (
-      chatType !== 'admin' &&
-      menuKeywords.some(k => normalizedText.includes(k)) &&
-      !isVariantPrompt
-    ) {
-      // Intentar buscar productos por el texto del usuario antes de mostrar el menú completo
+    // --- NUEVO: Manejo inteligente de menú y productos específicos ---
+    if (chatType !== 'admin' && menuKeywords.some(k => normalizedText.includes(k)) && !isVariantPrompt) {
       try {
-        const menu = await this.productsService.findAll({ locationId });
         // Buscar productos que coincidan con el texto del usuario (nombre parcial)
-        const matchingProducts = menu.filter(product =>
-          product.name.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').includes(normalizedText)
-        );
-        if (matchingProducts.length > 0 && normalizedText.length > 2) {
-          // Si hay coincidencias, responder solo con esos productos
-          let response = '';
-          if (matchingProducts.length === 1) {
-            const product = matchingProducts[0];
-            const formattedPrice = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-            response = `✅ *Producto Encontrado*\n\n🍽️ *${product.name}*\n💰 Precio: *$${formattedPrice}*\n🆔 ID: \`${product.id}\`\n\n¡Perfecto! Este producto está disponible.`;
-          } else {
-            const productList = matchingProducts.map((product, index) => {
-              const formattedPrice = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-              return `${index + 1}. *${product.name}*\n   💰 $${formattedPrice} | 🆔 \`${product.id}\``;
-            }).join('\n');
-            response = `🔍 *Búsqueda de Producto*\n\nSe encontraron *${matchingProducts.length}* productos que coinciden con tu búsqueda:\n\n${productList}\n\n¿Te gustaría pedir alguno de estos productos?`;
+        const menu = await this.productsService.findAll({ locationId });
+        // 1. Buscar producto base (coincidencia flexible)
+        function tokenize(str) {
+          return normalizeName(str)
+            .replace(/[()\[\],.]/g, '')
+            .replace(/\b(el|la|los|las|un|una|unos|unas|de|del|a|para|con|y|o|en|al)\b/gi, '')
+            .split(' ')
+            .filter(Boolean);
+        }
+        const userTokens = tokenize(text);
+        let bestProduct = null;
+        let bestScore = 0;
+        let candidateProducts = [];
+        for (const product of menu) {
+          const productTokens = tokenize(product.name);
+          const matchCount = productTokens.filter(tk => userTokens.includes(tk)).length;
+          const score = matchCount / productTokens.length + productTokens.length * 0.01;
+          if (matchCount > 0) {
+            candidateProducts.push({ product, score, matchCount });
+            if (score > bestScore) {
+              bestScore = score;
+              bestProduct = product;
+            }
           }
+        }
+        // Si hay varias coincidencias relevantes y el usuario usó una palabra genérica, pedir que elija
+        const genericWords = ['almuerzo', 'bebida', 'jugo', 'especial', 'ejecutivo', 'combo', 'plato', 'menu', 'menú', 'carta'];
+        const usedGeneric = userTokens.some(tk => genericWords.includes(tk));
+        if (candidateProducts.length > 1 && usedGeneric) {
+          // Mostrar lista de opciones para que el usuario elija
+          let response = '🔍 *Opciones encontradas:*\n';
+          candidateProducts.sort((a, b) => b.score - a.score);
+          candidateProducts.forEach(({ product }, idx) => {
+            const formattedPrice = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            response += `\n${idx + 1}. *${product.name}* - *$${formattedPrice}*`;
+          });
+          response += '\n\n*Por favor, dime el nombre o número de la opción que deseas.*';
           if ('emit' in client) {
             client.emit('ai_response', {
               type: 'text',
-              content: response
+              content: response,
             });
           }
           return response;
         }
-        // Si no hay coincidencias, mostrar el menú completo respetando el orden de categorías
-        // Obtener categorías ordenadas por el campo 'order' (definido por el admin en settings)
-        const categories = await this.categoriesService.categories({ orderBy: { order: 'asc' } });
-        // Agrupar productos por categoría usando solo categoryId
-        const categoriesMap = {};
-        for (const cat of categories) {
-          categoriesMap[cat.id] = { name: cat.name, products: [] };
+        const baseProduct = bestProduct && bestScore > 0.3 ? bestProduct : null;
+        // Diccionario de emojis sugeridos para grupos de variantes
+        const groupEmojis = {
+          'sopa': '🥣',
+          'proteína': '🍗',
+          'proteina': '🍗',
+          'arroz': '🍚',
+          'principio': '🥔',
+          'ensalada': '🥗',
+          'acompañamiento': '🍟',
+          'bebida': '🥤',
+        };
+        function getGroupEmoji(groupName) {
+          const key = groupName.trim().toLowerCase();
+          return groupEmojis[key] || '';
         }
-        menu.forEach(product => {
-          const catId = product.categoryId;
-          if (!catId) return;
-          if (categoriesMap[catId]) {
-            categoriesMap[catId].products.push(product);
+        if (baseProduct) {
+          // 2. Buscar variantes mencionadas en el mensaje
+          let selectedVariants = [];
+          let missingGroups = [];
+          if (baseProduct.variantGroups && baseProduct.variantGroups.length > 0) {
+            for (const groupVar of baseProduct.variantGroups) {
+              // Filtrar variantes válidas (no 'Sin ...')
+              const filteredVariants = groupVar.variants.filter(v => !v.name.trim().toLowerCase().startsWith('sin '));
+              // Buscar si alguna variante de este grupo es mencionada en el mensaje
+              const foundVariant = filteredVariants.find(v => normalizedText.includes(normalizeName(v.name)));
+              if (foundVariant) {
+                selectedVariants.push({ groupName: groupVar.name, variantName: foundVariant.name, price: foundVariant.price || 0 });
+          } else {
+                missingGroups.push(groupVar.name);
+              }
+            }
           }
-        });
-        let menuText = 'Te comparto el 🍽️ *Menú del Restaurante*\n';
-        let prodCount = 1;
-        for (const cat of categories) {
-          const group = categoriesMap[cat.id];
-          if (!group || group.products.length === 0) continue;
-          menuText += `\n\n**${group.name}**\n\n`;
-          for (const product of group.products) {
-            const price = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-            menuText += `${prodCount}. *${product.name}* - $${price}\n`;
+          // 3. Si faltan variantes obligatorias, pedir solo lo que falta
+          if (missingGroups.length > 0) {
+            let response = `*Para tu* *${baseProduct.name}*, *por favor indícame tu elección para:*\n`;
+            missingGroups.forEach(g => {
+              const groupVar = baseProduct.variantGroups.find(gr => gr.name === g);
+              if (groupVar) {
+                const filteredVariants = groupVar.variants.filter(v => !v.name.trim().toLowerCase().startsWith('sin '));
+                const emoji = getGroupEmoji(groupVar.name);
+                response += `\n${emoji} *${groupVar.name}:* ${filteredVariants.map(v => `*${v.name}*`).join(', ')}`;
+              }
+            });
+            response += '\n\n*Responde* con tu elección para continuar.';
+          if ('emit' in client) {
+            client.emit('ai_response', {
+              type: 'text',
+                content: response,
+            });
+          }
+          return response;
+        }
+          // 4. Calcular precio total
+          let totalPrice = baseProduct.price;
+          selectedVariants.forEach(v => { totalPrice += v.price; });
+          const formattedPrice = totalPrice.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+          // 5. Confirmar pedido y calcular subtotal automáticamente
+          let response = `✅ *Pedido Detectado*\n\n🍽️ *${baseProduct.name}*`;
+          if (selectedVariants.length > 0) {
+            response += '\n\n*Con:*';
+            selectedVariants.forEach(v => {
+              const emoji = getGroupEmoji(v.groupName);
+              response += `\n   ${emoji} *${v.groupName}:* *${v.variantName}*`;
+            });
+          }
+          response += `\n\n💰 *Total estimado:* *$${formattedPrice}*`;
+          response += '\n\nCalculando subtotal real...';
+          if ('emit' in client) {
+            client.emit('ai_response', {
+              type: 'text',
+              content: response,
+            });
+          }
+          // Llamar a calculate_order_subtotal automáticamente
+          try {
+            const items = [{
+              productName: baseProduct.name,
+              quantity: 1,
+              variants: selectedVariants.map(v => ({ groupName: v.groupName, variantName: v.variantName }))
+            }];
+            const subtotalResult = await this.executeFunction('calculate_order_subtotal', { items, locationId }, locationId, chatType);
+            if ('emit' in client) {
+              client.emit('ai_response', {
+                type: 'text',
+                content: subtotalResult.message,
+              });
+            }
+            return response + '\n\n' + subtotalResult.message;
+          } catch (err) {
+            if ('emit' in client) {
+              client.emit('ai_response', {
+                type: 'text',
+                content: '❌ Error calculando el subtotal: ' + err.message,
+              });
+            }
+            return response + '\n\n❌ Error calculando el subtotal: ' + err.message;
+          }
+        }
+        // Si no hay coincidencia compuesta, buscar productos por nombre parcial (como antes)
+        const matchingProducts = menu.filter(product =>
+          product.name.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').includes(normalizedText)
+        );
+        // Si hay coincidencias y el usuario no está pidiendo ver el menú completo, mostrar solo ese producto
+        const generalMenuPhrases = [
+          'ver menu', 'ver menú', 'ver carta', 'muéstrame el menú', 'muéstrame la carta', 'qué hay de almuerzo', 'qué hay para almorzar', 'qué tienes de almuerzo', 'opciones de almuerzo', 'opciones de menú', 'carta', 'menú', 'menu', 'almuerzos', 'almuerzo'
+        ];
+        const isGeneralMenuRequest = generalMenuPhrases.some(phrase => normalizedText.includes(phrase));
+        if (matchingProducts.length > 0 && !isGeneralMenuRequest) {
+          // Mostrar detalles del producto encontrado
+          let response = '';
+          if (matchingProducts.length === 1) {
+            const product = matchingProducts[0];
+            const formattedPrice = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            response = `✅ *Producto Encontrado*\n\n🍽️ *${product.name}*\n💰 *Precio:* *$${formattedPrice}*`;
             // Mostrar variantes si existen
-            const prod = product;
-            if (prod.variantGroups && prod.variantGroups.length > 0) {
-              for (const groupVar of prod.variantGroups) {
-                if (groupVar.variants && groupVar.variants.length > 0) {
-                  menuText += `   - ${groupVar.name}: ${groupVar.variants.map(v => v.name).join(', ')}\n`;
+            if (product.variantGroups && product.variantGroups.length > 0) {
+              for (const groupVar of product.variantGroups) {
+                // Filtrar variantes que NO empiecen con 'Sin '
+                const filteredVariants = groupVar.variants.filter(v => !v.name.trim().toLowerCase().startsWith('sin '));
+                const emoji = getGroupEmoji(groupVar.name);
+                if (filteredVariants.length > 0) {
+                  response += `\n   ${emoji} *${groupVar.name}:*`;
+                  for (const v of filteredVariants) {
+                    let variantLine = ` *${v.name}*`;
+                    if (v.price && v.price > 0) {
+                      const variantPrice = v.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                      variantLine += ` (+$${variantPrice})`;
+                    }
+                    response += `\n     •${variantLine}`;
+                  }
                 }
               }
             }
-            menuText += '\n';
-            prodCount++;
+            response += '\n\n¿*Te gustaría pedir* este producto o necesitas más información?';
+          } else {
+            // Si hay varias coincidencias, listarlas
+            response = `🔍 *Búsqueda de Producto*\n\nSe encontraron *${matchingProducts.length}* productos que coinciden con tu búsqueda:`;
+            matchingProducts.forEach((product, idx) => {
+              const formattedPrice = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+              response += `\n${idx + 1}. *${product.name}* - *$${formattedPrice}*`;
+            });
+            response += '\n\n¿*Te gustaría pedir* alguno de estos productos?';
           }
-          menuText += '\n';
-        }
-        menuText += '\n¿Te gustaría pedir algo? 😊';
         if ('emit' in client) {
           client.emit('ai_response', {
             type: 'text',
-            content: menuText
+              content: response,
+            });
+          }
+          return response;
+        }
+        // Si no hay coincidencias o es una consulta general, mostrar el menú completo
+        const menuResult = await this.executeFunction('get_menu', { locationId }, locationId, chatType);
+        if ('emit' in client) {
+          client.emit('ai_response', {
+            type: 'text',
+            content: menuResult.message,
           });
         }
-        return menuText;
+        return menuResult.message;
       } catch (error) {
-        // Si hay error, continuar con el flujo normal
-        console.error('Error buscando productos antes de mostrar menú:', error);
+        console.error('Error mostrando el menú/producto:', error);
+        if ('emit' in client) {
+          client.emit('error', {
+            message: 'Error mostrando el menú/producto',
+            details: error.message
+          });
+        }
+        return 'Error mostrando el menú/producto. Por favor, intenta de nuevo.';
       }
     }
+    // --- FIN NUEVO ---
 
     const conversationId = `${locationId}:${chatType}:${chatId}`;
     let conversation = this.conversations.get(conversationId);
@@ -509,6 +683,67 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         });
       }
 
+      // --- NUEVO: Confirmación de orden y creación automática ---
+      // Detectar si el usuario confirma la orden
+      const confirmKeywords = ['sí', 'si', 'confirmo', 'confirmar', 'correcto', 'está bien', 'ok', 'dale', 'listo'];
+      if (confirmKeywords.some(k => normalizedText.trim().startsWith(k))) {
+        // Buscar el último orderData validado en el estado de la conversación
+        const state = this.orderState.get(conversationIdMenu) as any || {};
+        const orderData = state && state.validatedOrderData;
+        // Validar que existan todos los datos de cliente antes de crear la orden
+        if (orderData && orderData.customerName && orderData.deliveryAddress && orderData.phone && orderData.neighborhood && orderData.paymentMethod) {
+          try {
+            const createdOrder = await this.ordersService.create({
+              items: orderData.items,
+              customerName: orderData.customerName,
+              deliveryAddress: orderData.deliveryAddress,
+              phone: orderData.phone,
+              neighborhood: orderData.neighborhood,
+              paymentMethod: orderData.paymentMethod,
+              locationId: orderData.locationId,
+              deliveryFee: orderData.deliveryFee,
+              type: OrderType.DELIVERY,
+              source: OrderSource.WHATSAPP,
+            });
+            if ('emit' in client) {
+              client.emit('ai_response', {
+                type: 'text',
+                content: `✅ ¡Tu orden ha sido creada exitosamente!\n\nNúmero de orden: *${createdOrder.id}*\n\nPronto recibirás la confirmación de tu pedido. ¡Gracias por confiar en nosotros!`,
+              });
+            }
+            // Limpiar el estado de la orden después de crearla
+            this.orderState.delete(conversationIdMenu);
+            return `✅ ¡Tu orden ha sido creada exitosamente!\n\nNúmero de orden: *${createdOrder.id}*\n\nPronto recibirás la confirmación de tu pedido. ¡Gracias por confiar en nosotros!`;
+          } catch (error) {
+            if ('emit' in client) {
+              client.emit('ai_response', {
+                type: 'text',
+                content: '❌ Error creando la orden: ' + error.message,
+              });
+            }
+            return '❌ Error creando la orden: ' + error.message;
+          }
+        } else {
+          const missingFields = [];
+          if (!orderData?.customerName) missingFields.push('nombre completo');
+          if (!orderData?.deliveryAddress) missingFields.push('dirección de entrega');
+          if (!orderData?.phone) missingFields.push('número de teléfono');
+          if (!orderData?.neighborhood) missingFields.push('barrio o sector');
+          if (!orderData?.paymentMethod) missingFields.push('método de pago');
+          const msg = missingFields.length > 0
+            ? `Por favor, proporciona los siguientes datos antes de confirmar la orden: ${missingFields.join(', ')}.`
+            : 'Por favor, primero proporciona todos los datos de entrega antes de confirmar la orden.';
+          if ('emit' in client) {
+            client.emit('ai_response', {
+              type: 'text',
+              content: msg,
+            });
+          }
+          return msg;
+        }
+      }
+      // --- FIN NUEVO ---
+
       return response.content || 'No response from AI';
     } catch (error) {
       console.error('Error in handleTextInput:', error);
@@ -625,6 +860,69 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           return {
             message: `❌ Error buscando productos: ${error.message}`
           };
+        }
+
+      case 'get_menu':
+        try {
+          const { locationId: menuLocationId } = functionArgs;
+          const menu = await this.productsService.findAll({ locationId: menuLocationId });
+          if (!menu || menu.length === 0) {
+            return { message: 'No se encontró ningún producto en el menú para esta ubicación.' };
+          }
+
+          // Obtener categorías ordenadas por 'order'
+          const categoriesList = await this.categoriesService.categories({ orderBy: { order: 'asc' } });
+          const categories: Record<string, { name: string; products: any[] }> = {};
+          for (const cat of categoriesList) {
+            categories[cat.id] = { name: cat.name, products: [] };
+          }
+          menu.forEach(product => {
+            const catId = product.categoryId;
+            if (!catId) return;
+            if (!categories[catId]) {
+              categories[catId] = { name: '', products: [] };
+            }
+            categories[catId].products.push(product);
+          });
+
+          let menuText = '🍽️ *Menú del Restaurante*\n';
+          let prodCount = 1;
+          for (const cat of categoriesList) {
+            const group = categories[cat.id];
+            if (!group || group.products.length === 0) continue;
+            menuText += `\n*${group.name}*\n`;
+            for (const product of group.products) {
+              const price = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+              menuText += `\n${prodCount}. *${product.name}* - $${price}`;
+              // Mostrar variantes si existen
+              const prod = product;
+              if (prod.variantGroups && prod.variantGroups.length > 0) {
+                for (const groupVar of prod.variantGroups) {
+                  // Filtrar variantes que NO empiecen con 'Sin '
+                  const filteredVariants = groupVar.variants.filter(v => !v.name.trim().toLowerCase().startsWith('sin '));
+                  if (filteredVariants.length > 0) {
+                    menuText += `\n   _${groupVar.name}_:`;
+                    for (const v of filteredVariants) {
+                      let variantLine = ` ${v.name}`;
+                      if (v.price && v.price > 0) {
+                        const variantPrice = v.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                        variantLine += ` (+$${variantPrice})`;
+                      }
+                      menuText += `\n     • ${variantLine}`;
+                    }
+                  }
+                }
+              }
+              menuText += '\n';
+              prodCount++;
+            }
+            menuText += '\n';
+          }
+          menuText += '\n¿Te gustaría pedir algo o necesitas más información sobre algún plato? 😊';
+          return { message: menuText };
+        } catch (error) {
+          console.error('Error in get_menu:', error);
+          return { message: `❌ Error obteniendo el menú: ${error.message}` };
         }
 
       case 'calculate_order_subtotal':
@@ -807,14 +1105,12 @@ Por favor, corrige los nombres de los productos y vuelve a intentar.`
             deliveryFeeText = `\n🚚 *Domicilio:* $${deliveryFee.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
           }
 
-          const result = {
-            message: `📋 *Resumen de tu Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ Todos los productos fueron validados correctamente.\n\n¿Deseas agregar algo más a tu orden o procedemos con tus datos de entrega?`,
+          let response = `📋 *Resumen de tu Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ Todos los productos fueron validados correctamente.\n\n¿Deseas agregar algo más a tu orden o procedemos con tus datos de entrega?`;
+          return {
+            message: response,
             validatedItems,
             totalAmount: totalAmount + deliveryFee
           };
-
-          console.log(`[AI Gateway] calculate_order_subtotal: Returning result with message length: ${result.message.length}`);
-          return result;
         } catch (error) {
           console.error('Error in calculate_order_subtotal:', error);
           console.error('Error stack:', error.stack);
@@ -954,7 +1250,7 @@ Por favor, corrige las variantes y vuelve a intentar.`
 
           const customerInfo = `👤 *Datos del Cliente*\n━━━━━━━━━━━━━━━━━━━━━━━━\n• *Nombre:* ${customerName}\n• *Dirección:* ${deliveryAddress}\n• *Teléfono:* ${phone}\n• *Barrio:* ${neighborhood}\n• *Método de pago:* ${paymentEmojis[paymentMethod]} ${paymentDisplay[paymentMethod]}`;
 
-          return {
+          const result = {
             message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *\"Sí\"* o *\"Confirmo\"* para proceder con la orden.`,
             validated: true,
             orderData: {
@@ -991,6 +1287,21 @@ Por favor, corrige las variantes y vuelve a intentar.`
               deliveryFee
             }
           };
+
+          // --- NUEVO: Guardar validatedOrderData en el estado de la conversación ---
+          if (result.validated && result.orderData) {
+            const stateKey = `${validateLocationId}:${chatType}:${functionArgs.chatId || ''}`;
+            const prevState = this.orderState.get(stateKey) as any || {};
+            this.orderState.set(stateKey, {
+              items: prevState.items || [],
+              customerData: prevState.customerData || {},
+              step: prevState.step || 'products',
+              validatedOrderData: result.orderData
+            });
+          }
+          // --- FIN NUEVO ---
+
+          return result;
         } catch (error) {
           console.error('Error in validate_order_before_creation:', error);
           return {
@@ -1012,149 +1323,29 @@ Por favor, corrige las variantes y vuelve a intentar.`
           // Obtener el valor de domicilio desde la configuración
           const deliveryFee = await this.settingsService.getDeliveryFee();
           
-          const menu = await this.productsService.findAll({ locationId });
-          const validProductIds = new Set(menu.map(product => product.id));
-
-          // Validar variantes en los items
-          for (const item of functionArgs.items) {
-            const product = menu.find(p => p.id === item.productId);
-            const prod: any = product;
-            const variantGroups = prod.variantGroups || [];
-            // NUEVO: Si los variants ya traen productVariantId, no validar por nombre
-            if (Array.isArray(item.variants) && item.variants.length > 0 && item.variants.every(v => v.productVariantId)) {
-              // Validar que todos los IDs existan en el producto
-              for (const v of item.variants) {
-                const group = variantGroups.find(g => normalizeName(g.name) === normalizeName(v.groupName));
-                if (!group) {
-                  return { message: `El grupo de variante "${v.groupName}" no existe para el producto *${product.name}*.` };
-                }
-                const variant = group.variants.find(va => va.id === v.productVariantId);
-                if (!variant) {
-                  return { message: `La variante seleccionada para el grupo "${group.name}" no existe en el producto *${product.name}*.` };
-                }
-              }
-              continue;
-            }
-            if (variantGroups.length > 0) {
-              if (!Array.isArray(item.variants)) item.variants = [];
-              const missingGroups = [];
-              let mappedVariants = [];
-              for (const group of variantGroups) {
-                const selected = item.variants.find(v => v.groupName && normalizeName(v.groupName) === normalizeName(group.name));
-                if (!selected || !selected.variantName || !normalizeName(selected.variantName)) {
-                  missingGroups.push({
-                    groupName: group.name,
-                    options: group.variants.map(v => v.name)
-                  });
-                } else {
-                  const variant = group.variants.find(v => normalizeName(v.name) === normalizeName(selected.variantName));
-                  if (!variant) {
-                    return {
-                      message: `La variante \"${selected.variantName}\" no existe para el grupo \"${group.name}\" en el producto *${product.name}*. Opciones válidas: ${group.variants.map(v => v.name).join(', ')}`
-                    };
-                  }
-                  mappedVariants.push({
-                    productVariantId: variant.id,
-                    groupName: group.name
-                  });
-                }
-              }
-              if (missingGroups.length > 0) {
-                let askText = `Para *${product.name}* necesito que elijas una opción para cada grupo faltante:\n`;
-                for (const mg of missingGroups) {
-                  askText += `• *${mg.groupName}*: ${mg.options.join(', ')}\n`;
-                }
-                askText += '\nPor favor, dime tus elecciones (por ejemplo: "Ajiaco, Carne en Bistec, Arroz blanco, Mora").';
-                return {
-                  message: askText
-                };
-              }
-              // Asigna los variants mapeados por ID para la creación de la orden
-              item.variants = mappedVariants;
-            }
-          }
-
-          // Validate product IDs
-          const invalidProducts = functionArgs.items.filter(
-            item => !validProductIds.has(item.productId)
-          );
-
-          if (invalidProducts.length > 0) {
-            throw new Error(`Invalid product IDs found: ${invalidProducts.map(p => p.productId).join(', ')}`);
-          }
-
-          // Create the order with the correct type
-          const order = await this.ordersService.create({
-            ...functionArgs,
-            locationId,
-            type: 'DELIVERY', // Always set to DELIVERY for AI orders
-            status: 'PENDING',
-            tableId: undefined, // Ensure tableId is not set for delivery orders
-            source: 'WHATSAPP',
-            deliveryFee, // NUEVO: pasar valor de domicilio
+          // Llamar al servicio real para crear la orden en la base de datos
+          const createdOrder = await this.ordersService.create({
+            items: functionArgs.items,
+            customerName: functionArgs.customerName,
+            deliveryAddress: functionArgs.deliveryAddress,
+            phone: functionArgs.phone,
+            neighborhood: functionArgs.neighborhood,
+            paymentMethod: functionArgs.paymentMethod,
+            locationId: functionArgs.locationId,
+            deliveryFee: functionArgs.deliveryFee || deliveryFee || 0,
+            type: OrderType.DELIVERY,
+            source: OrderSource.WHATSAPP,
           });
 
           return {
-            message: `🎉 *¡Orden Creada Exitosamente!*\n\n📋 *Orden #${order.id}*\n👤 Cliente: *${functionArgs.customerName}*\n📍 Dirección: ${functionArgs.deliveryAddress}\n📞 Teléfono: ${functionArgs.phone}\n\n✅ Tu pedido ha sido recibido y está siendo procesado.\n\n¡Gracias por tu compra! 😊`
+            message: `✅ ¡Tu orden ha sido creada exitosamente!\n\nNúmero de orden: *${createdOrder.id}*\n\nPronto recibirás la confirmación de tu pedido. ¡Gracias por confiar en nosotros!`,
+            validated: true
           };
         } catch (error) {
           console.error('Error in create_order:', error);
           return {
             message: `❌ Error creando la orden: ${error.message}`
           };
-        }
-
-      case 'get_menu':
-        try {
-          const { locationId: menuLocationId } = functionArgs;
-          const menu = await this.productsService.findAll({ locationId: menuLocationId });
-          if (!menu || menu.length === 0) {
-            return { message: 'No se encontró ningún producto en el menú para esta ubicación.' };
-          }
-
-          // Obtener categorías ordenadas por 'order'
-          const categoriesList = await this.categoriesService.categories({ orderBy: { order: 'asc' } });
-          const categories: Record<string, { name: string; products: any[] }> = {};
-          for (const cat of categoriesList) {
-            categories[cat.id] = { name: cat.name, products: [] };
-          }
-          menu.forEach(product => {
-            const catId = product.categoryId;
-            if (!catId) return;
-            if (!categories[catId]) {
-              categories[catId] = { name: '', products: [] };
-            }
-            categories[catId].products.push(product);
-          });
-
-          let menuText = 'Te comparto el 🍽️ *Menú del Restaurante*\n';
-          let prodCount = 1;
-          for (const cat of categoriesList) {
-            const group = categories[cat.id];
-            if (!group || group.products.length === 0) continue;
-            menuText += `\n\n**${group.name}**\n\n`;
-            for (const product of group.products) {
-              const price = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-              menuText += `${prodCount}. *${product.name}* - $${price}\n`;
-              // NUEVO: Mostrar variantes si existen
-              const prod = product;
-              if (prod.variantGroups && prod.variantGroups.length > 0) {
-                for (const groupVar of prod.variantGroups) {
-                  if (groupVar.variants && groupVar.variants.length > 0) {
-                    menuText += `   - ${groupVar.name}: ${groupVar.variants.map(v => v.name).join(', ')}\n`;
-                  }
-                }
-              }
-              menuText += '\n';
-              prodCount++;
-            }
-            menuText += '\n';
-          }
-          menuText += '\n¿Te gustaría pedir algo? 😊';
-          return { message: menuText };
-        } catch (error) {
-          console.error('Error in get_menu:', error);
-          return { message: `❌ Error obteniendo el menú: ${error.message}` };
         }
 
       default:

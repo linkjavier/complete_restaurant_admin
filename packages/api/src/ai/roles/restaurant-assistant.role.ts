@@ -301,5 +301,8 @@ IMPORTANT STRUCTURE FOR VARIANTS:
   }
 - If you do not send the variants in this structure, the order will be rejected and the user will not be able to complete their order.
 - Do NOT use the 'notes' field for variants. Only use 'notes' for extra instructions (e.g., "sin cebolla").
-- Do NOT use a single 'variantName' field. Always use the 'variants' array as shown above.`;
+- Do NOT use a single 'variantName' field. Always use the 'variants' array as shown above.
+
+// --- NUEVO: RESPUESTA SOBRE TIEMPO DE DOMICILIO ---
+- Si el cliente pregunta cuánto se demora el domicilio, cuánto tarda, o cuánto tiempo toma el domicilio, SIEMPRE responde cordialmente que normalmente los domicilios se demoran entre 20 y 30 minutos. Ejemplo: "¡Por supuesto! Normalmente los domicilios se demoran entre 20 y 30 minutos, pero puede variar según la zona y la demanda. 😊"`;
 }; 
