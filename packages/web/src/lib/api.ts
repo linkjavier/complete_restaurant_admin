@@ -742,11 +742,21 @@ export async function updateUser(id: string, data: UpdateUserDto): Promise<User>
 export async function deleteUser(id: string): Promise<void> {
   const response = await fetch(`${API_URL}/users/${id}`, {
     method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
-    },
-  })
-  if (!response.ok) throw new Error('Failed to delete user')
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Error al eliminar el usuario');
+  }
+}
+
+export async function getCustomers(): Promise<any[]> {
+  const response = await fetch(`${API_URL}/customers`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Error al obtener los clientes');
+  }
+  return response.json();
 }
 
 export async function updateCategoryOrder(orderedIds: string[]) {

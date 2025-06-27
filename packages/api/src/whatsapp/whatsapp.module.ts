@@ -6,6 +6,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AIModule } from '../ai/ai.module';
 import { STTModule } from '../stt/stt.module';
+import { CustomersModule } from '../customers/customers.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { STTModule } from '../stt/stt.module';
     EventEmitterModule.forRoot(),
     forwardRef(() => AIModule),
     STTModule,
+    forwardRef(() => CustomersModule),
   ],
   controllers: [WhatsappController],
   providers: [WhatsappService, WhatsappGateway],

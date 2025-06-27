@@ -56,6 +56,7 @@ model Location {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   order            Int               @default(0)
+  customers        Customer[]
 
   @@index([order])
   @@map("locations")
@@ -361,4 +362,21 @@ model ProductVariant {
 
   @@index([groupId])
   @@index([productId])
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String
+  address      String?
+  neighborhood String?
+  whatsappId   String? // chatId de WhatsApp si aplica
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId   String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([phone])
+  @@index([locationId])
+  @@unique([phone, locationId])
 }

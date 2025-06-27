@@ -475,7 +475,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
               });
             }
             return response + '\n\n❌ Error calculando el subtotal: ' + err.message;
-          }
+        }
         }
         // Si no hay coincidencia compuesta, buscar productos por nombre parcial (como antes)
         const matchingProducts = menu.filter(product =>
@@ -508,9 +508,9 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
                       variantLine += ` (+$${variantPrice})`;
                     }
                     response += `\n     •${variantLine}`;
-                  }
                 }
               }
+            }
             }
             response += '\n\n¿*Te gustaría pedir* este producto o necesitas más información?';
           } else {
@@ -1326,12 +1326,12 @@ Por favor, corrige las variantes y vuelve a intentar.`
           // Llamar al servicio real para crear la orden en la base de datos
           const createdOrder = await this.ordersService.create({
             items: functionArgs.items,
-            customerName: functionArgs.customerName,
-            deliveryAddress: functionArgs.deliveryAddress,
-            phone: functionArgs.phone,
-            neighborhood: functionArgs.neighborhood,
-            paymentMethod: functionArgs.paymentMethod,
-            locationId: functionArgs.locationId,
+              customerName: functionArgs.customerName,
+              deliveryAddress: functionArgs.deliveryAddress,
+              phone: functionArgs.phone,
+              neighborhood: functionArgs.neighborhood,
+              paymentMethod: functionArgs.paymentMethod,
+              locationId: functionArgs.locationId,
             deliveryFee: functionArgs.deliveryFee || deliveryFee || 0,
             type: OrderType.DELIVERY,
             source: OrderSource.WHATSAPP,

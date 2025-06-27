@@ -112,6 +112,12 @@ const routes = [
     href: "/admin/settings",
     roles: ['SUPER_ADMIN', 'ADMIN'],
   },
+  {
+    label: "Clientes",
+    icon: Users,
+    href: "/admin/customers",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
 ]
 
 export function Sidebar({ isMobile, onClose }: SidebarProps) {

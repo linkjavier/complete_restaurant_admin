@@ -6,6 +6,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AIGateway } from '../ai/ai.gateway';
 import { STTService } from '../stt/stt.service';
 import { WhatsappChat } from '@prisma/client';
+import { CustomersService } from '../customers/customers.service';
 
 @Injectable()
 export class WhatsappService {
@@ -29,6 +30,8 @@ export class WhatsappService {
     @Inject(forwardRef(() => AIGateway))
     private aiGateway: AIGateway,
     private sttService: STTService,
+    @Inject(forwardRef(() => CustomersService))
+    private customersService: CustomersService,
   ) {
     // No inicializar en el constructor
   }
@@ -656,7 +659,7 @@ export class WhatsappService {
     }
   }
 
-  async getChats(): Promise<any[]> {
+  async getChats(locationId?: string): Promise<any[]> {
     try {
       await this.initializeWhatsApp();
       
@@ -667,6 +670,12 @@ export class WhatsappService {
       const state = await this.client.getState();
       if (state !== 'CONNECTED') {
         throw new Error('WhatsApp is not connected');
+      }
+
+      // Usar locationId explícito si se pasa, si no, usar el de la instancia
+      const effectiveLocationId = locationId || this.locationId;
+      if (!effectiveLocationId) {
+        throw new Error('No locationId provided or set in WhatsappService');
       }
 
       // Check if we have cached chats that are still valid
@@ -682,7 +691,7 @@ export class WhatsappService {
       
       const chatSettings = await this.prisma.whatsappChat.findMany({
         where: {
-          locationId: this.locationId,
+          locationId: effectiveLocationId,
           id: { in: chats.map((c) => c.id._serialized) },
         },
       });
@@ -713,6 +722,9 @@ export class WhatsappService {
         this.logger.log(`Chat ${index + 1}: "${chat.name}" - Last message: "${chat.lastMessage.substring(0, 50)}${chat.lastMessage.length > 50 ? '...' : ''}"`);
       });
 
+      // Capturar información de clientes de chats individuales
+      await this.captureCustomerInfo(formattedChats, effectiveLocationId);
+
       // Update cache
       this.cachedChats = formattedChats;
       this.lastChatsUpdate = now;
@@ -726,6 +738,122 @@ export class WhatsappService {
         return this.cachedChats;
       }
       throw error;
+    }
+  }
+
+  private normalizePhone(phone: string): string {
+    // Quita todo lo que no sea dígito
+    return phone.replace(/[^0-9]/g, '');
+  }
+
+  private async captureCustomerInfo(chats: any[], locationId: string) {
+    try {
+      // Filtrar solo chats individuales (no grupos)
+      const individualChats = chats.filter(chat => 
+        chat.id.endsWith('@c.us') && 
+        !chat.id.includes('-') && 
+        !chat.id.includes('@g.us') &&
+        !chat.id.includes('@broadcast')
+      );
+
+      this.logger.log(`Processing ${individualChats.length} individual chats for customer info`);
+
+      for (const chat of individualChats) {
+        try {
+          // Extraer información del cliente desde el nombre del chat y mensajes
+          const customerInfo = await this.extractCustomerInfoFromChat(chat);
+          if (customerInfo) {
+            // Normalizar el teléfono
+            const normalizedPhone = this.normalizePhone(customerInfo.phone);
+            // Verificar si ya existe un cliente con este teléfono
+            const existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId);
+            if (!existingCustomer) {
+              // Crear nuevo cliente usando el servicio
+              const newCustomer = await this.customersService.create({
+                name: customerInfo.name,
+                phone: normalizedPhone,
+                address: customerInfo.address,
+                neighborhood: customerInfo.neighborhood,
+                whatsappId: chat.id,
+                locationId: locationId
+              });
+              this.logger.log(`Cliente creado automáticamente: ${newCustomer.name} (${newCustomer.phone})`);
+            } else if (!existingCustomer.whatsappId) {
+              // Actualizar cliente existente con whatsappId
+              await this.customersService.update(existingCustomer.id, { whatsappId: chat.id });
+              this.logger.log(`Cliente actualizado con WhatsApp: ${existingCustomer.name} (${existingCustomer.phone})`);
+            }
+          }
+        } catch (error) {
+          this.logger.error(`Error procesando chat ${chat.id}: ${error.message}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error capturando información de clientes: ${error.message}`);
+    }
+  }
+
+  private async extractCustomerInfoFromChat(chat: any) {
+    try {
+      const phone = chat.id.replace('@c.us', '');
+      let name = '';
+      let address = '';
+      let neighborhood = '';
+
+      // --- PARSING FLEXIBLE DEL NOMBRE DEL CHAT ---
+      if (chat.name && chat.name !== phone && !chat.name.startsWith('+57')) {
+        // Separar por comas, guiones o espacios dobles
+        const partes = chat.name.split(/[,\-]/).map(p => p.trim()).filter(Boolean);
+        const clavesDireccion = ['cra', 'calle', 'carrera', 'cll', 'av', 'avenida', '#', 'apto', 'casa', 'torre', 'piso', 'apartamento', 'unidad', 'edificio', 'manzana', 'mz', 'bloque', 'bq', 'sector', 'conjunto'];
+        partes.forEach(parte => {
+          const lower = parte.toLowerCase();
+          if (clavesDireccion.some(clave => lower.includes(clave))) {
+            address = address ? address + ' ' + parte : parte;
+          } else if (/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+( [A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*$/.test(parte)) {
+            // Si parece nombre propio (una o dos palabras con mayúscula)
+            name = name ? name + ' ' + parte : parte;
+          } else if (!neighborhood) {
+            neighborhood = parte;
+          }
+        });
+      }
+
+      // Si no se detectó nombre, usar "Cliente [últimos 4 del teléfono]"
+      if (!name) {
+        name = `Cliente ${phone.slice(-4)}`;
+      }
+      // Si no se detectó dirección, usar todo el chatName
+      if (!address && chat.name) {
+        address = chat.name;
+      }
+
+      // --- PARSING DE MENSAJE (mantener lógica anterior) ---
+      if (chat.lastMessage) {
+        const text = chat.lastMessage.toLowerCase();
+        // Buscar patrones de dirección
+        if (text.includes('dirección') || text.includes('direccion') || text.includes('vivo en') || text.includes('mi dirección')) {
+          const addressMatch = chat.lastMessage.match(/(?:dirección|direccion|vivo en|mi dirección es?)\s*:? 0*([^,.\n]+)/i);
+          if (addressMatch) {
+            address = addressMatch[1].trim();
+          }
+        }
+        // Buscar patrones de barrio
+        if (text.includes('barrio') || text.includes('sector') || text.includes('zona')) {
+          const neighborhoodMatch = chat.lastMessage.match(/(?:barrio|sector|zona)\s*:? *([^,.\n]+)/i);
+          if (neighborhoodMatch) {
+            neighborhood = neighborhoodMatch[1].trim();
+          }
+        }
+      }
+      return {
+        name,
+        phone: this.normalizePhone(phone),
+        address: address || null,
+        neighborhood: neighborhood || null
+      };
+    } catch (error) {
+      this.logger.error(`Error extrayendo información del chat ${chat.id}: ${error.message}`);
+      return null;
     }
   }
 
