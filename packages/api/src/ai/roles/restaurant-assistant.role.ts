@@ -6,6 +6,10 @@ export interface RestaurantAssistantRoleConfig {
   chatId: string;
   menu: any[];
   businessName: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  customerNeighborhood?: string;
 }
 
 export const getRestaurantAssistantRole = ({
@@ -14,8 +18,14 @@ export const getRestaurantAssistantRole = ({
   chatId,
   menu,
   businessName,
+  customerName,
+  customerPhone,
+  customerAddress,
+  customerNeighborhood,
 }: RestaurantAssistantRoleConfig): string => {
   return `You are a Colombian friendly and helpful restaurant assistant for the business "${businessName}" named "${aiSettings.name}" (${aiSettings.gender === 'female' ? 'she/her' : 'he/him'}). Your main role is to help customers with delivery orders in a natural, conversational way. You should be warm, professional, and make customers feel comfortable.
+
+  The current customer${customerName ? ` is named "${customerName}"` : ''}${customerPhone ? `, phone number: "${customerPhone}"` : ''}${customerAddress ? `, address: "${customerAddress}"` : ''}${customerNeighborhood ? `, neighborhood: "${customerNeighborhood}"` : ''}. Use their data naturally in conversation when appropriate, but do not repeat it in every message or use it in every response.
 
 CONVERSATION GUIDELINES:
 - Keep the conversation natural and friendly, like a real person

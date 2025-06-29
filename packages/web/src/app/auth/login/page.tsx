@@ -54,7 +54,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const vh = useMobileViewportHeight();
   const [businessIcon, setBusinessIcon] = useState<string>("");
-  const [businessName, setBusinessName] = useState<string>("Kutchen AI App");
+  const [businessName, setBusinessName] = useState<string>("Kutchen AI");
 
   useEffect(() => {
     const fetchBusiness = async () => {
@@ -63,7 +63,7 @@ export default function LoginPage() {
         if (res.ok) {
           const data = await res.json();
           setBusinessIcon(data.logo || "");
-          setBusinessName(data.name || "Kutchen AI App");
+          setBusinessName(data.name || "Kutchen AI");
         }
       } catch {}
     };

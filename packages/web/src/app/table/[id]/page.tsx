@@ -17,7 +17,7 @@ export default function TablePage() {
   const [customerName, setCustomerName] = useState("")
   const [isOrderStarted, setIsOrderStarted] = useState(false)
   const [businessIcon, setBusinessIcon] = useState<string>("")
-  const [businessName, setBusinessName] = useState<string>("Kutchen AI App")
+  const [businessName, setBusinessName] = useState<string>("Kutchen AI")
 
   useEffect(() => {
     const fetchTable = async () => {
@@ -39,7 +39,7 @@ export default function TablePage() {
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")
-          setBusinessName(data.name || "Kutchen AI App")
+          setBusinessName(data.name || "Kutchen AI")
         }
       } catch {}
     }

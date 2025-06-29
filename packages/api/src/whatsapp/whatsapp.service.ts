@@ -40,29 +40,29 @@ export class WhatsappService {
 
     this.initializationPromise = (async () => {
       try {
-        this.logger.log('Initializing WhatsApp client...');
+        // this.logger.log('Initializing WhatsApp client...');
         
         // Verificar si ya existe una sesión autenticada
         const authPath = '.wwebjs_auth';
         const sessionExists = await this.checkSessionExists(authPath);
-        this.logger.log(`Session exists: ${sessionExists}`);
+        // this.logger.log(`Session exists: ${sessionExists}`);
 
         // Si el cliente ya existe y está conectado, no necesitamos reinicializarlo
         if (this.client) {
           try {
             const state = await this.client.getState();
             if (state === 'CONNECTED') {
-              this.logger.log('WhatsApp client is already connected');
+              // this.logger.log('WhatsApp client is already connected');
               this.isConnected = true;
               return;
             }
           } catch (error) {
-            this.logger.error(`Error checking existing client state: ${error.message}`);
+            // this.logger.error(`Error checking existing client state: ${error.message}`);
             // Si hay un error, destruir el cliente existente y crear uno nuevo
             try {
               await this.client.destroy();
             } catch (destroyError) {
-              this.logger.error(`Error destroying existing client: ${destroyError.message}`);
+              // this.logger.error(`Error destroying existing client: ${destroyError.message}`);
             }
             this.client = null;
           }
@@ -108,19 +108,19 @@ export class WhatsappService {
           });
 
           this.client.on('qr', async (qr) => {
-            this.logger.log('Received QR code');
+            // this.logger.log('Received QR code');
             try {
               this.qrCode = await qrcode.toDataURL(qr);
               this.eventEmitter.emit('whatsapp.qr', this.qrCode);
               resolve(this.qrCode);
             } catch (error) {
-              this.logger.error(`Error generating QR code: ${error.message}`);
+              // this.logger.error(`Error generating QR code: ${error.message}`);
               resolve(null);
             }
           });
 
           this.client.on('authenticated', () => {
-            this.logger.log('WhatsApp client is authenticated');
+            // this.logger.log('WhatsApp client is authenticated');
             this.isAuthenticating = true;
             this.isConnected = false;
             this.qrCode = null;
@@ -133,7 +133,7 @@ export class WhatsappService {
           });
 
           this.client.on('ready', async () => {
-            this.logger.log('WhatsApp client is ready!');
+            // this.logger.log('WhatsApp client is ready!');
             this.isConnected = true;
             this.isAuthenticating = false;
             this.qrCode = null;
@@ -144,9 +144,9 @@ export class WhatsappService {
               const firstLocation = await this.prisma.location.findFirst();
               if (firstLocation) {
                 this.locationId = firstLocation.id;
-                this.logger.log(`Using location ID: ${this.locationId}`);
+                // this.logger.log(`Using location ID: ${this.locationId}`);
               } else {
-                this.logger.error('No location found in the database');
+                // this.logger.error('No location found in the database');
               }
             }
             
@@ -154,7 +154,7 @@ export class WhatsappService {
           });
 
           this.client.on('auth_failure', (error) => {
-            this.logger.error('WhatsApp authentication failed:', error);
+            // this.logger.error('WhatsApp authentication failed:', error);
             this.isConnected = false;
             this.isAuthenticating = false;
             this.initializationPromise = null;
@@ -163,7 +163,7 @@ export class WhatsappService {
           });
 
           this.client.on('disconnected', (reason) => {
-            this.logger.log(`WhatsApp client disconnected: ${reason}`);
+            // this.logger.log(`WhatsApp client disconnected: ${reason}`);
             this.isConnected = false;
             this.isAuthenticating = false;
             this.initializationPromise = null;
@@ -172,17 +172,17 @@ export class WhatsappService {
           });
 
           this.client.on('error', (error) => {
-            this.logger.error(`WhatsApp client error: ${error.message}`);
+            // this.logger.error(`WhatsApp client error: ${error.message}`);
             this.isConnected = false;
             this.initializationPromise = null;
             this.qrCodePromise = null;
             if (!this.isRestarting) {
               this.isRestarting = true;
-              this.logger.log('Attempting to restart WhatsApp client in 5 seconds...');
+              // this.logger.log('Attempting to restart WhatsApp client in 5 seconds...');
               setTimeout(() => {
                 this.isRestarting = false;
                 this.initializeWhatsApp().catch(err => {
-                  this.logger.error(`Failed to restart WhatsApp client: ${err.message}`);
+                  // this.logger.error(`Failed to restart WhatsApp client: ${err.message}`);
                 });
               }, 5000);
             }
@@ -194,16 +194,46 @@ export class WhatsappService {
               // Ignorar mensajes propios
               if (message.fromMe) return;
 
-              this.logger.log(`Received message from ${message.from}: ${message.body}`);
+              // --- NUEVO: Obtener información del contacto ---
+              let contactName = '';
+              let contactPushname = '';
+              let contactDisplayName = '';
+              
+              try {
+                // Obtener el contacto del mensaje
+                const contact: any = await message.getContact();
+                
+                // Log para verificar acceso correcto a los campos
+                // console.log(`[CONTACT DEBUG] Contact info for ${message.from}:`);
+                // console.log(`  - pushname: "${contact.pushname}"`);
+                // console.log(`  - name: "${contact.name}"`);
+                // console.log(`  - shortName: "${contact.shortName}"`);
+                // console.log(`  - number: "${contact.number}"`);
+                
+                contactPushname = contact.pushname || '';
+                contactName = contact.name || '';
+                
+                // Usar pushname si existe, si no usar name
+                contactDisplayName = contactPushname || contactName || '';
+                
+                // console.log(`[CONTACT DEBUG] Selected display name: "${contactDisplayName}"`);
+                
+              } catch (contactError) {
+                // console.error(`[CONTACT DEBUG] Error getting contact info: ${contactError.message}`);
+                contactDisplayName = '';
+              }
+              // --- FIN NUEVO ---
+
+              // this.logger.log(`Received message from ${message.from} (${contactDisplayName}): ${message.body}`);
 
               // Verificar si tenemos un locationId
               if (!this.locationId) {
                 const firstLocation = await this.prisma.location.findFirst();
                 if (firstLocation) {
                   this.locationId = firstLocation.id;
-                  this.logger.log(`Using location ID: ${this.locationId}`);
+                  // this.logger.log(`Using location ID: ${this.locationId}`);
                 } else {
-                  this.logger.error('No location found in the database');
+                  // this.logger.error('No location found in the database');
                   return;
                 }
               }
@@ -219,7 +249,7 @@ export class WhatsappService {
                     
                     // Transcribe the audio
                     const transcribedText = await this.sttService.transcribeAudio(audioBuffer);
-                    this.logger.log(`Transcribed voice note: ${transcribedText}`);
+                    // this.logger.log(`Transcribed voice note: ${transcribedText}`);
 
                     // Save the transcribed message in the database
                     await this.prisma.whatsappMessage.create({
@@ -292,7 +322,7 @@ export class WhatsappService {
                           };
                           this.lastChatsUpdate = Date.now();
                           this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
-                          this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
+                          // this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
                         }
                       }
                     } else {
@@ -307,7 +337,7 @@ export class WhatsappService {
                           };
                           this.lastChatsUpdate = Date.now();
                           this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
-                          this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
+                          // this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
                         }
                       }
                     }
@@ -315,7 +345,7 @@ export class WhatsappService {
                     return;
                   }
                 } catch (error) {
-                  this.logger.error(`Error processing voice note: ${error.message}`);
+                  // this.logger.error(`Error processing voice note: ${error.message}`);
                   // Solo enviar mensaje de error si la IA está habilitada para WhatsApp
                   const aiSettings = await this.prisma.settings.findFirst();
                   if (aiSettings?.aiEnabled) {
@@ -325,7 +355,7 @@ export class WhatsappService {
                         'Lo siento, hubo un error al procesar tu nota de voz. Por favor, intenta de nuevo o envía un mensaje de texto.'
                       );
                     } catch (sendError) {
-                      this.logger.error(`Error sending error message: ${sendError.message}`);
+                      // this.logger.error(`Error sending error message: ${sendError.message}`);
                     }
                   }
                   
@@ -340,7 +370,7 @@ export class WhatsappService {
                       };
                       this.lastChatsUpdate = Date.now();
                       this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
-                      this.logger.log(`Updated chat cache for ${message.from} with message: "${'Error al procesar nota de voz'.substring(0, 30)}..."`);
+                      // this.logger.log(`Updated chat cache for ${message.from} with message: "${'Error al procesar nota de voz'.substring(0, 30)}..."`);
                     }
                   }
                   
@@ -354,9 +384,9 @@ export class WhatsappService {
               });
 
               if (existingMessage) {
-                this.logger.log(
-                  `Message ${message.id._serialized} already exists, skipping...`,
-                );
+                // this.logger.log(
+                //   `Message ${message.id._serialized} already exists, skipping...`,
+                // );
                 return;
               }
 
@@ -373,7 +403,7 @@ export class WhatsappService {
                     aiEnabled: true, // Default to true
                   },
                 });
-                this.logger.log(`Created new chat settings for ${message.from}`);
+                // this.logger.log(`Created new chat settings for ${message.from}`);
               }
 
               // Save the message in the database
@@ -401,9 +431,9 @@ export class WhatsappService {
 
               // Check if AI is enabled for this chat
               if (!chatSettings.aiEnabled) {
-                this.logger.log(
-                  `AI is disabled for chat ${message.from}, not processing with AI`,
-                );
+                // this.logger.log(
+                //   `AI is disabled for chat ${message.from}, not processing with AI`,
+                // );
                 return;
               }
 
@@ -426,7 +456,7 @@ export class WhatsappService {
                   };
                   this.lastChatsUpdate = Date.now();
                   this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
-                  this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
+                  // this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
                 }
               }
 
@@ -469,7 +499,7 @@ export class WhatsappService {
                     };
                     this.lastChatsUpdate = Date.now();
                     this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
-                    this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
+                    // this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
                   }
                 }
               } else {
@@ -484,13 +514,13 @@ export class WhatsappService {
                     };
                     this.lastChatsUpdate = Date.now();
                     this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
-                    this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
+                    // this.logger.log(`Updated chat cache for ${message.from} with message: "${message.body.substring(0, 30)}..."`);
                   }
                 }
               }
 
             } catch (error) {
-              this.logger.error(`Error processing message with AI: ${error.message}`);
+              // this.logger.error(`Error processing message with AI: ${error.message}`);
               // Solo enviar mensaje de error si la IA está habilitada para WhatsApp
               const aiSettings = await this.prisma.settings.findFirst();
               if (aiSettings?.aiEnabled) {
@@ -500,7 +530,7 @@ export class WhatsappService {
                     'Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo más tarde.'
                   );
                 } catch (sendError) {
-                  this.logger.error(`Error sending error message: ${sendError.message}`);
+                  // this.logger.error(`Error sending error message: ${sendError.message}`);
                 }
               }
             }
@@ -509,7 +539,7 @@ export class WhatsappService {
           // Inicializar el cliente de manera asíncrona
           setTimeout(() => {
             this.client.initialize().catch(error => {
-              this.logger.error(`Error initializing WhatsApp client: ${error.message}`);
+              // this.logger.error(`Error initializing WhatsApp client: ${error.message}`);
               this.initializationPromise = null;
               this.qrCodePromise = null;
               // No relanzar el error para evitar que la aplicación se bloquee
@@ -532,18 +562,18 @@ export class WhatsappService {
           this.eventEmitter.on('whatsapp.ready', readyHandler);
         });
 
-        this.logger.log('WhatsApp client initialization completed');
+        // this.logger.log('WhatsApp client initialization completed');
 
         // Verificar el estado después de la inicialización
         const state = await this.client.getState();
         this.isConnected = state === 'CONNECTED';
-        this.logger.log(`Initial WhatsApp state: ${state}, isConnected: ${this.isConnected}`);
+        // this.logger.log(`Initial WhatsApp state: ${state}, isConnected: ${this.isConnected}`);
         
         if (this.isConnected) {
           this.eventEmitter.emit('whatsapp.ready');
         }
       } catch (error) {
-        this.logger.error(`Error initializing WhatsApp: ${error.message}`);
+        // this.logger.error(`Error initializing WhatsApp: ${error.message}`);
         this.initializationPromise = null;
         this.qrCodePromise = null;
         throw error;
@@ -559,10 +589,10 @@ export class WhatsappService {
       const path = require('path');
       const sessionPath = path.join(process.cwd(), authPath, 'restaurant-admin');
       const exists = fs.existsSync(sessionPath);
-      this.logger.log(`Session path ${sessionPath} exists: ${exists}`);
+      // this.logger.log(`Session path ${sessionPath} exists: ${exists}`);
       return exists;
     } catch (error) {
-      this.logger.error(`Error checking session: ${error.message}`);
+      // this.logger.error(`Error checking session: ${error.message}`);
       return false;
     }
   }
@@ -586,24 +616,24 @@ export class WhatsappService {
       await this.initializeWhatsApp();
       
       if (this.isConnected) {
-        this.logger.log('WhatsApp is already connected, no QR code needed');
+        // this.logger.log('WhatsApp is already connected, no QR code needed');
         return null;
       }
 
       if (this.qrCode) {
-        this.logger.log('Returning existing QR code');
+        // this.logger.log('Returning existing QR code');
         return this.qrCode;
       }
 
       if (this.qrCodePromise) {
-        this.logger.log('Waiting for QR code from existing promise');
+        // this.logger.log('Waiting for QR code from existing promise');
         return await this.qrCodePromise;
       }
 
-      this.logger.log('No QR code available, waiting for initialization');
+      // this.logger.log('No QR code available, waiting for initialization');
       return null;
     } catch (error) {
-      this.logger.error(`Error getting QR code: ${error.message}`);
+      // this.logger.error(`Error getting QR code: ${error.message}`);
       return null;
     }
   }
@@ -617,23 +647,23 @@ export class WhatsappService {
       await this.initializeWhatsApp();
       
       if (!this.client) {
-        this.logger.log('WhatsApp client not initialized');
+        // this.logger.log('WhatsApp client not initialized');
         return false;
       }
 
       try {
         const state = await this.client.getState();
         this.isConnected = state === 'CONNECTED';
-        this.logger.log(`WhatsApp state: ${state}, isConnected: ${this.isConnected}`);
+        // this.logger.log(`WhatsApp state: ${state}, isConnected: ${this.isConnected}`);
         
         if (this.isConnected) {
           // Verificar que podemos obtener los chats
           try {
             const chats = await this.client.getChats();
-            this.logger.log(`Successfully retrieved ${chats.length} chats`);
+            // this.logger.log(`Successfully retrieved ${chats.length} chats`);
             return true;
           } catch (error) {
-            this.logger.error(`Error getting chats: ${error.message}`);
+            // this.logger.error(`Error getting chats: ${error.message}`);
             // Si hay un error al obtener los chats, intentar reinicializar
             this.initializationPromise = null;
             await this.initializeWhatsApp();
@@ -643,7 +673,7 @@ export class WhatsappService {
         
         return false;
       } catch (error) {
-        this.logger.error(`Error getting WhatsApp state: ${error.message}`);
+        // this.logger.error(`Error getting WhatsApp state: ${error.message}`);
         this.isConnected = false;
         // Intentar reinicializar si hay un error
         this.initializationPromise = null;
@@ -651,7 +681,7 @@ export class WhatsappService {
         return false;
       }
     } catch (error) {
-      this.logger.error(`Error checking WhatsApp connection: ${error.message}`);
+      // this.logger.error(`Error checking WhatsApp connection: ${error.message}`);
       return false;
     }
   }
@@ -672,14 +702,21 @@ export class WhatsappService {
       // Check if we have cached chats that are still valid
       const now = Date.now();
       if (this.cachedChats.length > 0 && (now - this.lastChatsUpdate) < this.CHATS_CACHE_DURATION) {
-        this.logger.log('Returning cached chats');
+        // this.logger.log('Returning cached chats');
         return this.cachedChats;
       }
 
-      this.logger.log('Fetching WhatsApp chats...');
+      // this.logger.log('Fetching WhatsApp chats...');
       const chats = await this.client.getChats();
-      this.logger.log(`Found ${chats.length} chats`);
+      // this.logger.log(`Found ${chats.length} chats`);
       
+      // Log pushname de cada chat individual
+      // chats.forEach((chat: any) => {
+      //   if (chat.id && chat.id._serialized && chat.id._serialized.endsWith('@c.us')) {
+      //     this.logger.log(`[SYNC DEBUG] Chat: ${chat.id._serialized} | name: ${chat.name} | pushname: ${chat.pushname}`);
+      //   }
+      // });
+
       const chatSettings = await this.prisma.whatsappChat.findMany({
         where: {
           locationId: this.locationId,
@@ -701,17 +738,20 @@ export class WhatsappService {
           unreadCount: chat.unreadCount,
           aiEnabled: settings ? settings.aiEnabled : true, // Default to true if no settings found
         };
-        this.logger.debug(`Formatted chat: ${JSON.stringify(formatted)}`);
+        // this.logger.debug(`Formatted chat: ${JSON.stringify(formatted)}`);
         return formatted;
       });
 
-      this.logger.log(
-        `Formatted ${formattedChats.length} chats with last messages`,
-      );
+      // this.logger.log(
+      //   `Formatted ${formattedChats.length} chats with last messages`,
+      // );
       // Log a few examples for debugging
-      formattedChats.slice(0, 3).forEach((chat, index) => {
-        this.logger.log(`Chat ${index + 1}: "${chat.name}" - Last message: "${chat.lastMessage.substring(0, 50)}${chat.lastMessage.length > 50 ? '...' : ''}"`);
-      });
+      // formattedChats.slice(0, 3).forEach((chat, index) => {
+      //   this.logger.log(`Chat ${index + 1}: "${chat.name}" - Last message: "${chat.lastMessage.substring(0, 50)}${chat.lastMessage.length > 50 ? '...' : ''}"`);
+      // });
+
+      // Capturar información de clientes de chats individuales
+      await this.captureCustomerInfo(formattedChats, effectiveLocationId);
 
       // Update cache
       this.cachedChats = formattedChats;
@@ -719,13 +759,157 @@ export class WhatsappService {
 
       return formattedChats;
     } catch (error) {
-      this.logger.error(`Error getting WhatsApp chats: ${error.message}`);
+      // this.logger.error(`Error getting WhatsApp chats: ${error.message}`);
       // If we have cached chats, return them even if they're expired
       if (this.cachedChats.length > 0) {
-        this.logger.log('Returning expired cached chats due to error');
+        // this.logger.log('Returning expired cached chats due to error');
         return this.cachedChats;
       }
       throw error;
+    }
+  }
+
+  private normalizePhone(phone: string): string {
+    // Quita todo lo que no sea dígito
+    return phone.replace(/[^0-9]/g, '');
+  }
+
+  private async captureCustomerInfo(chats: any[], locationId: string) {
+    try {
+      // Filtrar solo chats individuales (no grupos)
+      const individualChats = chats.filter(chat => 
+        chat.id.endsWith('@c.us') && 
+        !chat.id.includes('-') && 
+        !chat.id.includes('@g.us') &&
+        !chat.id.includes('@broadcast')
+      );
+
+      // this.logger.log(`Processing ${individualChats.length} individual chats for customer info`);
+
+      for (const chat of individualChats) {
+        try {
+          // Extraer información del cliente desde el nombre del chat y mensajes
+          const customerInfo = await this.extractCustomerInfoFromChat(chat);
+          if (customerInfo) {
+            // Normalizar el teléfono
+            const normalizedPhone = this.normalizePhone(customerInfo.phone);
+            
+            // Verificar si ya existe un cliente con este teléfono
+            const existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId);
+            
+            if (!existingCustomer) {
+              try {
+                // Crear nuevo cliente usando el servicio
+                const newCustomer = await this.customersService.create({
+                  name: customerInfo.name,
+                  phone: normalizedPhone,
+                  address: customerInfo.address,
+                  neighborhood: customerInfo.neighborhood,
+                  whatsappId: chat.id,
+                  locationId: locationId
+                });
+                // this.logger.log(`Cliente creado automáticamente: ${newCustomer.name} (${newCustomer.phone})`);
+              } catch (createError) {
+                // Si hay un error de restricción única, significa que el cliente ya existe
+                if (createError.message.includes('Unique constraint failed')) {
+                  // this.logger.log(`Cliente ya existe para teléfono ${normalizedPhone}, saltando creación`);
+                  
+                  // Intentar actualizar el whatsappId si no lo tiene
+                  const existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId);
+                  if (existingCustomer && !existingCustomer.whatsappId) {
+                    await this.customersService.update(existingCustomer.id, { whatsappId: chat.id });
+                    // this.logger.log(`Cliente actualizado con WhatsApp: ${existingCustomer.name} (${existingCustomer.phone})`);
+                  }
+                } else {
+                  // Si es otro tipo de error, registrarlo
+                  // this.logger.error(`Error creando cliente para ${normalizedPhone}: ${createError.message}`);
+                }
+              }
+            } else if (!existingCustomer.whatsappId) {
+              // Actualizar cliente existente con whatsappId
+              await this.customersService.update(existingCustomer.id, { whatsappId: chat.id });
+              // this.logger.log(`Cliente actualizado con WhatsApp: ${existingCustomer.name} (${existingCustomer.phone})`);
+            } else {
+              // this.logger.debug(`Cliente ya existe y tiene WhatsApp ID: ${existingCustomer.name} (${existingCustomer.phone})`);
+            }
+          }
+        } catch (error) {
+          // this.logger.error(`Error procesando chat ${chat.id}: ${error.message}`);
+        }
+      }
+    } catch (error) {
+      // this.logger.error(`Error capturando información de clientes: ${error.message}`);
+    }
+  }
+
+  private async extractCustomerInfoFromChat(chat: any) {
+    try {
+      const phone = chat.id.replace('@c.us', '');
+      let name = '';
+      let address = '';
+      let neighborhood = '';
+
+      // --- NUEVO: Usar pushname si está disponible ---
+      if (chat.pushname && chat.pushname.trim()) {
+        name = chat.pushname.trim();
+        // console.log(`[CONTACT DEBUG] Using pushname for chat ${chat.id}: "${name}"`);
+      } else if (chat.name && chat.name !== phone && !chat.name.startsWith('+57')) {
+        // --- PARSING FLEXIBLE DEL NOMBRE DEL CHAT ---
+        // Separar por comas, guiones o espacios dobles
+        const partes = chat.name.split(/[,\-]/).map(p => p.trim()).filter(Boolean);
+        const clavesDireccion = ['cra', 'calle', 'carrera', 'cll', 'av', 'avenida', '#', 'apto', 'casa', 'torre', 'piso', 'apartamento', 'unidad', 'edificio', 'manzana', 'mz', 'bloque', 'bq', 'sector', 'conjunto'];
+        partes.forEach(parte => {
+          const lower = parte.toLowerCase();
+          if (clavesDireccion.some(clave => lower.includes(clave))) {
+            address = address ? address + ' ' + parte : parte;
+          } else if (/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+( [A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*$/.test(parte)) {
+            // Si parece nombre propio (una o dos palabras con mayúscula)
+            name = name ? name + ' ' + parte : parte;
+          } else if (!neighborhood) {
+            neighborhood = parte;
+          }
+        });
+        // console.log(`[CONTACT DEBUG] Using parsed name for chat ${chat.id}: "${name}"`);
+      }
+      // --- FIN NUEVO ---
+
+      // Si no se detectó nombre, usar "Cliente [últimos 4 del teléfono]"
+      if (!name) {
+        name = `Cliente ${phone.slice(-4)}`;
+        // console.log(`[CONTACT DEBUG] Using default name for chat ${chat.id}: "${name}"`);
+      }
+      // Si no se detectó dirección, usar todo el chatName
+      if (!address && chat.name) {
+        address = chat.name;
+      }
+
+      // --- PARSING DE MENSAJE (mantener lógica anterior) ---
+      if (chat.lastMessage) {
+        const text = chat.lastMessage.toLowerCase();
+        // Buscar patrones de dirección
+        if (text.includes('dirección') || text.includes('direccion') || text.includes('vivo en') || text.includes('mi dirección')) {
+          const addressMatch = chat.lastMessage.match(/(?:dirección|direccion|vivo en|mi dirección es?)\s*:? 0*([^,.\n]+)/i);
+          if (addressMatch) {
+            address = addressMatch[1].trim();
+          }
+        }
+        // Buscar patrones de barrio
+        if (text.includes('barrio') || text.includes('sector') || text.includes('zona')) {
+          const neighborhoodMatch = chat.lastMessage.match(/(?:barrio|sector|zona)\s*:? *([^,.\n]+)/i);
+          if (neighborhoodMatch) {
+            neighborhood = neighborhoodMatch[1].trim();
+          }
+        }
+      }
+      return {
+        name,
+        phone: this.normalizePhone(phone),
+        address: address || null,
+        neighborhood: neighborhood || null
+      };
+    } catch (error) {
+      // this.logger.error(`Error extrayendo información del chat ${chat.id}: ${error.message}`);
+      return null;
     }
   }
 
@@ -782,7 +966,7 @@ export class WhatsappService {
 
       return allMessages;
     } catch (error) {
-      this.logger.error(`Error getting chat messages: ${error.message}`);
+      // this.logger.error(`Error getting chat messages: ${error.message}`);
       throw error;
     }
   }
@@ -801,9 +985,9 @@ export class WhatsappService {
 
       // Enviar el mensaje
       await chat.sendMessage(message);
-      this.logger.log(`Message sent to ${to}: ${message}`);
+      // this.logger.log(`Message sent to ${to}: ${message}`);
     } catch (error) {
-      this.logger.error(`Error sending message: ${error.message}`);
+      // this.logger.error(`Error sending message: ${error.message}`);
       throw error;
     }
   }
@@ -817,7 +1001,7 @@ export class WhatsappService {
         timestamp,
       };
       this.lastChatsUpdate = Date.now();
-      this.logger.debug(`Updated chat cache for ${chatId} with message: "${lastMessage.substring(0, 30)}..."`);
+      // this.logger.debug(`Updated chat cache for ${chatId} with message: "${lastMessage.substring(0, 30)}..."`);
     }
   }
 
@@ -825,7 +1009,7 @@ export class WhatsappService {
     chatId: string,
     locationId: string,
   ): Promise<WhatsappChat> {
-    this.logger.log(`Toggling AI for chat ${chatId} in location ${locationId}`);
+    // this.logger.log(`Toggling AI for chat ${chatId} in location ${locationId}`);
     const chat = await this.prisma.whatsappChat.findUnique({
       where: { id: chatId },
     });
@@ -835,9 +1019,9 @@ export class WhatsappService {
         where: { id: chatId },
         data: { aiEnabled: !chat.aiEnabled },
       });
-      this.logger.log(
-        `AI for chat ${chatId} is now ${updatedChat.aiEnabled ? 'enabled' : 'disabled'}`,
-      );
+      // this.logger.log(
+      //   `AI for chat ${chatId} is now ${updatedChat.aiEnabled ? 'enabled' : 'disabled'}`,
+      // );
       return updatedChat;
     } else {
       const newChat = await this.prisma.whatsappChat.create({
@@ -847,7 +1031,7 @@ export class WhatsappService {
           aiEnabled: false, // If it doesn't exist, the first toggle disables it
         },
       });
-      this.logger.log(`Created new chat settings for ${chatId}, AI disabled`);
+      // this.logger.log(`Created new chat settings for ${chatId}, AI disabled`);
       return newChat;
     }
   }

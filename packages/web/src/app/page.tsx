@@ -8,7 +8,7 @@ import React, { useEffect, useState } from "react"
 
 export default function HomePage() {
   const [businessIcon, setBusinessIcon] = useState<string>("")
-  const [businessName, setBusinessName] = useState<string>("Kutchen AI App")
+  const [businessName, setBusinessName] = useState<string>("Kutchen AI")
   useEffect(() => {
     const fetchBusiness = async () => {
       try {
@@ -16,7 +16,7 @@ export default function HomePage() {
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")
-          setBusinessName(data.name || "Kutchen AI App")
+          setBusinessName(data.name || "Kutchen AI")
         }
       } catch {}
     }
