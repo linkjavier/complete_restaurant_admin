@@ -39,6 +39,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private openai: OpenAI;
   private locationIds: Map<string, string> = new Map();
   private chatTypes: Map<string, 'whatsapp' | 'ai' | 'admin'> = new Map();
+  private orderState: Map<string, { items: any[]; customerData: any; step: string; validatedOrderData?: any }> = new Map();
 
   constructor(
     private configService: ConfigService,
@@ -154,6 +155,42 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!locationId || !chatType || !chatId) {
       console.error('Missing required parameters for text input');
       return 'Error: Missing required parameters';
+    }
+
+    const normalizedText = text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+    // --- NUEVO: Responder sobre tiempo de domicilio antes de cualquier otro flujo ---
+    const deliveryTimeKeywords = [
+      'cuanto se demora el domicilio',
+      'cuánto se demora el domicilio',
+      'cuanto tarda el domicilio',
+      'cuánto tarda el domicilio',
+      'cuanto tiempo toma el domicilio',
+      'cuánto tiempo toma el domicilio',
+      'tiempo de entrega',
+      'tiempo domicilio',
+      'demora domicilio',
+      'demora del domicilio',
+      'cuanto se demora el pedido',
+      'cuánto se demora el pedido',
+      'cuanto tarda el pedido',
+      'cuánto tarda el pedido',
+      'cuanto tiempo toma el pedido',
+      'cuánto tiempo toma el pedido',
+      'tiempo de entrega del pedido',
+      'tiempo pedido',
+      'demora pedido',
+      'demora del pedido',
+    ];
+    if (deliveryTimeKeywords.some(k => normalizedText.includes(k))) {
+      const response = '¡Por supuesto! Normalmente los domicilios se demoran entre 20 y 30 minutos, pero puede variar según la zona y la demanda. 😊';
+      if ('emit' in client) {
+        client.emit('ai_response', {
+          type: 'text',
+          content: response
+        });
+      }
+      return response;
     }
 
     const conversationId = this.conversationService.getConversationId(locationId, chatType, chatId);

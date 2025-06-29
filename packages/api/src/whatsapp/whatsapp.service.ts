@@ -6,6 +6,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AIGateway } from '../ai/ai.gateway';
 import { STTService } from '../stt/stt.service';
 import { WhatsappChat } from '@prisma/client';
+import { CustomersService } from '../customers/customers.service';
 
 @Injectable()
 export class WhatsappService {
@@ -29,6 +30,8 @@ export class WhatsappService {
     @Inject(forwardRef(() => AIGateway))
     private aiGateway: AIGateway,
     private sttService: STTService,
+    @Inject(forwardRef(() => CustomersService))
+    private customersService: CustomersService,
   ) {
     // No inicializar en el constructor
   }
@@ -686,7 +689,7 @@ export class WhatsappService {
     }
   }
 
-  async getChats(): Promise<any[]> {
+  async getChats(locationId?: string): Promise<any[]> {
     try {
       await this.initializeWhatsApp();
       
@@ -697,6 +700,12 @@ export class WhatsappService {
       const state = await this.client.getState();
       if (state !== 'CONNECTED') {
         throw new Error('WhatsApp is not connected');
+      }
+
+      // Usar locationId explícito si se pasa, si no, usar el de la instancia
+      const effectiveLocationId = locationId || this.locationId;
+      if (!effectiveLocationId) {
+        throw new Error('No locationId provided or set in WhatsappService');
       }
 
       // Check if we have cached chats that are still valid
@@ -719,7 +728,7 @@ export class WhatsappService {
 
       const chatSettings = await this.prisma.whatsappChat.findMany({
         where: {
-          locationId: this.locationId,
+          locationId: effectiveLocationId,
           id: { in: chats.map((c) => c.id._serialized) },
         },
       });

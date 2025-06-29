@@ -126,13 +126,18 @@ module.exports = {
   				to: {
   					height: 0
   				}
-  			}
+  			},
+  			'product-grow': {
+  				'0%': { transform: 'scale(0.85)', opacity: '0.7' },
+  				'100%': { transform: 'scale(1)', opacity: '1' },
+  			},
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'product-grow': 'product-grow 0.25s cubic-bezier(0.4,0,0.2,1)',
   		}
   	}
   },
   plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
-}; 
+};

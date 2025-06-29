@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { ImageUpload } from "@/components/admin/products/image-upload"
+import { CategoryOrderManager } from "@/components/admin/settings/category-order-manager"
 
 export default function SettingsPage() {
   const [businessName, setBusinessName] = useState("")
@@ -19,6 +20,7 @@ export default function SettingsPage() {
   const [aiName, setAiName] = useState("")
   const [aiGender, setAiGender] = useState("")
   const [aiEnabled, setAiEnabled] = useState(false)
+  const [deliveryFee, setDeliveryFee] = useState<number>(0)
 
   const { toast } = useToast()
 
@@ -43,6 +45,7 @@ export default function SettingsPage() {
         setAiName(data.name)
         setAiGender(data.gender)
         setAiEnabled(data.enabled)
+        setDeliveryFee(data.deliveryFee ?? 0)
       }
     } catch (error) {
       toast({
@@ -100,6 +103,7 @@ export default function SettingsPage() {
           name: aiName,
           gender: aiGender,
           enabled: aiEnabled,
+          deliveryFee,
         }),
       })
 
@@ -134,7 +138,7 @@ export default function SettingsPage() {
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6">Configuración</h1>
       
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Sección de Configuración del negocio */}
         <Card>
           <CardHeader>
@@ -234,6 +238,19 @@ export default function SettingsPage() {
               <Label htmlFor="ai-enabled">Activar Asistente IA</Label>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="delivery-fee">Valor de domicilio ($COP)</Label>
+              <Input
+                id="delivery-fee"
+                type="number"
+                min={0}
+                value={deliveryFee}
+                onChange={e => setDeliveryFee(Number(e.target.value))}
+                disabled={isSaving}
+                className="w-32"
+              />
+            </div>
+
             <Button 
               onClick={handleSave}
               disabled={isSaving}
@@ -250,6 +267,9 @@ export default function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
+        
+        {/* Sección de Orden de Categorías */}
+        <CategoryOrderManager />
       </div>
     </div>
   )

@@ -75,6 +75,7 @@ export class SettingsService {
           aiName: settings.name,
           aiGender: settings.gender,
           aiEnabled: settings.enabled,
+          deliveryFee: settings.deliveryFee,
         },
       });
       
@@ -82,6 +83,7 @@ export class SettingsService {
         name: updated.aiName,
         gender: updated.aiGender,
         enabled: updated.aiEnabled,
+        deliveryFee: updated.deliveryFee ?? 0,
       };
     } else {
       // Create new settings
@@ -90,6 +92,7 @@ export class SettingsService {
           aiName: settings.name,
           aiGender: settings.gender,
           aiEnabled: settings.enabled,
+          deliveryFee: settings.deliveryFee,
         },
       });
       
@@ -97,6 +100,7 @@ export class SettingsService {
         name: created.aiName,
         gender: created.aiGender,
         enabled: created.aiEnabled,
+        deliveryFee: created.deliveryFee ?? 0,
       };
     }
   }
@@ -111,6 +115,7 @@ export class SettingsService {
           aiName: 'Sandra',
           aiGender: 'female',
           aiEnabled: false,
+          deliveryFee: 0,
         },
       });
       
@@ -118,6 +123,7 @@ export class SettingsService {
         name: defaultSettings.aiName,
         gender: defaultSettings.aiGender,
         enabled: defaultSettings.aiEnabled,
+        deliveryFee: defaultSettings.deliveryFee ?? 0,
       };
     }
     
@@ -125,6 +131,21 @@ export class SettingsService {
       name: settings.aiName,
       gender: settings.aiGender,
       enabled: settings.aiEnabled,
+      deliveryFee: settings.deliveryFee ?? 0,
     };
+  }
+
+  async getDeliveryFee(): Promise<number> {
+    const settings = await this.prisma.settings.findFirst();
+    return settings?.deliveryFee ?? 0;
+  }
+
+  async setDeliveryFee(value: number): Promise<void> {
+    let settings = await this.prisma.settings.findFirst();
+    if (!settings) {
+      await this.prisma.settings.create({ data: { deliveryFee: value } });
+    } else {
+      await this.prisma.settings.update({ where: { id: settings.id }, data: { deliveryFee: value } });
+    }
   }
 } 

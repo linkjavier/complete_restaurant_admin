@@ -22,7 +22,8 @@ model User {
   avatar        String?
   location      Location?      @relation(fields: [locationId], references: [id])
   locationId    String?
-  orders        Order[]
+  orders        Order[]        @relation("orderUser")
+  deletedOrders Order[]        @relation("orderDeletedBy")
   notifications Notification[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -54,7 +55,10 @@ model Location {
   ingredients      Ingredient[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  order            Int               @default(0)
+  customers        Customer[]
 
+  @@index([order])
   @@map("locations")
 }
 
@@ -79,24 +83,25 @@ enum TableStatus {
 }
 
 model Product {
-  id          String              @id @default(cuid())
-  name        String
-  description String?
-  price       Float
-  image       String?
-  category    Category            @relation(fields: [categoryId], references: [id])
-  categoryId  String
-  isActive    Boolean             @default(true)
-  isFinal     Boolean             @default(false) // true if it's a processed product
-  quantity    Float               @default(0) // current stock quantity
-  location    Location            @relation(fields: [locationId], references: [id])
-  locationId  String
-  ingredients ProductIngredient[]
-  orderItems  OrderItem[]
-  productions ProductionLog[]
-  variants    ProductVariant[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id            String                @id @default(cuid())
+  name          String
+  description   String?
+  price         Float
+  image         String?
+  category      Category              @relation(fields: [categoryId], references: [id])
+  categoryId    String
+  isActive      Boolean               @default(true)
+  isFinal       Boolean               @default(false) // true if it's a processed product
+  quantity      Float                 @default(0) // current stock quantity
+  location      Location              @relation(fields: [locationId], references: [id])
+  locationId    String
+  ingredients   ProductIngredient[]
+  orderItems    OrderItem[]
+  productions   ProductionLog[]
+  variants      ProductVariant[]
+  variantGroups ProductVariantGroup[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 }
 
 model Category {
@@ -104,8 +109,11 @@ model Category {
   name        String
   description String?
   products    Product[]
+  order       Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([order])
 }
 
 model Ingredient {
@@ -175,7 +183,7 @@ model Order {
   type            OrderType      @default(TABLE)
   status          OrderStatus    @default(PENDING)
   isPaid          Boolean        @default(false)
-  user            User?          @relation(fields: [userId], references: [id])
+  user            User?          @relation("orderUser", fields: [userId], references: [id])
   userId          String?
   customerName    String?
   deliveryAddress String?
@@ -185,6 +193,13 @@ model Order {
   source          OrderSource
   items           OrderItem[]
   payments        Payment[]
+  deliveryFee     Float?         // NUEVO: valor de domicilio por orden
+  subtotal        Float?
+  total           Float?
+  isDeleted       Boolean?   @default(false)
+  deletedAt       DateTime?
+  deletedById     String?
+  deletedBy       User?      @relation("orderDeletedBy", fields: [deletedById], references: [id])
 }
 
 enum OrderStatus {
@@ -196,17 +211,26 @@ enum OrderStatus {
 }
 
 model OrderItem {
-  id               String          @id @default(cuid())
-  order            Order           @relation(fields: [orderId], references: [id])
-  orderId          String
-  product          Product         @relation(fields: [productId], references: [id])
-  productId        String
-  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
-  productVariantId String?
-  quantity         Int
-  status           OrderItemStatus @default(PENDING)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  id        String             @id @default(cuid())
+  order     Order              @relation(fields: [orderId], references: [id])
+  orderId   String
+  product   Product            @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Int
+  price     Float?
+  status    OrderItemStatus    @default(PENDING)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  variants  OrderItemVariant[]
+}
+
+model OrderItemVariant {
+  id               String         @id @default(cuid())
+  orderItem        OrderItem      @relation(fields: [orderItemId], references: [id])
+  orderItemId      String
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  productVariantId String
+  groupName        String?
 }
 
 enum OrderItemStatus {
@@ -303,21 +327,56 @@ model Settings {
   aiName       String   @default("Sandra")
   aiGender     String   @default("female")
   aiEnabled    Boolean  @default(false)
-  businessName String   @default("Blondie Restaurant App")
+  businessName String   @default("Kutchen AI")
   businessLogo String?
+  deliveryFee  Float?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
 
+model ProductVariantGroup {
+  id        String           @id @default(cuid())
+  name      String
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  variants  ProductVariant[]
+  order     Int              @default(0)
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
 model ProductVariant {
-  id         String      @id @default(cuid())
-  name       String
-  price      Float?
-  image      String?
-  isActive   Boolean     @default(true)
-  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId  String
-  orderItems OrderItem[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id                String              @id @default(cuid())
+  name              String
+  price             Float?
+  image             String?
+  isActive          Boolean             @default(true)
+  group             ProductVariantGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId           String
+  product           Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId         String
+  orderItemVariants OrderItemVariant[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([groupId])
+  @@index([productId])
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String
+  address      String?
+  neighborhood String?
+  whatsappId   String? // chatId de WhatsApp si aplica
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId   String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([phone])
+  @@index([locationId])
+  @@unique([phone, locationId])
 }

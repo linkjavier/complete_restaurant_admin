@@ -14,7 +14,8 @@ import {
   Table, 
   createOrder, 
   getActiveOrders,
-  processPayment
+  processPayment,
+  getCategories
 } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -25,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Cart } from "@/components/admin/pos/cart"
-import { ProductGrid } from "@/components/admin/pos/product-grid"
+import { ProductGrid, CategoryTitle } from "@/components/admin/pos/product-grid"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 export default function PosPage() {
@@ -79,21 +80,14 @@ export default function PosPage() {
     try {
       setLoading(true)
       setError(null)
-      const [productsData, tablesData] = await Promise.all([
+      const [productsData, tablesData, categoriesData] = await Promise.all([
         getProducts(),
-        getTables()
+        getTables(),
+        getCategories(),
       ])
-      setProducts(productsData)
+      setProducts([...productsData].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })))
       setTables(tablesData)
-      
-      // Extract unique categories
-      const uniqueCategories = new Map<string, Category>()
-      productsData.forEach(product => {
-        if (product.category) {
-          uniqueCategories.set(product.category.id, product.category)
-        }
-      })
-      setCategories(Array.from(uniqueCategories.values()))
+      setCategories(categoriesData)
     } catch (err) {
       console.error('Error fetching data:', err)
       setError('Error al cargar los datos. Por favor, intente de nuevo.')
@@ -108,17 +102,29 @@ export default function PosPage() {
   }
 
   // Nueva función para generar la clave del carrito
-  function getCartKey(product: Product, variant?: ProductVariant) {
-    if (variant) {
-      return `${product.id}__${variant.name}`
+  function getCartKey(product: Product, variants?: ProductVariant[] | ProductVariant) {
+    if (Array.isArray(variants) && variants.length > 0) {
+      // Clave única por producto y variantes seleccionadas
+      return `${product.id}__${variants.map(v => v.id).join('_')}`
+    } else if (variants && !Array.isArray(variants)) {
+      return `${product.id}__${variants.id}`
     }
     return product.id
   }
 
-  // Actualizar handleAddToCart
-  const handleAddToCart = (product: Product, variant?: ProductVariant) => {
-    // Si hay variante, asegurar que tiene id
-    if (variant && !variant.id) {
+  // Actualizar handleAddToCart para soportar múltiples variantes
+  const handleAddToCart = (product: Product, variantsOrVariant?: ProductVariant[] | ProductVariant) => {
+    // Validar ids
+    if (Array.isArray(variantsOrVariant)) {
+      if (variantsOrVariant.some(v => !v.id)) {
+        toast({
+          title: "Error",
+          description: "Alguna variante seleccionada no tiene un ID válido.",
+          variant: "destructive",
+        })
+        return
+      }
+    } else if (variantsOrVariant && !variantsOrVariant.id) {
       toast({
         title: "Error",
         description: "La variante seleccionada no tiene un ID válido.",
@@ -126,14 +132,18 @@ export default function PosPage() {
       })
       return
     }
-    const key = getCartKey(product, variant)
+    const key = getCartKey(product, variantsOrVariant)
     setCart(prev => {
       const prevItem = prev[key]
       return {
         ...prev,
         [key]: {
           product,
-          variant,
+          ...(Array.isArray(variantsOrVariant)
+            ? { variants: variantsOrVariant }
+            : variantsOrVariant
+              ? { variant: variantsOrVariant }
+              : {}),
           quantity: prevItem ? prevItem.quantity + 1 : 1
         }
       }
@@ -204,13 +214,20 @@ export default function PosPage() {
       }
 
       const orderItems = Object.values(cart).map(item => {
-        if (item.variant && !item.variant.id) {
-          throw new Error("La variante seleccionada no tiene un ID válido.")
+        let variantsArr: { productVariantId: string, groupName?: string }[] = [];
+        // Soporte para múltiples variantes por item
+        if (Array.isArray((item as any).variants) && (item as any).variants.length > 0) {
+          variantsArr = (item as any).variants.map((v: any) => ({
+            productVariantId: v.id,
+            groupName: v.groupName || undefined
+          }))
+        } else if ((item as any).variant) {
+          variantsArr = [{ productVariantId: (item as any).variant.id }]
         }
         return {
           productId: item.product.id,
           quantity: item.quantity,
-          ...(item.variant ? { productVariantId: item.variant.id } : {})
+          variants: variantsArr
         }
       })
 
@@ -295,6 +312,25 @@ export default function PosPage() {
     return matchesCategory && matchesSearch
   })
 
+  const groupedProducts =
+    selectedCategory === "all"
+      ? categories
+          .map(category => ({
+            categoryName: category.name,
+            categoryId: category.id,
+            products: filteredProducts.filter(p => p.categoryId === category.id),
+          }))
+          .filter(group => group.products.length > 0)
+      : filteredProducts.length > 0
+      ? [
+          {
+            categoryName: categories.find((c) => c.id === selectedCategory)?.name || "",
+            categoryId: selectedCategory,
+            products: filteredProducts,
+          },
+        ]
+      : []
+
   // Get all active orders for selected table
   const currentOrders = activeOrders
 
@@ -360,7 +396,7 @@ export default function PosPage() {
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto">
             <ProductGrid
-              products={filteredProducts}
+              groupedProducts={groupedProducts}
               onAddToCart={handleAddToCart}
               cart={Object.fromEntries(Object.entries(cart).map(([key, item]) => [key, item.quantity]))}
             />

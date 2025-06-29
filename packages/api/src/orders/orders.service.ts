@@ -35,7 +35,11 @@ export class OrdersService {
         items: {
           include: {
             product: true,
-            productVariant: true,
+            variants: {
+              include: {
+                productVariant: true,
+              },
+            },
           },
         },
         payments: true,
@@ -64,7 +68,11 @@ export class OrdersService {
         items: {
           include: {
             product: true,
-            productVariant: true,
+            variants: {
+              include: {
+                productVariant: true,
+              },
+            },
           },
         },
         payments: true,
@@ -78,33 +86,55 @@ export class OrdersService {
       
       const { userId, items, ...orderData } = createOrderDto;
 
-      // Map variantName to productVariantId if present
-      const itemsWithVariantId = await Promise.all(items.map(async (item: any) => {
-        if (item.variantName && typeof item.variantName === 'string' && item.variantName.trim() !== '') {
-          const product = await this.productsService.findOne(item.productId) as any;
-          if (product && Array.isArray(product.variants) && product.variants.length > 0) {
-            const variant = product.variants.find((v: any) => v.name.toLowerCase() === item.variantName.toLowerCase());
-            if (variant) {
-              return {
-                ...item,
-                productVariantId: variant.id,
-              };
-            }
+      // START: Price calculation logic
+      let orderSubtotal = 0;
+      const itemsWithPrice = await Promise.all(
+        items.map(async (item) => {
+          const product = await this.productsService.findOne(item.productId);
+          if (!product) {
+            throw new NotFoundException(`Product with ID ${item.productId} not found`);
           }
-        }
-        return item;
-      }));
+
+          let variantsPrice = 0;
+          if (item.variants && item.variants.length > 0) {
+            const variantIds = item.variants.map(v => v.productVariantId);
+            const variantRecords = await this.prisma.productVariant.findMany({
+              where: { id: { in: variantIds } },
+            });
+            variantsPrice = variantRecords.reduce((sum, v) => sum + (v.price || 0), 0);
+          }
+
+          const unitPrice = (product.price || 0) + variantsPrice;
+          orderSubtotal += unitPrice * item.quantity;
+
+          return {
+            ...item,
+            price: unitPrice, // Calculated unit price
+          };
+        }),
+      );
+
+      const orderTotal = orderSubtotal + (createOrderDto.deliveryFee || 0);
+      // END: Price calculation logic
 
       const orderCreateData: any = {
         ...orderData,
         status: orderData.status || 'PENDING',
         isPaid: orderData.isPaid || false,
+        subtotal: orderSubtotal, // Calculated subtotal
+        total: orderTotal,       // Calculated total
         items: {
-          create: itemsWithVariantId.map(item => ({
+          create: itemsWithPrice.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
+            price: item.price, // Save the calculated price
             status: 'PENDING',
-            ...(item.productVariantId ? { productVariantId: item.productVariantId } : {}),
+            variants: {
+              create: item.variants?.map(variant => ({
+                productVariantId: variant.productVariantId,
+                groupName: variant.groupName || null,
+              })) || []
+            },
           })),
         }
       };
@@ -117,24 +147,32 @@ export class OrdersService {
 
       const order = await this.prisma.$transaction(async (tx) => {
         const newOrder = await tx.order.create({
-          data: orderCreateData,
+          data: {
+            ...orderCreateData,
+            deliveryFee: createOrderDto.deliveryFee ?? 0,
+          },
           include: {
             items: {
               include: {
                 product: true,
-                productVariant: true,
+                variants: {
+                  include: {
+                    productVariant: true,
+                  },
+                },
               },
             },
             table: true,
             location: true,
+            user: true,
+            payments: true,
           },
         });
-        
         this.logger.log(`Order created with ID: ${newOrder.id}`);
         return newOrder;
       });
 
-      // Emit WebSocket event for real-time updates
+      // Emit WebSocket event para actualizaciones en tiempo real
       if (order.locationId) {
         try {
           this.logger.log(`Emitting new order event for order ${order.id} to location ${order.locationId}`);
@@ -163,7 +201,7 @@ export class OrdersService {
     }
   }
 
-  async findAll(locationId?: string, tableId?: string, kitchen?: boolean) {
+  async findAll(locationId?: string, tableId?: string, kitchen?: boolean, showDeleted = false) {
     const where: Prisma.OrderWhereInput = {};
 
     if (locationId) {
@@ -184,16 +222,31 @@ export class OrdersService {
       };
     }
 
+    // Soft delete filter
+    if (!showDeleted) {
+      where.OR = [
+        { isDeleted: false },
+        { isDeleted: null },
+      ];
+    } else {
+      where.isDeleted = true;
+    }
+
     return this.prisma.order.findMany({
       where,
       include: {
         table: true,
         location: true,
         user: true,
+        deletedBy: true,
         items: {
           include: {
             product: true,
-            productVariant: true,
+            variants: {
+              include: {
+                productVariant: true,
+              },
+            },
           },
         },
         payments: true,
@@ -212,7 +265,11 @@ export class OrdersService {
           items: {
             include: {
               product: true,
-              productVariant: true,
+              variants: {
+                include: {
+                  productVariant: true,
+                },
+              },
             },
           },
           table: true,
@@ -255,7 +312,11 @@ export class OrdersService {
           items: {
             include: {
               product: true,
-              productVariant: true,
+              variants: {
+                include: {
+                  productVariant: true,
+                },
+              },
             },
           },
           table: true,
@@ -287,16 +348,22 @@ export class OrdersService {
           items: {
             include: {
               product: true,
-              productVariant: true,
-            }
+              variants: {
+                include: {
+                  productVariant: true,
+                },
+              },
+            },
           },
           location: true,
         },
       });
 
-      if (!order) {
-        this.logger.warn(`Order with ID ${orderId} not found for item status update`);
-        throw new NotFoundException(`Order with ID ${orderId} not found`);
+      // El resultado de order.findUnique puede ser null o no incluir 'items' si no se especifica el include correctamente.
+      // Aseguramos que 'items' está incluido y tipado correctamente.
+      if (!order || !('items' in order) || !Array.isArray(order.items)) {
+        this.logger.warn(`Order with ID ${orderId} not found for item status update, or items not present`);
+        throw new NotFoundException(`Order with ID ${orderId} not found or items missing`);
       }
 
       const item = order.items.find(item => item.id === itemId);
@@ -336,7 +403,7 @@ export class OrdersService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, deletedById?: string) {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id },
@@ -350,11 +417,15 @@ export class OrdersService {
         throw new NotFoundException(`Order with ID ${id} not found`);
       }
 
-      const deletedOrder = await this.prisma.order.delete({
+      const deletedOrder = await this.prisma.order.update({
         where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedById: deletedById || null,
+        },
       });
-      
-      this.logger.log(`Order ${id} deleted successfully`);
+      this.logger.log(`Order ${id} marked as deleted successfully`);
       return deletedOrder;
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -363,5 +434,9 @@ export class OrdersService {
       this.logger.error(`Error removing order ${id}: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  async findDeleted(locationId?: string) {
+    return this.findAll(locationId, undefined, false, true);
   }
 }

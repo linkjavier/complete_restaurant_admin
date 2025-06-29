@@ -1,32 +1,23 @@
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import type { Product } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
   constructor(private prisma: PrismaService) {}
 
-  async create(data: any): Promise<Product> {
+  async create(data: any): Promise<any> {
     try {
       this.logger.debug(`Creating product with data: ${JSON.stringify(data)}`);
-      
-      // Extraer los ingredientes y variantes antes de crear el producto
-      const { ingredients, variants, ...productData } = data;
-      
-      // Transacción para asegurar que todo se crea correctamente
+      const { ingredients, variantGroups, ...productData } = data;
       return await this.prisma.$transaction(async (tx) => {
         // 1. Crear el producto base
         const product = await tx.product.create({
           data: productData,
-          include: {
-            category: true,
-          },
+          include: { category: true },
         });
-        
-        this.logger.debug(`Created product with ID: ${product.id}`);
-        
-        // 2. Si hay ingredientes, crearlos uno por uno
+        // 2. Ingredientes
         if (ingredients && ingredients.length > 0) {
           for (const ingredient of ingredients) {
             await tx.productIngredient.create({
@@ -37,36 +28,45 @@ export class ProductsService {
               }
             });
           }
-          this.logger.debug(`Added ${ingredients.length} ingredients to product`);
         }
-        
-        // 3. Si hay variantes, crearlas
-        if (variants && variants.length > 0) {
-          for (const variant of variants) {
-            await tx.productVariant.create({
+        // 3. Grupos de variantes y variantes
+        if (variantGroups && variantGroups.length > 0) {
+          for (const group of variantGroups) {
+            const groupRecord = await tx.productVariantGroup.create({
               data: {
+                name: group.name,
+                order: group.order ?? 0,
                 productId: product.id,
-                name: variant.name,
-                price: variant.price,
-                image: variant.image,
-                isActive: variant.isActive !== undefined ? variant.isActive : true,
-              }
+              },
             });
+            if (group.variants && group.variants.length > 0) {
+              for (const variant of group.variants) {
+                await tx.productVariant.create({
+                  data: {
+                    name: variant.name,
+                    price: variant.price,
+                    image: variant.image,
+                    isActive: variant.isActive !== undefined ? variant.isActive : true,
+                    groupId: groupRecord.id,
+                    productId: product.id,
+                  },
+                });
+              }
+            }
           }
-          this.logger.debug(`Added ${variants.length} variants to product`);
         }
-        
-        // 4. Obtener el producto completo con ingredientes y variantes
+        // 4. Obtener el producto completo con ingredientes y grupos/variantes
         return await tx.product.findUnique({
           where: { id: product.id },
           include: {
             category: true,
-            ingredients: {
+            ingredients: { include: { ingredient: true } },
+            variantGroups: {
               include: {
-                ingredient: true,
+                variants: true
               },
+              orderBy: { order: 'asc' }
             },
-            variants: true,
           },
         });
       });
@@ -77,15 +77,7 @@ export class ProductsService {
     }
   }
 
-  async findAll({
-    locationId,
-    categoryId,
-    search,
-  }: {
-    locationId: string;
-    categoryId?: string;
-    search?: string;
-  }) {
+  async findAll({ locationId, categoryId, search }: { locationId: string; categoryId?: string; search?: string; }) {
     try {
       return this.prisma.product.findMany({
         where: {
@@ -100,7 +92,14 @@ export class ProductsService {
         },
         include: {
           category: true,
-          variants: true,
+          variantGroups: {
+            where: { isActive: true },
+            include: {
+              variants: { where: { isActive: true } }
+            },
+            orderBy: { order: 'asc' }
+          },
+          ingredients: { include: { ingredient: true } },
         },
       });
     } catch (error) {
@@ -109,18 +108,20 @@ export class ProductsService {
     }
   }
 
-  async findOne(id: string): Promise<Product | null> {
+  async findOne(id: string): Promise<any> {
     try {
       return this.prisma.product.findUnique({
         where: { id },
         include: {
           category: true,
-          ingredients: {
+          ingredients: { include: { ingredient: true } },
+          variantGroups: {
+            where: { isActive: true },
             include: {
-              ingredient: true,
+              variants: { where: { isActive: true } }
             },
+            orderBy: { order: 'asc' }
           },
-          variants: true,
         },
       });
     } catch (error) {
@@ -129,34 +130,17 @@ export class ProductsService {
     }
   }
 
-  async update(id: string, data: any): Promise<Product> {
+  async update(id: string, data: any): Promise<any> {
     try {
-      const { ingredients, variants, categoryId, locationId, ...productData } = data;
-      // Transforma categoryId/locationId a la forma anidada de Prisma
-      if (categoryId) {
-        productData.category = { connect: { id: categoryId } };
-      }
-      if (locationId) {
-        productData.location = { connect: { id: locationId } };
-      }
-      // Transacción para asegurar que todo se actualiza correctamente
+      const { ingredients, variantGroups, categoryId, locationId, ...productData } = data;
+      if (categoryId) productData.category = { connect: { id: categoryId } };
+      if (locationId) productData.location = { connect: { id: locationId } };
       return await this.prisma.$transaction(async (tx) => {
         // 1. Actualizar el producto
-        const product = await tx.product.update({
-          where: { id },
-          data: productData,
-        });
-        
-        // 2. Si hay ingredientes, actualizar las relaciones
+        const product = await tx.product.update({ where: { id }, data: productData });
+        // 2. Ingredientes
         if (ingredients) {
-          // Eliminar las relaciones existentes
-          await tx.productIngredient.deleteMany({
-            where: {
-              productId: id
-            }
-          });
-          
-          // Crear las nuevas relaciones
+          await tx.productIngredient.deleteMany({ where: { productId: id } });
           for (const ingredient of ingredients) {
             await tx.productIngredient.create({
               data: {
@@ -167,39 +151,50 @@ export class ProductsService {
             });
           }
         }
-        
-        // 3. Si hay variantes, actualizar las relaciones
-        if (variants) {
-          // Eliminar todas las variantes existentes
-          await tx.productVariant.deleteMany({
-            where: { productId: id }
-          });
-          
-          // Crear las nuevas variantes
-          for (const variant of variants) {
-            await tx.productVariant.create({
+        // 3. Grupos de variantes y variantes
+        if (variantGroups) {
+          // Borrado lógico de variantes y grupos de variantes
+          const oldGroups = await tx.productVariantGroup.findMany({ where: { productId: id } });
+          for (const group of oldGroups) {
+            await tx.productVariant.updateMany({ where: { groupId: group.id }, data: { isActive: false } });
+          }
+          await tx.productVariantGroup.updateMany({ where: { productId: id }, data: { isActive: false } });
+          // Crear nuevos grupos y variantes
+          for (const group of variantGroups) {
+            const groupRecord = await tx.productVariantGroup.create({
               data: {
+                name: group.name,
+                order: group.order ?? 0,
                 productId: product.id,
-                name: variant.name,
-                price: variant.price,
-                image: variant.image,
-                isActive: variant.isActive !== undefined ? variant.isActive : true,
-              }
+                isActive: true,
+              },
             });
+            if (group.variants && group.variants.length > 0) {
+              for (const variant of group.variants) {
+                await tx.productVariant.create({
+                  data: {
+                    name: variant.name,
+                    price: variant.price,
+                    image: variant.image,
+                    isActive: variant.isActive !== undefined ? variant.isActive : true,
+                    groupId: groupRecord.id,
+                    productId: product.id,
+                  },
+                });
+              }
+            }
           }
         }
-        
-        // 4. Obtener el producto actualizado con todos los datos
+        // 4. Obtener el producto actualizado
         return await tx.product.findUnique({
           where: { id: product.id },
           include: {
             category: true,
-            ingredients: {
-              include: {
-                ingredient: true,
-              },
+            ingredients: { include: { ingredient: true } },
+            variantGroups: {
+              include: { variants: true },
+              orderBy: { order: 'asc' }
             },
-            variants: true,
           },
         });
       });
@@ -209,7 +204,7 @@ export class ProductsService {
     }
   }
 
-  async remove(id: string): Promise<Product> {
+  async remove(id: string): Promise<any> {
     try {
       // Obtener el producto antes de eliminarlo
       const product = await this.findOne(id);
@@ -246,4 +241,4 @@ export class ProductsService {
       throw new InternalServerErrorException(`Error removing product: ${error.message}`);
     }
   }
-} 
+}

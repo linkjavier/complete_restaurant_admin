@@ -11,6 +11,13 @@ export interface ProductVariant {
   isActive?: boolean;
 }
 
+export interface ProductVariantGroup {
+  id: string;
+  name: string;
+  order?: number;
+  variants: ProductVariant[];
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -25,7 +32,7 @@ export interface Product {
   createdAt?: string;
   updatedAt?: string;
   quantity: number;
-  variants?: ProductVariant[];
+  variantGroups?: ProductVariantGroup[];
 }
 
 export interface Table {
@@ -404,7 +411,7 @@ export async function createProduct(data: {
     ingredientId: string
     quantity: number
   }[]
-  variants?: ProductVariant[]
+  variantGroups?: Omit<ProductVariantGroup, 'id'>[]
 }): Promise<Product> {
   const response = await fetch(`${API_URL}/products`, {
     method: "POST",
@@ -433,7 +440,7 @@ export async function updateProduct(id: string, data: {
     ingredientId: string
     quantity: number
   }[]
-  variants?: ProductVariant[]
+  variantGroups?: Omit<ProductVariantGroup, 'id'>[]
 }): Promise<Product> {
   const response = await fetch(`${API_URL}/products/${id}`, {
     method: "PATCH",
@@ -473,32 +480,36 @@ export async function getOrders(locationId?: string) {
   return response.json();
 }
 
-export async function createOrder(data: {
-  tableId?: string;
-  locationId: string;
-  userId?: string;
-  type: 'TABLE' | 'TAKEOUT' | 'DELIVERY';
-  items: Array<{
-    productId: string;
-    quantity: number;
-    productVariantId?: string;
-  }>;
-  status?: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'DELIVERED' | 'CANCELLED';
-  isPaid?: boolean;
-  customerName?: string;
-  deliveryAddress?: string;
-  neighborhood?: string;
-  phone?: string;
-  paymentMethod?: 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'TRANSFER';
-  source?: 'POS' | 'QR' | 'WHATSAPP';
-}) {
+export async function createOrder(data: any) {
+  // Adaptar items con variantes múltiples al formato backend y asegurar que 'variants' siempre es array
+  const items = (data.items || []).map((item: any) => {
+    // Si ya tiene 'variants' como array, transformar
+    if (Array.isArray(item.variants)) {
+      return {
+        ...item,
+        variants: item.variants.map((v: any) => ({
+          productVariantId: v.productVariantId || v.id,
+          groupName: v.groupName || undefined,
+        })),
+      };
+    } else if (item.variant) {
+      // Si tiene solo 'variant', transformar a array
+      return {
+        ...item,
+        variants: [{ productVariantId: item.variant.id, groupName: item.variant.groupName }],
+      };
+    }
+    // Si no tiene variantes, poner variants como array vacío
+    return { ...item, variants: [] };
+  });
+  const payload = { ...data, items };
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
     method: 'POST',
     headers: {
       ...getAuthHeaders(),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     throw new Error('Failed to create order');
@@ -731,9 +742,31 @@ export async function updateUser(id: string, data: UpdateUserDto): Promise<User>
 export async function deleteUser(id: string): Promise<void> {
   const response = await fetch(`${API_URL}/users/${id}`, {
     method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
-    },
-  })
-  if (!response.ok) throw new Error('Failed to delete user')
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Error al eliminar el usuario');
+  }
+}
+
+export async function getCustomers(): Promise<any[]> {
+  const response = await fetch(`${API_URL}/customers`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Error al obtener los clientes');
+  }
+  return response.json();
+}
+
+export async function updateCategoryOrder(orderedIds: string[]) {
+  const response = await fetch(`${API_URL}/categories/order`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ orderedIds }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update category order');
+  }
+  return response.json();
 }

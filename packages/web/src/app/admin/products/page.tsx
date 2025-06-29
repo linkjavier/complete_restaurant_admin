@@ -1,19 +1,14 @@
 "use client"
 
 import { ProductsManager } from "@/components/admin/products/products-manager"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function ProductsPage() {
   return (
-    <div className="container mx-auto py-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Gestión de Productos</CardTitle>
-        </CardHeader>
-        <CardContent>
+    <div className="flex-1 space-y-4 p-4 sm:p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight">Gestión de Productos</h2>
+      </div>
           <ProductsManager />
-        </CardContent>
-      </Card>
     </div>
   )
 } 

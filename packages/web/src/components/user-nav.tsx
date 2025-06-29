@@ -55,10 +55,10 @@ interface Message {
 }
 
 export function UserNav() {
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingState, setIsLoading] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -181,7 +181,7 @@ export function UserNav() {
   };
 
   useEffect(() => {
-    if (!user?.locationId) return
+    if (isLoading || !user?.locationId) return
 
     const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
       transports: ['websocket'],
@@ -236,7 +236,7 @@ export function UserNav() {
     return () => {
       socketInstance.disconnect()
     }
-  }, [user])
+  }, [user, isLoading])
 
   // Clean up on unmount
   useEffect(() => {
@@ -251,7 +251,7 @@ export function UserNav() {
   }, []);
 
   const handleSendMessage = () => {
-    if (!input.trim() || !mainSocket || !isConnected || isLoading) return
+    if (!input.trim() || !mainSocket || !isConnected || isLoadingState) return
 
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -410,7 +410,7 @@ export function UserNav() {
             )}
             <Button 
               onClick={isRecording ? stopRecording : handleSendMessage} 
-              disabled={(!input.trim() && !isRecording) || !isConnected || isLoading}
+              disabled={(!input.trim() && !isRecording) || !isConnected || isLoadingState}
               className={cn(
                 "transition-colors",
                 isRecording && "bg-primary text-primary-foreground"

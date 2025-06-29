@@ -1,4 +1,4 @@
-import { IsString, IsArray, ValidateNested, IsNotEmpty, IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import { IsString, IsArray, ValidateNested, IsNotEmpty, IsOptional, IsEnum, IsBoolean, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus } from '@prisma/client';
 
@@ -21,6 +21,16 @@ export enum OrderSource {
   WHATSAPP = 'WHATSAPP'
 }
 
+class OrderItemVariantDto {
+  @IsString()
+  @IsNotEmpty()
+  productVariantId: string;
+
+  @IsString()
+  @IsOptional()
+  groupName?: string;
+}
+
 class OrderItemDto {
   @IsString()
   @IsNotEmpty()
@@ -29,13 +39,10 @@ class OrderItemDto {
   @IsNotEmpty()
   quantity: number;
 
-  @IsString()
-  @IsOptional()
-  productVariantId?: string;
-
-  @IsString()
-  @IsOptional()
-  variantName?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderItemVariantDto)
+  variants: OrderItemVariantDto[];
 }
 
 export class CreateOrderDto {
@@ -85,6 +92,10 @@ export class CreateOrderDto {
 
   @IsEnum(OrderSource)
   source: OrderSource;
+
+  @IsNumber()
+  @IsOptional()
+  deliveryFee?: number;
 
   @IsArray()
   @ValidateNested({ each: true })

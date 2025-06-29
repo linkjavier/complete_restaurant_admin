@@ -23,6 +23,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { SettingsModule } from './settings/settings.module';
 import { UploadModule } from './upload/upload.module';
 import { STTModule } from './stt/stt.module';
+import { CustomersModule } from './customers/customers.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { STTModule } from './stt/stt.module';
     SettingsModule,
     UploadModule,
     STTModule,
+    CustomersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
