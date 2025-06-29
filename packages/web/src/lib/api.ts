@@ -759,6 +759,30 @@ export async function getCustomers(): Promise<any[]> {
   return response.json();
 }
 
+export async function updateCustomer(id: string, data: {
+  name?: string;
+  phone?: string;
+  address?: string;
+  neighborhood?: string;
+  whatsappId?: string;
+  locationId?: string;
+}): Promise<any> {
+  const response = await fetch(`${API_URL}/customers/${id}`, {
+    method: 'PUT',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Error al actualizar el cliente');
+  }
+  
+  return response.json();
+}
+
 export async function updateCategoryOrder(orderedIds: string[]) {
   const response = await fetch(`${API_URL}/categories/order`, {
     method: 'PATCH',

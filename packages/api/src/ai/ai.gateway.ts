@@ -157,7 +157,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return 'Error: Missing required parameters';
     }
 
-    const normalizedText = text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    const deliveryTimeText = text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
 
     // --- NUEVO: Responder sobre tiempo de domicilio antes de cualquier otro flujo ---
     const deliveryTimeKeywords = [
@@ -182,7 +182,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       'demora pedido',
       'demora del pedido',
     ];
-    if (deliveryTimeKeywords.some(k => normalizedText.includes(k))) {
+    if (deliveryTimeKeywords.some(k => deliveryTimeText.includes(k))) {
       const response = '¡Por supuesto! Normalmente los domicilios se demoran entre 20 y 30 minutos, pero puede variar según la zona y la demanda. 😊';
       if ('emit' in client) {
         client.emit('ai_response', {

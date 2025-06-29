@@ -4,40 +4,76 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Phone, MapPin, Calendar, User, RefreshCw, MessageSquare, Plus, Trash2, Pencil } from 'lucide-react';
+import { Phone, MapPin, Calendar, User, RefreshCw, MessageSquare, Check, X, Edit3, GripVertical, ArrowRight } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { getCustomers } from '@/lib/api';
+import { getCustomers, updateCustomer } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+
+interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  address?: string;
+  neighborhood?: string;
+  whatsappId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface EditableField {
+  id: string;
+  type: 'name' | 'phone' | 'address' | 'neighborhood';
+  value: string;
+  originalValue: string;
+}
+
+interface DragState {
+  customerId: string;
+  sourceField: EditableField['type'];
+  targetField: EditableField['type'] | null;
+}
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<any>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    address: '',
-    neighborhood: ''
-  });
+  const [editingFields, setEditingFields] = useState<EditableField[]>([]);
+  const [savingCustomer, setSavingCustomer] = useState<string | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const router = useRouter();
 
   const fetchCustomers = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await getCustomers();
       setCustomers(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching customers:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los clientes",
-        variant: "destructive",
-      });
+      
+      // Check if the error is authentication related
+      if (error.message?.includes('No authentication token found') || 
+          error.message?.includes('Authentication expired') ||
+          error.message?.includes('Unauthorized')) {
+        setError("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.");
+        
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          router.push('/auth/login');
+        }, 2000);
+      } else {
+        setError("No se pudieron cargar los clientes. Por favor, intenta de nuevo.");
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los clientes",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -74,7 +110,6 @@ export default function CustomersPage() {
           title: "¡Sincronización exitosa!",
           description: result.message,
         });
-        // Recargar la lista de clientes
         await fetchCustomers();
       } else {
         toast({
@@ -83,15 +118,267 @@ export default function CustomersPage() {
           variant: "destructive",
         });
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo sincronizar con WhatsApp",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      console.error('Error syncing WhatsApp:', error);
+      
+      // Check if the error is authentication related
+      if (error.message?.includes('No authentication token found') || 
+          error.message?.includes('Authentication expired') ||
+          error.message?.includes('Unauthorized')) {
+        toast({
+          title: "Error de autenticación",
+          description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
+          variant: "destructive",
+          duration: 3000
+        });
+        
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          router.push('/auth/login');
+        }, 2000);
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo sincronizar con WhatsApp",
+          variant: "destructive",
+        });
+      }
     } finally {
       setSyncing(false);
     }
+  };
+
+  const startEditing = (customerId: string, fieldType: EditableField['type'], value: string) => {
+    const existingField = editingFields.find(f => f.id === customerId && f.type === fieldType);
+    if (existingField) return;
+
+    setEditingFields(prev => [...prev, {
+      id: customerId,
+      type: fieldType,
+      value: value,
+      originalValue: value
+    }]);
+  };
+
+  const updateEditingField = (customerId: string, fieldType: EditableField['type'], value: string) => {
+    setEditingFields(prev => 
+      prev.map(field => 
+        field.id === customerId && field.type === fieldType 
+          ? { ...field, value } 
+          : field
+      )
+    );
+  };
+
+  const cancelEditing = (customerId: string, fieldType: EditableField['type']) => {
+    setEditingFields(prev => 
+      prev.filter(field => !(field.id === customerId && field.type === fieldType))
+    );
+  };
+
+  const saveCustomerChanges = async (customerId: string) => {
+    const customerFields = editingFields.filter(field => field.id === customerId);
+    if (customerFields.length === 0) return;
+
+    setSavingCustomer(customerId);
+    try {
+      const updateData: any = {};
+      customerFields.forEach(field => {
+        if (field.value !== field.originalValue) {
+          updateData[field.type] = field.value;
+        }
+      });
+
+      if (Object.keys(updateData).length > 0) {
+        await updateCustomer(customerId, updateData);
+        
+        // Update local state
+        setCustomers(prev => 
+          prev.map(customer => 
+            customer.id === customerId 
+              ? { ...customer, ...updateData }
+              : customer
+          )
+        );
+
+        // Remove editing fields for this customer
+        setEditingFields(prev => 
+          prev.filter(field => field.id !== customerId)
+        );
+
+        toast({
+          title: "¡Cliente actualizado!",
+          description: "Los cambios se han guardado correctamente",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error updating customer:', error);
+      
+      // Check if the error is authentication related
+      if (error.message?.includes('No authentication token found') || 
+          error.message?.includes('Authentication expired') ||
+          error.message?.includes('Unauthorized')) {
+        toast({
+          title: "Error de autenticación",
+          description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
+          variant: "destructive",
+          duration: 3000
+        });
+        
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          router.push('/auth/login');
+        }, 2000);
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo actualizar el cliente",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setSavingCustomer(null);
+    }
+  };
+
+  const hasChanges = (customerId: string) => {
+    const customerFields = editingFields.filter(field => field.id === customerId);
+    return customerFields.some(field => field.value !== field.originalValue);
+  };
+
+  const getFieldValue = (customer: Customer, fieldType: EditableField['type']) => {
+    const editingField = editingFields.find(f => f.id === customer.id && f.type === fieldType);
+    return editingField ? editingField.value : customer[fieldType] || '';
+  };
+
+  // Drag and drop functionality
+  const startDrag = (customerId: string, sourceField: EditableField['type']) => {
+    setDragState({
+      customerId,
+      sourceField,
+      targetField: null
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetField: EditableField['type']) => {
+    e.preventDefault();
+    if (dragState) {
+      setDragState(prev => prev ? { ...prev, targetField } : null);
+    }
+  };
+
+  const handleDrop = (customerId: string, targetField: EditableField['type']) => {
+    if (!dragState || dragState.customerId !== customerId || dragState.sourceField === targetField) {
+      setDragState(null);
+      return;
+    }
+
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer) {
+      setDragState(null);
+      return;
+    }
+
+    const sourceValue = getFieldValue(customer, dragState.sourceField);
+    const targetValue = getFieldValue(customer, targetField);
+
+    // Swap the values
+    const newUpdateData: any = {};
+    newUpdateData[dragState.sourceField] = targetValue;
+    newUpdateData[targetField] = sourceValue;
+
+    // Update local state immediately
+    setCustomers(prev => 
+      prev.map(c => 
+        c.id === customerId 
+          ? { ...c, ...newUpdateData }
+          : c
+      )
+    );
+
+    // Add to editing fields for saving
+    Object.entries(newUpdateData).forEach(([fieldType, value]) => {
+      const existingField = editingFields.find(f => f.id === customerId && f.type === fieldType as EditableField['type']);
+      if (!existingField) {
+        setEditingFields(prev => [...prev, {
+          id: customerId,
+          type: fieldType as EditableField['type'],
+          value: value as string,
+          originalValue: customer[fieldType as keyof Customer] as string || ''
+        }]);
+      } else {
+        setEditingFields(prev => 
+          prev.map(field => 
+            field.id === customerId && field.type === fieldType as EditableField['type']
+              ? { ...field, value: value as string }
+              : field
+          )
+        );
+      }
+    });
+
+    setDragState(null);
+    toast({
+      title: "Campos intercambiados",
+      description: `Se movió el contenido de ${dragState.sourceField} a ${targetField}`,
+    });
+  };
+
+  const renderEditableField = (customer: Customer, fieldType: EditableField['type'], placeholder: string, icon: React.ReactNode) => {
+    const isEditing = editingFields.some(f => f.id === customer.id && f.type === fieldType);
+    const value = getFieldValue(customer, fieldType);
+    const isDragging = dragState?.customerId === customer.id && dragState?.sourceField === fieldType;
+    const isDragTarget = dragState?.customerId === customer.id && dragState?.targetField === fieldType;
+
+    if (isEditing) {
+      return (
+        <div className="flex items-center space-x-2">
+          {icon}
+          <Input
+            value={value}
+            onChange={(e) => updateEditingField(customer.id, fieldType, e.target.value)}
+            placeholder={placeholder}
+            className="flex-1 min-w-0"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                saveCustomerChanges(customer.id);
+              } else if (e.key === 'Escape') {
+                cancelEditing(customer.id, fieldType);
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div 
+        className={`flex items-center space-x-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 p-1 rounded transition-colors group relative ${
+          isDragging ? 'opacity-50' : ''
+        } ${isDragTarget ? 'bg-blue-100 dark:bg-blue-900 border-2 border-blue-300' : ''}`}
+        onClick={() => startEditing(customer.id, fieldType, value)}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          startDrag(customer.id, fieldType);
+        }}
+        onDragOver={(e) => handleDragOver(e, fieldType)}
+        onDrop={(e) => handleDrop(customer.id, fieldType)}
+        onDragEnd={() => setDragState(null)}
+      >
+        <GripVertical className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+        {icon}
+        <span className="text-gray-700 dark:text-gray-300 break-words">
+          {value || '-'}
+        </span>
+        <Edit3 className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+        {isDragTarget && (
+          <div className="absolute inset-0 bg-blue-200 dark:bg-blue-800 opacity-20 rounded pointer-events-none flex items-center justify-center">
+            <ArrowRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          </div>
+        )}
+      </div>
+    );
   };
 
   useEffect(() => {
@@ -117,7 +404,7 @@ export default function CustomersPage() {
               Clientes
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Gestiona la información de tus clientes
+              Gestiona la información de tus clientes. Haz clic en cualquier campo para editarlo o arrastra para mover contenido entre campos.
             </p>
           </div>
           <div className="flex gap-2">
@@ -145,16 +432,25 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {customers && customers.length > 0 ? (
+      {error ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="text-center text-red-500 mb-4">
+              {error}
+            </div>
+            <Button onClick={fetchCustomers}>Reintentar</Button>
+          </CardContent>
+        </Card>
+      ) : customers && customers.length > 0 ? (
         <div className="grid gap-4 md:gap-6">
           {/* Vista de tarjetas para móviles */}
           <div className="grid grid-cols-1 md:hidden gap-4">
-            {customers.map((customer: any) => (
-              <Card key={customer.id} className="hover:shadow-md transition-shadow">
+            {customers.map((customer: Customer) => (
+              <Card key={customer.id} className="hover:shadow-md transition-shadow group">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {customer.name}
+                      {renderEditableField(customer, 'name', 'Nombre del cliente', <User className="h-4 w-4" />)}
                     </CardTitle>
                     <div className="flex gap-1">
                       {customer.whatsappId && (
@@ -169,28 +465,47 @@ export default function CustomersPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Phone className="h-4 w-4" />
-                    <span>{customer.phone}</span>
+                  <div className="space-y-2">
+                    {renderEditableField(customer, 'phone', 'Número de teléfono', <Phone className="h-4 w-4" />)}
                   </div>
-                  {customer.address && (
-                    <div className="flex items-start space-x-2 text-sm text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span className="break-words">{customer.address}</span>
-                    </div>
-                  )}
-                  {customer.neighborhood && (
-                    <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      <span>{customer.neighborhood}</span>
-                    </div>
-                  )}
+                  {renderEditableField(customer, 'address', 'Dirección', <MapPin className="h-4 w-4" />)}
+                  {renderEditableField(customer, 'neighborhood', 'Barrio', <MapPin className="h-4 w-4" />)}
                   <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-500">
                     <Calendar className="h-3 w-3" />
                     <span>
                       Registrado: {new Date(customer.createdAt).toLocaleDateString('es-CO')}
                     </span>
                   </div>
+                  {hasChanges(customer.id) && (
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        size="sm"
+                        onClick={() => saveCustomerChanges(customer.id)}
+                        disabled={savingCustomer === customer.id}
+                        className="flex items-center gap-1"
+                      >
+                        {savingCustomer === customer.id ? (
+                          <RefreshCw className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Check className="h-3 w-3" />
+                        )}
+                        {savingCustomer === customer.id ? 'Guardando...' : 'Guardar'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          editingFields
+                            .filter(f => f.id === customer.id)
+                            .forEach(f => cancelEditing(customer.id, f.type));
+                        }}
+                        className="flex items-center gap-1"
+                      >
+                        <X className="h-3 w-3" />
+                        Cancelar
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -228,41 +543,30 @@ export default function CustomersPage() {
                         <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">
                           Fecha de Registro
                         </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">
+                          Acciones
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {customers.map((customer: any, index: number) => (
+                      {customers.map((customer: Customer, index: number) => (
                         <tr 
                           key={customer.id} 
-                          className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
+                          className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group ${
                             index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50/50 dark:bg-gray-800/30'
                           }`}
                         >
                           <td className="py-3 px-4">
-                            <div className="font-medium text-gray-900 dark:text-white">
-                              {customer.name}
-                            </div>
+                            {renderEditableField(customer, 'name', 'Nombre del cliente', <User className="h-4 w-4" />)}
                           </td>
                           <td className="py-3 px-4">
-                            <div className="flex items-center space-x-2">
-                              <Phone className="h-4 w-4 text-gray-500" />
-                              <span className="text-gray-700 dark:text-gray-300">
-                                {customer.phone}
-                              </span>
-                            </div>
+                            {renderEditableField(customer, 'phone', 'Número de teléfono', <Phone className="h-4 w-4" />)}
                           </td>
                           <td className="py-3 px-4">
-                            <div className="flex items-start space-x-2">
-                              <MapPin className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                              <span className="text-gray-700 dark:text-gray-300 break-words max-w-xs">
-                                {customer.address || '-'}
-                              </span>
-                            </div>
+                            {renderEditableField(customer, 'address', 'Dirección', <MapPin className="h-4 w-4" />)}
                           </td>
                           <td className="py-3 px-4">
-                            <span className="text-gray-700 dark:text-gray-300">
-                              {customer.neighborhood || '-'}
-                            </span>
+                            {renderEditableField(customer, 'neighborhood', 'Barrio', <MapPin className="h-4 w-4" />)}
                           </td>
                           <td className="py-3 px-4">
                             {customer.whatsappId ? (
@@ -286,6 +590,37 @@ export default function CustomersPage() {
                                 })}
                               </span>
                             </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            {hasChanges(customer.id) && (
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  onClick={() => saveCustomerChanges(customer.id)}
+                                  disabled={savingCustomer === customer.id}
+                                  className="flex items-center gap-1"
+                                >
+                                  {savingCustomer === customer.id ? (
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Check className="h-3 w-3" />
+                                  )}
+                                  {savingCustomer === customer.id ? 'Guardando...' : 'Guardar'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    editingFields
+                                      .filter(f => f.id === customer.id)
+                                      .forEach(f => cancelEditing(customer.id, f.type));
+                                  }}
+                                  className="flex items-center gap-1"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}

@@ -233,57 +233,55 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                 (route.href === '/admin/users' && pathname.startsWith('/admin/users/')) ||
                 (route.href === '/admin/settings' && pathname.startsWith('/admin/settings/'));
 
-                  const linkContent = (
-                    <div
-                      className={cn(
-                        "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
-                        isActive ? "text-white bg-white/10" : "text-zinc-400",
-                        isCollapsed ? "justify-center" : ""
-                      )}
-                      onClick={() => handleNavigation(route.href)}
-                    >
-                      <div className="flex items-center">
-                        <route.icon className="h-5 w-5" />
-                        {!isCollapsed && <span className="ml-3">{route.label}</span>}
-                      </div>
-                    </div>
-                  );
+              const linkContent = (
+                <div
+                  className={cn(
+                    "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
+                    isActive ? "text-white bg-white/10" : "text-zinc-400",
+                    isCollapsed ? "justify-center" : ""
+                  )}
+                  onClick={() => handleNavigation(route.href)}
+                >
+                  <div className="flex items-center">
+                    <route.icon className="h-5 w-5" />
+                    {!isCollapsed && <span className="ml-3">{route.label}</span>}
+                  </div>
+                </div>
+              );
 
-                  return (
-                    <TooltipProvider key={route.href} delayDuration={100}>
-                      <Tooltip open={isCollapsed ? undefined : false}>
-                        <TooltipTrigger asChild>
-                          {linkContent}
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="bg-[#111827] text-white border-none">
-                          {route.label}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  );
-                })}
-              </div>
-            </div>
+              return (
+                <TooltipProvider key={route.href} delayDuration={100}>
+                  <Tooltip open={isCollapsed ? undefined : false}>
+                    <TooltipTrigger asChild>
+                      {linkContent}
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="bg-[#111827] text-white border-none">
+                      {route.label}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })}
           </div>
         </div>
-        {/* Collapse button for desktop, sticky at bottom */}
-        {!isMobile && (
-          <div className="sticky bottom-0 left-0 w-full bg-[#111827] z-20 flex justify-center pb-4 pt-2 border-t border-white/5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full bg-gray-800 hover:bg-gray-700 active:bg-gray-600 relative z-[9999]"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-            >
-              {isCollapsed ? (
-                <ChevronRight className="h-4 w-4 text-white" />
-              ) : (
-                <ChevronLeft className="h-4 w-4 text-white" />
-              )}
-            </Button>
-          </div>
-        )}
       </div>
+      {/* Collapse button for desktop, sticky at bottom */}
+      {!isMobile && (
+        <div className="sticky bottom-0 left-0 w-full bg-[#111827] z-20 flex justify-center pb-4 pt-2 border-t border-white/5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full bg-gray-800 hover:bg-gray-700 active:bg-gray-600 relative z-[9999]"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4 text-white" />
+            ) : (
+              <ChevronLeft className="h-4 w-4 text-white" />
+            )}
+          </Button>
+        </div>
+      )}
       {/* Mobile close button */}
       {isMobile && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2 md:hidden">
