@@ -440,6 +440,80 @@ export class WhatsappService {
                 return;
               }
 
+              // --- NUEVO: Verificar también el switch global de AI ---
+              const aiSettings = await this.prisma.settings.findFirst();
+              if (!aiSettings?.aiEnabled) {
+                // this.logger.log(
+                //   `Global AI is disabled, not processing message from ${message.from}`,
+                // );
+                return;
+              }
+              // --- FIN NUEVO ---
+
+              // --- NUEVO: Detectar si es un saludo inicial ---
+              const isInitialGreeting = this.isInitialGreeting(message.body);
+              if (isInitialGreeting) {
+                try {
+                  const phone = this.normalizePhone(message.from);
+                  const customer = await this.customersService.findByPhone(phone, this.locationId);
+                  const cleanName = customer && customer.name ? customer.name.trim() : '';
+                  
+                  let welcomeMessage = '';
+                  if (cleanName.length > 0) {
+                    welcomeMessage = `👋 ¡Hola, *${cleanName}*! Soy tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
+                  } else {
+                    welcomeMessage = `👋 ¡Hola! Soy tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
+                  }
+
+                  // Enviar el saludo personalizado
+                  await this.client.sendMessage(message.from, welcomeMessage);
+
+                  // Guardar el mensaje de saludo en la base de datos
+                  await this.prisma.whatsappMessage.create({
+                    data: {
+                      from: message.from,
+                      body: welcomeMessage,
+                      timestamp: new Date(),
+                      location: {
+                        connect: {
+                          id: this.locationId
+                        }
+                      },
+                      isFromAI: true,
+                    }
+                  });
+
+                  // Emitir eventos para actualizar el frontend
+                  this.eventEmitter.emit('whatsapp.message', {
+                    from: message.from,
+                    body: welcomeMessage,
+                    timestamp: Date.now() / 1000,
+                    fromMe: true,
+                  });
+
+                  // Actualizar la caché de chats
+                  if (this.cachedChats.length > 0) {
+                    const chatIndex = this.cachedChats.findIndex(chat => chat.id === message.from);
+                    if (chatIndex !== -1) {
+                      this.cachedChats[chatIndex] = {
+                        ...this.cachedChats[chatIndex],
+                        lastMessage: welcomeMessage,
+                        timestamp: Date.now() / 1000,
+                      };
+                      this.lastChatsUpdate = Date.now();
+                      this.eventEmitter.emit('whatsapp.chats', { chats: this.cachedChats });
+                    }
+                  }
+
+                  // No procesar más con AI para saludos iniciales
+                  return;
+                } catch (error) {
+                  // this.logger.error(`Error sending personalized greeting: ${error.message}`);
+                  // Si falla el saludo personalizado, continuar con el procesamiento normal
+                }
+              }
+              // --- FIN NUEVO ---
+
               // Procesar el mensaje con la IA
               const aiResponse = await this.aiGateway.handleTextInput({
                 text: message.body,
@@ -1043,5 +1117,12 @@ export class WhatsappService {
       // this.logger.log(`Created new chat settings for ${chatId}, AI disabled`);
       return newChat;
     }
+  }
+
+  private isInitialGreeting(message: string): boolean {
+    const initialGreetings = [
+      'hola', 'buenos días', 'buenas tardes', 'buenas noches', '¿qué tal?', '¿qué pasa?', '¿qué hay?', '¿qué tal estás?', '¿qué tal estás?'
+    ];
+    return initialGreetings.some(greeting => message.toLowerCase().includes(greeting));
   }
 } 

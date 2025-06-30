@@ -17,6 +17,9 @@ export class CustomerContextService {
     const phone = this.normalizePhone(chatId);
     const customer = await this.customersService.findByPhone(phone, locationId);
     
+    // DEBUG: Verifica si el customer tiene el nombre y datos correctos
+    console.log('[DEBUG][getCustomerContext] phone:', phone, 'customer:', customer);
+
     if (customer && customer.name) {
       return {
         name: customer.name,

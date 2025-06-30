@@ -11,6 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { WhatsappService } from './whatsapp.service';
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CustomerContextService } from '../ai/services/customer-context.service';
 
 @WebSocketGateway({
   cors: {
@@ -28,6 +29,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private readonly whatsappService: WhatsappService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly customerContextService: CustomerContextService,
   ) {
     // Suscribirse a eventos de WhatsApp
     this.eventEmitter.on('whatsapp.qr', (qrCode: string) => {
@@ -74,6 +76,26 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
     // this.logger.log(`Client connected: ${client.id}`);
     this.connectedClients.set(client.id, client);
     await this.sendStatus(client);
+
+    // --- SALUDO PERSONALIZADO ---
+    try {
+      // Intenta obtener el chatId y locationId del handshake (ajusta según tu frontend)
+      const chatId = client.handshake.query.chatId as string;
+      const locationId = client.handshake.query.locationId as string;
+      if (chatId && locationId) {
+        const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId);
+        const cleanName = customerContext && customerContext.name ? customerContext.name.trim() : '';
+        let welcomeMessage = '';
+        if (cleanName.length > 0) {
+          welcomeMessage = `👋 ¡Hola, *${cleanName}*! Soy tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
+        } else {
+          welcomeMessage = `👋 ¡Hola! Soy tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
+        }
+        client.emit('whatsapp:welcome', { message: welcomeMessage });
+      }
+    } catch (err) {
+      this.logger.error('Error enviando saludo personalizado:', err);
+    }
   }
 
   handleDisconnect(client: Socket) {

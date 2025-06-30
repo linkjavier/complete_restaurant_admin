@@ -30,35 +30,11 @@ export class OrderHandlerService {
     return createdOrder;
   }
 
-  validateOrderData(orderData: any): { isValid: boolean; missingFields: string[] } {
-    const requiredFields = ['customerName', 'deliveryAddress', 'phone', 'neighborhood', 'paymentMethod'];
-    const missingFields = requiredFields.filter(field => !orderData[field]);
-    
-    return {
-      isValid: missingFields.length === 0,
-      missingFields
-    };
-  }
-
   formatOrderSuccessMessage(orderId: string): string {
     return `✅ ¡Tu orden ha sido creada exitosamente!\n\nNúmero de orden: *${orderId}*\n\nPronto recibirás la confirmación de tu pedido. ¡Gracias por confiar en nosotros!`;
   }
 
   formatOrderErrorMessage(error: any): string {
     return `❌ Error creando la orden: ${error.message}`;
-  }
-
-  formatMissingFieldsMessage(missingFields: string[]): string {
-    const fieldNames = {
-      customerName: 'nombre completo',
-      deliveryAddress: 'dirección de entrega',
-      phone: 'número de teléfono',
-      neighborhood: 'barrio o sector',
-      paymentMethod: 'método de pago'
-    };
-
-    const missingFieldNames = missingFields.map(field => fieldNames[field] || field);
-    
-    return `Por favor, proporciona los siguientes datos antes de confirmar la orden: ${missingFieldNames.join(', ')}.`;
   }
 } 

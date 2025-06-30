@@ -148,6 +148,10 @@ export const restaurantAssistantFunctions = [
           type: 'string',
           description: 'ID of the location where the order is being placed',
         },
+        chatId: {
+          type: 'string',
+          description: 'Chat ID to identify the customer in the database',
+        },
       },
       required: ['items', 'totalAmount', 'customerName', 'deliveryAddress', 'phone', 'neighborhood', 'paymentMethod', 'locationId'],
     },

@@ -84,6 +84,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     
     try {
       const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId);
+      // DEBUG: Verifica si el customerContext recibido tiene el nombre y datos correctos
+      console.log('[DEBUG][ai.gateway.ts] customerContext recibido:', customerContext);
       const conversationContext: ConversationContext = {
         locationId,
         chatType,
@@ -100,18 +102,24 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const businessSettings = await this.settingsService.getBusinessSettings();
       const businessName = businessSettings.name;
 
+      // DEBUG: Verificar el contenido real de customerContext
+      console.log('[DEBUG] customerContext:', customerContext);
+
       let welcomeMessage = '';
       if (chatType === 'admin') {
-        welcomeMessage = `👋 ¡Hola! Soy *${aiSettings.name}*, tu asistente administrativo.` +
-          `\n\n🔧 Estoy aquí para ayudarte con las tareas administrativas del restaurante.\n\n¿En qué puedo ayudarte hoy? 😊`;
+        welcomeMessage = `👋 ¡Hola! Soy *${aiSettings.name}*, tu asistente administrativo.\n\n🔧 Estoy aquí para ayudarte con las tareas administrativas del restaurante.\n\n¿En qué puedo ayudarte hoy? 😊`;
       } else {
-        welcomeMessage = `👋 ¡Hola! Bienvenido a *${businessName}*. Mi nombre es *${aiSettings.name}*.` +
-          `\n\n🍽️ Estoy aquí para ayudarte con tu pedido a domicilio.\n\n¿En qué puedo ayudarte hoy? 😊`;
+        const cleanName = customerContext && customerContext.name ? customerContext.name.trim() : '';
+        if (cleanName.length > 0) {
+          welcomeMessage = `👋 ¡Hola, *${cleanName}*! Soy *${aiSettings.name}*, tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
+        } else {
+          welcomeMessage = `👋 ¡Hola! Soy *${aiSettings.name}*, tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
+        }
       }
 
       client.emit('ai_response', {
         type: 'text',
-        content: customerContext.greeting + welcomeMessage,
+        content: welcomeMessage,
       });
     } catch (error) {
       console.error('Error in handleConnection:', error);
@@ -451,31 +459,31 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private async handleOrderConfirmation(client: any, conversationId: string, locationId: string, chatType: string): Promise<string> {
     const orderData = this.orderStateService.getValidatedOrderData(conversationId);
-    const validation = this.orderHandler.validateOrderData(orderData);
+    console.log('[DEBUG] orderData recuperado en handleOrderConfirmation:', orderData);
     
-    if (validation.isValid) {
-      try {
-        const createdOrder = await this.orderHandler.createOrder(orderData);
-        const response = this.orderHandler.formatOrderSuccessMessage(createdOrder.id);
-        this.orderStateService.deleteState(conversationId);
-        
-        if ('emit' in client) {
-          client.emit('ai_response', { type: 'text', content: response });
-        }
-        return response;
-      } catch (error) {
-        const errorMessage = this.orderHandler.formatOrderErrorMessage(error);
-        if ('emit' in client) {
-          client.emit('ai_response', { type: 'text', content: errorMessage });
-        }
-        return errorMessage;
-      }
-    } else {
-      const missingFieldsMessage = this.orderHandler.formatMissingFieldsMessage(validation.missingFields);
+    if (!orderData) {
+      const errorMessage = 'No hay datos de orden para confirmar. Por favor, selecciona productos primero.';
       if ('emit' in client) {
-        client.emit('ai_response', { type: 'text', content: missingFieldsMessage });
+        client.emit('ai_response', { type: 'text', content: errorMessage });
       }
-      return missingFieldsMessage;
+      return errorMessage;
+    }
+
+    try {
+      const createdOrder = await this.orderHandler.createOrder(orderData);
+      const response = this.orderHandler.formatOrderSuccessMessage(createdOrder.id);
+      this.orderStateService.deleteState(conversationId);
+      
+      if ('emit' in client) {
+        client.emit('ai_response', { type: 'text', content: response });
+      }
+      return response;
+    } catch (error) {
+      const errorMessage = this.orderHandler.formatOrderErrorMessage(error);
+      if ('emit' in client) {
+        client.emit('ai_response', { type: 'text', content: errorMessage });
+      }
+      return errorMessage;
     }
   }
 
@@ -527,11 +535,22 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         });
         
         if (functionResult && (functionResult.validatedItems || functionResult.validated)) {
-          this.orderStateService.setValidatedOrderData(conversationId, {
-            ...(functionResult.orderData || {}),
-            validatedItems: functionResult.validatedItems,
-            totalAmount: functionResult.totalAmount
-          });
+          console.log('[DEBUG] Guardando orderData en OrderStateService:', functionResult.orderData);
+          
+          // Si es calculate_order_subtotal, guardar validatedItems como items
+          if (response.function_call.name === 'calculate_order_subtotal') {
+            this.orderStateService.setValidatedOrderData(conversationId, {
+              items: functionResult.validatedItems,
+              totalAmount: functionResult.totalAmount
+            });
+          } else if (functionResult.orderData) {
+            // Si es validate_order_before_creation, guardar orderData completo
+            this.orderStateService.setValidatedOrderData(conversationId, {
+              ...functionResult.orderData,
+              validatedItems: functionResult.validatedItems,
+              totalAmount: functionResult.totalAmount
+            });
+          }
         }
         
         if ('emit' in client) {

@@ -6,6 +6,7 @@ import { OrderType, OrderSource } from '../../orders/dto/create-order.dto';
 import { normalizeName, getGroupEmoji, getPaymentEmoji, getPaymentDisplay, formatPrice } from '../utils/text-utils';
 import { OrderStateService } from './order-state.service';
 import { NLPService } from './nlp.service';
+import { CustomersService } from '../../customers/customers.service';
 
 @Injectable()
 export class FunctionExecutorService {
@@ -17,6 +18,7 @@ export class FunctionExecutorService {
     private settingsService: SettingsService,
     private ordersService: OrdersService,
     private orderStateService: OrderStateService,
+    private customersService: CustomersService,
   ) {}
 
   private async getNLPService(locationId: string): Promise<NLPService> {
@@ -353,12 +355,96 @@ export class FunctionExecutorService {
 
   private async validateOrderBeforeCreation(functionArgs: any, locationId: string) {
     try {
-      const { items, totalAmount, customerName, deliveryAddress, phone, neighborhood, paymentMethod } = functionArgs;
+      const { items, totalAmount, customerName, deliveryAddress, phone, neighborhood, paymentMethod, chatId } = functionArgs;
       
-      if (!customerName || !deliveryAddress || !phone || !neighborhood || !paymentMethod) {
-        return {
-          message: `Para completar tu pedido, necesito algunos datos de entrega:\n\n1. *Nombre completo*\n2. *Dirección de entrega*\n3. *Número de teléfono*\n4. *Barrio o sector*\n5. *Método de pago* (Efectivo, Tarjeta de Crédito, Tarjeta Débito, o Transferencia)\n\nPor favor, proporcióname esta información. 📝`
-        };
+      // --- NUEVO: Verificar si el cliente existe en la base de datos ---
+      let existingCustomer = null;
+      if (chatId) {
+        const normalizedPhone = chatId.replace(/@c\.us$/, '').replace(/[^0-9]/g, '');
+        existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId);
+      }
+
+      // --- NUEVO: Determinar qué datos faltan o necesitan confirmación ---
+      const missingFields = [];
+      const customerDataToConfirm: {
+        name?: string;
+        deliveryAddress?: string;
+        phone?: string;
+        neighborhood?: string;
+        paymentMethod?: string;
+      } = {};
+
+      if (!customerName) {
+        if (existingCustomer?.name) {
+          customerDataToConfirm.name = existingCustomer.name;
+        } else {
+          missingFields.push('Nombre completo');
+        }
+      } else {
+        customerDataToConfirm.name = customerName;
+      }
+
+      if (!deliveryAddress) {
+        if (existingCustomer?.address) {
+          customerDataToConfirm.deliveryAddress = existingCustomer.address;
+        } else {
+          missingFields.push('Dirección de entrega');
+        }
+      } else {
+        customerDataToConfirm.deliveryAddress = deliveryAddress;
+      }
+
+      if (!phone) {
+        if (existingCustomer?.phone) {
+          customerDataToConfirm.phone = existingCustomer.phone;
+        } else {
+          missingFields.push('Número de teléfono');
+        }
+      } else {
+        customerDataToConfirm.phone = phone;
+      }
+
+      if (!neighborhood) {
+        if (existingCustomer?.neighborhood) {
+          customerDataToConfirm.neighborhood = existingCustomer.neighborhood;
+        } else {
+          missingFields.push('Barrio o sector');
+        }
+      } else {
+        customerDataToConfirm.neighborhood = neighborhood;
+      }
+
+      if (!paymentMethod) {
+        missingFields.push('Método de pago');
+      } else {
+        customerDataToConfirm.paymentMethod = paymentMethod;
+      }
+
+      // --- NUEVO: Si faltan datos, mostrar mensaje con datos existentes confirmados ---
+      if (missingFields.length > 0) {
+        let message = '';
+        
+        if (existingCustomer && Object.keys(customerDataToConfirm).length > 0) {
+          message += `👋 ¡Hola ${existingCustomer.name}! Veo que ya tienes datos registrados:\n\n`;
+          message += `✅ *Datos confirmados:*\n`;
+          if (customerDataToConfirm.name) message += `• Nombre: ${customerDataToConfirm.name}\n`;
+          if (customerDataToConfirm.deliveryAddress) message += `• Dirección: ${customerDataToConfirm.deliveryAddress}\n`;
+          if (customerDataToConfirm.phone) message += `• Teléfono: ${customerDataToConfirm.phone}\n`;
+          if (customerDataToConfirm.neighborhood) message += `• Barrio: ${customerDataToConfirm.neighborhood}\n`;
+          message += `\n📝 *Necesito que me proporciones:*\n`;
+        } else {
+          message += `Para completar tu pedido, necesito algunos datos de entrega:\n\n`;
+        }
+        
+        message += missingFields.map((field, index) => `${index + 1}. *${field}*`).join('\n');
+        
+        if (missingFields.includes('Método de pago')) {
+          message += `\n\n💳 *Método de pago:* Efectivo, Tarjeta de Crédito, Tarjeta Débito, o Transferencia`;
+        }
+        
+        message += `\n\nPor favor, proporcióname esta información. 📝`;
+        
+        return { message };
       }
 
       if (!items || items.length === 0) {
@@ -433,10 +519,18 @@ export class FunctionExecutorService {
         ? `\n🚚 *Domicilio:* $${formatPrice(deliveryFee)}` 
         : '';
 
-      const customerInfo = `👤 *Datos del Cliente*\n━━━━━━━━━━━━━━━━━━━━━━━━\n• *Nombre:* ${customerName}\n• *Dirección:* ${deliveryAddress}\n• *Teléfono:* ${phone}\n• *Barrio:* ${neighborhood}\n• *Método de pago:* ${getPaymentEmoji(paymentMethod)} ${getPaymentDisplay(paymentMethod)}`;
+      // --- NUEVO: Mensaje personalizado según si es cliente existente o nuevo ---
+      let customerInfoHeader = '';
+      if (existingCustomer) {
+        customerInfoHeader = `👤 *Datos del Cliente (Confirmados)*\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+      } else {
+        customerInfoHeader = `👤 *Datos del Cliente*\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+      }
+
+      const customerInfo = `${customerInfoHeader}\n• *Nombre:* ${customerDataToConfirm.name}\n• *Dirección:* ${customerDataToConfirm.deliveryAddress}\n• *Teléfono:* ${customerDataToConfirm.phone}\n• *Barrio:* ${customerDataToConfirm.neighborhood}\n• *Método de pago:* ${getPaymentEmoji(customerDataToConfirm.paymentMethod)} ${getPaymentDisplay(customerDataToConfirm.paymentMethod)}`;
 
       const result = {
-        message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *\"Sí\"* o *\"Confirmo\"* para proceder con la orden.`,
+        message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *"Sí"* o *"Confirmo"* para proceder con la orden.`,
         validated: true,
         orderData: {
           items: itemsWithPrices.map(item => ({
@@ -447,11 +541,11 @@ export class FunctionExecutorService {
             variants: item.variants || [],
             notes: item.notes
           })),
-          customerName,
-          deliveryAddress,
-          phone,
-          neighborhood,
-          paymentMethod,
+          customerName: customerDataToConfirm.name,
+          deliveryAddress: customerDataToConfirm.deliveryAddress,
+          phone: customerDataToConfirm.phone,
+          neighborhood: customerDataToConfirm.neighborhood,
+          paymentMethod: customerDataToConfirm.paymentMethod,
           locationId,
           deliveryFee
         }

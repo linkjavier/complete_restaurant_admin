@@ -102,22 +102,23 @@ const routes = [
     roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
+    label: "Clientes",
+    icon: ContactRound,
+    href: "/admin/customers",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
+  {
     label: "Usuarios",
     icon: Users,
     href: "/admin/users",
     roles: ['SUPER_ADMIN', 'ADMIN'],
   },
+
   {
     label: "Configuración",
     icon: Settings,
     href: "/admin/settings",
     roles: ['SUPER_ADMIN', 'ADMIN'],
-  },
-  {
-    label: "Clientes",
-    icon: ContactRound,
-    href: "/admin/customers",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
 ]
 

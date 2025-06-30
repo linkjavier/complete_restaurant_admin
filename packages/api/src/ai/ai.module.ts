@@ -35,6 +35,6 @@ import { CustomersModule } from '../customers/customers.module';
     OrderHandlerService,
     FunctionExecutorService,
   ],
-  exports: [AIGateway],
+  exports: [AIGateway, CustomerContextService],
 })
 export class AIModule {} 
