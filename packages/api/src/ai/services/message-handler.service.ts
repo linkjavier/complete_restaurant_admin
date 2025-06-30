@@ -38,8 +38,39 @@ export class MessageHandlerService {
     'ver menú',
     'ver carta',
     'quiero',
-    'almuerzo',
-    'almuerzos',
+  ];
+
+  private readonly lunchKeywords = [
+    'tienen almuerzo',
+    'tienen almuerzos',
+    'qué tienes de almuerzo',
+    'que tienes de almuerzo',
+    'qué tienen de almuerzo',
+    'que tienen de almuerzo',
+    'qué hay de almorzar',
+    'que hay de almorzar',
+    'qué hay para almorzar',
+    'que hay para almorzar',
+    'todavía tienen almuerzos',
+    'todavia tienen almuerzos',
+    'qué hay de almuerzo',
+    'que hay de almuerzo',
+    'qué almuerzos tienen',
+    'que almuerzos tienen',
+    'qué hay para comer',
+    'que hay para comer',
+    'qué platos tienen',
+    'que platos tienen',
+    'qué comidas tienen',
+    'que comidas tienen',
+    'almuerzos disponibles',
+    'platos del día',
+    'especiales del día',
+    'especiales de almuerzo',
+    'menú del día',
+    'menu del dia',
+    'almuerzo ejecutivo',
+    'plato ejecutivo',
   ];
 
   private readonly confirmKeywords = [
@@ -64,6 +95,11 @@ export class MessageHandlerService {
   isMenuRequest(text: string): boolean {
     const normalizedText = this.normalizeText(text);
     return this.menuKeywords.some(keyword => normalizedText.includes(keyword));
+  }
+
+  isLunchRequest(text: string): boolean {
+    const normalizedText = this.normalizeText(text);
+    return this.lunchKeywords.some(keyword => normalizedText.includes(keyword));
   }
 
   isConfirmation(text: string): boolean {
@@ -105,5 +141,35 @@ export class MessageHandlerService {
 
   getDeliveryTimeResponse(): string {
     return '¡Por supuesto! Normalmente los domicilios se demoran entre 20 y 30 minutos, pero puede variar según la zona y la demanda. 😊';
+  }
+
+  isGeneralLunchRequest(text: string): boolean {
+    const normalizedText = this.normalizeText(text);
+    const generalLunchPhrases = [
+      'qué tienes de almuerzo',
+      'que tienes de almuerzo',
+      'qué tienen de almuerzo',
+      'que tienen de almuerzo',
+      'qué hay de almorzar',
+      'que hay de almorzar',
+      'qué hay para almorzar',
+      'que hay para almorzar',
+      'todavía tienen almuerzos',
+      'todavia tienen almuerzos',
+      'qué hay de almuerzo',
+      'que hay de almuerzo',
+      'qué almuerzos tienen',
+      'que almuerzos tienen',
+      'opciones de almuerzo',
+      'menú del día',
+      'menu del dia',
+      'platos del día',
+      'especiales del día',
+      'especiales de almuerzo',
+      'almuerzos disponibles',
+      'plato ejecutivo',
+      'almuerzo ejecutivo',
+    ];
+    return generalLunchPhrases.some(phrase => normalizedText.includes(phrase));
   }
 } 

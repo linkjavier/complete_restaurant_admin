@@ -158,7 +158,6 @@ export class FunctionExecutorService {
         if (matchingProducts.length === 0) {
           return { message: `❌ Producto no encontrado: "${item.productName}"` };
         }
-        
         if (matchingProducts.length > 1) {
           // --- Heurística de negocio: si hay panadería y chocolate, prioriza bebida ---
           const bakeryKeywords = ['pan', 'pandebono', 'almojábana', 'arepa', 'buñuelo', 'panadería', 'pastelería'];
@@ -169,15 +168,34 @@ export class FunctionExecutorService {
           if (hasBakery && beverageOptions.length === 1) {
             // Selecciona automáticamente la bebida
             const product = beverageOptions[0];
-            const subtotal = product.price * item.quantity;
+            let variantTotal = 0;
+            let variantDetails = [];
+            if (item.variants && item.variants.length > 0 && product.variantGroups) {
+              for (const v of item.variants) {
+                const group = product.variantGroups.find(g => normalizeName(g.name) === normalizeName(v.groupName));
+                if (group) {
+                  const variant = group.variants.find(va => normalizeName(va.name) === normalizeName(v.variantName));
+                  if (variant) {
+                    if (variant.price && variant.price > 0) {
+                      variantTotal += variant.price;
+                      variantDetails.push({ groupName: v.groupName, variantName: v.variantName, price: variant.price });
+                    } else {
+                      variantDetails.push({ groupName: v.groupName, variantName: v.variantName, price: 0 });
+                    }
+                  }
+                }
+              }
+            }
+            const subtotal = (product.price + variantTotal) * item.quantity;
             totalAmount += subtotal;
             validatedItems.push({
               productId: product.id,
               productName: product.name,
               quantity: item.quantity,
-              unitPrice: product.price,
+              unitPrice: product.price + variantTotal,
               subtotal,
               variants: item.variants || [],
+              variantDetails,
               notes: item.notes || '',
               variantSummary: ''
             });
@@ -218,17 +236,84 @@ export class FunctionExecutorService {
           };
         }
 
+        // Solo hay un producto, ahora sí chequea variantes obligatorias
         const product = matchingProducts[0];
-        const subtotal = product.price * item.quantity;
+        // --- NUEVO: Flujo empresarial de variantes por subgrupo ---
+        // Agrupa por variantes ya elegidas
+        let subgroups = [];
+        if (item.quantity > 1 && item.variants && item.variants.length > 0) {
+          // Agrupa por combinación de variantes ya elegidas
+          const variantKey = vArr => vArr.map(v => `${normalizeName(v.groupName)}:${normalizeName(v.variantName)}`).sort().join('|');
+          const groupMap = {};
+          (item.subgroups || [{ quantity: item.quantity, variants: item.variants }]).forEach(sub => {
+            const key = variantKey(sub.variants);
+            if (!groupMap[key]) groupMap[key] = { quantity: 0, variants: sub.variants };
+            groupMap[key].quantity += sub.quantity;
+          });
+          subgroups = Object.values(groupMap);
+        } else {
+          subgroups = [{ quantity: item.quantity, variants: item.variants || [] }];
+        }
+        // Para cada subgrupo, verifica variantes faltantes
+        for (const sub of subgroups) {
+          let missingVariantGroups = [];
+          if (product.variantGroups && product.variantGroups.length > 0) {
+            for (const group of product.variantGroups) {
+              if (group.isActive !== false && group.variants && group.variants.length > 0) {
+                const userChose = sub.variants && sub.variants.some(v => normalizeName(v.groupName) === normalizeName(group.name));
+                if (!userChose) {
+                  missingVariantGroups.push(group);
+                }
+              }
+            }
+          }
+          if (missingVariantGroups.length > 0) {
+            let msg = `¡Perfecto! Para los *${sub.quantity}* *${product.name}*${sub.variants && sub.variants.length > 0 ? ` (${sub.variants.map(v => `${v.groupName}: ${v.variantName}`).join(', ')})` : ''}, necesito que elijas una opción para cada grupo:`;
+            for (const group of missingVariantGroups) {
+              const emoji = getGroupEmoji(group.name);
+              const options = group.variants.map(v => {
+                if (v.price && v.price > 0) {
+                  return `${v.name} ($${formatPrice(v.price)})`;
+                } else {
+                  return v.name;
+                }
+              }).join(', ');
+              msg += `\n${emoji ? emoji + ' ' : ''}*${group.name}*: ${options}`;
+            }
+            msg += '\n\nPor favor, dime tus elecciones para cada grupo (por ejemplo: "Proteína: Pollo asado, Ensalada: Verde").';
+            return { message: msg };
+          }
+        }
+        
+        let variantTotal = 0;
+        let variantDetails = [];
+        if (item.variants && item.variants.length > 0 && product.variantGroups) {
+          for (const v of item.variants) {
+            const group = product.variantGroups.find(g => normalizeName(g.name) === normalizeName(v.groupName));
+            if (group) {
+              const variant = group.variants.find(va => normalizeName(va.name) === normalizeName(v.variantName));
+              if (variant) {
+                if (variant.price && variant.price > 0) {
+                  variantTotal += variant.price;
+                  variantDetails.push({ groupName: v.groupName, variantName: v.variantName, price: variant.price });
+                } else {
+                  variantDetails.push({ groupName: v.groupName, variantName: v.variantName, price: 0 });
+                }
+              }
+            }
+          }
+        }
+        const subtotal = (product.price + variantTotal) * item.quantity;
         totalAmount += subtotal;
         
         validatedItems.push({
           productId: product.id,
           productName: product.name,
           quantity: item.quantity,
-          unitPrice: product.price,
+          unitPrice: product.price + variantTotal,
           subtotal,
           variants: item.variants || [],
+          variantDetails,
           notes: item.notes || '',
           variantSummary: ''
         });
@@ -236,10 +321,16 @@ export class FunctionExecutorService {
 
       const itemsSummary = validatedItems.map((item, index) => {
         let variantLines = '';
-        if (item.variants && item.variants.length > 0) {
-          variantLines = item.variants.map(v => `   • ${v.groupName}: ${v.variantName}`).join('\n');
+        if (item.variantDetails && item.variantDetails.length > 0) {
+          variantLines = item.variantDetails.map(v => {
+            if (v.price && v.price > 0) {
+              return `   • ${v.groupName}: ${v.variantName} ($${formatPrice(v.price)})`;
+            } else {
+              return `   • ${v.groupName}: ${v.variantName}`;
+            }
+          }).join('\n');
         }
-        return `${index + 1}. *${item.productName}*${variantLines ? '\n' + variantLines : ''}\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`;
+        return `${index + 1}. *${item.productName}*${variantLines ? '\n' + variantLines : ''}\n   └ ${item.quantity} × $${formatPrice(item.unitPrice)} = *$${formatPrice(item.subtotal)}*`;
       }).join('\n');
 
       const formattedTotal = formatPrice(totalAmount + deliveryFee);
@@ -282,15 +373,62 @@ export class FunctionExecutorService {
       const itemsWithSyncedVariants = this.syncVariantsWithIds(items, menu);
       console.log('[VALIDATE ORDER] Items con variantes sincronizadas:', JSON.stringify(itemsWithSyncedVariants, null, 2));
 
-      const itemsSummary = itemsWithSyncedVariants.map((item, index) => {
-        let variantLines = '';
-        if (item.variants && item.variants.length > 0) {
-          variantLines = item.variants.map(v => `   • ${v.groupName}: ${v.variantName}`).join('\n');
+      // --- NUEVO: Calcular unitPrice y subtotal sumando variantes ---
+      const itemsWithPrices = itemsWithSyncedVariants.map(item => {
+        const product = menu.find(p => p.id === item.productId);
+        let variantTotal = 0;
+        if (item.variants && item.variants.length > 0 && product && product.variantGroups) {
+          for (const v of item.variants) {
+            const group = product.variantGroups.find(g => normalizeName(g.name) === normalizeName(v.groupName));
+            if (group) {
+              const variant = group.variants.find(va => normalizeName(va.name) === normalizeName(v.variantName));
+              if (variant && variant.price && variant.price > 0) {
+                variantTotal += variant.price;
+              }
+            }
+          }
         }
-        return `${index + 1}. *${item.productName}*${variantLines ? '\n' + variantLines : ''}\n   └ ${item.quantity} × $${item.unitPrice} = *$${item.subtotal}*`;
+        const unitPrice = (product ? product.price : 0) + variantTotal;
+        const subtotal = unitPrice * item.quantity;
+        return {
+          ...item,
+          unitPrice,
+          subtotal
+        };
+      });
+
+      const itemsSummary = itemsWithPrices.map((item, index) => {
+        let variantLines = '';
+        let variantDetails = [];
+        if (item.variants && item.variants.length > 0 && menu) {
+          const product = menu.find(p => p.id === item.productId);
+          for (const v of item.variants) {
+            const group = product?.variantGroups?.find(g => normalizeName(g.name) === normalizeName(v.groupName));
+            if (group) {
+              const variant = group.variants.find(va => normalizeName(va.name) === normalizeName(v.variantName));
+              if (variant) {
+                if (variant.price && variant.price > 0) {
+                  variantDetails.push({ groupName: v.groupName, variantName: v.variantName, price: variant.price });
+                } else {
+                  variantDetails.push({ groupName: v.groupName, variantName: v.variantName, price: 0 });
+                }
+              }
+            }
+          }
+        }
+        if (variantDetails.length > 0) {
+          variantLines = variantDetails.map(v => {
+            if (v.price && v.price > 0) {
+              return `   • ${v.groupName}: ${v.variantName} ($${formatPrice(v.price)})`;
+            } else {
+              return `   • ${v.groupName}: ${v.variantName}`;
+            }
+          }).join('\n');
+        }
+        return `${index + 1}. *${item.productName}*${variantLines ? '\n' + variantLines : ''}\n   └ ${item.quantity} × $${formatPrice(item.unitPrice || 0)} = *$${formatPrice(item.subtotal || 0)}*`;
       }).join('\n');
 
-      const formattedTotal = formatPrice(totalWithDelivery);
+      const formattedTotal = formatPrice(itemsWithPrices.reduce((sum, item) => sum + item.subtotal, 0) + deliveryFee);
       const deliveryFeeText = deliveryFee > 0 
         ? `\n🚚 *Domicilio:* $${formatPrice(deliveryFee)}` 
         : '';
@@ -301,9 +439,11 @@ export class FunctionExecutorService {
         message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *\"Sí\"* o *\"Confirmo\"* para proceder con la orden.`,
         validated: true,
         orderData: {
-          items: itemsWithSyncedVariants.map(item => ({
+          items: itemsWithPrices.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            subtotal: item.subtotal,
             variants: item.variants || [],
             notes: item.notes
           })),

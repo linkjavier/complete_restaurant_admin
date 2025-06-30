@@ -90,6 +90,15 @@ export class OrdersService {
       let orderSubtotal = 0;
       const itemsWithPrice = await Promise.all(
         items.map(async (item) => {
+          // Si el item ya trae unitPrice y subtotal, úsalo
+          if (typeof item.unitPrice === 'number' && typeof item.subtotal === 'number') {
+            orderSubtotal += item.subtotal;
+            return {
+              ...item,
+              price: item.unitPrice,
+            };
+          }
+          // Si no, calcula como antes
           const product = await this.productsService.findOne(item.productId);
           if (!product) {
             throw new NotFoundException(`Product with ID ${item.productId} not found`);

@@ -673,9 +673,9 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-1">
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-2xl" style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {(item.productVariant?.price ?? item.product?.price ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -684,7 +684,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        ${((item.productVariant?.price ?? item.product?.price ?? 0) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}
@@ -939,9 +939,9 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-1">
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-2xl" style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {(item.productVariant?.price ?? item.product?.price ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -950,7 +950,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        ${((item.productVariant?.price ?? item.product?.price ?? 0) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}
@@ -1176,9 +1176,9 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-1">
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-2xl" style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {(item.productVariant?.price ?? item.product?.price ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -1187,7 +1187,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        ${((item.productVariant?.price ?? item.product?.price ?? 0) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}
@@ -1413,9 +1413,9 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-1">
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-2xl" style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {(item.productVariant?.price ?? item.product?.price ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -1424,7 +1424,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        ${((item.productVariant?.price ?? item.product?.price ?? 0) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}

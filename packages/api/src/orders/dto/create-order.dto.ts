@@ -43,6 +43,14 @@ class OrderItemDto {
   @ValidateNested({ each: true })
   @Type(() => OrderItemVariantDto)
   variants: OrderItemVariantDto[];
+
+  @IsNumber()
+  @IsOptional()
+  unitPrice?: number;
+
+  @IsNumber()
+  @IsOptional()
+  subtotal?: number;
 }
 
 export class CreateOrderDto {

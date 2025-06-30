@@ -222,7 +222,38 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     }
 
-    // Handle menu requests
+    // Primero: si es una pregunta general de almuerzo, muestra el menú de almuerzos
+    if (chatType !== 'admin' && this.messageHandler.isGeneralLunchRequest(text)) {
+      const lastAssistantMessage = this.conversationService.getLastAssistantMessage(conversationId);
+      if (!this.messageHandler.isVariantPrompt(lastAssistantMessage)) {
+        return await this.handleLunchRequest(client, locationId, chatType);
+      }
+    }
+
+    // Si la frase contiene "almuerzo" pero NO es una pregunta general, usa NLP para buscar el producto en almuerzos
+    if (chatType !== 'admin' && this.messageHandler.isLunchRequest(text)) {
+      // Obtener solo productos de almuerzos
+      const lunchMenu = await this.menuHandler.getLunchProducts(locationId);
+      const nlp = new (require('./services/nlp.service').NLPService)(lunchMenu);
+      const nlpResult = nlp.findBestProduct(text);
+      if (nlpResult) {
+        // Agrega un mensaje explícito al historial para guiar al modelo
+        this.conversationService.addMessage(conversationId, {
+          role: 'user',
+          content: `Quiero pedir el producto: ${Array.isArray(nlpResult) ? nlpResult[0].name : nlpResult.name}`
+        });
+        return await this.processWithOpenAI(client, text, locationId, chatType, chatId);
+      } else {
+        // Si no hay match, muestra el menú de almuerzos como fallback
+        const lunchMenuText = await this.menuHandler.getLunchMenuText(locationId);
+        if ('emit' in client) {
+          client.emit('ai_response', { type: 'text', content: lunchMenuText });
+        }
+        return lunchMenuText;
+      }
+    }
+
+    // Luego, si no es de almuerzo, el menú general
     if (chatType !== 'admin' && this.messageHandler.isMenuRequest(text)) {
       const lastAssistantMessage = this.conversationService.getLastAssistantMessage(conversationId);
       if (!this.messageHandler.isVariantPrompt(lastAssistantMessage)) {
@@ -384,6 +415,23 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (error) {
       console.error('Error handling menu request:', error);
       const errorMessage = 'Error mostrando el menú/producto. Por favor, intenta de nuevo.';
+      if ('emit' in client) {
+        client.emit('error', { message: errorMessage, details: error.message });
+      }
+      return errorMessage;
+    }
+  }
+
+  private async handleLunchRequest(client: any, locationId: string, chatType: string): Promise<string> {
+    try {
+      const lunchMenuText = await this.menuHandler.getLunchMenuText(locationId);
+      if ('emit' in client) {
+        client.emit('ai_response', { type: 'text', content: lunchMenuText });
+      }
+      return lunchMenuText;
+    } catch (error) {
+      console.error('Error handling lunch request:', error);
+      const errorMessage = 'Error mostrando las opciones de almuerzo. Por favor, intenta de nuevo.';
       if ('emit' in client) {
         client.emit('error', { message: errorMessage, details: error.message });
       }

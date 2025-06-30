@@ -207,4 +207,95 @@ export class MenuHandlerService {
     response += '\n\n*Por favor, dime el nombre o número de la opción que deseas.*';
     return response;
   }
+
+  async getLunchProducts(locationId: string): Promise<any[]> {
+    const menu = await this.productsService.findAll({ locationId });
+    const categoriesList = await this.categoriesService.categories({ orderBy: { order: 'asc' } });
+    const lunchCategories = categoriesList.filter(cat => {
+      const categoryName = this.normalizeName(cat.name);
+      return (
+        categoryName.includes('almuerzo') ||
+        categoryName.includes('almuerzos') ||
+        categoryName.includes('menudel dia') ||
+        categoryName.includes('menu del dia') ||
+        categoryName.includes('ejecutivo')
+      );
+    });
+    const lunchCategoryIds = lunchCategories.map(cat => cat.id);
+    return menu.filter(product => lunchCategoryIds.includes(product.categoryId));
+  }
+
+  async getLunchMenuText(locationId: string): Promise<string> {
+    const menu = await this.productsService.findAll({ locationId });
+    if (!menu || menu.length === 0) {
+      return 'No se encontró ningún producto en el menú para esta ubicación.';
+    }
+
+    const categoriesList = await this.categoriesService.categories({ orderBy: { order: 'asc' } });
+    // Filtro estricto solo para almuerzos
+    const lunchCategories = categoriesList.filter(cat => {
+      const categoryName = this.normalizeName(cat.name);
+      return (
+        categoryName.includes('almuerzo') ||
+        categoryName.includes('almuerzos') ||
+        categoryName.includes('menudel dia') ||
+        categoryName.includes('menu del dia') ||
+        categoryName.includes('ejecutivo')
+      );
+    });
+
+    if (lunchCategories.length === 0) {
+      return '🍽️ *Opciones de Almuerzo*\n\nPor el momento no tenemos una categoría específica de almuerzos configurada. Te muestro nuestro menú completo:\n\n' + await this.getMenuText(locationId);
+    }
+
+    const categories: Record<string, { name: string; products: any[] }> = {};
+    for (const cat of lunchCategories) {
+      categories[cat.id] = { name: cat.name, products: [] };
+    }
+    
+    menu.forEach(product => {
+      const catId = product.categoryId;
+      if (!catId || !categories[catId]) return;
+      categories[catId].products.push(product);
+    });
+
+    let menuText = '🍛 *Opciones de Almuerzo*\n';
+    let prodCount = 1;
+    
+    for (const cat of lunchCategories) {
+      const group = categories[cat.id];
+      if (!group || group.products.length === 0) continue;
+      const emoji = this.getCategoryEmoji(group.name);
+      menuText += `\n\n${emoji} *${group.name}*`;
+      for (const product of group.products) {
+        const price = product.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        menuText += `\n${prodCount}. *${product.name}* - $${price}`;
+        if (product.description) {
+          menuText += `\n   _${product.description}_`;
+        }
+        // Mostrar variantes de forma clara y amigable
+        if (product.variantGroups && product.variantGroups.length > 0) {
+          for (const groupVar of product.variantGroups) {
+            const filteredVariants = groupVar.variants.filter(v => !v.name.trim().toLowerCase().startsWith('sin '));
+            if (filteredVariants.length > 0) {
+              const groupEmoji = this.getGroupEmoji(groupVar.name);
+              menuText += `\n   ${groupEmoji} *${groupVar.name}:*`;
+              for (const v of filteredVariants) {
+                let variantLine = ` ${v.name}`;
+                if (v.price && v.price > 0) {
+                  const variantPrice = v.price.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                  variantLine += ` (+$${variantPrice})`;
+                }
+                menuText += `\n      -${variantLine}`;
+              }
+            }
+          }
+        }
+        prodCount++;
+      }
+    }
+    
+    menuText += '\n\n*¿Cuál de estos almuerzos te gustaría pedir?* 😊';
+    return menuText;
+  }
 } 

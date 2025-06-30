@@ -1,8 +1,8 @@
-// @ts-ignore
-import Fuse from 'fuse.js';
+// Cambia la importación para compatibilidad universal
+const Fuse = require('fuse.js');
 
 export class NLPService {
-  private fuse: Fuse<any>;
+  private fuse: any;
   private synonymMap: Record<string, string[]> = {
     'Chocolate': ['chocolate para tomar', 'chocolate bebida', 'chocolate caliente', 'chocolate drink', 'chocolate bebida caliente'],
     'Croissant de Chocolate': ['croissant chocolate', 'croissant de chocolate', 'croissant relleno de chocolate'],
