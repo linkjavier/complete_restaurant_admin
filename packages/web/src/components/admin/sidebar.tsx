@@ -21,7 +21,8 @@ import {
   ChevronRight,
   Receipt,
   Bot,
-  MessageSquare
+  MessageSquare,
+  ContactRound
 } from "lucide-react"
 import {
   Tooltip,
@@ -114,7 +115,7 @@ const routes = [
   },
   {
     label: "Clientes",
-    icon: Users,
+    icon: ContactRound,
     href: "/admin/customers",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },

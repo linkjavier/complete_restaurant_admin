@@ -547,7 +547,7 @@ export function OrdersManager() {
                 </div>
               ) : (
                 <>
-                  <TabsContent value="active" className="mt-16 md:mt-8">
+                  <TabsContent value="active" className="pt-24 md:pt-0">
                     <div className="space-y-4">
                       {filteredOrders.length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
@@ -673,7 +673,7 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-2xl" style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
                                           {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
@@ -813,7 +813,7 @@ export function OrdersManager() {
                       )}
                     </div>
                   </TabsContent>
-                  <TabsContent value="completed" className="mt-16 md:mt-8">
+                  <TabsContent value="completed" className="pt-24 md:pt-0">
                     <div className="space-y-4">
                       {orders.filter(o => o.status === "READY").length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
@@ -939,7 +939,7 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-2xl" style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
                                           {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
@@ -1050,7 +1050,7 @@ export function OrdersManager() {
                       )}
                     </div>
                   </TabsContent>
-                  <TabsContent value="paid" className="mt-16 md:mt-8">
+                  <TabsContent value="paid" className="pt-24 md:pt-0">
                     <div className="space-y-4">
                       {orders.filter(o => o.isPaid).length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
@@ -1176,7 +1176,7 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-2xl" style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
                                           {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
@@ -1287,7 +1287,7 @@ export function OrdersManager() {
                       )}
                     </div>
                   </TabsContent>
-                  <TabsContent value="cancelled" className="mt-16 md:mt-8">
+                  <TabsContent value="cancelled" className="pt-24 md:pt-0">
                     <div className="space-y-4">
                       {orders.filter(o => o.status === "CANCELLED").length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
@@ -1413,7 +1413,7 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-2xl" style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
                                           {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
@@ -1497,7 +1497,7 @@ export function OrdersManager() {
                       )}
                     </div>
                   </TabsContent>
-                  <TabsContent value="deleted" className="mt-16 md:mt-8 pt-8 md:pt-0">
+                  <TabsContent value="deleted" className="pt-24 md:pt-0">
                     <div className="space-y-4">
                       {deletedOrders.length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
