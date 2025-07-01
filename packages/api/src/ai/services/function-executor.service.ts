@@ -153,21 +153,33 @@ export class FunctionExecutorService {
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        const matchingProducts = menu.filter(product => 
+        let matchingProducts = menu.filter(product => 
           product.name.toLowerCase().includes(item.productName.toLowerCase())
         );
         
         if (matchingProducts.length === 0) {
           return { message: `❌ Producto no encontrado: "${item.productName}"` };
         }
+
+        // --- MEJORA: Heurística de bebida por item ---
+        // Si hay más de un producto con el mismo nombre, y uno es bebida, y el item parece bebida, selecciona la bebida automáticamente
         if (matchingProducts.length > 1) {
-          // --- Heurística de negocio: si hay panadería y chocolate, prioriza bebida ---
-          const bakeryKeywords = ['pan', 'pandebono', 'almojábana', 'arepa', 'buñuelo', 'panadería', 'pastelería'];
-          const hasBakery = items.some(it => bakeryKeywords.some(k => it.productName.toLowerCase().includes(k)));
           const beverageOptions = matchingProducts.filter(opt =>
             opt.category && opt.category.name && opt.category.name.toLowerCase().includes('bebida')
           );
-          if (hasBakery && beverageOptions.length === 1) {
+          // Heurística: si el nombre del item contiene palabras típicas de bebida
+          const beverageKeywords = ['chocolate', 'cafe', 'té', 'te', 'jugo', 'limonada', 'agua', 'malteada', 'bebida', 'gaseosa', 'cola', 'refresco', 'soda', 'milkshake', 'granizado', 'ponche'];
+          const isLikelyBeverage = beverageKeywords.some(k => normalizeName(item.productName).includes(normalizeName(k)));
+          // O si el usuario pidió exactamente una bebida por NLP
+          let nlpIsBeverage = false;
+          if (beverageOptions.length > 0) {
+            const nlp = new NLPService(beverageOptions);
+            const nlpResult = nlp.findBestProduct(item.productName);
+            if (nlpResult && !Array.isArray(nlpResult)) {
+              nlpIsBeverage = true;
+            }
+          }
+          if ((isLikelyBeverage || nlpIsBeverage) && beverageOptions.length === 1) {
             // Selecciona automáticamente la bebida
             const product = beverageOptions[0];
             let variantTotal = 0;
@@ -202,7 +214,7 @@ export class FunctionExecutorService {
               variantSummary: ''
             });
             continue;
-          } else if (hasBakery && beverageOptions.length > 1) {
+          } else if ((isLikelyBeverage || nlpIsBeverage) && beverageOptions.length > 1) {
             // Si hay varias bebidas, pregunta solo por las bebidas
             if (functionArgs.conversationId && this.orderStateService) {
               this.orderStateService.updateState(functionArgs.conversationId, {
@@ -220,7 +232,7 @@ export class FunctionExecutorService {
               message: `🔎 He encontrado varias bebidas que coinciden con *"${item.productName}"*:\n\n${options}\n\nPor favor, dime el número o el nombre exacto de la bebida que deseas. 😊`
             };
           }
-          // Si la heurística no resuelve, usa NLP para desambiguar
+          // Si la heurística no resuelve, usa NLP para desambiguar entre todos los productos
           if (functionArgs.conversationId && this.orderStateService) {
             this.orderStateService.updateState(functionArgs.conversationId, {
               pendingProductSelection: {
@@ -618,12 +630,17 @@ export class FunctionExecutorService {
   private async createOrder(functionArgs: any) {
     try {
       const deliveryFee = await this.settingsService.getDeliveryFee();
-      
-      // Las variantes ya están sincronizadas en validateOrderBeforeCreation
-      console.log('[CREATE ORDER] Items recibidos (variantes ya sincronizadas):', JSON.stringify(functionArgs.items, null, 2));
-
+      // --- NUEVO: Sincroniza variantes con IDs si no están presentes ---
+      const menu = await this.productsService.findAll({ locationId: functionArgs.locationId });
+      let items = functionArgs.items;
+      // Si alguna variante no tiene productVariantId, sincroniza
+      if (items.some(item => (item.variants || []).some(v => !v.productVariantId))) {
+        items = this.syncVariantsWithIds(items, menu);
+      }
+      // Las variantes ya están sincronizadas en validateOrderBeforeCreation, pero por seguridad se repite aquí
+      console.log('[CREATE ORDER] Items recibidos (variantes ya sincronizadas):', JSON.stringify(items, null, 2));
       const createdOrder = await this.ordersService.create({
-        items: functionArgs.items,
+        items,
         customerName: functionArgs.customerName,
         deliveryAddress: functionArgs.deliveryAddress,
         phone: functionArgs.phone,
@@ -634,7 +651,6 @@ export class FunctionExecutorService {
         type: OrderType.DELIVERY,
         source: OrderSource.WHATSAPP,
       });
-
       return {
         message: `✅ ¡Tu orden ha sido creada exitosamente!\n\nNúmero de orden: *${createdOrder.id}*\n\nPronto recibirás la confirmación de tu pedido. ¡Gracias por confiar en nosotros!`,
         validated: true

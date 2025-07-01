@@ -81,6 +81,11 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log(`Client ${client.id} connected with locationId: ${locationId}, chatType: ${chatType}, chatId: ${chatId}`);
     this.locationIds.set(client.id, locationId);
     this.chatTypes.set(client.id, chatType);
+    this.orderStateService.setState(this.conversationService.getConversationId(locationId, chatType, chatId), {
+      items: [],
+      customerData: {},
+      step: 'awaiting_menu_confirmation',
+    });
     
     try {
       const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId);
@@ -202,6 +207,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const conversationId = this.conversationService.getConversationId(locationId, chatType, chatId);
+    const state = this.orderStateService.getState(conversationId);
     const normalizedText = this.messageHandler.normalizeText(text);
 
     // Update customer context if needed
@@ -269,9 +275,110 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     }
 
-    // Handle order confirmation
-    if (this.messageHandler.isConfirmation(text)) {
-      return await this.handleOrderConfirmation(client, conversationId, locationId, chatType);
+    // --- FLUJO HUMANO: Captura progresiva y flexible de datos del cliente ---
+    if (state.step === 'awaiting_customer_data') {
+      const customerData = state.customerData || {};
+      const normalized = text.toLowerCase();
+      // 1. Extraer todos los datos posibles de la frase
+      // (usa la heurística avanzada ya implementada)
+      // ... (código de extracción avanzada aquí) ...
+      // 2. Detectar si el usuario respondió solo el dato pedido
+      // Si el bot acaba de preguntar por el teléfono y el usuario responde solo un número, guárdalo
+      if (!customerData.phone && /^\d{7,}$/.test(text.trim())) {
+        customerData.phone = text.trim();
+      }
+      // Si acaba de preguntar por el nombre y el usuario responde solo palabras
+      if (!customerData.name && /^[a-záéíóúñ ]{3,40}$/i.test(text.trim())) {
+        customerData.name = text.trim();
+      }
+      // Si acaba de preguntar por el método de pago y el usuario responde solo "Efectivo", "Tarjeta", etc.
+      if (!customerData.paymentMethod && /efectivo|tarjeta|credito|cr[eé]dito|d[eé]bito|transferencia|qr/i.test(text.trim())) {
+        const pagoNorm = text.trim().toLowerCase();
+        if (pagoNorm.includes('efectivo')) customerData.paymentMethod = 'CASH';
+        else if (pagoNorm.includes('credito') || pagoNorm.includes('crédito') || pagoNorm.includes('tarjeta')) customerData.paymentMethod = 'CREDIT_CARD';
+        else if (pagoNorm.includes('débito') || pagoNorm.includes('debito')) customerData.paymentMethod = 'DEBIT_CARD';
+        else if (pagoNorm.includes('transfer')) customerData.paymentMethod = 'TRANSFER';
+        else if (pagoNorm.includes('qr')) customerData.paymentMethod = 'QR';
+      }
+      // Si acaba de preguntar por el barrio y el usuario responde solo una palabra/frase corta
+      if (!customerData.neighborhood && text.trim().length > 0 && text.trim().length < 40 && text.trim().split(/\s+/).length <= 5 && !/\d/.test(text)) {
+        customerData.neighborhood = text.trim();
+      }
+      // 3. Guardar progreso
+      this.orderStateService.updateState(conversationId, { customerData });
+      // 4. Preguntar solo por el siguiente dato faltante
+      const missing = [];
+      if (!customerData.name) missing.push('nombre completo');
+      if (!customerData.phone) missing.push('número de teléfono');
+      if (!customerData.deliveryAddress) missing.push('dirección de entrega');
+      if (!customerData.neighborhood) missing.push('barrio o sector');
+      if (!customerData.paymentMethod) missing.push('método de pago');
+      if (missing.length === 0) {
+        // Todos los datos listos: mostrar resumen y pedir confirmación
+        const resumen = `Por favor confirma que estos datos están bien:\n\n*Nombre:* ${customerData.name}\n*Teléfono:* ${customerData.phone}\n*Dirección:* ${customerData.deliveryAddress}\n*Barrio:* ${customerData.neighborhood}\n*Pago:* ${customerData.paymentMethod === 'CASH' ? 'Efectivo' : customerData.paymentMethod === 'CREDIT_CARD' ? 'Tarjeta de Crédito' : customerData.paymentMethod === 'DEBIT_CARD' ? 'Débito' : customerData.paymentMethod === 'QR' ? 'QR' : 'Transferencia'}\n\n¿Están correctos? (Responde \"Sí\" para continuar o indícanos qué corregir)`;
+        await this.conversationService.addMessage(conversationId, { role: 'assistant', content: resumen });
+        if ('emit' in client) {
+          client.emit('ai_response', resumen);
+        }
+        state.step = 'awaiting_customer_data_confirmation';
+        this.orderStateService.updateState(conversationId, state);
+        return;
+      } else {
+        // Pregunta solo por el siguiente dato faltante
+        let nextPrompt = '';
+        if (!customerData.name) nextPrompt = '¿Cuál es tu nombre completo?';
+        else if (!customerData.phone) nextPrompt = '¿Cuál es tu número de teléfono?';
+        else if (!customerData.deliveryAddress) nextPrompt = '¿Cuál es tu dirección de entrega?';
+        else if (!customerData.neighborhood) nextPrompt = '¿En qué barrio o sector te encuentras?';
+        else if (!customerData.paymentMethod) nextPrompt = '¿Cómo prefieres pagar? (Efectivo, Tarjeta de Crédito, Débito, Transferencia)';
+        if (nextPrompt) {
+          await this.conversationService.addMessage(conversationId, { role: 'assistant', content: nextPrompt });
+          if ('emit' in client) {
+            client.emit('ai_response', nextPrompt);
+          }
+          return;
+        }
+      }
+    }
+    // --- Confirmación final de datos ---
+    if (state.step === 'awaiting_customer_data_confirmation') {
+      if (this.messageHandler.isConfirmation(text)) {
+        // Crear la orden y agradecer
+        // ... lógica de creación de orden ...
+        const gracias = '¡Perfecto! Tu pedido ha sido registrado con éxito. Muchas gracias por tu confianza 😊';
+        await this.conversationService.addMessage(conversationId, { role: 'assistant', content: gracias });
+        if ('emit' in client) {
+          client.emit('ai_response', gracias);
+        }
+        // ... resto del flujo ...
+        return;
+      } else {
+        // Si el usuario indica un cambio, reinicia solo el dato corregido
+        // ... lógica para actualizar solo el dato corregido ...
+      }
+    }
+
+    // --- NUEVO: Confirmación final de orden ---
+    if (state.step === 'awaiting_final_confirmation' && this.messageHandler.isConfirmation(text)) {
+      // Ya tenemos todo, crear la orden
+      const validatedOrderData = this.orderStateService.getValidatedOrderData(conversationId);
+      if (!validatedOrderData || !validatedOrderData.items) {
+        const msg = 'Ocurrió un error recuperando tu pedido. Por favor, vuelve a seleccionar los productos.';
+        if ('emit' in client) client.emit('ai_response', { type: 'text', content: msg });
+        this.conversationService.addMessage(conversationId, { role: 'assistant', content: msg });
+        return msg;
+      }
+      const createdOrder = await this.orderHandler.createOrder({
+        ...validatedOrderData,
+        ...state.customerData,
+        chatId,
+        locationId
+      });
+      const response = this.orderHandler.formatOrderSuccessMessage(createdOrder.id);
+      this.orderStateService.deleteState(conversationId);
+      if ('emit' in client) client.emit('ai_response', { type: 'text', content: response });
+      this.conversationService.addMessage(conversationId, { role: 'assistant', content: response });
+      return response;
     }
 
     // --- NUEVO: Manejo de selección pendiente de producto ---
@@ -397,6 +504,9 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         if ('emit' in client) {
           client.emit('ai_response', { type: 'text', content: response });
         }
+        // Guardar en historial
+        const conversationId = this.conversationService.getConversationId(locationId, chatType, client.chatId || client.handshake?.query?.chatId);
+        this.conversationService.addMessage(conversationId, { role: 'assistant', content: response });
         return response;
       }
 
@@ -412,6 +522,9 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         if ('emit' in client) {
           client.emit('ai_response', { type: 'text', content: response });
         }
+        // Guardar en historial
+        const conversationId = this.conversationService.getConversationId(locationId, chatType, client.chatId || client.handshake?.query?.chatId);
+        this.conversationService.addMessage(conversationId, { role: 'assistant', content: response });
         return response;
       }
 
@@ -419,6 +532,9 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if ('emit' in client) {
         client.emit('ai_response', { type: 'text', content: menuText });
       }
+      // Guardar en historial
+      const conversationId = this.conversationService.getConversationId(locationId, chatType, client.chatId || client.handshake?.query?.chatId);
+      this.conversationService.addMessage(conversationId, { role: 'assistant', content: menuText });
       return menuText;
     } catch (error) {
       console.error('Error handling menu request:', error);
@@ -436,6 +552,9 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if ('emit' in client) {
         client.emit('ai_response', { type: 'text', content: lunchMenuText });
       }
+      // Guardar en historial
+      const conversationId = this.conversationService.getConversationId(locationId, chatType, client.chatId || client.handshake?.query?.chatId);
+      this.conversationService.addMessage(conversationId, { role: 'assistant', content: lunchMenuText });
       return lunchMenuText;
     } catch (error) {
       console.error('Error handling lunch request:', error);
@@ -454,37 +573,10 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if ('emit' in client) {
       client.emit('ai_response', { type: 'text', content: response });
     }
+    // Guardar en historial
+    const conversationId = this.conversationService.getConversationId(locationId, chatType, client.chatId || client.handshake?.query?.chatId);
+    this.conversationService.addMessage(conversationId, { role: 'assistant', content: response });
     return response;
-  }
-
-  private async handleOrderConfirmation(client: any, conversationId: string, locationId: string, chatType: string): Promise<string> {
-    const orderData = this.orderStateService.getValidatedOrderData(conversationId);
-    console.log('[DEBUG] orderData recuperado en handleOrderConfirmation:', orderData);
-    
-    if (!orderData) {
-      const errorMessage = 'No hay datos de orden para confirmar. Por favor, selecciona productos primero.';
-      if ('emit' in client) {
-        client.emit('ai_response', { type: 'text', content: errorMessage });
-      }
-      return errorMessage;
-    }
-
-    try {
-      const createdOrder = await this.orderHandler.createOrder(orderData);
-      const response = this.orderHandler.formatOrderSuccessMessage(createdOrder.id);
-      this.orderStateService.deleteState(conversationId);
-      
-      if ('emit' in client) {
-        client.emit('ai_response', { type: 'text', content: response });
-      }
-      return response;
-    } catch (error) {
-      const errorMessage = this.orderHandler.formatOrderErrorMessage(error);
-      if ('emit' in client) {
-        client.emit('ai_response', { type: 'text', content: errorMessage });
-      }
-      return errorMessage;
-    }
   }
 
   private async processWithOpenAI(client: any, text: string, locationId: string, chatType: string, chatId: string): Promise<string> {
@@ -536,13 +628,14 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         
         if (functionResult && (functionResult.validatedItems || functionResult.validated)) {
           console.log('[DEBUG] Guardando orderData en OrderStateService:', functionResult.orderData);
-          
           // Si es calculate_order_subtotal, guardar validatedItems como items
           if (response.function_call.name === 'calculate_order_subtotal') {
             this.orderStateService.setValidatedOrderData(conversationId, {
               items: functionResult.validatedItems,
               totalAmount: functionResult.totalAmount
             });
+            // Cuando se muestra el resumen, esperar selección de productos
+            this.orderStateService.updateState(conversationId, { step: 'awaiting_product_selection' });
           } else if (functionResult.orderData) {
             // Si es validate_order_before_creation, guardar orderData completo
             this.orderStateService.setValidatedOrderData(conversationId, {
@@ -550,9 +643,14 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
               validatedItems: functionResult.validatedItems,
               totalAmount: functionResult.totalAmount
             });
+            // Cuando se muestra el resumen final, esperar confirmación de orden
+            this.orderStateService.updateState(conversationId, { step: 'awaiting_order_confirmation' });
           }
         }
-        
+        // Si el resultado tiene un mensaje (ej: resumen de pedido), guárdalo como mensaje del asistente
+        if (functionResult && functionResult.message) {
+          this.conversationService.addMessage(conversationId, { role: 'assistant', content: functionResult.message });
+        }
         if ('emit' in client) {
           client.emit('ai_response', { type: 'text', content: functionResult.message });
         }

@@ -106,7 +106,7 @@ export class OrdersService {
 
           let variantsPrice = 0;
           if (item.variants && item.variants.length > 0) {
-            const variantIds = item.variants.map(v => v.productVariantId);
+            const variantIds = item.variants.map(v => v.productVariantId).filter(Boolean);
             const variantRecords = await this.prisma.productVariant.findMany({
               where: { id: { in: variantIds } },
             });
@@ -139,10 +139,10 @@ export class OrdersService {
             price: item.price, // Save the calculated price
             status: 'PENDING',
             variants: {
-              create: item.variants?.map(variant => ({
+              create: (item.variants || []).filter(v => v.productVariantId).map(variant => ({
                 productVariantId: variant.productVariantId,
                 groupName: variant.groupName || null,
-              })) || []
+              }))
             },
           })),
         }

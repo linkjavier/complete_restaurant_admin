@@ -82,7 +82,45 @@ export class MenuHandlerService {
   }> {
     const menu = await this.productsService.findAll({ locationId });
     const userTokens = this.messageHandler.tokenize(text);
-    
+    const normalizedText = this.normalizeName(text);
+
+    // --- HEURÍSTICA HUMANA: Priorizar bebidas ---
+    const bebidaKeywords = ['chocolate', 'cafe', 'jugo', 'milo', 'capuchino', 'capuccino', 'avena', 'te', 'té'];
+    const bebidaCategoryNames = ['bebida', 'bebidas', 'jugos', 'cafeteria', 'cafetería', 'cafe', 'cafés', 'desayuno', 'desayunos'];
+    const isPedidoBebida = bebidaKeywords.some(b => normalizedText.includes(b)) &&
+      !/pan|croissant|postre|torta|galleta|brownie|pastel|empanada|arepa|sandwich|sándwich|panaderia|panadería|snack|bolleria|bollería/.test(normalizedText);
+
+    // Si el usuario pregunta explícitamente por "productos con ..." o "qué productos tienen ..."
+    const isBusquedaGeneral = /productos? (con|que tienen|que contengan)/i.test(text) || /hay.*(con|de)/i.test(text);
+
+    // Buscar bebidas exactas
+    let bebidaEncontrada = null;
+    if (isPedidoBebida && !isBusquedaGeneral) {
+      // Buscar productos en categorías de bebida cuyo nombre coincida exactamente
+      bebidaEncontrada = menu.find(product => {
+        const prodName = this.normalizeName(product.name);
+        const catName = product.category?.name ? this.normalizeName(product.category.name) : '';
+        return bebidaKeywords.some(b => prodName === b) && bebidaCategoryNames.some(cn => catName.includes(cn));
+      });
+      // Si no hay coincidencia exacta, buscar por inclusión
+      if (!bebidaEncontrada) {
+        bebidaEncontrada = menu.find(product => {
+          const prodName = this.normalizeName(product.name);
+          const catName = product.category?.name ? this.normalizeName(product.category.name) : '';
+          return bebidaKeywords.some(b => prodName.includes(b)) && bebidaCategoryNames.some(cn => catName.includes(cn));
+        });
+      }
+      if (bebidaEncontrada) {
+        return {
+          bestProduct: bebidaEncontrada,
+          candidateProducts: [],
+          matchingProducts: [bebidaEncontrada],
+        };
+      }
+    }
+
+    // --- FIN HEURÍSTICA ---
+
     let bestProduct = null;
     let bestScore = 0;
     let candidateProducts = [];
@@ -91,7 +129,6 @@ export class MenuHandlerService {
       const productTokens = this.messageHandler.tokenize(product.name);
       const matchCount = productTokens.filter(tk => userTokens.includes(tk)).length;
       const score = matchCount / productTokens.length + productTokens.length * 0.01;
-      
       if (matchCount > 0) {
         candidateProducts.push({ product, score, matchCount });
         if (score > bestScore) {

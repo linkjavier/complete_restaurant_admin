@@ -74,8 +74,10 @@ export class MessageHandlerService {
   ];
 
   private readonly confirmKeywords = [
-    'sí', 'si', 'confirmo', 'confirmar', 'correcto', 
-    'está bien', 'ok', 'dale', 'listo', 'así está bien'
+    'sí', 'si', 'confirmo', 'confirmar', 'correcto', 'está bien', 'ok', 'dale', 'listo', 'así está bien',
+    'perfecto', 'eso es', 'de acuerdo', 'está correcto', 'así está correcto el pedido', 'súper', 'genial', 'vale', 'va',
+    'afirmativo', 'seguro', 'por supuesto', 'claro', 'excelente', 'me parece bien', 'así está perfecto', 'así está correcto',
+    'así está', 'todo bien', 'todo correcto', 'okay', 'okey'
   ];
 
   private readonly genericWords = [
@@ -104,7 +106,7 @@ export class MessageHandlerService {
 
   isConfirmation(text: string): boolean {
     const normalizedText = this.normalizeText(text);
-    return this.confirmKeywords.some(keyword => normalizedText.trim().startsWith(keyword));
+    return this.confirmKeywords.some(keyword => normalizedText.includes(keyword));
   }
 
   isVariantPrompt(lastAssistantMessage: string): boolean {
