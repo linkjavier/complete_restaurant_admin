@@ -10,7 +10,7 @@ export class OrderHandlerService {
     private customerContext: CustomerContextService,
   ) {}
 
-  async createOrder(orderData: any): Promise<{ id: string }> {
+  async createOrder(orderData: any, tenantId: string): Promise<{ id: string }> {
     const createdOrder = await this.ordersService.create({
       items: orderData.items,
       customerName: orderData.customerName,
@@ -22,10 +22,10 @@ export class OrderHandlerService {
       deliveryFee: orderData.deliveryFee || 0,
       type: OrderType.DELIVERY,
       source: OrderSource.WHATSAPP,
-    });
+    }, tenantId);
 
     // Update customer data after order creation
-    await this.customerContext.updateCustomerAfterOrder(orderData);
+    await this.customerContext.updateCustomerAfterOrder(orderData, tenantId);
 
     return createdOrder;
   }

@@ -83,7 +83,10 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
       const chatId = client.handshake.query.chatId as string;
       const locationId = client.handshake.query.locationId as string;
       if (chatId && locationId) {
-        const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId);
+        // Obtener tenantId a partir de locationId
+        const location = await this.whatsappService['prisma'].location.findUnique({ where: { id: locationId } });
+        const tenantId = location ? location.tenantId : undefined;
+        const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId, tenantId);
         const cleanName = customerContext && customerContext.name ? customerContext.name.trim() : '';
         let welcomeMessage = '';
         if (cleanName.length > 0) {

@@ -6,6 +6,8 @@ import { swaggerConfig } from './swagger.config';
 import { ConfigService } from '@nestjs/config';
 import { RedisIoAdapter } from './orders/socket-io-redis.adapter';
 import * as express from 'express';
+import { TenantMiddleware } from './middleware/tenant.middleware';
+import { PrismaService } from './prisma/prisma.service';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -40,6 +42,13 @@ async function bootstrap() {
 
     // Enable validation
     app.useGlobalPipes(new ValidationPipe());
+
+    // Tenant middleware: extrae tenantId del subdominio
+    const prisma = app.get(PrismaService);
+    app.use(async (req, res, next) => {
+      const tenantMiddleware = new TenantMiddleware(prisma);
+      await tenantMiddleware.use(req, res, next);
+    });
 
     // Swagger documentation
     const document = SwaggerModule.createDocument(app, swaggerConfig);

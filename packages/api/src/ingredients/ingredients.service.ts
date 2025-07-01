@@ -23,7 +23,7 @@ export class IngredientsService {
   
   constructor(private prisma: PrismaService) {}
 
-  async create(createIngredientDto: CreateIngredientDto) {
+  async create(createIngredientDto: CreateIngredientDto & { tenantId: string }) {
     try {
       // Depurar los valores recibidos
       this.logger.debug(`Creating ingredient with data: ${JSON.stringify(createIngredientDto)}`);
@@ -43,7 +43,8 @@ export class IngredientsService {
           quantity: quantity,
           unit: unit,
           minQuantity: minQuantity,
-          locationId: createIngredientDto.locationId,
+          location: { connect: { id: createIngredientDto.locationId } },
+          tenant: { connect: { id: createIngredientDto.tenantId } },
         },
         include: {
           location: true,

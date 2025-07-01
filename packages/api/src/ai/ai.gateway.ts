@@ -21,6 +21,7 @@ import { MenuHandlerService } from './services/menu-handler.service';
 import { OrderHandlerService } from './services/order-handler.service';
 import { FunctionExecutorService } from './services/function-executor.service';
 import { NLPService } from './services/nlp.service';
+import { LocationsService } from '../locations/locations.service';
 
 function asChatType(value: any): 'whatsapp' | 'ai' | 'admin' {
   if (value === 'whatsapp' || value === 'ai' || value === 'admin') return value;
@@ -51,7 +52,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private messageHandler: MessageHandlerService,
     private menuHandler: MenuHandlerService,
     private orderHandler: OrderHandlerService,
-    private functionExecutor: FunctionExecutorService
+    private functionExecutor: FunctionExecutorService,
+    private locationsService: LocationsService
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
@@ -88,11 +90,13 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     
     try {
-      const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId);
+      const tenantId = await this.getTenantId(locationId);
+      const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId, tenantId);
       // DEBUG: Verifica si el customerContext recibido tiene el nombre y datos correctos
       console.log('[DEBUG][ai.gateway.ts] customerContext recibido:', customerContext);
       const conversationContext: ConversationContext = {
         locationId,
+        tenantId,
         chatType,
         chatId,
         customerName: customerContext.name,
@@ -247,7 +251,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Si la frase contiene "almuerzo" pero NO es una pregunta general, usa NLP para buscar el producto en almuerzos
     if (chatType !== 'admin' && this.messageHandler.isLunchRequest(text)) {
       // Obtener solo productos de almuerzos
-      const lunchMenu = await this.menuHandler.getLunchProducts(locationId);
+      const tenantId = await this.getTenantId(locationId);
+      const lunchMenu = await this.menuHandler.getLunchProducts(locationId, tenantId);
       const nlp = new (require('./services/nlp.service').NLPService)(lunchMenu);
       const nlpResult = nlp.findBestProduct(text);
       if (nlpResult) {
@@ -259,7 +264,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return await this.processWithOpenAI(client, text, locationId, chatType, chatId);
       } else {
         // Si no hay match, muestra el menú de almuerzos como fallback
-        const lunchMenuText = await this.menuHandler.getLunchMenuText(locationId);
+        const tenantId = await this.getTenantId(locationId);
+        const lunchMenuText = await this.menuHandler.getLunchMenuText(locationId, tenantId);
         if ('emit' in client) {
           client.emit('ai_response', { type: 'text', content: lunchMenuText });
         }
@@ -361,6 +367,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // --- NUEVO: Confirmación final de orden ---
     if (state.step === 'awaiting_final_confirmation' && this.messageHandler.isConfirmation(text)) {
       // Ya tenemos todo, crear la orden
+      const tenantId = await this.getTenantId(locationId);
       const validatedOrderData = this.orderStateService.getValidatedOrderData(conversationId);
       if (!validatedOrderData || !validatedOrderData.items) {
         const msg = 'Ocurrió un error recuperando tu pedido. Por favor, vuelve a seleccionar los productos.';
@@ -373,7 +380,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ...state.customerData,
         chatId,
         locationId
-      });
+      }, tenantId);
       const response = this.orderHandler.formatOrderSuccessMessage(createdOrder.id);
       this.orderStateService.deleteState(conversationId);
       if ('emit' in client) client.emit('ai_response', { type: 'text', content: response });
@@ -405,6 +412,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
       // Si no se seleccionó automáticamente, usa NLPService
       if (!selectedProduct) {
+        const tenantId = await this.getTenantId(locationId);
         const nlp = new NLPService(pendingSelection.options);
         const nlpResult = nlp.findBestProduct(text);
         if (Array.isArray(nlpResult)) {
@@ -432,11 +440,13 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           items,
           conversationId
         };
+        const tenantId = await this.getTenantId(locationId);
         const subtotalResult = await this.functionExecutor.executeFunction(
           'calculate_order_subtotal',
           functionArgs,
           locationId,
-          chatType
+          chatType,
+          tenantId
         );
         if ('emit' in client) {
           client.emit('ai_response', { type: 'text', content: subtotalResult.message });
@@ -480,9 +490,11 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ? chatType
         : 'ai';
     if (chatTypeFixed === 'whatsapp' && chatId && locationId) {
-      const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId);
+      const tenantId = await this.getTenantId(locationId);
+      const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId, tenantId);
       const conversationContext = {
         locationId,
+        tenantId,
         chatType: chatTypeFixed,
         chatId,
         customerName: customerContext.name,
@@ -496,7 +508,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private async handleMenuRequest(client: any, text: string, locationId: string, chatType: string): Promise<string> {
     try {
-      const { bestProduct, candidateProducts, matchingProducts } = await this.menuHandler.searchProducts(text, locationId);
+      const tenantId = await this.getTenantId(locationId);
+      const { bestProduct, candidateProducts, matchingProducts } = await this.menuHandler.searchProducts(text, locationId, tenantId);
       
       const usedGeneric = this.messageHandler.hasUsedGenericWords(text);
       if (candidateProducts.length > 1 && usedGeneric) {
@@ -528,7 +541,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return response;
       }
 
-      const menuText = await this.menuHandler.getMenuText(locationId);
+      const menuText = await this.menuHandler.getMenuText(locationId, tenantId);
       if ('emit' in client) {
         client.emit('ai_response', { type: 'text', content: menuText });
       }
@@ -548,7 +561,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private async handleLunchRequest(client: any, locationId: string, chatType: string): Promise<string> {
     try {
-      const lunchMenuText = await this.menuHandler.getLunchMenuText(locationId);
+      const tenantId = await this.getTenantId(locationId);
+      const lunchMenuText = await this.menuHandler.getLunchMenuText(locationId, tenantId);
       if ('emit' in client) {
         client.emit('ai_response', { type: 'text', content: lunchMenuText });
       }
@@ -583,6 +597,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const conversationId = this.conversationService.getConversationId(locationId, chatType, chatId);
     const conversation = await this.conversationService.getOrCreateConversation({
       locationId,
+      tenantId: await this.getTenantId(locationId),
       chatType,
       chatId,
     } as ConversationContext);
@@ -591,6 +606,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     try {
       console.log(`[AI Gateway] Calling OpenAI API with ${conversation.length} messages`);
+      const tenantId = await this.getTenantId(locationId);
       const completion = await this.openai.chat.completions.create({
         model: 'gpt-4o-mini-2024-07-18',
         messages: conversation,
@@ -617,7 +633,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           response.function_call.name,
           JSON.parse(response.function_call.arguments),
           locationId,
-          chatType
+          chatType,
+          tenantId
         );
         
         this.conversationService.addMessage(conversationId, {
@@ -670,5 +687,11 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
       return errorMessage;
     }
+  }
+
+  private async getTenantId(locationId: string): Promise<string> {
+    const location = await this.locationsService.findOne(locationId, undefined);
+    if (!location) throw new Error('Ubicación no encontrada');
+    return location.tenantId;
   }
 }

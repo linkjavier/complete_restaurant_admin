@@ -23,8 +23,8 @@ export class FunctionExecutorService {
     private orderHandler: OrderHandlerService,
   ) {}
 
-  private async getNLPService(locationId: string): Promise<NLPService> {
-    const menu = await this.productsService.findAll({ locationId });
+  private async getNLPService(locationId: string, tenantId: string): Promise<NLPService> {
+    const menu = await this.productsService.findAll({ locationId, tenantId });
     const menuHash = JSON.stringify(menu.map(p => p.id + p.name + p.price)).substring(0, 1000); // simple hash
     if (!this.nlpService || this.lastMenuHash !== menuHash) {
       this.nlpService = new NLPService(menu);
@@ -37,7 +37,8 @@ export class FunctionExecutorService {
     functionName: string, 
     functionArgs: any, 
     locationId: string, 
-    chatType: string
+    chatType: string,
+    tenantId: string
   ): Promise<{ message: string; validatedItems?: any[]; totalAmount?: number; validated?: boolean; orderData?: any }> {
     console.log(`[Function Executor] Processing ${functionName} for ${chatType}`);
     
@@ -45,7 +46,7 @@ export class FunctionExecutorService {
       return this.handleAdminFunction(functionName, functionArgs);
     }
     
-    return this.handleRestaurantFunction(functionName, functionArgs, locationId);
+    return this.handleRestaurantFunction(functionName, functionArgs, locationId, tenantId);
   }
 
   private handleAdminFunction(functionName: string, functionArgs: any) {
@@ -61,27 +62,27 @@ export class FunctionExecutorService {
     }
   }
 
-  private async handleRestaurantFunction(functionName: string, functionArgs: any, locationId: string) {
+  private async handleRestaurantFunction(functionName: string, functionArgs: any, locationId: string, tenantId: string) {
     switch (functionName) {
       case 'search_products_by_name':
-        return await this.searchProductsByName(functionArgs, locationId);
+        return await this.searchProductsByName(functionArgs, locationId, tenantId);
       case 'get_menu':
-        return await this.getMenu(locationId);
+        return await this.getMenu(locationId, tenantId);
       case 'calculate_order_subtotal':
-        return await this.calculateOrderSubtotal(functionArgs, locationId);
+        return await this.calculateOrderSubtotal(functionArgs, locationId, tenantId);
       case 'validate_order_before_creation':
-        return await this.validateOrderBeforeCreation(functionArgs, locationId);
+        return await this.validateOrderBeforeCreation(functionArgs, locationId, tenantId);
       case 'create_order':
-        return await this.createOrder(functionArgs);
+        return await this.createOrder(functionArgs, tenantId);
       default:
         return { message: `Función de restaurante no implementada: ${functionName}` };
     }
   }
 
-  private async searchProductsByName(functionArgs: any, locationId: string) {
+  private async searchProductsByName(functionArgs: any, locationId: string, tenantId: string) {
     try {
       const { productName, locationId: searchLocationId } = functionArgs;
-      const menu = await this.productsService.findAll({ locationId: searchLocationId });
+      const menu = await this.productsService.findAll({ locationId: searchLocationId, tenantId });
       
       const matchingProducts = menu.filter(product => 
         product.name.toLowerCase().includes(productName.toLowerCase())
@@ -115,9 +116,9 @@ export class FunctionExecutorService {
     }
   }
 
-  private async getMenu(locationId: string) {
+  private async getMenu(locationId: string, tenantId: string) {
     try {
-      const menu = await this.productsService.findAll({ locationId });
+      const menu = await this.productsService.findAll({ locationId, tenantId });
       if (!menu || menu.length === 0) {
         return { message: 'No se encontró ningún producto en el menú para esta ubicación.' };
       }
@@ -138,7 +139,7 @@ export class FunctionExecutorService {
     }
   }
 
-  private async calculateOrderSubtotal(functionArgs: any, locationId: string) {
+  private async calculateOrderSubtotal(functionArgs: any, locationId: string, tenantId: string) {
     try {
       const { items } = functionArgs;
       // LOG de depuración para ver el payload recibido y variantes
@@ -147,7 +148,7 @@ export class FunctionExecutorService {
         return { message: '❌ Error: No se proporcionaron productos válidos para calcular.' };
       }
 
-      const menu = await this.productsService.findAll({ locationId });
+      const menu = await this.productsService.findAll({ locationId, tenantId });
       const deliveryFee = await this.settingsService.getDeliveryFee();
       
       let totalAmount = 0;
@@ -367,7 +368,7 @@ export class FunctionExecutorService {
     }
   }
 
-  private async validateOrderBeforeCreation(functionArgs: any, locationId: string) {
+  private async validateOrderBeforeCreation(functionArgs: any, locationId: string, tenantId: string) {
     try {
       const { items, totalAmount, customerName, deliveryAddress, phone, neighborhood, paymentMethod, chatId } = functionArgs;
       
@@ -375,7 +376,7 @@ export class FunctionExecutorService {
       let existingCustomer = null;
       if (chatId) {
         const normalizedPhone = chatId.replace(/@c\.us$/, '').replace(/[^0-9]/g, '');
-        existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId);
+        existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId, tenantId);
       }
 
       // --- NUEVO: Determinar qué datos faltan o necesitan confirmación ---
@@ -469,7 +470,7 @@ export class FunctionExecutorService {
       const calculatedTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
       const totalWithDelivery = calculatedTotal + deliveryFee;
 
-      const menu = await this.productsService.findAll({ locationId });
+      const menu = await this.productsService.findAll({ locationId, tenantId });
       const itemsWithSyncedVariants = this.syncVariantsWithIds(items, menu);
       console.log('[VALIDATE ORDER] Items con variantes sincronizadas:', JSON.stringify(itemsWithSyncedVariants, null, 2));
 
@@ -629,10 +630,10 @@ export class FunctionExecutorService {
     });
   }
 
-  private async createOrder(functionArgs: any) {
+  private async createOrder(functionArgs: any, tenantId: string) {
     // Redirige toda la creación de orden a OrderHandlerService para evitar duplicidad y garantizar que se guarde el cliente
     try {
-      const createdOrder = await this.orderHandler.createOrder(functionArgs);
+      const createdOrder = await this.orderHandler.createOrder(functionArgs, tenantId);
       return {
         message: `✅ ¡Tu orden ha sido creada exitosamente!\n\nNúmero de orden: *${createdOrder.id}*\n\nPronto recibirás la confirmación de tu pedido. ¡Gracias por confiar en nosotros!`,
         validated: true

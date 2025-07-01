@@ -12,6 +12,7 @@ import { ProductsService } from './products.service';
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { CreateProductDto, UpdateProductDto, ProductVariantDto } from './product.dto';
+import { CurrentTenant } from '../auth/decorators/tenant.decorator';
 
 
 @ApiTags('products')
@@ -20,18 +21,20 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  create(@Body() createProductDto: CreateProductDto) {
-    return this.productsService.create(createProductDto);
+  create(@Body() createProductDto: CreateProductDto, @CurrentTenant() tenantId: string) {
+    return this.productsService.create(createProductDto, tenantId);
   }
 
   @Public()
   @Get()
   findAll(
+    @CurrentTenant() tenantId: string,
     @Query('locationId') locationId: string,
     @Query('categoryId') categoryId?: string,
     @Query('search') search?: string,
   ) {
     return this.productsService.findAll({
+      tenantId,
       locationId,
       categoryId,
       search,
@@ -47,8 +50,9 @@ export class ProductsController {
   update(
     @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
+    @CurrentTenant() tenantId: string,
   ) {
-    return this.productsService.update(id, updateProductDto);
+    return this.productsService.update(id, updateProductDto, tenantId);
   }
 
   @Delete(':id')

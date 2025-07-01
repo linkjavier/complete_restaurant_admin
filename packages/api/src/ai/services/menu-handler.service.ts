@@ -75,12 +75,12 @@ export class MenuHandlerService {
     return categoryEmojis[key] || '🍽️';
   }
 
-  async searchProducts(text: string, locationId: string): Promise<{
+  async searchProducts(text: string, locationId: string, tenantId: string): Promise<{
     bestProduct: any;
     candidateProducts: any[];
     matchingProducts: any[];
   }> {
-    const menu = await this.productsService.findAll({ locationId });
+    const menu = await this.productsService.findAll({ locationId, tenantId });
     const userTokens = this.messageHandler.tokenize(text);
     const normalizedText = this.normalizeName(text);
 
@@ -145,8 +145,8 @@ export class MenuHandlerService {
     return { bestProduct, candidateProducts, matchingProducts };
   }
 
-  async getMenuText(locationId: string): Promise<string> {
-    const menu = await this.productsService.findAll({ locationId });
+  async getMenuText(locationId: string, tenantId: string): Promise<string> {
+    const menu = await this.productsService.findAll({ locationId, tenantId });
     if (!menu || menu.length === 0) {
       return 'No se encontró ningún producto en el menú para esta ubicación.';
     }
@@ -245,8 +245,8 @@ export class MenuHandlerService {
     return response;
   }
 
-  async getLunchProducts(locationId: string): Promise<any[]> {
-    const menu = await this.productsService.findAll({ locationId });
+  async getLunchProducts(locationId: string, tenantId: string): Promise<any[]> {
+    const menu = await this.productsService.findAll({ locationId, tenantId });
     const categoriesList = await this.categoriesService.categories({ orderBy: { order: 'asc' } });
     const lunchCategories = categoriesList.filter(cat => {
       const categoryName = this.normalizeName(cat.name);
@@ -262,8 +262,8 @@ export class MenuHandlerService {
     return menu.filter(product => lunchCategoryIds.includes(product.categoryId));
   }
 
-  async getLunchMenuText(locationId: string): Promise<string> {
-    const menu = await this.productsService.findAll({ locationId });
+  async getLunchMenuText(locationId: string, tenantId: string): Promise<string> {
+    const menu = await this.productsService.findAll({ locationId, tenantId });
     if (!menu || menu.length === 0) {
       return 'No se encontró ningún producto en el menú para esta ubicación.';
     }
@@ -282,7 +282,7 @@ export class MenuHandlerService {
     });
 
     if (lunchCategories.length === 0) {
-      return '🍽️ *Opciones de Almuerzo*\n\nPor el momento no tenemos una categoría específica de almuerzos configurada. Te muestro nuestro menú completo:\n\n' + await this.getMenuText(locationId);
+      return '🍽️ *Opciones de Almuerzo*\n\nPor el momento no tenemos una categoría específica de almuerzos configurada. Te muestro nuestro menú completo:\n\n' + await this.getMenuText(locationId, tenantId);
     }
 
     const categories: Record<string, { name: string; products: any[] }> = {};

@@ -67,10 +67,13 @@ export class PosController {
     @Param('id') orderId: string,
     @Body() paymentData: ProcessPaymentDto,
   ) {
+    const order = await this.posService['prisma'].order.findUnique({ where: { id: orderId } });
+    if (!order) throw new Error('Order not found');
     return this.posService.processPayment(
       orderId,
       paymentData.amount,
       paymentData.method,
+      order.tenantId,
     );
   }
 

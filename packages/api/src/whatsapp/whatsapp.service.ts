@@ -455,7 +455,9 @@ export class WhatsappService {
               if (isInitialGreeting) {
                 try {
                   const phone = this.normalizePhone(message.from);
-                  const customer = await this.customersService.findByPhone(phone, this.locationId);
+                  const location = await this.prisma.location.findUnique({ where: { id: this.locationId } });
+                  const tenantId = location ? location.tenantId : null;
+                  const customer = await this.customersService.findByPhone(phone, this.locationId, tenantId);
                   const cleanName = customer && customer.name ? customer.name.trim() : '';
                   
                   let welcomeMessage = '';
@@ -859,6 +861,10 @@ export class WhatsappService {
 
   private async captureCustomerInfo(chats: any[], locationId: string) {
     try {
+      // Obtener tenantId a partir de locationId
+      const location = await this.prisma.location.findUnique({ where: { id: locationId } });
+      if (!location) return;
+      const tenantId = location.tenantId;
       // Filtrar solo chats individuales (no grupos)
       const individualChats = chats.filter(chat => 
         chat.id.endsWith('@c.us') && 
@@ -866,63 +872,37 @@ export class WhatsappService {
         !chat.id.includes('@g.us') &&
         !chat.id.includes('@broadcast')
       );
-
-      // this.logger.log(`Processing ${individualChats.length} individual chats for customer info`);
-
       for (const chat of individualChats) {
         try {
-          // Extraer información del cliente desde el nombre del chat y mensajes
           const customerInfo = await this.extractCustomerInfoFromChat(chat);
           if (customerInfo) {
-            // Normalizar el teléfono
             const normalizedPhone = this.normalizePhone(customerInfo.phone);
-            
-            // Verificar si ya existe un cliente con este teléfono
-            const existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId);
-            
+            const existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId, tenantId);
             if (!existingCustomer) {
               try {
-                // Crear nuevo cliente usando el servicio
-                const newCustomer = await this.customersService.create({
+                await this.customersService.create({
                   name: customerInfo.name,
                   phone: normalizedPhone,
                   address: customerInfo.address,
                   neighborhood: customerInfo.neighborhood,
                   whatsappId: chat.id,
                   locationId: locationId
-                });
-                // this.logger.log(`Cliente creado automáticamente: ${newCustomer.name} (${newCustomer.phone})`);
+                }, tenantId);
               } catch (createError) {
-                // Si hay un error de restricción única, significa que el cliente ya existe
                 if (createError.message.includes('Unique constraint failed')) {
-                  // this.logger.log(`Cliente ya existe para teléfono ${normalizedPhone}, saltando creación`);
-                  
-                  // Intentar actualizar el whatsappId si no lo tiene
-                  const existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId);
+                  const existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId, tenantId);
                   if (existingCustomer && !existingCustomer.whatsappId) {
-                    await this.customersService.update(existingCustomer.id, { whatsappId: chat.id });
-                    // this.logger.log(`Cliente actualizado con WhatsApp: ${existingCustomer.name} (${existingCustomer.phone})`);
+                    await this.customersService.update(existingCustomer.id, { whatsappId: chat.id }, tenantId);
                   }
-                } else {
-                  // Si es otro tipo de error, registrarlo
-                  // this.logger.error(`Error creando cliente para ${normalizedPhone}: ${createError.message}`);
                 }
               }
             } else if (!existingCustomer.whatsappId) {
-              // Actualizar cliente existente con whatsappId
-              await this.customersService.update(existingCustomer.id, { whatsappId: chat.id });
-              // this.logger.log(`Cliente actualizado con WhatsApp: ${existingCustomer.name} (${existingCustomer.phone})`);
-            } else {
-              // this.logger.debug(`Cliente ya existe y tiene WhatsApp ID: ${existingCustomer.name} (${existingCustomer.phone})`);
+              await this.customersService.update(existingCustomer.id, { whatsappId: chat.id }, tenantId);
             }
           }
-        } catch (error) {
-          // this.logger.error(`Error procesando chat ${chat.id}: ${error.message}`);
-        }
+        } catch (error) {}
       }
-    } catch (error) {
-      // this.logger.error(`Error capturando información de clientes: ${error.message}`);
-    }
+    } catch (error) {}
   }
 
   private async extractCustomerInfoFromChat(chat: any) {

@@ -31,7 +31,10 @@ export class TablesController {
   @ApiResponse({ status: 201, description: 'Table created successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async create(@Body() data: { number: number; seats: number; locationId: string }) {
-    return this.tablesService.create(data);
+    // Obtener tenantId a partir de locationId
+    const location = await this.tablesService['prisma'].location.findUnique({ where: { id: data.locationId } });
+    if (!location) throw new Error('Location not found');
+    return this.tablesService.create({ ...data, tenantId: location.tenantId });
   }
 
   @Get()

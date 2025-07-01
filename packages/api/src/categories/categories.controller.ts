@@ -18,9 +18,13 @@ export class CategoriesController {
 
   @Post()
   async createCategory(
-    @Body() categoryData: { name: string; description?: string },
+    @Body() categoryData: { name: string; description?: string; tenantId: string },
   ): Promise<CategoryModel> {
-    return this.categoriesService.createCategory(categoryData);
+    return this.categoriesService.createCategory({
+      name: categoryData.name,
+      description: categoryData.description,
+      tenantId: categoryData.tenantId,
+    });
   }
 
   @Patch('order')

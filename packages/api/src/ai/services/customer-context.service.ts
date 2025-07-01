@@ -13,9 +13,9 @@ export interface CustomerContext {
 export class CustomerContextService {
   constructor(private customersService: CustomersService) {}
 
-  async getCustomerContext(chatId: string, locationId: string): Promise<CustomerContext> {
+  async getCustomerContext(chatId: string, locationId: string, tenantId: string): Promise<CustomerContext> {
     const phone = this.normalizePhone(chatId);
-    const customer = await this.customersService.findByPhone(phone, locationId);
+    const customer = await this.customersService.findByPhone(phone, locationId, tenantId);
     
     // DEBUG: Verifica si el customer tiene el nombre y datos correctos
     console.log('[DEBUG][getCustomerContext] phone:', phone, 'customer:', customer);
@@ -43,7 +43,7 @@ export class CustomerContextService {
     return chatId.replace(/@c\.us$/, '').replace(/[^0-9]/g, '');
   }
 
-  async updateCustomerAfterOrder(orderData: any): Promise<void> {
+  async updateCustomerAfterOrder(orderData: any, tenantId: string): Promise<void> {
     try {
       await this.customersService.upsert({
         name: orderData.customerName,
@@ -52,7 +52,7 @@ export class CustomerContextService {
         neighborhood: orderData.neighborhood,
         whatsappId: orderData.chatId || '',
         locationId: orderData.locationId,
-      });
+      }, tenantId);
     } catch (err) {
       console.error('Error updating customer after order:', err);
     }

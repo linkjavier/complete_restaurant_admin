@@ -7,14 +7,14 @@ export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
   constructor(private prisma: PrismaService) {}
 
-  async create(data: any): Promise<any> {
+  async create(data: any, tenantId: string): Promise<any> {
     try {
       this.logger.debug(`Creating product with data: ${JSON.stringify(data)}`);
       const { ingredients, variantGroups, ...productData } = data;
       return await this.prisma.$transaction(async (tx) => {
         // 1. Crear el producto base
         const product = await tx.product.create({
-          data: productData,
+          data: { ...productData, tenant: { connect: { id: tenantId } } },
           include: { category: true },
         });
         // 2. Ingredientes
@@ -36,7 +36,8 @@ export class ProductsService {
               data: {
                 name: group.name,
                 order: group.order ?? 0,
-                productId: product.id,
+                product: { connect: { id: product.id } },
+                tenant: { connect: { id: tenantId } },
               },
             });
             if (group.variants && group.variants.length > 0) {
@@ -47,8 +48,9 @@ export class ProductsService {
                     price: variant.price,
                     image: variant.image,
                     isActive: variant.isActive !== undefined ? variant.isActive : true,
-                    groupId: groupRecord.id,
-                    productId: product.id,
+                    group: { connect: { id: groupRecord.id } },
+                    product: { connect: { id: product.id } },
+                    tenant: { connect: { id: tenantId } },
                   },
                 });
               }
@@ -77,10 +79,11 @@ export class ProductsService {
     }
   }
 
-  async findAll({ locationId, categoryId, search }: { locationId: string; categoryId?: string; search?: string; }) {
+  async findAll({ tenantId, locationId, categoryId, search }: { tenantId: string; locationId: string; categoryId?: string; search?: string; }) {
     try {
       return this.prisma.product.findMany({
         where: {
+          tenantId,
           locationId,
           categoryId: categoryId,
           OR: search
@@ -130,7 +133,7 @@ export class ProductsService {
     }
   }
 
-  async update(id: string, data: any): Promise<any> {
+  async update(id: string, data: any, tenantId: string): Promise<any> {
     try {
       const { ingredients, variantGroups, categoryId, locationId, ...productData } = data;
       if (categoryId) productData.category = { connect: { id: categoryId } };
@@ -165,8 +168,9 @@ export class ProductsService {
               data: {
                 name: group.name,
                 order: group.order ?? 0,
-                productId: product.id,
+                product: { connect: { id: product.id } },
                 isActive: true,
+                tenant: { connect: { id: tenantId } },
               },
             });
             if (group.variants && group.variants.length > 0) {
@@ -177,8 +181,9 @@ export class ProductsService {
                     price: variant.price,
                     image: variant.image,
                     isActive: variant.isActive !== undefined ? variant.isActive : true,
-                    groupId: groupRecord.id,
-                    productId: product.id,
+                    group: { connect: { id: groupRecord.id } },
+                    product: { connect: { id: product.id } },
+                    tenant: { connect: { id: tenantId } },
                   },
                 });
               }

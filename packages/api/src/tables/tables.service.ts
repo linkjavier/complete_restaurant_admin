@@ -47,25 +47,17 @@ export class TablesService {
     });
   }
 
-  async create(data: { number: number; seats: number; locationId: string }): Promise<Table> {
-    // Verificar si la ubicación existe
-    const location = await this.prisma.location.findUnique({
-      where: { id: data.locationId },
-    });
-
+  async create(data: { number: number; seats: number; locationId: string; tenantId: string }): Promise<Table> {
+    const location = await this.prisma.location.findUnique({ where: { id: data.locationId } });
     if (!location) {
       throw new NotFoundException(`Ubicación con ID ${data.locationId} no encontrada`);
     }
-
     return this.prisma.table.create({
       data: {
         number: data.number,
         seats: data.seats,
-        location: {
-          connect: {
-            id: data.locationId,
-          },
-        },
+        location: { connect: { id: data.locationId } },
+        tenant: { connect: { id: data.tenantId } },
       },
     });
   }

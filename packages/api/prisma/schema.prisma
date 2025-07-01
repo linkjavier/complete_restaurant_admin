@@ -12,9 +12,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  locations Location[]
+  products  Product[]
+  orders    Order[]
+  categories Category[]
+  ingredients Ingredient[]
+  customers Customer[]
+  tables    Table[]
+  payments  Payment[]
+  productVariantGroups ProductVariantGroup[]
+  productVariants      ProductVariant[]
+}
+
 model User {
   id            String         @id @default(uuid())
-  email         String         @unique
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  email         String
   password      String
   firstName     String
   lastName      String
@@ -27,6 +48,8 @@ model User {
   notifications Notification[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  @@unique([tenantId, email])
 }
 
 enum UserRole {
@@ -42,6 +65,8 @@ enum UserRole {
 
 model Location {
   id               String            @id @default(uuid())
+  tenantId         String
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
   name             String
   address          String
   phone            String
@@ -64,6 +89,8 @@ model Location {
 
 model Table {
   id         String      @id @default(uuid())
+  tenantId   String
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
   number     Int
   seats      Int
   status     TableStatus @default(AVAILABLE)
@@ -84,6 +111,8 @@ enum TableStatus {
 
 model Product {
   id            String                @id @default(cuid())
+  tenantId      String
+  tenant        Tenant                @relation(fields: [tenantId], references: [id])
   name          String
   description   String?
   price         Float
@@ -91,8 +120,8 @@ model Product {
   category      Category              @relation(fields: [categoryId], references: [id])
   categoryId    String
   isActive      Boolean               @default(true)
-  isFinal       Boolean               @default(false) // true if it's a processed product
-  quantity      Float                 @default(0) // current stock quantity
+  isFinal       Boolean               @default(false)
+  quantity      Float                 @default(0)
   location      Location              @relation(fields: [locationId], references: [id])
   locationId    String
   ingredients   ProductIngredient[]
@@ -106,6 +135,8 @@ model Product {
 
 model Category {
   id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
   name        String
   description String?
   products    Product[]
@@ -114,10 +145,13 @@ model Category {
   updatedAt   DateTime  @updatedAt
 
   @@index([order])
+  @@unique([tenantId, name])
 }
 
 model Ingredient {
   id          String              @id @default(cuid())
+  tenantId    String
+  tenant      Tenant              @relation(fields: [tenantId], references: [id])
   name        String
   description String?
   quantity    Float
@@ -131,6 +165,7 @@ model Ingredient {
   updatedAt   DateTime            @updatedAt
 
   @@index([locationId])
+  @@unique([tenantId, name])
 }
 
 model ProductIngredient {
@@ -174,6 +209,8 @@ enum OrderSource {
 
 model Order {
   id              String         @id @default(uuid())
+  tenantId        String
+  tenant          Tenant         @relation(fields: [tenantId], references: [id])
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   location        Location?      @relation(fields: [locationId], references: [id])
@@ -193,7 +230,7 @@ model Order {
   source          OrderSource
   items           OrderItem[]
   payments        Payment[]
-  deliveryFee     Float?         // NUEVO: valor de domicilio por orden
+  deliveryFee     Float?
   subtotal        Float?
   total           Float?
   isDeleted       Boolean?   @default(false)
@@ -243,6 +280,8 @@ enum OrderItemStatus {
 
 model Payment {
   id        String        @id @default(cuid())
+  tenantId  String
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
   order     Order         @relation(fields: [orderId], references: [id])
   orderId   String
   amount    Float
@@ -336,6 +375,8 @@ model Settings {
 
 model ProductVariantGroup {
   id        String           @id @default(cuid())
+  tenantId  String
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
   name      String
   product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId String
@@ -348,6 +389,8 @@ model ProductVariantGroup {
 
 model ProductVariant {
   id                String              @id @default(cuid())
+  tenantId          String
+  tenant            Tenant              @relation(fields: [tenantId], references: [id])
   name              String
   price             Float?
   image             String?
@@ -366,11 +409,13 @@ model ProductVariant {
 
 model Customer {
   id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
   name         String
   phone        String
   address      String?
   neighborhood String?
-  whatsappId   String? // chatId de WhatsApp si aplica
+  whatsappId   String?
   location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   locationId   String
   createdAt    DateTime @default(now())
@@ -378,5 +423,6 @@ model Customer {
 
   @@index([phone])
   @@index([locationId])
-  @@unique([phone, locationId])
+  @@unique([tenantId, phone])
+  @@unique([phone, locationId, tenantId], name: "phone_locationId_tenantId")
 }

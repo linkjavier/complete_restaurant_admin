@@ -13,9 +13,9 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, password: string): Promise<LoginUser | null> {
+  async validateUser(email: string, password: string, tenantId: string): Promise<LoginUser | null> {
     console.log("Validando")
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({ where: { tenantId_email: { tenantId, email } } });
     if (user && (await bcrypt.compare(password, user.password))) {
       return {
         id: user.id,
@@ -38,6 +38,12 @@ export class AuthService {
             name: true,
           },
         },
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 
@@ -50,6 +56,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       locationId: user.locationId,
+      tenantId: result.tenantId,
     };
 
     return {
@@ -69,10 +76,10 @@ export class AuthService {
     };
   }
 
-  async register(data: RegisterDto): Promise<LoginResponse> {
-    // Verificar si el email ya existe
+  async register(data: RegisterDto, tenantId: string): Promise<LoginResponse> {
+    // Verificar si el email ya existe para ese tenant
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: data.email },
+      where: { tenantId_email: { tenantId, email: data.email } },
     });
 
     if (existingUser) {
@@ -83,6 +90,7 @@ export class AuthService {
 
     const dbUser = await this.prisma.user.create({
       data: {
+        tenantId,
         email: data.email,
         password: hashedPassword,
         firstName: data.firstName,
@@ -93,6 +101,12 @@ export class AuthService {
       },
       include: {
         location: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        tenant: {
           select: {
             id: true,
             name: true,
@@ -113,14 +127,16 @@ export class AuthService {
     email: string;
     firstName: string;
     lastName: string;
+    tenantId: string;
   }): Promise<LoginResponse> {
     let dbUser = await this.prisma.user.findUnique({
-      where: { email: user.email },
+      where: { tenantId_email: { tenantId: user.tenantId, email: user.email } },
     });
 
     if (!dbUser) {
       dbUser = await this.prisma.user.create({
         data: {
+          tenantId: user.tenantId,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,

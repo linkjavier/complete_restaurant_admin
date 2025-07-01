@@ -53,13 +53,14 @@ export class OrdersService {
     cursor?: Prisma.OrderWhereUniqueInput;
     where?: Prisma.OrderWhereInput;
     orderBy?: Prisma.OrderOrderByWithRelationInput;
+    tenantId: string;
   }): Promise<Order[]> {
-    const { skip, take, cursor, where, orderBy } = params;
+    const { skip, take, cursor, where, orderBy, tenantId } = params;
     return this.prisma.order.findMany({
       skip,
       take,
       cursor,
-      where,
+      where: { ...where, tenantId },
       orderBy,
       include: {
         table: true,
@@ -80,7 +81,7 @@ export class OrdersService {
     });
   }
 
-  async create(createOrderDto: CreateOrderDto) {
+  async create(createOrderDto: CreateOrderDto, tenantId: string) {
     try {
       this.logger.log(`Creating order from DTO: ${JSON.stringify(createOrderDto)}`);
       
@@ -128,6 +129,7 @@ export class OrdersService {
 
       const orderCreateData: any = {
         ...orderData,
+        tenantId,
         status: orderData.status || 'PENDING',
         isPaid: orderData.isPaid || false,
         subtotal: orderSubtotal, // Calculated subtotal
@@ -139,10 +141,10 @@ export class OrdersService {
             price: item.price, // Save the calculated price
             status: 'PENDING',
             variants: {
-              create: (item.variants || []).filter(v => v.productVariantId).map(variant => ({
+              create: item.variants?.map(variant => ({
                 productVariantId: variant.productVariantId,
                 groupName: variant.groupName || null,
-              }))
+              })) || []
             },
           })),
         }

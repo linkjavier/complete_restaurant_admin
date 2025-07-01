@@ -12,17 +12,17 @@ export class CustomersService {
     private whatsappService: WhatsappService,
   ) {}
 
-  async create(data: CreateCustomerDto) {
+  async create(data: CreateCustomerDto, tenantId: string) {
     try {
-      return await this.prisma.customer.create({ data });
+      return await this.prisma.customer.create({ data: { ...data, tenantId } });
     } catch (error) {
       // Si es un error de restricción única, intentar encontrar el cliente existente
       if (error.message.includes('Unique constraint failed')) {
-        const existingCustomer = await this.findByPhone(data.phone, data.locationId);
+        const existingCustomer = await this.findByPhone(data.phone, data.locationId, tenantId);
         if (existingCustomer) {
           // Si el cliente existe pero no tiene whatsappId, actualizarlo
           if (!existingCustomer.whatsappId && data.whatsappId) {
-            return await this.update(existingCustomer.id, { whatsappId: data.whatsappId });
+            return await this.update(existingCustomer.id, { whatsappId: data.whatsappId }, tenantId);
           }
           return existingCustomer;
         }
@@ -31,22 +31,23 @@ export class CustomersService {
     }
   }
 
-  async findAll(locationId: string) {
-    return this.prisma.customer.findMany({ where: { locationId }, orderBy: { createdAt: 'desc' } });
+  async findAll(locationId: string, tenantId: string) {
+    return this.prisma.customer.findMany({ where: { locationId, tenantId }, orderBy: { createdAt: 'desc' } });
   }
 
-  async findOne(id: string) {
-    return this.prisma.customer.findUnique({ where: { id } });
+  async findOne(id: string, tenantId: string) {
+    return this.prisma.customer.findFirst({ where: { id, tenantId } });
   }
 
-  async findByPhone(phone: string, locationId: string) {
+  async findByPhone(phone: string, locationId: string, tenantId: string) {
     // Normalizar el número a solo dígitos
     const normalizedPhone = phone.replace(/[^0-9]/g, '');
     console.log(`[CUSTOMERSERVICE] Buscando cliente por teléfono: ${normalizedPhone}, locationId: ${locationId}`);
     const customer = await this.prisma.customer.findFirst({ 
       where: { 
         phone: normalizedPhone,
-        locationId 
+        locationId,
+        tenantId
       } 
     });
     if (customer) {
@@ -57,20 +58,20 @@ export class CustomersService {
     return customer;
   }
 
-  async update(id: string, data: UpdateCustomerDto) {
-    return this.prisma.customer.update({ where: { id }, data });
+  async update(id: string, data: UpdateCustomerDto, tenantId: string) {
+    return this.prisma.customer.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.customer.delete({ where: { id } });
+  async remove(id: string, tenantId: string) {
+    return this.prisma.customer.delete({ where: { id, tenantId } });
   }
 
-  async syncFromWhatsApp(locationId: string) {
+  async syncFromWhatsApp(locationId: string, tenantId: string) {
     try {
       // Llama a WhatsappService.getChats para forzar la captura de clientes
       const chats = await this.whatsappService.getChats(locationId);
       // Devuelve un resumen
-      const total = await this.prisma.customer.count({ where: { locationId } });
+      const total = await this.prisma.customer.count({ where: { locationId, tenantId } });
       return {
         success: true,
         message: `Sincronización completada. Total de clientes: ${total}`,
@@ -134,7 +135,7 @@ export class CustomersService {
     };
   }
 
-  async seedCustomers(locationId: string) {
+  async seedCustomers(locationId: string, tenantId: string) {
     const sampleCustomers = [
       {
         name: 'María González',
@@ -142,6 +143,7 @@ export class CustomersService {
         address: 'Calle 123 #45-67',
         neighborhood: 'Centro',
         locationId,
+        tenantId,
       },
       {
         name: 'Carlos Rodríguez',
@@ -149,6 +151,7 @@ export class CustomersService {
         address: 'Carrera 78 #12-34',
         neighborhood: 'La Soledad',
         locationId,
+        tenantId,
       },
       {
         name: 'Ana Martínez',
@@ -156,6 +159,7 @@ export class CustomersService {
         address: 'Avenida 5 #23-45',
         neighborhood: 'San Fernando',
         locationId,
+        tenantId,
       },
       {
         name: 'Luis Pérez',
@@ -163,6 +167,7 @@ export class CustomersService {
         address: 'Calle 90 #67-89',
         neighborhood: 'El Prado',
         locationId,
+        tenantId,
       },
       {
         name: 'Sofia Herrera',
@@ -170,45 +175,34 @@ export class CustomersService {
         address: 'Carrera 45 #12-78',
         neighborhood: 'Buenos Aires',
         locationId,
+        tenantId,
       },
     ];
-
     const createdCustomers = [];
     for (const customerData of sampleCustomers) {
       const existingCustomer = await this.prisma.customer.findFirst({
-        where: { phone: customerData.phone, locationId }
+        where: { phone: customerData.phone, locationId, tenantId }
       });
-      
       if (!existingCustomer) {
         const customer = await this.prisma.customer.create({ data: customerData });
         createdCustomers.push(customer);
       }
     }
-
     return createdCustomers;
   }
 
-  async upsert(data: CreateCustomerDto) {
+  async upsert(data: CreateCustomerDto, tenantId: string) {
     const normalizedPhone = data.phone.replace(/[^0-9]/g, '');
-    
     return this.prisma.customer.upsert({
       where: {
-        phone_locationId: {
+        phone_locationId_tenantId: {
           phone: normalizedPhone,
-          locationId: data.locationId
-        }
+          locationId: data.locationId,
+          tenantId,
+        },
       },
-      update: {
-        name: data.name,
-        address: data.address,
-        neighborhood: data.neighborhood,
-        whatsappId: data.whatsappId,
-        updatedAt: new Date()
-      },
-      create: {
-        ...data,
-        phone: normalizedPhone
-      }
+      update: data,
+      create: { ...data, phone: normalizedPhone, tenantId },
     });
   }
 } 

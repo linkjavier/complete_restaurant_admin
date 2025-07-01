@@ -38,10 +38,13 @@ export class PaymentsController {
     },
   ) {
     try {
+      const order = await this.paymentsService['prisma'].order.findUnique({ where: { id: paymentData.orderId } });
+      if (!order) throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
       return await this.paymentsService.processPayment(
         paymentData.orderId,
         paymentData.amount,
         paymentData.method,
+        order.tenantId,
       );
     } catch (error) {
       throw new HttpException(

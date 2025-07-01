@@ -14,6 +14,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { STTModule } from '../stt/stt.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { CustomersModule } from '../customers/customers.module';
+import { LocationsModule } from '../locations/locations.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { CustomersModule } from '../customers/customers.module';
     STTModule,
     CategoriesModule,
     forwardRef(() => CustomersModule),
+    LocationsModule,
   ],
   providers: [
     AIGateway,

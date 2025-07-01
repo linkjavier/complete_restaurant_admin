@@ -18,6 +18,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { Request } from 'express';
+import { CurrentTenant } from '../auth/decorators/tenant.decorator';
 
 
 @ApiTags('orders')
@@ -28,13 +29,14 @@ export class OrdersController {
 
   @Public()
   @Post()
-  create(@Body() createOrderDto: CreateOrderDto) {
-    return this.ordersService.create(createOrderDto);
+  create(@Body() createOrderDto: CreateOrderDto, @CurrentTenant() tenantId: string) {
+    return this.ordersService.create(createOrderDto, tenantId);
   }
 
   @Public()
   @Get()
   findAll(
+    @CurrentTenant() tenantId: string,
     @Query('locationId') locationId?: string,
     @Query('tableId') tableId?: string,
     @Query('kitchen') kitchen?: boolean,
@@ -42,7 +44,10 @@ export class OrdersController {
     if (!kitchen && !tableId) {
       throw new BadRequestException('tableId is required for non-kitchen requests');
     }
-    return this.ordersService.findAll(locationId, tableId, kitchen);
+    return this.ordersService.orders({
+      tenantId,
+      where: { locationId, tableId },
+    });
   }
 
   @Get(':id')

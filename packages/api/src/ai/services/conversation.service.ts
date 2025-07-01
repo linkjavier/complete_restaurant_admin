@@ -8,6 +8,7 @@ import { CustomersService } from '../../customers/customers.service';
 
 export interface ConversationContext {
   locationId: string;
+  tenantId: string;
   chatType: 'whatsapp' | 'ai' | 'admin';
   chatId: string;
   customerName?: string;
@@ -70,6 +71,7 @@ export class ConversationService {
     } else {
       const menu = await this.productsService.findAll({
         locationId: context.locationId,
+        tenantId: context.tenantId,
       });
       
       return {
