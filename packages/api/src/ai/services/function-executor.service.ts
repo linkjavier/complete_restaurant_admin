@@ -7,6 +7,7 @@ import { normalizeName, getGroupEmoji, getPaymentEmoji, getPaymentDisplay, forma
 import { OrderStateService } from './order-state.service';
 import { NLPService } from './nlp.service';
 import { CustomersService } from '../../customers/customers.service';
+import { OrderHandlerService } from './order-handler.service';
 
 @Injectable()
 export class FunctionExecutorService {
@@ -19,6 +20,7 @@ export class FunctionExecutorService {
     private ordersService: OrdersService,
     private orderStateService: OrderStateService,
     private customersService: CustomersService,
+    private orderHandler: OrderHandlerService,
   ) {}
 
   private async getNLPService(locationId: string): Promise<NLPService> {
@@ -628,29 +630,9 @@ export class FunctionExecutorService {
   }
 
   private async createOrder(functionArgs: any) {
+    // Redirige toda la creación de orden a OrderHandlerService para evitar duplicidad y garantizar que se guarde el cliente
     try {
-      const deliveryFee = await this.settingsService.getDeliveryFee();
-      // --- NUEVO: Sincroniza variantes con IDs si no están presentes ---
-      const menu = await this.productsService.findAll({ locationId: functionArgs.locationId });
-      let items = functionArgs.items;
-      // Si alguna variante no tiene productVariantId, sincroniza
-      if (items.some(item => (item.variants || []).some(v => !v.productVariantId))) {
-        items = this.syncVariantsWithIds(items, menu);
-      }
-      // Las variantes ya están sincronizadas en validateOrderBeforeCreation, pero por seguridad se repite aquí
-      console.log('[CREATE ORDER] Items recibidos (variantes ya sincronizadas):', JSON.stringify(items, null, 2));
-      const createdOrder = await this.ordersService.create({
-        items,
-        customerName: functionArgs.customerName,
-        deliveryAddress: functionArgs.deliveryAddress,
-        phone: functionArgs.phone,
-        neighborhood: functionArgs.neighborhood,
-        paymentMethod: functionArgs.paymentMethod,
-        locationId: functionArgs.locationId,
-        deliveryFee: functionArgs.deliveryFee || deliveryFee || 0,
-        type: OrderType.DELIVERY,
-        source: OrderSource.WHATSAPP,
-      });
+      const createdOrder = await this.orderHandler.createOrder(functionArgs);
       return {
         message: `✅ ¡Tu orden ha sido creada exitosamente!\n\nNúmero de orden: *${createdOrder.id}*\n\nPronto recibirás la confirmación de tu pedido. ¡Gracias por confiar en nosotros!`,
         validated: true
