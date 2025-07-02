@@ -14,8 +14,10 @@ export class ProductsService {
       return await this.prisma.$transaction(async (tx) => {
         // 1. Crear el producto base
         const product = await tx.product.create({
-          data: { ...productData, tenant: { connect: { id: tenantId } } },
-          include: { category: true },
+          data: { 
+            ...productData, 
+            tenantId: tenantId
+          },
         });
         // 2. Ingredientes
         if (ingredients && ingredients.length > 0) {
@@ -29,45 +31,50 @@ export class ProductsService {
             });
           }
         }
-        // 3. Grupos de variantes y variantes
+        // 3. Crear grupos de variantes si existen
         if (variantGroups && variantGroups.length > 0) {
-          for (const group of variantGroups) {
-            const groupRecord = await tx.productVariantGroup.create({
+          for (const groupData of variantGroups) {
+            const group = await tx.productVariantGroup.create({
               data: {
-                name: group.name,
-                order: group.order ?? 0,
+                name: groupData.name,
+                order: groupData.order,
                 product: { connect: { id: product.id } },
-                tenant: { connect: { id: tenantId } },
-              },
+                tenant: { connect: { id: tenantId } }
+              } as any,
             });
-            if (group.variants && group.variants.length > 0) {
-              for (const variant of group.variants) {
+
+            // 4. Crear variantes para cada grupo
+            if (groupData.variants && groupData.variants.length > 0) {
+              for (const variantData of groupData.variants) {
                 await tx.productVariant.create({
                   data: {
-                    name: variant.name,
-                    price: variant.price,
-                    image: variant.image,
-                    isActive: variant.isActive !== undefined ? variant.isActive : true,
-                    group: { connect: { id: groupRecord.id } },
+                    name: variantData.name,
+                    price: variantData.price,
+                    image: variantData.image,
+                    isActive: variantData.isActive,
+                    group: { connect: { id: group.id } },
                     product: { connect: { id: product.id } },
-                    tenant: { connect: { id: tenantId } },
-                  },
+                    tenant: { connect: { id: tenantId } }
+                  } as any,
                 });
               }
             }
           }
         }
-        // 4. Obtener el producto completo con ingredientes y grupos/variantes
+        // 5. Obtener el producto completo con ingredientes y grupos/variantes
         return await tx.product.findUnique({
           where: { id: product.id },
           include: {
             category: true,
-            ingredients: { include: { ingredient: true } },
+            ingredients: {
+              include: {
+                ingredient: true,
+              },
+            },
             variantGroups: {
               include: {
-                variants: true
+                variants: true,
               },
-              orderBy: { order: 'asc' }
             },
           },
         });
@@ -163,28 +170,27 @@ export class ProductsService {
           }
           await tx.productVariantGroup.updateMany({ where: { productId: id }, data: { isActive: false } });
           // Crear nuevos grupos y variantes
-          for (const group of variantGroups) {
-            const groupRecord = await tx.productVariantGroup.create({
+          for (const groupData of variantGroups) {
+            const group = await tx.productVariantGroup.create({
               data: {
-                name: group.name,
-                order: group.order ?? 0,
+                name: groupData.name,
+                order: groupData.order,
                 product: { connect: { id: product.id } },
-                isActive: true,
-                tenant: { connect: { id: tenantId } },
-              },
+                tenant: { connect: { id: tenantId } }
+              } as any,
             });
-            if (group.variants && group.variants.length > 0) {
-              for (const variant of group.variants) {
+            if (groupData.variants && groupData.variants.length > 0) {
+              for (const variantData of groupData.variants) {
                 await tx.productVariant.create({
                   data: {
-                    name: variant.name,
-                    price: variant.price,
-                    image: variant.image,
-                    isActive: variant.isActive !== undefined ? variant.isActive : true,
-                    group: { connect: { id: groupRecord.id } },
+                    name: variantData.name,
+                    price: variantData.price,
+                    image: variantData.image,
+                    isActive: variantData.isActive,
+                    group: { connect: { id: group.id } },
                     product: { connect: { id: product.id } },
-                    tenant: { connect: { id: tenantId } },
-                  },
+                    tenant: { connect: { id: tenantId } }
+                  } as any,
                 });
               }
             }

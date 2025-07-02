@@ -371,8 +371,8 @@ await app.listen(port, '0.0.0.0');
 
 4. **Start databases**
 ```bash
-docker-compose up postgres
-docker-compose up redis
+docker-compose up -d postgres
+docker-compose up -d redis
 ```
 
 5. **Start backend**

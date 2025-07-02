@@ -75,34 +75,26 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      console.log('[LoginPage] Starting login process...');
       const data = await login(email, password);
+      
+      console.log('[LoginPage] Login successful, user data:', data);
       
       toast({
         title: 'Success',
         description: 'You have been logged in successfully.',
       });
 
-      // Redirect based on user role
-      switch (data.user.role) {
-        case 'SUPER_ADMIN':
-          router.push('/admin/dashboard');
-          break;
-        case 'ADMIN':
-          router.push('/admin/dashboard');
-          break;
-        case 'MANAGER':
-          router.push('/admin/dashboard');
-          break;
-        case 'CHEF':
-          router.push('/admin/kitchen-manager');
-          break;
-        case 'STAFF':
-          router.push('/staff/dashboard');
-          break;
-        default:
-          router.push('/');
-      }
+      // Guardar el token en localStorage
+      localStorage.setItem('token', data.access_token);
+      // Guardar el token como cookie accesible por el middleware y subdominios
+      document.cookie = `token=${data.access_token}; path=/; max-age=604800; domain=.localhost`;
+      // Esperar a que la cookie se guarde antes de redirigir
+      setTimeout(() => {
+        window.location.href = '/admin/dashboard';
+      }, 100);
     } catch (error) {
+      console.error('[LoginPage] Login error:', error);
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'An error occurred',

@@ -14,14 +14,19 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (isLoading) return; // No redirigir mientras carga
+    if (!user) {
       router.push('/auth/login');
-    } else if (!isLoading && user && allowedRoles && !allowedRoles.includes(user.role)) {
+    } else if (user && allowedRoles && !allowedRoles.includes(user.role)) {
       router.push('/');
     }
   }, [user, isLoading, allowedRoles, router]);
 
+  // Log current state
+  console.log('[ProtectedRoute] Current state - user:', user, 'isLoading:', isLoading, 'error:', error);
+
   if (isLoading) {
+    console.log('[ProtectedRoute] Showing loading spinner');
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -30,6 +35,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
 
   if (error) {
+    console.log('[ProtectedRoute] Showing error:', error);
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="text-center">
@@ -41,10 +47,12 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
 
   if (!user) {
+    console.log('[ProtectedRoute] No user, returning null');
     return null;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    console.log('[ProtectedRoute] User role not allowed:', user.role, 'Allowed roles:', allowedRoles);
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="text-center">
@@ -57,5 +65,6 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     );
   }
 
+  console.log('[ProtectedRoute] Rendering children');
   return <>{children}</>;
 } 

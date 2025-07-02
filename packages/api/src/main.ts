@@ -37,8 +37,14 @@ async function bootstrap() {
       logger.log('Redis adapter disabled by configuration, using default adapter');
     }
 
-    // Enable CORS
-    app.enableCors();
+    // Enable CORS con header X-Tenant-ID
+    app.enableCors({
+      origin: true,
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID'],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      optionsSuccessStatus: 200,
+    });
 
     // Enable validation
     app.useGlobalPipes(new ValidationPipe());
@@ -55,7 +61,7 @@ async function bootstrap() {
     SwaggerModule.setup('api', app, document);
 
     const port = configService.get('PORT', '3000');
-    await app.listen(port);
+    await app.listen(port, '0.0.0.0');
     logger.log(`Application is running on: http://localhost:${port}`);
   } catch (error) {
     logger.error(`Error during application bootstrap: ${error.message}`, error.stack);

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+"use client";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { getAuthToken } from "@/lib/auth";
-import { getUser, User } from "@/lib/api";
+import { getUser, User, API_URL } from "@/lib/api";
 import { useRouter } from 'next/navigation';
 
 interface AuthState {
@@ -9,7 +10,15 @@ interface AuthState {
   error: string | null;
 }
 
-export function useAuth() {
+interface AuthContextType extends AuthState {
+  login: (email: string, password: string) => Promise<any>;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -17,47 +26,42 @@ export function useAuth() {
     error: null,
   });
 
+  // Cargar usuario al montar
   useEffect(() => {
     const token = getAuthToken();
     if (!token) {
       setState(prev => ({ ...prev, isLoading: false }));
       return;
     }
-
     const fetchUser = async () => {
       try {
         const userData = await getUser();
         setState({ user: userData, isLoading: false, error: null });
       } catch (error) {
-        console.error("Failed to fetch user:", error);
         setState({ user: null, isLoading: false, error: 'Failed to fetch user' });
       }
     };
-
     fetchUser();
   }, []);
 
   const login = async (email: string, password: string) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      console.log("Login use-auth")
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-
       if (!response.ok) {
         const error = await response.json();
-        console.error("Login failed: ", error); // Log para ver el error
         throw new Error(error.message || 'Login failed');
       }
-
       const data = await response.json();
-      // Guardar el token en localStorage
       localStorage.setItem('token', data.access_token);
-      setState({ user: data.user, isLoading: false, error: null });
-      return data;
+      document.cookie = `token=${data.access_token}; path=/; max-age=604800; samesite=lax;`;
+      const userData = await getUser();
+      setState({ user: userData, isLoading: false, error: null });
+      return { ...data, user: userData };
     } catch (error) {
       setState(prev => ({
         ...prev,
@@ -72,7 +76,6 @@ export function useAuth() {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      // Limpiar el token de localStorage
       localStorage.removeItem('token');
       setState({ user: null, isLoading: false, error: null });
       router.push('/auth/login');
@@ -85,9 +88,27 @@ export function useAuth() {
     }
   };
 
-  return {
-    ...state,
-    login,
-    logout,
+  const refreshUser = async () => {
+    setState(prev => ({ ...prev, isLoading: true }));
+    try {
+      const userData = await getUser();
+      setState({ user: userData, isLoading: false, error: null });
+    } catch (error) {
+      setState({ user: null, isLoading: false, error: 'Failed to fetch user' });
+    }
   };
+
+  return (
+    <AuthContext.Provider value={{ ...state, login, logout, refreshUser }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 } 

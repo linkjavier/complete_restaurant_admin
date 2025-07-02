@@ -6,16 +6,18 @@ import { AuthService } from '../auth.service';
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
   constructor(private authService: AuthService) {
-    super({ usernameField: 'email' });
+    super({ usernameField: 'email', passReqToCallback: true });
   }
 
-  async validate(email: string, password: string, done: Function) {
-    const request = arguments[2];
-    const tenantId = request.body.tenantId;
+  async validate(req: any, email: string, password: string) {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      throw new UnauthorizedException('No tenantId in request');
+    }
     const user = await this.authService.validateUser(email, password, tenantId);
     if (!user) {
-      return done(new UnauthorizedException(), false);
+      throw new UnauthorizedException('Invalid credentials');
     }
-    return done(null, user);
+    return user;
   }
 } 
