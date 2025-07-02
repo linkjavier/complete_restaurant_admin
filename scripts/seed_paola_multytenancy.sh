@@ -31,9 +31,13 @@ REGISTER_RESPONSE=$(curl -s -X POST "$API_URL/auth/register" \
     "password": "12345678",
     "firstName": "Paola",
     "lastName": "User",
-    "role": "SUPER_ADMIN"
+    "role": "SUPER_ADMIN",
+    "tenantId": "'$TENANT_ID'"
   }')
 echo "Respuesta registro usuario: $REGISTER_RESPONSE"
+
+# Extraer token del registro si existe
+REG_TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.access_token')
 
 # 3. Login
 echo "Logueando usuario..."
@@ -43,9 +47,16 @@ TOKEN=$(curl -s -X POST "$API_URL/auth/login" \
     "email": "paola@test.com",
     "password": "12345678"
   }' | jq -r '.access_token')
+
+# Si el login falla, usa el token del registro
 if [ -z "$TOKEN" ] || [ "$TOKEN" == "null" ]; then
-  echo "Error: no se pudo obtener el token"
-  exit 1
+  if [ -n "$REG_TOKEN" ] && [ "$REG_TOKEN" != "null" ]; then
+    TOKEN="$REG_TOKEN"
+    echo "Usando token del registro."
+  else
+    echo "Error: no se pudo obtener el token"
+    exit 1
+  fi
 fi
 echo "Token obtenido: $TOKEN"
 
@@ -59,6 +70,7 @@ LOCATION_RESPONSE=$(curl -s -X POST "$API_URL/locations" \
     "address": "Calle Falsa 123",
     "phone": "3001234567"
   }')
+echo "Respuesta creación ubicación: $LOCATION_RESPONSE"
 LOCATION_ID=$(echo "$LOCATION_RESPONSE" | jq -r '.id')
 if [ -z "$LOCATION_ID" ] || [ "$LOCATION_ID" == "null" ]; then
   echo "Error: no se pudo crear la ubicación"

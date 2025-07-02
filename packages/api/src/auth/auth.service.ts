@@ -77,20 +77,32 @@ export class AuthService {
   }
 
   async register(data: RegisterDto, tenantId: string): Promise<LoginResponse> {
+    // Si no hay tenantId pero sí tenantName, crear el tenant
+    let finalTenantId = tenantId;
+    if (!finalTenantId && data.tenantName) {
+      // Verificar si ya existe un tenant con ese nombre
+      const existingTenant = await this.prisma.tenant.findFirst({ where: { name: data.tenantName } });
+      if (existingTenant) {
+        finalTenantId = existingTenant.id;
+      } else {
+        const newTenant = await this.prisma.tenant.create({ data: { name: data.tenantName } });
+        finalTenantId = newTenant.id;
+      }
+    }
+    if (!finalTenantId) {
+      throw new UnauthorizedException('tenantId or tenantName is required');
+    }
     // Verificar si el email ya existe para ese tenant
     const existingUser = await this.prisma.user.findUnique({
-      where: { tenantId_email: { tenantId, email: data.email } },
+      where: { tenantId_email: { tenantId: finalTenantId, email: data.email } },
     });
-
     if (existingUser) {
       throw new ConflictException('Email already exists');
     }
-
     const hashedPassword = await bcrypt.hash(data.password, 10);
-
     const dbUser = await this.prisma.user.create({
       data: {
-        tenantId,
+        tenantId: finalTenantId,
         email: data.email,
         password: hashedPassword,
         firstName: data.firstName,
@@ -114,7 +126,6 @@ export class AuthService {
         },
       },
     });
-
     return this.login({
       id: dbUser.id,
       email: dbUser.email,

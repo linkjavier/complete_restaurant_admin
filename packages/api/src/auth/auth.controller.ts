@@ -104,8 +104,8 @@ export class AuthController {
   })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   async register(@Body() registerDto: RegisterDto): Promise<LoginResponse> {
-    if (!registerDto['tenantId']) {
-      throw new UnauthorizedException('tenantId is required');
+    if (!registerDto['tenantId'] && !registerDto['tenantName']) {
+      throw new UnauthorizedException('tenantId or tenantName is required');
     }
     return this.authService.register(registerDto, registerDto['tenantId']);
   }

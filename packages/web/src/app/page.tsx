@@ -6,6 +6,49 @@ import { Button } from '@/components/ui/button';
 import { ThemeSwitch } from "@/components/theme-switch";
 import React, { useEffect, useState } from "react"
 
+const features = [
+  {
+    title: "Dashboard en Tiempo Real",
+    desc: "Control total de tu restaurante con métricas y reportes instantáneos.",
+    icon: "/assets/dashboard.svg"
+  },
+  {
+    title: "Asistente de Inteligencia Artificial",
+    desc: "Atiende clientes, toma pedidos y responde automáticamente 24/7.",
+    icon: "/assets/ai.svg"
+  },
+  {
+    title: "POS y Ventas",
+    desc: "Punto de venta rápido, control de caja y facturación fácil.",
+    icon: "/assets/pos.svg"
+  },
+  {
+    title: "Gestión de Órdenes y Cocina",
+    desc: "Pedidos claros, sin errores y panel especial para chefs y staff.",
+    icon: "/assets/orders.svg"
+  },
+  {
+    title: "Inventario e Ingredientes",
+    desc: "Controla tu stock, costos y evita pérdidas.",
+    icon: "/assets/inventory.svg"
+  },
+  {
+    title: "Multi-Sucursal y Usuarios",
+    desc: "Administra todas tus ubicaciones y tu equipo desde un solo lugar.",
+    icon: "/assets/multilocation.svg"
+  },
+  {
+    title: "Clientes y CRM",
+    desc: "Historial, preferencias y marketing inteligente para tus clientes.",
+    icon: "/assets/customers.svg"
+  },
+  {
+    title: "Configuración Flexible",
+    desc: "Personaliza la plataforma a tu medida, sin límites.",
+    icon: "/assets/settings.svg"
+  },
+];
+
 export default function HomePage() {
   const [businessIcon, setBusinessIcon] = useState<string>("")
   const [businessName, setBusinessName] = useState<string>("Kutchen AI")
@@ -24,34 +67,96 @@ export default function HomePage() {
   }, [])
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center">
-      <div className="absolute top-4 right-4">
-        <ThemeSwitch />
-      </div>
-      <div className="container flex flex-col items-center justify-center gap-4 px-4 text-center">
-        <Image
-          src={businessIcon || "/assets/kutchen_app_logo.png"}
-          alt="Logo Negocio"
-          width={120}
-          height={120}
-          priority
-        />
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-          Welcome to{' '}
-          <span className="text-primary">{businessName}</span>
-        </h1>
-        <p className="max-w-[42rem] leading-normal text-muted-foreground sm:text-xl sm:leading-8">
-          A modern restaurant management system for multi-location restaurants and bakeries.
-        </p>
-        <div className="flex gap-4">
-          <Button asChild>
-            <Link href="/auth/login">Sign In</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/auth/register">Sign Up</Link>
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-[#f8fafc] to-[#e0e7ef]">
+      {/* Header */}
+      <header className="flex items-center justify-between px-8 py-6">
+        <div className="flex items-center gap-3">
+          <Image src={businessIcon || "/assets/kutchen_app_logo.png"} alt="Logo KutchenAI" width={48} height={48} />
+          <span className="text-2xl font-bold text-[#1e293b]">KutchenAI</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <ThemeSwitch />
+          <Button asChild variant="outline" className="font-semibold">
+            <Link href="/auth/login">Iniciar sesión</Link>
           </Button>
         </div>
-      </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="flex flex-col items-center justify-center text-center py-16 px-4">
+        <h1 className="text-5xl md:text-6xl font-extrabold text-[#1e293b] max-w-3xl mb-6 leading-tight">
+          La IA que revoluciona la gestión de tu restaurante
+        </h1>
+        <p className="text-xl md:text-2xl text-[#334155] max-w-2xl mb-8">
+          Si eres dueño de restaurante, tenemos la mejor opción para optimizar tu negocio. KutchenAI es el asistente inteligente que automatiza, vende más y te da el control total. ¡Confía en la plataforma líder y lleva tu restaurante al siguiente nivel!
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 mb-8">
+          <Button size="lg" className="text-lg font-bold px-8 py-6 shadow-lg">
+            <Link href="/auth/register">Solicita una demo</Link>
+          </Button>
+          <Button size="lg" variant="outline" className="text-lg font-bold px-8 py-6">
+            <Link href="#funcionalidades">Ver funcionalidades</Link>
+          </Button>
+        </div>
+        <Image src="/assets/hero-restaurant-ai.svg" alt="Hero KutchenAI" width={500} height={320} className="rounded-xl shadow-xl" />
+      </section>
+
+      {/* Confianza */}
+      <section className="flex flex-col items-center py-8 px-4">
+        <p className="text-lg text-[#64748b] mb-2">Más de <span className="font-bold text-[#1e293b]">500 restaurantes</span> confían en KutchenAI</p>
+        <div className="flex gap-6 flex-wrap justify-center items-center">
+          <Image src="/assets/trust1.svg" alt="Cliente 1" width={80} height={40} />
+          <Image src="/assets/trust2.svg" alt="Cliente 2" width={80} height={40} />
+          <Image src="/assets/trust3.svg" alt="Cliente 3" width={80} height={40} />
+          <Image src="/assets/trust4.svg" alt="Cliente 4" width={80} height={40} />
+        </div>
+      </section>
+
+      {/* Funcionalidades */}
+      <section id="funcionalidades" className="py-16 px-4 bg-white rounded-t-3xl shadow-inner">
+        <h2 className="text-4xl font-bold text-center mb-10 text-[#1e293b]">Todo lo que tu restaurante necesita</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+          {features.map((f, i) => (
+            <div key={i} className="flex flex-col items-center bg-[#f1f5f9] rounded-xl p-6 shadow hover:scale-105 transition-transform">
+              <Image src={f.icon} alt={f.title} width={56} height={56} className="mb-4" />
+              <h3 className="text-xl font-semibold mb-2 text-[#1e293b]">{f.title}</h3>
+              <p className="text-[#475569] text-center">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Beneficios */}
+      <section className="py-16 px-4 flex flex-col items-center bg-gradient-to-b from-[#e0e7ef] to-[#f8fafc]">
+        <h2 className="text-3xl font-bold mb-6 text-[#1e293b]">¿Por qué KutchenAI?</h2>
+        <ul className="max-w-3xl text-lg text-[#334155] space-y-4">
+          <li>✅ Ahorra tiempo y dinero automatizando tareas repetitivas.</li>
+          <li>✅ Mejora la experiencia de tus clientes con atención 24/7 y pedidos sin errores.</li>
+          <li>✅ Toma decisiones inteligentes con reportes y métricas en tiempo real.</li>
+          <li>✅ Seguridad y privacidad de nivel bancario.</li>
+          <li>✅ Plataforma flexible, escalable y fácil de usar.</li>
+        </ul>
+      </section>
+
+      {/* CTA final */}
+      <section className="py-16 px-4 flex flex-col items-center">
+        <h2 className="text-3xl font-bold mb-4 text-[#1e293b]">¿Listo para transformar tu restaurante?</h2>
+        <Button size="lg" className="text-lg font-bold px-8 py-6 shadow-lg mb-2">
+          <Link href="/auth/register">Empieza gratis ahora</Link>
+        </Button>
+        <p className="text-[#64748b]">Sin tarjeta de crédito. Sin compromiso.</p>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 px-4 text-center text-[#64748b] border-t border-[#e5e7eb]">
+        <div className="mb-2">
+          <Image src={businessIcon || "/assets/kutchen_app_logo.png"} alt="Logo KutchenAI" width={32} height={32} className="inline-block mr-2" />
+          <span className="font-semibold">KutchenAI</span> &copy; {new Date().getFullYear()}
+        </div>
+        <div>
+          Plataforma de gestión inteligente para restaurantes. <Link href="/legal" className="underline">Términos y condiciones</Link>
+        </div>
+      </footer>
     </div>
   );
 }
