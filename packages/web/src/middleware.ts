@@ -5,13 +5,14 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
   const { pathname } = request.nextUrl;
 
-  // Detectar subdominio ignorando el puerto
   const hostHeader = request.headers.get('host') || '';
-  const host = hostHeader.split(':')[0]; // Ignora el puerto
+  const host = hostHeader.split(':')[0];
   const parts = host.split('.');
-  // Para localhost, el subdominio es parts[0] si hay al menos 2 partes y la última es 'localhost'
+
+  // Detectar subdominio en cualquier entorno (localhost o producción)
   const isLocalhost = host.endsWith('localhost');
-  const hasSubdomain = isLocalhost && parts.length >= 2 && parts[0] !== 'localhost';
+  const isProductionSubdomain = !isLocalhost && parts.length > 2;
+  const hasSubdomain = (isLocalhost && parts.length >= 2 && parts[0] !== 'localhost') || isProductionSubdomain;
 
   // Si hay subdominio y la ruta es '/', redirigir a /auth/login
   if (hasSubdomain && pathname === '/') {
