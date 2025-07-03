@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { ThemeSwitch } from "@/components/theme-switch"
 import Head from 'next/head';
+import { API_URL } from '@/lib/api';
 
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
@@ -54,16 +55,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const vh = useMobileViewportHeight();
   const [businessIcon, setBusinessIcon] = useState<string>("");
-  const [businessName, setBusinessName] = useState<string>("Blondie Restaurant App");
+  const [businessName, setBusinessName] = useState<string>("Kutchen AI");
 
   useEffect(() => {
     const fetchBusiness = async () => {
       try {
-        const res = await fetch("/api/settings/business");
+        const res = await fetch(`${API_URL}/settings/business`);
         if (res.ok) {
           const data = await res.json();
           setBusinessIcon(data.logo || "");
-          setBusinessName(data.name || "Blondie Restaurant App");
+          setBusinessName(data.name || "Kutchen AI");
         }
       } catch {}
     };
@@ -75,34 +76,24 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      console.log('[LoginPage] Starting login process...');
       const data = await login(email, password);
+      
+      console.log('[LoginPage] Login successful, user data:', data);
       
       toast({
         title: 'Success',
         description: 'You have been logged in successfully.',
       });
 
-      // Redirect based on user role
-      switch (data.user.role) {
-        case 'SUPER_ADMIN':
-          router.push('/admin/dashboard');
-          break;
-        case 'ADMIN':
-          router.push('/admin/dashboard');
-          break;
-        case 'MANAGER':
-          router.push('/admin/dashboard');
-          break;
-        case 'CHEF':
-          router.push('/admin/kitchen-manager');
-          break;
-        case 'STAFF':
-          router.push('/staff/dashboard');
-          break;
-        default:
-          router.push('/');
-      }
+      // Guardar el token en localStorage
+      localStorage.setItem('token', data.access_token);
+      // Guardar el token como cookie accesible por el middleware y subdominios
+      document.cookie = `token=${data.access_token}; path=/; max-age=604800; domain=.localhost`;
+      // Redirigir al dashboard de forma fluida
+      router.push('/admin/dashboard');
     } catch (error) {
+      console.error('[LoginPage] Login error:', error);
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'An error occurred',
@@ -145,7 +136,7 @@ export default function LoginPage() {
             <CardHeader className="space-y-1">
               <div className="flex justify-center mb-6">
                 <Image
-                  src={businessIcon || "/assets/blondie-logo.png"}
+                  src={businessIcon || "/assets/kutchen_app_logo.png"}
                   alt="Logo Negocio"
                   width={120}
                   height={120}

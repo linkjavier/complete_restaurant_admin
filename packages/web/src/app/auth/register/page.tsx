@@ -15,6 +15,7 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
+    tenantName: '',
     email: '',
     password: '',
     firstName: '',
@@ -39,8 +40,22 @@ export default function RegisterPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Registration failed');
+        let errorMsg = 'Registration failed';
+        if (response.status === 409) {
+          errorMsg = 'El correo electrónico ya está registrado para este negocio.';
+        } else {
+          try {
+            const error = await response.json();
+            if (Array.isArray(error.message)) {
+              errorMsg = error.message.join('\n');
+            } else if (typeof error.message === 'string') {
+              errorMsg = error.message;
+            } else {
+              errorMsg = error.error || errorMsg;
+            }
+          } catch {}
+        }
+        throw new Error(errorMsg);
       }
 
       toast({
@@ -50,9 +65,17 @@ export default function RegisterPage() {
 
       router.push('/auth/login');
     } catch (error) {
+      let errorMsg = 'An error occurred';
+      if (error instanceof Error) {
+        errorMsg = error.message;
+      } else if (typeof error === 'string') {
+        errorMsg = error;
+      }
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'An error occurred',
+        description: (
+          <span style={{ whiteSpace: 'pre-line' }}>{errorMsg}</span>
+        ),
         variant: 'destructive',
       });
     } finally {
@@ -82,65 +105,80 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <AvatarUpload
-            onImageUploaded={(url) => setFormData(prev => ({ ...prev, avatar: url }))}
-            currentImage={formData.avatar}
-            initials={getInitials()}
-          />
-          <div className="grid grid-cols-2 gap-2">
+          <form onSubmit={handleSubmit} className="grid gap-4">
             <Input
-              id="firstName"
-              name="firstName"
-              placeholder="First name"
+              id="tenantName"
+              name="tenantName"
+              placeholder="Nombre del negocio"
               type="text"
-              autoCapitalize="none"
-              autoComplete="given-name"
+              autoCapitalize="words"
+              autoComplete="organization"
               autoCorrect="off"
               disabled={isLoading}
-              value={formData.firstName}
+              value={formData.tenantName}
+              onChange={handleChange}
+            />
+            <span className="text-xs text-muted-foreground mb-2">Ejemplo: Restaurante Paola, Cafetería Central...</span>
+            <AvatarUpload
+              onImageUploaded={(url) => setFormData(prev => ({ ...prev, avatar: url }))}
+              currentImage={formData.avatar}
+              initials={getInitials()}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                id="firstName"
+                name="firstName"
+                placeholder="First name"
+                type="text"
+                autoCapitalize="none"
+                autoComplete="given-name"
+                autoCorrect="off"
+                disabled={isLoading}
+                value={formData.firstName}
+                onChange={handleChange}
+              />
+              <Input
+                id="lastName"
+                name="lastName"
+                placeholder="Last name"
+                type="text"
+                autoCapitalize="none"
+                autoComplete="family-name"
+                autoCorrect="off"
+                disabled={isLoading}
+                value={formData.lastName}
+                onChange={handleChange}
+              />
+            </div>
+            <Input
+              id="email"
+              name="email"
+              placeholder="name@example.com"
+              type="email"
+              autoCapitalize="none"
+              autoComplete="email"
+              autoCorrect="off"
+              disabled={isLoading}
+              value={formData.email}
               onChange={handleChange}
             />
             <Input
-              id="lastName"
-              name="lastName"
-              placeholder="Last name"
-              type="text"
-              autoCapitalize="none"
-              autoComplete="family-name"
-              autoCorrect="off"
+              id="password"
+              name="password"
+              placeholder="Password"
+              type="password"
+              autoComplete="new-password"
               disabled={isLoading}
-              value={formData.lastName}
+              value={formData.password}
               onChange={handleChange}
             />
-          </div>
-          <Input
-            id="email"
-            name="email"
-            placeholder="name@example.com"
-            type="email"
-            autoCapitalize="none"
-            autoComplete="email"
-            autoCorrect="off"
-            disabled={isLoading}
-            value={formData.email}
-            onChange={handleChange}
-          />
-          <Input
-            id="password"
-            name="password"
-            placeholder="Password"
-            type="password"
-            autoComplete="new-password"
-            disabled={isLoading}
-            value={formData.password}
-            onChange={handleChange}
-          />
-          <Button disabled={isLoading}>
-            {isLoading && (
-              <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Create Account
-          </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && (
+                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Create Account
+            </Button>
+          </form>
         </CardContent>
         <CardFooter>
           <p className="text-center text-sm text-muted-foreground">

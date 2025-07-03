@@ -38,4 +38,9 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   avatar?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  tenantName?: string;
 }

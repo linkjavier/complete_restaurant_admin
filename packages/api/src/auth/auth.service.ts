@@ -13,16 +13,21 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, password: string): Promise<LoginUser | null> {
-    console.log("Validando")
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (user && (await bcrypt.compare(password, user.password))) {
-      return {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        locationId: user.locationId,
-      };
+  async validateUser(email: string, password: string, tenantId: string): Promise<LoginUser | null> {
+    console.log("[validateUser] tenantId:", tenantId, "email:", email);
+    const user = await this.prisma.user.findUnique({ where: { tenantId_email: { tenantId, email } } });
+    console.log("[validateUser] user found:", !!user, user ? user.email : null);
+    if (user) {
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      console.log("[validateUser] password match:", passwordMatch);
+      if (passwordMatch) {
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          locationId: user.locationId,
+        };
+      }
     }
     return null;
   }
@@ -33,6 +38,12 @@ export class AuthService {
       where: { id: user.id },
       include: {
         location: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        tenant: {
           select: {
             id: true,
             name: true,
@@ -50,6 +61,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       locationId: user.locationId,
+      tenantId: result.tenantId,
     };
 
     return {
@@ -69,25 +81,38 @@ export class AuthService {
     };
   }
 
-  async register(data: RegisterDto): Promise<LoginResponse> {
-    // Verificar si el email ya existe
+  async register(data: RegisterDto, tenantId: string): Promise<LoginResponse> {
+    // Si no hay tenantId pero sí tenantName, crear el tenant
+    let finalTenantId = tenantId;
+    if (!finalTenantId && data.tenantName) {
+      // Verificar si ya existe un tenant con ese nombre
+      const existingTenant = await this.prisma.tenant.findFirst({ where: { name: data.tenantName } });
+      if (existingTenant) {
+        finalTenantId = existingTenant.id;
+      } else {
+        const newTenant = await this.prisma.tenant.create({ data: { name: data.tenantName } });
+        finalTenantId = newTenant.id;
+      }
+    }
+    if (!finalTenantId) {
+      throw new UnauthorizedException('tenantId or tenantName is required');
+    }
+    // Verificar si el email ya existe para ese tenant
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: data.email },
+      where: { tenantId_email: { tenantId: finalTenantId, email: data.email } },
     });
-
     if (existingUser) {
       throw new ConflictException('Email already exists');
     }
-
     const hashedPassword = await bcrypt.hash(data.password, 10);
-
     const dbUser = await this.prisma.user.create({
       data: {
+        tenantId: finalTenantId,
         email: data.email,
         password: hashedPassword,
         firstName: data.firstName,
         lastName: data.lastName,
-        role: data.role,
+        role: 'SUPER_ADMIN',
         locationId: data.locationId,
         avatar: data.avatar,
       },
@@ -98,9 +123,14 @@ export class AuthService {
             name: true,
           },
         },
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
-
     return this.login({
       id: dbUser.id,
       email: dbUser.email,
@@ -113,14 +143,16 @@ export class AuthService {
     email: string;
     firstName: string;
     lastName: string;
+    tenantId: string;
   }): Promise<LoginResponse> {
     let dbUser = await this.prisma.user.findUnique({
-      where: { email: user.email },
+      where: { tenantId_email: { tenantId: user.tenantId, email: user.email } },
     });
 
     if (!dbUser) {
       dbUser = await this.prisma.user.create({
         data: {
+          tenantId: user.tenantId,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,

@@ -7,15 +7,17 @@ export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
   constructor(private prisma: PrismaService) {}
 
-  async create(data: any): Promise<any> {
+  async create(data: any, tenantId: string): Promise<any> {
     try {
       this.logger.debug(`Creating product with data: ${JSON.stringify(data)}`);
       const { ingredients, variantGroups, ...productData } = data;
       return await this.prisma.$transaction(async (tx) => {
         // 1. Crear el producto base
         const product = await tx.product.create({
-          data: productData,
-          include: { category: true },
+          data: { 
+            ...productData, 
+            tenantId: tenantId
+          },
         });
         // 2. Ingredientes
         if (ingredients && ingredients.length > 0) {
@@ -29,43 +31,50 @@ export class ProductsService {
             });
           }
         }
-        // 3. Grupos de variantes y variantes
+        // 3. Crear grupos de variantes si existen
         if (variantGroups && variantGroups.length > 0) {
-          for (const group of variantGroups) {
-            const groupRecord = await tx.productVariantGroup.create({
+          for (const groupData of variantGroups) {
+            const group = await tx.productVariantGroup.create({
               data: {
-                name: group.name,
-                order: group.order ?? 0,
-                productId: product.id,
-              },
+                name: groupData.name,
+                order: groupData.order,
+                product: { connect: { id: product.id } },
+                tenant: { connect: { id: tenantId } }
+              } as any,
             });
-            if (group.variants && group.variants.length > 0) {
-              for (const variant of group.variants) {
+
+            // 4. Crear variantes para cada grupo
+            if (groupData.variants && groupData.variants.length > 0) {
+              for (const variantData of groupData.variants) {
                 await tx.productVariant.create({
                   data: {
-                    name: variant.name,
-                    price: variant.price,
-                    image: variant.image,
-                    isActive: variant.isActive !== undefined ? variant.isActive : true,
-                    groupId: groupRecord.id,
-                    productId: product.id,
-                  },
+                    name: variantData.name,
+                    price: variantData.price,
+                    image: variantData.image,
+                    isActive: variantData.isActive,
+                    group: { connect: { id: group.id } },
+                    product: { connect: { id: product.id } },
+                    tenant: { connect: { id: tenantId } }
+                  } as any,
                 });
               }
             }
           }
         }
-        // 4. Obtener el producto completo con ingredientes y grupos/variantes
+        // 5. Obtener el producto completo con ingredientes y grupos/variantes
         return await tx.product.findUnique({
           where: { id: product.id },
           include: {
             category: true,
-            ingredients: { include: { ingredient: true } },
+            ingredients: {
+              include: {
+                ingredient: true,
+              },
+            },
             variantGroups: {
               include: {
-                variants: true
+                variants: true,
               },
-              orderBy: { order: 'asc' }
             },
           },
         });
@@ -77,10 +86,11 @@ export class ProductsService {
     }
   }
 
-  async findAll({ locationId, categoryId, search }: { locationId: string; categoryId?: string; search?: string; }) {
+  async findAll({ tenantId, locationId, categoryId, search }: { tenantId: string; locationId: string; categoryId?: string; search?: string; }) {
     try {
       return this.prisma.product.findMany({
         where: {
+          tenantId,
           locationId,
           categoryId: categoryId,
           OR: search
@@ -130,7 +140,7 @@ export class ProductsService {
     }
   }
 
-  async update(id: string, data: any): Promise<any> {
+  async update(id: string, data: any, tenantId: string): Promise<any> {
     try {
       const { ingredients, variantGroups, categoryId, locationId, ...productData } = data;
       if (categoryId) productData.category = { connect: { id: categoryId } };
@@ -160,26 +170,27 @@ export class ProductsService {
           }
           await tx.productVariantGroup.updateMany({ where: { productId: id }, data: { isActive: false } });
           // Crear nuevos grupos y variantes
-          for (const group of variantGroups) {
-            const groupRecord = await tx.productVariantGroup.create({
+          for (const groupData of variantGroups) {
+            const group = await tx.productVariantGroup.create({
               data: {
-                name: group.name,
-                order: group.order ?? 0,
-                productId: product.id,
-                isActive: true,
-              },
+                name: groupData.name,
+                order: groupData.order,
+                product: { connect: { id: product.id } },
+                tenant: { connect: { id: tenantId } }
+              } as any,
             });
-            if (group.variants && group.variants.length > 0) {
-              for (const variant of group.variants) {
+            if (groupData.variants && groupData.variants.length > 0) {
+              for (const variantData of groupData.variants) {
                 await tx.productVariant.create({
                   data: {
-                    name: variant.name,
-                    price: variant.price,
-                    image: variant.image,
-                    isActive: variant.isActive !== undefined ? variant.isActive : true,
-                    groupId: groupRecord.id,
-                    productId: product.id,
-                  },
+                    name: variantData.name,
+                    price: variantData.price,
+                    image: variantData.image,
+                    isActive: variantData.isActive,
+                    group: { connect: { id: group.id } },
+                    product: { connect: { id: product.id } },
+                    tenant: { connect: { id: tenantId } }
+                  } as any,
                 });
               }
             }

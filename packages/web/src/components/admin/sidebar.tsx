@@ -21,7 +21,8 @@ import {
   ChevronRight,
   Receipt,
   Bot,
-  MessageSquare
+  MessageSquare,
+  ContactRound
 } from "lucide-react"
 import {
   Tooltip,
@@ -33,6 +34,7 @@ import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { ThemeSwitch } from "@/components/theme-switch"
 import "@/app/sidebar-scrollbar.css"
+import { API_URL } from '@/lib/api'
 
 interface SidebarProps {
   isMobile?: boolean
@@ -101,22 +103,23 @@ const routes = [
     roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
+    label: "Clientes",
+    icon: ContactRound,
+    href: "/admin/customers",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
+  {
     label: "Usuarios",
     icon: Users,
     href: "/admin/users",
     roles: ['SUPER_ADMIN', 'ADMIN'],
   },
+
   {
     label: "Configuración",
     icon: Settings,
     href: "/admin/settings",
     roles: ['SUPER_ADMIN', 'ADMIN'],
-  },
-  {
-    label: "Clientes",
-    icon: Users,
-    href: "/admin/customers",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
 ]
 
@@ -139,7 +142,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     // Obtener logo y nombre del negocio desde la API
     const fetchBusiness = async () => {
       try {
-        const res = await fetch("/api/settings/business")
+        const res = await fetch(`${API_URL}/settings/business`)
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")
@@ -179,113 +182,109 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
       isCollapsed ? "w-[70px]" : "w-[280px]",
       isMobile ? "overflow-y-auto" : "overflow-hidden"
     )}>
-      <div className="flex flex-col h-full max-h-screen overflow-x-hidden">
-        <div className="flex-1 flex flex-col overflow-y-auto min-h-0 overflow-x-hidden sidebar-scrollbar bg-[#111827]">
-          <div className="space-y-4 py-4 flex flex-col h-full">
-            <div className="px-3 py-2 flex-1">
-              <div className="flex items-center justify-between pl-3 mb-4 sticky top-0 bg-[#111827] z-10">
-                <div className="flex items-center gap-3">
-                  {!isCollapsed && (
-                    <>
-                      <div className="md:hidden">
-                        <Image
-                          src={businessIcon || "/assets/blondie-logo.png"}
-                          alt="Logo Negocio"
-                          width={40}
-                          height={40}
-                          priority
-                        />
-                      </div>
-                      <div 
-                        className="cursor-pointer"
-                        onClick={() => handleNavigation('/admin/dashboard')}
-                      >
-                        <h1 className="text-2xl font-bold">
-                          {businessName}
-                        </h1>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <ThemeSwitch />
-                </div>
-              </div>
-              <div className={cn(
-                "flex justify-center mb-10 transition-all duration-300",
-                isCollapsed ? "px-2" : "px-4",
-                "hidden md:flex"
-              )}>
-                <Image
-                  src={businessIcon || "/assets/blondie-logo.png"}
-                  alt="Logo Negocio"
-                  width={150}
-                  height={150}
-                  priority
-                />
-              </div>
-              <div className="space-y-1 pb-4">
-                {routes.filter(route => !route.roles || route.roles.includes(user.role)).map((route) => {
-                  const isActive = pathname === route.href || 
-                    (route.href === '/admin/pos' && pathname.startsWith('/admin/pos/')) ||
-                    (route.href === '/admin/orders' && pathname.startsWith('/admin/orders/')) ||
-                    (route.href === '/admin/tables' && pathname.startsWith('/admin/tables/')) ||
-                    (route.href === '/admin/products' && pathname.startsWith('/admin/products/')) ||
-                    (route.href === '/admin/categories' && pathname.startsWith('/admin/categories/')) ||
-                    (route.href === '/admin/users' && pathname.startsWith('/admin/users/')) ||
-                    (route.href === '/admin/settings' && pathname.startsWith('/admin/settings/'));
-
-                  const linkContent = (
-                    <div
-                      className={cn(
-                        "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
-                        isActive ? "text-white bg-white/10" : "text-zinc-400",
-                        isCollapsed ? "justify-center" : ""
-                      )}
-                      onClick={() => handleNavigation(route.href)}
-                    >
-                      <div className="flex items-center">
-                        <route.icon className="h-5 w-5" />
-                        {!isCollapsed && <span className="ml-3">{route.label}</span>}
-                      </div>
-                    </div>
-                  );
-
-                  return (
-                    <TooltipProvider key={route.href} delayDuration={100}>
-                      <Tooltip open={isCollapsed ? undefined : false}>
-                        <TooltipTrigger asChild>
-                          {linkContent}
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="bg-[#111827] text-white border-none">
-                          {route.label}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  );
-                })}
-              </div>
+      <div className="space-y-4 py-4 flex flex-col h-full">
+        <div className="px-3 py-2 flex-1">
+          <div className="flex items-center justify-between pl-3 mb-4 sticky top-0 bg-[#111827] z-10">
+            <div className="flex items-center gap-3">
+              {!isCollapsed && (
+                <>
+                  <div className="md:hidden">
+                    <Image
+                      src={businessIcon || "/assets/kutchen_app_logo.png"}
+                      alt="Logo Negocio"
+                      width={40}
+                      height={40}
+                      priority
+                    />
+                  </div>
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => handleNavigation('/admin/dashboard')}
+                  >
+                    <h1 className="text-2xl font-bold">
+                      {businessName}
+                    </h1>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <ThemeSwitch />
             </div>
           </div>
-        </div>
-        {/* Collapse button for desktop, sticky at bottom */}
-        {!isMobile && (
-          <div className="sticky bottom-0 left-0 w-full bg-[#111827] z-20 flex justify-center pb-4 pt-2 border-t border-white/5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full bg-gray-800 hover:bg-gray-700 active:bg-gray-600 relative z-[9999]"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-            >
-              {isCollapsed ? (
-                <ChevronRight className="h-4 w-4 text-white" />
-              ) : (
-                <ChevronLeft className="h-4 w-4 text-white" />
-              )}
-            </Button>
+          <div className={cn(
+            "flex justify-center mb-10 transition-all duration-300",
+            isCollapsed ? "px-2" : "px-4",
+            "hidden md:flex"
+          )}>
+            <Image
+              src={businessIcon || "/assets/kutchen_app_logo.png"}
+              alt="Logo Negocio"
+              width={150}
+              height={150}
+              priority
+            />
           </div>
-        )}
+          <div className="space-y-1 pb-4">
+            {routes.filter(route => !route.roles || route.roles.includes(user.role)).map((route) => {
+              const isActive = pathname === route.href || 
+                (route.href === '/admin/pos' && pathname.startsWith('/admin/pos/')) ||
+                (route.href === '/admin/orders' && pathname.startsWith('/admin/orders/')) ||
+                (route.href === '/admin/tables' && pathname.startsWith('/admin/tables/')) ||
+                (route.href === '/admin/products' && pathname.startsWith('/admin/products/')) ||
+                (route.href === '/admin/categories' && pathname.startsWith('/admin/categories/')) ||
+                (route.href === '/admin/users' && pathname.startsWith('/admin/users/')) ||
+                (route.href === '/admin/settings' && pathname.startsWith('/admin/settings/'));
+
+              const linkContent = (
+                <div
+                  className={cn(
+                    "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
+                    isActive ? "text-white bg-white/10" : "text-zinc-400",
+                    isCollapsed ? "justify-center" : ""
+                  )}
+                  onClick={() => handleNavigation(route.href)}
+                >
+                  <div className="flex items-center">
+                    <route.icon className="h-5 w-5" />
+                    {!isCollapsed && <span className="ml-3">{route.label}</span>}
+                  </div>
+                </div>
+              );
+
+              return (
+                <TooltipProvider key={route.href} delayDuration={100}>
+                  <Tooltip open={isCollapsed ? undefined : false}>
+                    <TooltipTrigger asChild>
+                      {linkContent}
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="bg-[#111827] text-white border-none">
+                      {route.label}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })}
+          </div>
+        </div>
       </div>
+      {/* Collapse button for desktop, sticky at bottom */}
+      {!isMobile && (
+        <div className="sticky bottom-0 left-0 w-full bg-[#111827] z-20 flex justify-center pb-4 pt-2 border-t border-white/5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full bg-gray-800 hover:bg-gray-700 active:bg-gray-600 relative z-[9999]"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4 text-white" />
+            ) : (
+              <ChevronLeft className="h-4 w-4 text-white" />
+            )}
+          </Button>
+        </div>
+      )}
       {/* Mobile close button */}
       {isMobile && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2 md:hidden">

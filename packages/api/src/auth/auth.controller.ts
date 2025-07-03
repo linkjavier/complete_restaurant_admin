@@ -66,7 +66,6 @@ export class AuthController {
 
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Req() req: any): Promise<LoginResponse> {
-    console.log("Aqui vamos ejecutando LOGIN INVALIDO")
     return this.authService.login(req.user);
   }
 
@@ -103,8 +102,19 @@ export class AuthController {
     }
   })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
-  async register(@Body() registerDto: RegisterDto): Promise<LoginResponse> {
-    return this.authService.register(registerDto);
+  async register(@Body() registerDto: RegisterDto, @Req() req: Request): Promise<LoginResponse> {
+    // Solo permitir registro en localhost (sin subdominio)
+    const hostHeader = req.headers.host || '';
+    const host = hostHeader.split(':')[0];
+    const parts = host.split('.');
+    const isLocalhost = host === 'localhost';
+    if (!isLocalhost) {
+      throw new UnauthorizedException('Registration is only allowed from localhost');
+    }
+    if (!registerDto['tenantName']) {
+      throw new UnauthorizedException('tenantName is required');
+    }
+    return this.authService.register(registerDto, undefined);
   }
 
   @UseGuards(JwtAuthGuard)

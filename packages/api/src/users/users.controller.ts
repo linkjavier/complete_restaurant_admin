@@ -17,6 +17,7 @@ import { UserRole } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CurrentTenant } from '../auth/decorators/tenant.decorator';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -31,8 +32,8 @@ export class UsersController {
   @ApiResponse({ status: 201, description: 'User created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  create(@Body() createUserDto: CreateUserDto, @CurrentTenant() tenantId: string) {
+    return this.usersService.create(createUserDto, tenantId);
   }
 
   @Get()
@@ -40,8 +41,8 @@ export class UsersController {
   @ApiOperation({ summary: 'Get all users' })
   @ApiResponse({ status: 200, description: 'Return all users' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@CurrentTenant() tenantId: string) {
+    return this.usersService.findAll(tenantId);
   }
 
   @Get(':id')
@@ -50,8 +51,8 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Return the user' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.usersService.findOne(id, tenantId);
   }
 
   @Patch(':id')
@@ -60,8 +61,8 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'User updated successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @CurrentTenant() tenantId: string) {
+    return this.usersService.update(id, updateUserDto, tenantId);
   }
 
   @Delete(':id')
@@ -70,8 +71,8 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  remove(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.usersService.remove(id, tenantId);
   }
 
   @Patch(':id/role')
@@ -83,8 +84,9 @@ export class UsersController {
   updateRole(
     @Param('id') id: string,
     @Body('role') role: UserRole,
+    @CurrentTenant() tenantId: string,
   ) {
-    return this.usersService.updateRole(id, role);
+    return this.usersService.updateRole(id, role, tenantId);
   }
 
   @Patch(':id/location')
@@ -96,7 +98,8 @@ export class UsersController {
   assignLocation(
     @Param('id') id: string,
     @Body('locationId') locationId: string,
+    @CurrentTenant() tenantId: string,
   ) {
-    return this.usersService.assignLocation(id, locationId);
+    return this.usersService.assignLocation(id, locationId, tenantId);
   }
 } 

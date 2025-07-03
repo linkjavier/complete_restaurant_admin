@@ -15,6 +15,8 @@ export function LocationsManager() {
   const [error, setError] = useState<string | null>(null)
   const [newLocation, setNewLocation] = useState({
     name: "",
+    address: "",
+    phone: "",
   })
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
   const { toast } = useToast()
@@ -39,10 +41,10 @@ export function LocationsManager() {
 
   const handleCreateLocation = async () => {
     try {
-      if (!newLocation.name) {
+      if (!newLocation.name || !newLocation.address || !newLocation.phone) {
         toast({
           title: "Error",
-          description: "Por favor ingresa un nombre",
+          description: "Por favor ingresa nombre, dirección y teléfono",
           variant: "destructive",
         })
         return
@@ -50,6 +52,8 @@ export function LocationsManager() {
 
       await createLocation({
         name: newLocation.name,
+        address: newLocation.address,
+        phone: newLocation.phone,
       })
 
       toast({
@@ -59,6 +63,8 @@ export function LocationsManager() {
 
       setNewLocation({
         name: "",
+        address: "",
+        phone: "",
       })
 
       fetchLocations()
@@ -144,6 +150,28 @@ export function LocationsManager() {
                   editingLocation
                     ? setEditingLocation({ ...editingLocation, name: e.target.value })
                     : setNewLocation({ ...newLocation, name: e.target.value })
+                }
+              />
+              <Label htmlFor="address">Dirección</Label>
+              <Input
+                id="address"
+                placeholder="Ingresa la dirección"
+                value={editingLocation ? editingLocation.address : newLocation.address}
+                onChange={(e) =>
+                  editingLocation
+                    ? setEditingLocation({ ...editingLocation, address: e.target.value })
+                    : setNewLocation({ ...newLocation, address: e.target.value })
+                }
+              />
+              <Label htmlFor="phone">Teléfono</Label>
+              <Input
+                id="phone"
+                placeholder="Ingresa el teléfono"
+                value={editingLocation ? editingLocation.phone : newLocation.phone}
+                onChange={(e) =>
+                  editingLocation
+                    ? setEditingLocation({ ...editingLocation, phone: e.target.value })
+                    : setNewLocation({ ...newLocation, phone: e.target.value })
                 }
               />
             </div>

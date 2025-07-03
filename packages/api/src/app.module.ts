@@ -24,6 +24,7 @@ import { SettingsModule } from './settings/settings.module';
 import { UploadModule } from './upload/upload.module';
 import { STTModule } from './stt/stt.module';
 import { CustomersModule } from './customers/customers.module';
+import { TenantsModule } from './tenants/tenants.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { CustomersModule } from './customers/customers.module';
     UploadModule,
     STTModule,
     CustomersModule,
+    TenantsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

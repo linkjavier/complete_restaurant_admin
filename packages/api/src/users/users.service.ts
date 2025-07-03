@@ -24,35 +24,33 @@ export type UserWithPassword = UserResponse & {
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(): Promise<UserResponse[]> {
+  async findAll(tenantId: string): Promise<UserResponse[]> {
     const users = await this.prisma.user.findMany({
+      where: { tenantId },
       include: {
         location: true,
       },
     });
-
     return users.map(({ password, ...rest }) => rest);
   }
 
-  async findOne(id: string): Promise<UserResponse> {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId: string): Promise<UserResponse> {
+    const user = await this.prisma.user.findFirst({
+      where: { id, tenantId },
       include: {
         location: true,
       },
     });
-
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
-
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 
-  async findByEmail(email: string): Promise<UserWithPassword | null> {
-    return this.prisma.user.findUnique({
-      where: { email },
+  async findByEmail(email: string, tenantId: string): Promise<UserWithPassword | null> {
+    return this.prisma.user.findFirst({
+      where: { email, tenantId },
       include: {
         location: true,
       },
@@ -67,14 +65,12 @@ export class UsersService {
     role?: UserRole;
     avatar?: string | null;
     locationId?: string | null;
-  }): Promise<UserWithPassword> {
-    const existingUser = await this.findByEmail(data.email);
+  }, tenantId: string): Promise<UserWithPassword> {
+    const existingUser = await this.findByEmail(data.email, tenantId);
     if (existingUser) {
       throw new ConflictException('Email already in use');
     }
-  
     const hashedPassword = await bcrypt.hash(data.password, 10);
-  
     const user = await this.prisma.user.create({
       data: {
         email: data.email,
@@ -82,14 +78,14 @@ export class UsersService {
         firstName: data.firstName,
         lastName: data.lastName,
         role: data.role || UserRole.CUSTOMER,
-        locationId: data.locationId || null,
+        location: data.locationId ? { connect: { id: data.locationId } } : undefined,
         avatar: data.avatar || null,
+        tenant: { connect: { id: tenantId } },
       },
       include: {
         location: true,
       },
     });
-
     return user;
   }
 
@@ -104,60 +100,64 @@ export class UsersService {
       avatar?: string | null;
       locationId?: string | null;
     },
+    tenantId: string,
   ): Promise<UserResponse> {
     if (data.email) {
-      const existingUser = await this.findByEmail(data.email);
+      const existingUser = await this.findByEmail(data.email, tenantId);
       if (existingUser && existingUser.id !== id) {
         throw new ConflictException('Email already in use');
       }
     }
-
     if (data.password) {
       data.password = await bcrypt.hash(data.password, 10);
     }
-
     const user = await this.prisma.user.update({
-      where: { id },
-      data,
+      where: { id, tenantId },
+      data: {
+        email: data.email,
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: data.role,
+        avatar: data.avatar,
+        location: data.locationId ? { connect: { id: data.locationId } } : undefined,
+      },
       include: {
         location: true,
       },
     });
-
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, tenantId: string): Promise<void> {
     try {
-      await this.prisma.user.delete({ where: { id } });
+      await this.prisma.user.delete({ where: { id, tenantId } });
     } catch (error) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
   }
 
-  async updateRole(id: string, role: UserRole): Promise<UserResponse> {
+  async updateRole(id: string, role: UserRole, tenantId: string): Promise<UserResponse> {
     const user = await this.prisma.user.update({
-      where: { id },
+      where: { id, tenantId },
       data: { role },
       include: {
         location: true,
       },
     });
-
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 
-  async assignLocation(userId: string, locationId: string): Promise<UserResponse> {
+  async assignLocation(userId: string, locationId: string, tenantId: string): Promise<UserResponse> {
     const user = await this.prisma.user.update({
-      where: { id: userId },
-      data: { locationId },
+      where: { id: userId, tenantId },
+      data: { location: { connect: { id: locationId } } },
       include: {
         location: true,
       },
     });
-
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }

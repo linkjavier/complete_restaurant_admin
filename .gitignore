@@ -47,3 +47,5 @@ docker-compose.override.yml
 
 # Personal Assistant Project
 Personal-Assistant/
+
+package-lock.json

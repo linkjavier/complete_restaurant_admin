@@ -13,12 +13,29 @@ import { cn } from "@/lib/utils"
 import { io, Socket } from "socket.io-client"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
+import { API_URL } from '@/lib/api'
+
+// Función para renderizar texto como WhatsApp
+const renderWhatsAppText = (text: string) => {
+  if (!text) return '';
+  
+  // Convertir el texto a HTML manteniendo el formato de WhatsApp
+  let html = text
+    // Convertir *texto* a <strong>texto</strong> (negritas)
+    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+    // Convertir _texto_ a <em>texto</em> (cursivas)
+    .replace(/_(.*?)_/g, '<em>$1</em>')
+    // Convertir `texto` a <code>texto</code> (código)
+    .replace(/`(.*?)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-sm">$1</code>')
+    // Convertir saltos de línea a <br>
+    .replace(/\n/g, '<br>');
+  
+  return html;
+};
 
 interface Message {
   id: string
@@ -518,7 +535,7 @@ export default function AIManagerPage() {
   const handleAIToggle = async (checked: boolean) => {
     setIsSavingSettings(true)
     try {
-      const response = await fetch("/api/settings/ai", {
+      const response = await fetch(`${API_URL}/settings/ai`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -547,7 +564,7 @@ export default function AIManagerPage() {
   useEffect(() => {
     const loadAISettings = async () => {
       try {
-        const response = await fetch("/api/settings/ai")
+        const response = await fetch(`${API_URL}/settings/ai`)
         if (!response.ok) {
           throw new Error("Failed to load settings")
         }
@@ -940,11 +957,10 @@ export default function AIManagerPage() {
                                               : "bg-primary text-primary-foreground"
                                           )}
                                         >
-                                          <div className="prose prose-sm dark:prose-invert max-w-none">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                              {message.content}
-                                            </ReactMarkdown>
-                                          </div>
+                                          <div 
+                                            className="prose prose-sm dark:prose-invert max-w-none"
+                                            dangerouslySetInnerHTML={{ __html: renderWhatsAppText(message.content) }}
+                                          />
                                           <span className="text-xs opacity-70">
                                             {message.timestamp.toLocaleTimeString()}
                                           </span>
@@ -1023,18 +1039,10 @@ export default function AIManagerPage() {
                           "rounded-lg p-4 max-w-[80%]",
                           message.role === "assistant" ? "bg-muted" : "bg-primary text-primary-foreground"
                         )}>
-                          <div className="prose prose-sm dark:prose-invert max-w-none">
-                            <ReactMarkdown 
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                h2: ({node, ...props}) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
-                                ul: ({node, ...props}) => <ul className="list-disc pl-4" {...props} />,
-                                li: ({node, ...props}) => <li className="mb-1" {...props} />
-                              }}
-                            >
-                              {message.content}
-                            </ReactMarkdown>
-                          </div>
+                          <div 
+                            className="prose prose-sm dark:prose-invert max-w-none"
+                            dangerouslySetInnerHTML={{ __html: renderWhatsAppText(message.content) }}
+                          />
                           <span className="text-xs opacity-70">
                             {message.timestamp.toLocaleTimeString()}
                           </span>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Minus, Users, CheckCircle2 } from "lucide-react"
-import { OrderItem, Product, getAuthToken } from "@/lib/api"
+import { OrderItem, Product, getAuthToken, API_URL } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { io } from "socket.io-client"
 
@@ -53,6 +53,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
         items: items.map(item => ({
           productId: item.product.id,
           quantity: item.quantity,
+          variants: Array.isArray((item as any).variants) ? (item as any).variants : [],
         })),
         source: 'QR',
       };
@@ -62,7 +63,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
         (orderData as any).splitBill = splitNames;
       }
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+      const response = await fetch(`${API_URL}/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,7 +80,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
       const newOrder = await response.json();
 
       // Conectar al socket y emitir el evento de nueva orden
-      const socket = io(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+      const socket = io(`${API_URL}/orders`, {
         transports: ['websocket'],
         path: '/socket.io',
       });

@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateLocationDto } from './dto/create-location.dto';
+import { CurrentTenant } from '../auth/decorators/tenant.decorator';
 
 @ApiTags('locations')
 @Controller('locations')
@@ -26,16 +27,16 @@ export class LocationsController {
   @Get()
   @ApiOperation({ summary: 'Obtener todas las ubicaciones' })
   @ApiResponse({ status: 200, description: 'Lista de ubicaciones' })
-  async findAll() {
-    return this.locationsService.findAll();
+  async findAll(@CurrentTenant() tenantId: string) {
+    return this.locationsService.findAll(tenantId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener una ubicación por ID' })
   @ApiResponse({ status: 200, description: 'Ubicación encontrada' })
   @ApiResponse({ status: 404, description: 'Ubicación no encontrada' })
-  async findOne(@Param('id') id: string) {
-    const location = await this.locationsService.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    const location = await this.locationsService.findOne(id, tenantId);
     if (!location) {
       throw new NotFoundException(`Ubicación con ID ${id} no encontrada`);
     }
@@ -46,31 +47,31 @@ export class LocationsController {
   @ApiOperation({ summary: 'Crear una nueva ubicación' })
   @ApiResponse({ status: 201, description: 'Ubicación creada exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
-  async create(@Body() data: CreateLocationDto) {
-    return this.locationsService.create(data);
+  async create(@Body() data: CreateLocationDto, @CurrentTenant() tenantId: string) {
+    return this.locationsService.create(data, tenantId);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Actualizar una ubicación' })
   @ApiResponse({ status: 200, description: 'Ubicación actualizada exitosamente' })
   @ApiResponse({ status: 404, description: 'Ubicación no encontrada' })
-  async update(@Param('id') id: string, @Body() data: CreateLocationDto) {
-    const location = await this.locationsService.findOne(id);
+  async update(@Param('id') id: string, @Body() data: CreateLocationDto, @CurrentTenant() tenantId: string) {
+    const location = await this.locationsService.findOne(id, tenantId);
     if (!location) {
       throw new NotFoundException(`Ubicación con ID ${id} no encontrada`);
     }
-    return this.locationsService.update(id, data);
+    return this.locationsService.update(id, data, tenantId);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar una ubicación' })
   @ApiResponse({ status: 200, description: 'Ubicación eliminada exitosamente' })
   @ApiResponse({ status: 404, description: 'Ubicación no encontrada' })
-  async remove(@Param('id') id: string) {
-    const location = await this.locationsService.findOne(id);
+  async remove(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    const location = await this.locationsService.findOne(id, tenantId);
     if (!location) {
       throw new NotFoundException(`Ubicación con ID ${id} no encontrada`);
     }
-    return this.locationsService.remove(id);
+    return this.locationsService.remove(id, tenantId);
   }
 } 

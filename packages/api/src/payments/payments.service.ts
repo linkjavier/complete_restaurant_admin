@@ -19,9 +19,14 @@ export class PaymentsService {
 
   constructor(private prisma: PrismaService) {}
 
-  async create(createPaymentDto: CreatePaymentDto) {
+  async create(createPaymentDto: CreatePaymentDto & { tenantId: string }) {
+    const { tenantId, orderId, ...rest } = createPaymentDto;
     return this.prisma.payment.create({
-      data: createPaymentDto,
+      data: {
+        ...rest,
+        order: { connect: { id: orderId } },
+        tenant: { connect: { id: tenantId } },
+      },
       include: {
         order: true,
       },
@@ -79,6 +84,7 @@ export class PaymentsService {
     orderId: string,
     amount: number,
     method: PaymentMethod,
+    tenantId: string,
   ): Promise<Payment> {
     // Validar la orden
     const paymentDetails = await this.getOrderPaymentDetails(orderId);
@@ -95,10 +101,11 @@ export class PaymentsService {
     // Crear el pago
     const payment = await this.prisma.payment.create({
       data: {
-        orderId,
+        order: { connect: { id: orderId } },
         amount,
         method,
         status: PaymentStatus.COMPLETED,
+        tenant: { connect: { id: tenantId } },
       },
       include: {
         order: true,

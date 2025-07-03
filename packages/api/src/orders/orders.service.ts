@@ -53,13 +53,14 @@ export class OrdersService {
     cursor?: Prisma.OrderWhereUniqueInput;
     where?: Prisma.OrderWhereInput;
     orderBy?: Prisma.OrderOrderByWithRelationInput;
+    tenantId: string;
   }): Promise<Order[]> {
-    const { skip, take, cursor, where, orderBy } = params;
+    const { skip, take, cursor, where, orderBy, tenantId } = params;
     return this.prisma.order.findMany({
       skip,
       take,
       cursor,
-      where,
+      where: { ...where, tenantId },
       orderBy,
       include: {
         table: true,
@@ -80,7 +81,7 @@ export class OrdersService {
     });
   }
 
-  async create(createOrderDto: CreateOrderDto) {
+  async create(createOrderDto: CreateOrderDto, tenantId: string) {
     try {
       this.logger.log(`Creating order from DTO: ${JSON.stringify(createOrderDto)}`);
       
@@ -90,6 +91,15 @@ export class OrdersService {
       let orderSubtotal = 0;
       const itemsWithPrice = await Promise.all(
         items.map(async (item) => {
+          // Si el item ya trae unitPrice y subtotal, úsalo
+          if (typeof item.unitPrice === 'number' && typeof item.subtotal === 'number') {
+            orderSubtotal += item.subtotal;
+            return {
+              ...item,
+              price: item.unitPrice,
+            };
+          }
+          // Si no, calcula como antes
           const product = await this.productsService.findOne(item.productId);
           if (!product) {
             throw new NotFoundException(`Product with ID ${item.productId} not found`);
@@ -97,7 +107,7 @@ export class OrdersService {
 
           let variantsPrice = 0;
           if (item.variants && item.variants.length > 0) {
-            const variantIds = item.variants.map(v => v.productVariantId);
+            const variantIds = item.variants.map(v => v.productVariantId).filter(Boolean);
             const variantRecords = await this.prisma.productVariant.findMany({
               where: { id: { in: variantIds } },
             });
@@ -119,6 +129,7 @@ export class OrdersService {
 
       const orderCreateData: any = {
         ...orderData,
+        tenantId,
         status: orderData.status || 'PENDING',
         isPaid: orderData.isPaid || false,
         subtotal: orderSubtotal, // Calculated subtotal

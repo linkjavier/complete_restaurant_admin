@@ -105,37 +105,32 @@ export class PosService {
     orderId: string,
     amount: number,
     method: PaymentMethod,
+    tenantId: string,
   ): Promise<Payment> {
     const orderDetails = await this.getOrderDetails(orderId);
-
     if (amount > orderDetails.remainingBalance) {
       throw new BadRequestException('Payment amount exceeds remaining balance');
     }
-
     const payment = await this.prisma.payment.create({
       data: {
         orderId,
         amount,
         method,
         status: PaymentStatus.COMPLETED,
+        tenantId,
       },
     });
-
-    // Check if order is fully paid
     if (orderDetails.remainingBalance - amount === 0) {
       await this.prisma.order.update({
         where: { id: orderId },
         data: { isPaid: true },
       });
     }
-
-    // Emit payment update
     this.server.emit('paymentProcessed', {
       orderId,
       payment,
       remainingBalance: orderDetails.remainingBalance - amount,
     });
-
     return payment;
   }
 
@@ -161,6 +156,7 @@ export class PosService {
           data.orderId,
           payment.amount,
           payment.method,
+          '',
         ),
       ),
     );

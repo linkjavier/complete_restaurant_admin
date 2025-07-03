@@ -23,7 +23,7 @@ export class IngredientsService {
   
   constructor(private prisma: PrismaService) {}
 
-  async create(createIngredientDto: CreateIngredientDto) {
+  async create(createIngredientDto: CreateIngredientDto & { tenantId: string }) {
     try {
       // Depurar los valores recibidos
       this.logger.debug(`Creating ingredient with data: ${JSON.stringify(createIngredientDto)}`);
@@ -43,7 +43,8 @@ export class IngredientsService {
           quantity: quantity,
           unit: unit,
           minQuantity: minQuantity,
-          locationId: createIngredientDto.locationId,
+          location: { connect: { id: createIngredientDto.locationId } },
+          tenant: { connect: { id: createIngredientDto.tenantId } },
         },
         include: {
           location: true,
@@ -60,15 +61,14 @@ export class IngredientsService {
     }
   }
 
-  async findAll() {
+  async findAll(params?: { where?: any }) {
     try {
-      // Obtener todos los ingredientes usando Prisma ORM
       const ingredients = await this.prisma.ingredient.findMany({
+        where: params?.where,
         include: {
           location: true,
         },
       });
-      
       return ingredients;
     } catch (error) {
       this.logger.error(`Error finding all ingredients: ${error.message}`);

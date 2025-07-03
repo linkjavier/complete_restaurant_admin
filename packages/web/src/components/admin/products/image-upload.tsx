@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Upload } from 'lucide-react'
 import { useToast } from "@/components/ui/use-toast"
+import { API_URL } from '@/lib/api'
 
 interface ImageUploadProps {
   onImageUploaded: (url: string) => void
@@ -47,7 +48,7 @@ export function ImageUpload({ onImageUploaded, currentImage, buttonText }: Image
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch('/api/upload/image', {
+      const response = await fetch(`${API_URL}/upload/image`, {
         method: 'POST',
         body: formData,
       })

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { getTable, Table } from "@/lib/api"
+import { getTable, Table, API_URL } from "@/lib/api"
 import { Menu } from "@/components/table/menu"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -17,7 +17,7 @@ export default function TablePage() {
   const [customerName, setCustomerName] = useState("")
   const [isOrderStarted, setIsOrderStarted] = useState(false)
   const [businessIcon, setBusinessIcon] = useState<string>("")
-  const [businessName, setBusinessName] = useState<string>("Blondie Restaurant App")
+  const [businessName, setBusinessName] = useState<string>("Kutchen AI")
 
   useEffect(() => {
     const fetchTable = async () => {
@@ -35,11 +35,11 @@ export default function TablePage() {
 
     const fetchBusiness = async () => {
       try {
-        const res = await fetch("/api/settings/business")
+        const res = await fetch(`${API_URL}/settings/business`)
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")
-          setBusinessName(data.name || "Blondie Restaurant App")
+          setBusinessName(data.name || "Kutchen AI")
         }
       } catch {}
     }
@@ -81,7 +81,7 @@ export default function TablePage() {
           
           <div className="flex relative w-[100px] h-[100px]">
             <Image
-              src={businessIcon || "/assets/blondie-logo.png"}
+              src={businessIcon || "/assets/kutchen_app_logo.png"}
               alt="Logo Negocio"
               width={100}
               height={100}

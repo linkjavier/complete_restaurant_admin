@@ -25,6 +25,7 @@ import {
 import { useOrderSocket } from "@/hooks/use-order-socket"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { API_URL } from '@/lib/api'
 
 // Tipos para las órdenes
 type OrderStatus = "PENDING" | "IN_PROGRESS" | "READY" | "CANCELLED" | "PAID"
@@ -241,7 +242,7 @@ export function OrdersManager() {
   // Updated fetchOrders function to include the required kitchen=true query parameter
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?kitchen=false`, {
+      const response = await fetch(`${API_URL}/orders?kitchen=false`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -281,7 +282,7 @@ export function OrdersManager() {
 
   const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/status`, {
+      const response = await fetch(`${API_URL}/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -312,7 +313,7 @@ export function OrdersManager() {
 
   const handleProcessPayment = async (orderId: string, paymentMethod: PaymentMethod) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/payments/process`, {
+      const response = await fetch(`${API_URL}/payments/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -347,7 +348,7 @@ export function OrdersManager() {
 
   const handlePrintReceipt = async (orderId: string) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/receipt`, {
+      const response = await fetch(`${API_URL}/orders/${orderId}/receipt`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -463,7 +464,7 @@ export function OrdersManager() {
   // Fetch deleted orders
   const fetchDeletedOrders = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/deleted/list?locationId=${user?.locationId || ''}`, {
+      const response = await fetch(`${API_URL}/orders/deleted/list?locationId=${user?.locationId || ''}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -482,7 +483,7 @@ export function OrdersManager() {
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/delete`, {
+      const response = await fetch(`${API_URL}/orders/${orderId}/delete`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -547,7 +548,7 @@ export function OrdersManager() {
                 </div>
               ) : (
                 <>
-                  <TabsContent value="active" className="mt-16 md:mt-8">
+                  <TabsContent value="active" className="pt-24 md:pt-0">
                     <div className="space-y-4">
                       {filteredOrders.length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
@@ -673,9 +674,9 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-1">
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {(item.productVariant?.price ?? item.product?.price ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -684,7 +685,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        ${((item.productVariant?.price ?? item.product?.price ?? 0) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}
@@ -813,7 +814,7 @@ export function OrdersManager() {
                       )}
                     </div>
                   </TabsContent>
-                  <TabsContent value="completed" className="mt-16 md:mt-8">
+                  <TabsContent value="completed" className="pt-24 md:pt-0">
                     <div className="space-y-4">
                       {orders.filter(o => o.status === "READY").length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
@@ -939,9 +940,9 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-1">
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {(item.productVariant?.price ?? item.product?.price ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -950,7 +951,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        ${((item.productVariant?.price ?? item.product?.price ?? 0) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}
@@ -1050,7 +1051,7 @@ export function OrdersManager() {
                       )}
                     </div>
                   </TabsContent>
-                  <TabsContent value="paid" className="mt-16 md:mt-8">
+                  <TabsContent value="paid" className="pt-24 md:pt-0">
                     <div className="space-y-4">
                       {orders.filter(o => o.isPaid).length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
@@ -1176,9 +1177,9 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-1">
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {(item.productVariant?.price ?? item.product?.price ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -1187,7 +1188,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        ${((item.productVariant?.price ?? item.product?.price ?? 0) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}
@@ -1287,7 +1288,7 @@ export function OrdersManager() {
                       )}
                     </div>
                   </TabsContent>
-                  <TabsContent value="cancelled" className="mt-16 md:mt-8">
+                  <TabsContent value="cancelled" className="pt-24 md:pt-0">
                     <div className="space-y-4">
                       {orders.filter(o => o.status === "CANCELLED").length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
@@ -1413,9 +1414,9 @@ export function OrdersManager() {
                                             )}
                                           </div>
                                         )}
-                                        <div className="ml-4 text-xs text-muted-foreground mt-1">
+                                        <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {(item.productVariant?.price ?? item.product?.price ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -1424,7 +1425,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        ${((item.productVariant?.price ?? item.product?.price ?? 0) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}
@@ -1497,7 +1498,7 @@ export function OrdersManager() {
                       )}
                     </div>
                   </TabsContent>
-                  <TabsContent value="deleted" className="mt-16 md:mt-8 pt-8 md:pt-0">
+                  <TabsContent value="deleted" className="pt-24 md:pt-0">
                     <div className="space-y-4">
                       {deletedOrders.length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">

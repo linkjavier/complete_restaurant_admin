@@ -11,6 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { WhatsappService } from './whatsapp.service';
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CustomerContextService } from '../ai/services/customer-context.service';
 
 @WebSocketGateway({
   cors: {
@@ -28,40 +29,41 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private readonly whatsappService: WhatsappService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly customerContextService: CustomerContextService,
   ) {
     // Suscribirse a eventos de WhatsApp
     this.eventEmitter.on('whatsapp.qr', (qrCode: string) => {
-      this.logger.log('Received QR code event');
+      // this.logger.log('Received QR code event');
       this.broadcastToAll('whatsapp:qr', { qrCode });
     });
 
     this.eventEmitter.on('whatsapp.ready', () => {
-      this.logger.log('Received ready event');
+      // this.logger.log('Received ready event');
       this.broadcastToAll('whatsapp:status', { isConnected: true });
     });
 
     this.eventEmitter.on('whatsapp.authenticated', () => {
-      this.logger.log('Received authenticated event');
+      // this.logger.log('Received authenticated event');
       this.broadcastToAll('whatsapp:authenticating', {});
     });
 
     this.eventEmitter.on('whatsapp.auth_failure', (error: any) => {
-      this.logger.error('Received auth failure event:', error);
+      // this.logger.error('Received auth failure event:', error);
       this.broadcastToAll('whatsapp:status', { isConnected: false });
     });
 
     this.eventEmitter.on('whatsapp.disconnected', (reason: string) => {
-      this.logger.log(`Received disconnected event: ${reason}`);
+      // this.logger.log(`Received disconnected event: ${reason}`);
       this.broadcastToAll('whatsapp:status', { isConnected: false });
     });
 
     this.eventEmitter.on('whatsapp.chats', (data: { chats: any[] }) => {
-      this.logger.log(`Received chats update event with ${data.chats.length} chats`);
+      // this.logger.log(`Received chats update event with ${data.chats.length} chats`);
       this.broadcastToAll('whatsapp:chats', data);
     });
 
     this.eventEmitter.on('whatsapp.message', (message: any) => {
-      this.logger.log('Received message event');
+      // this.logger.log('Received message event');
       this.broadcastToAll('whatsapp:message', message);
     });
   }
@@ -71,13 +73,36 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   async handleConnection(client: Socket) {
-    this.logger.log(`Client connected: ${client.id}`);
+    // this.logger.log(`Client connected: ${client.id}`);
     this.connectedClients.set(client.id, client);
     await this.sendStatus(client);
+
+    // --- SALUDO PERSONALIZADO ---
+    try {
+      // Intenta obtener el chatId y locationId del handshake (ajusta según tu frontend)
+      const chatId = client.handshake.query.chatId as string;
+      const locationId = client.handshake.query.locationId as string;
+      if (chatId && locationId) {
+        // Obtener tenantId a partir de locationId
+        const location = await this.whatsappService['prisma'].location.findUnique({ where: { id: locationId } });
+        const tenantId = location ? location.tenantId : undefined;
+        const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId, tenantId);
+        const cleanName = customerContext && customerContext.name ? customerContext.name.trim() : '';
+        let welcomeMessage = '';
+        if (cleanName.length > 0) {
+          welcomeMessage = `👋 ¡Hola, *${cleanName}*! Soy tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
+        } else {
+          welcomeMessage = `👋 ¡Hola! Soy tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
+        }
+        client.emit('whatsapp:welcome', { message: welcomeMessage });
+      }
+    } catch (err) {
+      this.logger.error('Error enviando saludo personalizado:', err);
+    }
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
+    // this.logger.log(`Client disconnected: ${client.id}`);
     this.connectedClients.delete(client.id);
   }
 
@@ -92,34 +117,34 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
       const isConnected = await this.whatsappService.isWhatsAppConnected();
       const isAuthenticating = await this.whatsappService.isWhatsAppAuthenticating();
 
-      this.logger.log(`Sending status - Connected: ${isConnected}, Authenticating: ${isAuthenticating}`);
+      // this.logger.log(`Sending status - Connected: ${isConnected}, Authenticating: ${isAuthenticating}`);
 
       if (isConnected) {
         client.emit('whatsapp:status', { isConnected: true });
-        this.logger.log('WhatsApp is connected, sending initial chats');
+        // this.logger.log('WhatsApp is connected, sending initial chats');
         try {
           const chats = await this.whatsappService.getChats();
-          this.logger.log(`Sending ${chats.length} initial chats`);
+          // this.logger.log(`Sending ${chats.length} initial chats`);
           client.emit('whatsapp:chats', { chats });
         } catch (error) {
-          this.logger.error(`Error getting initial chats: ${error.message}`);
+          // this.logger.error(`Error getting initial chats: ${error.message}`);
           client.emit('whatsapp:error', { message: 'Error getting initial chats' });
         }
       } else if (isAuthenticating) {
-        this.logger.log('WhatsApp is authenticating');
+        // this.logger.log('WhatsApp is authenticating');
         client.emit('whatsapp:authenticating');
       } else {
-        this.logger.log('WhatsApp is not connected, requesting QR code');
+        // this.logger.log('WhatsApp is not connected, requesting QR code');
         client.emit('whatsapp:status', { isConnected: false });
         const qrCode = await this.whatsappService.getQRCode();
         if (qrCode) {
           client.emit('whatsapp:qr', { qrCode });
         } else {
-          this.logger.log('No QR code available, client will wait.');
+          // this.logger.log('No QR code available, client will wait.');
         }
       }
     } catch (error) {
-      this.logger.error(`Error sending WhatsApp status: ${error.message}`);
+      // this.logger.error(`Error sending WhatsApp status: ${error.message}`);
       client.emit('whatsapp:status', { isConnected: false });
       client.emit('whatsapp:error', { message: 'Error getting WhatsApp status' });
     }
@@ -130,15 +155,15 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
     try {
       const isConnected = await this.whatsappService.isWhatsAppConnected();
       if (!isConnected) {
-        this.logger.error('Cannot get chats: WhatsApp is not connected');
+        // this.logger.error('Cannot get chats: WhatsApp is not connected');
         throw new Error('WhatsApp is not connected');
       }
 
       const chats = await this.whatsappService.getChats();
-      this.logger.log(`Sending ${chats.length} chats to client`);
+      // this.logger.log(`Sending ${chats.length} chats to client`);
       client.emit('whatsapp:chats', { chats });
     } catch (error) {
-      this.logger.error(`Error getting chats: ${error.message}`);
+      // this.logger.error(`Error getting chats: ${error.message}`);
       client.emit('whatsapp:error', { message: error.message });
     }
   }
@@ -146,7 +171,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
   @SubscribeMessage('whatsapp:getQR')
   async handleGetQR(@ConnectedSocket() client: Socket) {
     try {
-      this.logger.log('Client requested QR code');
+      // this.logger.log('Client requested QR code');
       const qrCode = await this.whatsappService.getQRCode();
       if (qrCode) {
         client.emit('whatsapp:qr', { qrCode });
@@ -154,7 +179,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
         client.emit('whatsapp:error', { message: 'No QR code available' });
       }
     } catch (error) {
-      this.logger.error(`Error getting QR code: ${error.message}`);
+      // this.logger.error(`Error getting QR code: ${error.message}`);
       client.emit('whatsapp:error', { message: error.message });
     }
   }
@@ -173,7 +198,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
       const messages = await this.whatsappService.getChatMessages(data.chatId);
       client.emit('whatsapp:chatMessages', { messages });
     } catch (error) {
-      this.logger.error(`Error getting chat messages: ${error.message}`);
+      // this.logger.error(`Error getting chat messages: ${error.message}`);
       client.emit('whatsapp:error', { message: error.message });
     }
   }
@@ -184,9 +209,9 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() data: { chatId: string; locationId: string },
   ) {
     try {
-      this.logger.log(
-        `Received toggle AI request for chat ${data.chatId} in location ${data.locationId}`,
-      );
+      // this.logger.log(
+      //   `Received toggle AI request for chat ${data.chatId} in location ${data.locationId}`,
+      // );
       const updatedChat = await this.whatsappService.toggleAIChat(
         data.chatId,
         data.locationId,
@@ -196,7 +221,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Broadcast to all clients to update the chat list
       this.broadcastToAll('whatsapp:chatUpdated', updatedChat);
     } catch (error) {
-      this.logger.error(`Error toggling AI for chat: ${error.message}`);
+      // this.logger.error(`Error toggling AI for chat: ${error.message}`);
       client.emit('whatsapp:error', {
         message: 'Error toggling AI for chat',
         details: error.message,
@@ -223,7 +248,7 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
         fromMe: true,
       });
     } catch (error) {
-      this.logger.error(`Error sending message: ${error.message}`);
+      // this.logger.error(`Error sending message: ${error.message}`);
       client.emit('whatsapp:error', { message: error.message });
     }
   }

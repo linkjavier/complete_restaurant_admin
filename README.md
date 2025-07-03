@@ -1,6 +1,6 @@
-# Blondie Restaurant Bar - Comprehensive Management System
+# Kutchen AI - Comprehensive Management System
 
-![Blondie Logo](https://res.cloudinary.com/djegujdt1/image/upload/v1746047136/blondie-logo.png)
+<img src="https://res.cloudinary.com/djegujdt1/image/upload/v1750544639/x1zuo78uvmhfmszfrpha.png" alt="Kutchen Logo" width="300" height="auto" style="max-width: 50%; height: auto;">
 
 Full-stack web system for comprehensive restaurant and bakery management with table service, smart QR ordering, kitchen module, ingredient-based inventory, multi-location reports, and analytics.
 
@@ -122,7 +122,7 @@ Full-stack web system for comprehensive restaurant and bakery management with ta
 ## 📦 Project Structure
 
 ```
-blondie-restaurant-bar/
+kutchen-app/
 ├── packages/
 │   ├── api/                    # Backend NestJS
 │   │   ├── src/
@@ -304,8 +304,9 @@ sudo yum install -y epel-release
 sudo yum install -y certbot python3-certbot-nginx
 ```
 
-4. **Configure NGINX as proxy for Nest.js**
+4. **Configure NGINX as proxy for Nest.js** 
 ```bash
+## We use blondie as example. Use your app name
 sudo nano /etc/nginx/conf.d/blondieapp.conf
 ```
 
@@ -370,8 +371,8 @@ await app.listen(port, '0.0.0.0');
 
 4. **Start databases**
 ```bash
-docker-compose up postgres
-docker-compose up redis
+docker-compose up -d postgres
+docker-compose up -d redis
 ```
 
 5. **Start backend**
@@ -429,6 +430,15 @@ chmod +x ./scripts/seed-database-paola.sh && ./scripts/seed-database-paola.sh
 
 # Script para manejar creación de productos con variantes. Funciona con export 3
 chmod +x ./scripts/seed-database-paola3.sh && ./scripts/seed-database-paola3.sh
+
+chmod +x ./scripts/seed_paola_multytenancy.sh && ./scripts/seed_paola_multytenancy.sh
+
+
+sudo yum update -y
+sudo yum install -y python3 python3-pip
+pip3 install --user csvkit # Para el script multytenancy
+pip3 install --upgrade csvkit
+export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
 
 # Seed database with images
 chmod +x ./scripts/seed-database-with-images.sh && ./scripts/seed-database-with-images.sh

@@ -1,4 +1,16 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+function getApiUrl() {
+  if (typeof window === 'undefined') return 'http://localhost:3000'; // SSR fallback
+  const [subdomain, ...rest] = window.location.host.split('.');
+  const backendPort = '3000';
+  // Si el host es "localhost" (sin subdominio), fallback a localhost:3000
+  if (rest.join('.') === 'localhost' || window.location.host === 'localhost:3000') {
+    return `http://localhost:${backendPort}`;
+  }
+  // Si hay subdominio, úsalo para la API
+  return `http://${subdomain}.localhost:${backendPort}`;
+}
+
+export const API_URL = getApiUrl();
 
 console.log(process.env.NEXT_PUBLIC_API_URL)
 console.log(API_URL)
@@ -48,6 +60,8 @@ export interface Table {
 export interface Location {
   id: string;
   name: string;
+  address: string;
+  phone: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -146,12 +160,30 @@ export interface UpdateUserDto {
   avatar?: string;
 }
 
+const getTenantIdFromSubdomain = () => {
+  if (typeof window === 'undefined') return null;
+  const host = window.location.hostname; // Usa hostname para evitar el puerto
+  const parts = host.split('.');
+  console.log('[getTenantIdFromSubdomain] host:', host, 'parts:', parts);
+  if (parts.length >= 2 && parts[1] === 'localhost') {
+    const tenantId = parts[0]; // 'paola' en paola.localhost
+    console.log('[getTenantIdFromSubdomain] tenantId found:', tenantId);
+    return tenantId;
+  }
+  console.log('[getTenantIdFromSubdomain] no tenantId found');
+  return null;
+};
+
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
-  return {
+  const tenantId = getTenantIdFromSubdomain();
+  const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}),
   };
+  console.log('[getAuthHeaders] token:', token ? 'present' : 'missing', 'tenantId:', tenantId, 'headers:', headers);
+  return headers;
 };
 
 export function getAuthToken(): string | null {
@@ -242,7 +274,7 @@ export async function getLocations(): Promise<Location[]> {
   return response.json();
 }
 
-export async function createLocation(data: { name: string }): Promise<Location> {
+export async function createLocation(data: { name: string; address: string; phone: string }): Promise<Location> {
   const response = await fetch(`${API_URL}/locations`, {
     method: 'POST',
     headers: getAuthHeaders(),
@@ -503,7 +535,7 @@ export async function createOrder(data: any) {
     return { ...item, variants: [] };
   });
   const payload = { ...data, items };
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+  const response = await fetch(`${API_URL}/orders`, {
     method: 'POST',
     headers: {
       ...getAuthHeaders(),
@@ -543,11 +575,13 @@ export async function getUser(): Promise<User> {
   const token = getAuthToken();
   if (!token) throw new Error("No authentication token found");
 
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  console.log('[getUser] Making request to:', `${API_URL}/auth/me`);
+  const response = await fetch(`${API_URL}/auth/me`, {
+    headers: getAuthHeaders(),
+    credentials: 'include',
   });
+
+  console.log('[getUser] Response status:', response.status, 'ok:', response.ok);
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -555,10 +589,14 @@ export async function getUser(): Promise<User> {
       localStorage.removeItem('token');
       throw new Error("Authentication expired or invalid");
     }
+    const errorText = await response.text();
+    console.error('[getUser] Error response:', errorText);
     throw new Error("Failed to fetch user");
   }
 
-  return response.json();
+  const userData = await response.json();
+  console.log('[getUser] User data received:', userData);
+  return userData;
 }
 
 export async function getKitchenOrders(): Promise<any[]> {
@@ -645,7 +683,7 @@ export async function getActiveOrders(tableId: string) {
     //   }
     // });
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?tableId=${tableId}`);
+    const response = await fetch(`${API_URL}/orders?tableId=${tableId}`);
 
     if (!response.ok) {
       // if (response.status === 401) {
@@ -708,6 +746,7 @@ export async function getUsers(): Promise<User[]> {
     headers: {
       'Authorization': `Bearer ${getAuthToken()}`,
     },
+    credentials: 'include',
   })
   if (!response.ok) throw new Error('Failed to fetch users')
   return response.json()
@@ -721,6 +760,7 @@ export async function createUser(data: CreateUserDto): Promise<User> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(data),
+    credentials: 'include',
   })
   if (!response.ok) throw new Error('Failed to create user')
   return response.json()
@@ -734,6 +774,7 @@ export async function updateUser(id: string, data: UpdateUserDto): Promise<User>
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(data),
+    credentials: 'include',
   })
   if (!response.ok) throw new Error('Failed to update user')
   return response.json()
@@ -756,6 +797,30 @@ export async function getCustomers(): Promise<any[]> {
   if (!response.ok) {
     throw new Error('Error al obtener los clientes');
   }
+  return response.json();
+}
+
+export async function updateCustomer(id: string, data: {
+  name?: string;
+  phone?: string;
+  address?: string;
+  neighborhood?: string;
+  whatsappId?: string;
+  locationId?: string;
+}): Promise<any> {
+  const response = await fetch(`${API_URL}/customers/${id}`, {
+    method: 'PUT',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Error al actualizar el cliente');
+  }
+  
   return response.json();
 }
 

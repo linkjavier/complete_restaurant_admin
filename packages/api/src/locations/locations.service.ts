@@ -7,14 +7,14 @@ import { Prisma } from '@prisma/client';
 export class LocationsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: CreateLocationDto) {
+  async create(data: CreateLocationDto, tenantId: string) {
     return this.prisma.location.create({
-      data,
+      data: { ...data, tenant: { connect: { id: tenantId } } },
     });
   }
 
-  async findAll() {
-    return this.prisma.location.findMany();
+  async findAll(tenantId: string) {
+    return this.prisma.location.findMany({ where: { tenantId } });
   }
 
   async findByUser(userId: string) {
@@ -29,10 +29,8 @@ export class LocationsService {
     });
   }
 
-  async findOne(id: string) {
-    return this.prisma.location.findUnique({
-      where: { id },
-    });
+  async findOne(id: string, tenantId: string): Promise<any> {
+    return this.prisma.location.findFirst({ where: { id, tenantId } });
   }
 
   async findOneByUser(id: string, userId: string) {
@@ -48,16 +46,16 @@ export class LocationsService {
     });
   }
 
-  async update(id: string, data: Partial<CreateLocationDto>) {
+  async update(id: string, data: Partial<CreateLocationDto>, tenantId: string) {
     return this.prisma.location.update({
-      where: { id },
+      where: { id, tenantId },
       data,
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, tenantId: string) {
     return this.prisma.location.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 } 

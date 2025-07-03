@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { useToast } from '@/components/ui/use-toast'
+import { API_URL } from '@/lib/api'
 
 interface UseKitchenSocketReturn {
   socket: Socket | null;
@@ -23,7 +24,7 @@ export function useKitchenSocket(): UseKitchenSocketReturn {
 
   // Initialize socket connection
   useEffect(() => {
-    const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+    const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || API_URL
     
     const initSocket = () => {
       console.log('Initializing socket connection to', SOCKET_URL)

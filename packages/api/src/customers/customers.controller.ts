@@ -3,45 +3,58 @@ import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
+import { CurrentTenant } from '../auth/decorators/tenant.decorator';
 
 @Controller('customers')
-@UseGuards(JwtAuthGuard)
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
+  @Public()
+  @Get('test')
+  test() {
+    return { message: 'Customers controller is working' };
+  }
+
   @Post()
-  create(@Body() createCustomerDto: CreateCustomerDto) {
-    return this.customersService.create(createCustomerDto);
+  @UseGuards(JwtAuthGuard)
+  create(@Body() createCustomerDto: CreateCustomerDto, @CurrentTenant() tenantId: string) {
+    return this.customersService.create(createCustomerDto, tenantId);
   }
 
   @Get()
-  findAll(@Query('locationId') locationId: string, @Req() req) {
-    const effectiveLocationId = locationId || req.user?.locationId;
-    return this.customersService.findAll(effectiveLocationId);
+  @UseGuards(JwtAuthGuard)
+  findAll(@Query('locationId') locationId: string, @CurrentTenant() tenantId: string) {
+    return this.customersService.findAll(locationId, tenantId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.customersService.findOne(id);
+  @UseGuards(JwtAuthGuard)
+  findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.customersService.findOne(id, tenantId);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() updateCustomerDto: UpdateCustomerDto) {
-    return this.customersService.update(id, updateCustomerDto);
+  @UseGuards(JwtAuthGuard)
+  update(@Param('id') id: string, @Body() updateCustomerDto: UpdateCustomerDto, @CurrentTenant() tenantId: string) {
+    return this.customersService.update(id, updateCustomerDto, tenantId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.customersService.remove(id);
+  @UseGuards(JwtAuthGuard)
+  remove(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.customersService.remove(id, tenantId);
   }
 
   @Post('seed/:locationId')
-  seedCustomers(@Param('locationId') locationId: string) {
-    return this.customersService.seedCustomers(locationId);
+  @UseGuards(JwtAuthGuard)
+  seedCustomers(@Param('locationId') locationId: string, @CurrentTenant() tenantId: string) {
+    return this.customersService.seedCustomers(locationId, tenantId);
   }
 
   @Post('sync-whatsapp/:locationId')
-  syncFromWhatsApp(@Param('locationId') locationId: string) {
-    return this.customersService.syncFromWhatsApp(locationId);
+  @UseGuards(JwtAuthGuard)
+  syncFromWhatsApp(@Param('locationId') locationId: string, @CurrentTenant() tenantId: string) {
+    return this.customersService.syncFromWhatsApp(locationId, tenantId);
   }
 } 

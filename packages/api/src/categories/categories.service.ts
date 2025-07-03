@@ -33,9 +33,21 @@ export class CategoriesService {
     });
   }
 
-  async createCategory(data: Prisma.CategoryCreateInput): Promise<Category> {
+  async createCategory(data: { name: string; description?: string; tenantId: string }): Promise<Category> {
+    const { tenantId, name, description } = data;
+    
+    if (!tenantId) {
+      throw new Error('tenantId is required');
+    }
+    
+    console.log('Creating category with tenantId:', tenantId, 'name:', name);
+    
     return this.prisma.category.create({
-      data,
+      data: {
+        name,
+        description,
+        tenant: { connect: { id: tenantId } },
+      },
     });
   }
 
