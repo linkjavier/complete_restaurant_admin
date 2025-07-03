@@ -3,22 +3,27 @@ function getApiUrl() {
     return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   }
   const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-  const [subdomain, ...rest] = window.location.host.split('.');
+  const backendDomain = backendBase.replace(/^https?:\/\//, '');
+  const backendProtocol = backendBase.startsWith('https://') ? 'https://' : 'http://';
+  const host = window.location.host;
+  const [subdomain, ...rest] = host.split('.');
 
-  // Si estamos en localhost (sin subdominio)
-  if (rest.join('.') === 'localhost' || window.location.host === 'localhost:3000') {
-    return `http://localhost:3000`;
+  // LOCALHOST
+  if (host.endsWith('.localhost:3001') || host.endsWith('.localhost:3000') || host.endsWith('.localhost')) {
+    // Si hay subdominio (ej: paola.localhost:3001)
+    return `http://${subdomain}.localhost:3000`;
+  }
+  if (host === 'localhost:3000' || host === 'localhost:3001' || rest.join('.') === 'localhost') {
+    // Sin subdominio
+    return 'http://localhost:3000';
   }
 
-  // Si hay subdominio y estamos en producción
-  if (subdomain && backendBase) {
-    // Elimina el protocolo de backendBase para evitar doble https://
-    const base = backendBase.replace(/^https?:\/\//, '');
-    const protocol = backendBase.startsWith('https://') ? 'https://' : 'http://';
-    return `${protocol}${subdomain}.${base}`;
+  // PRODUCCIÓN
+  // Si hay subdominio (ej: paola.kutchenbrain.xyz)
+  if (subdomain && rest.length > 1) {
+    return `${backendProtocol}${subdomain}.${backendDomain}`;
   }
-
-  // Fallback
+  // Sin subdominio
   return backendBase;
 }
 
