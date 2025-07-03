@@ -15,8 +15,8 @@ export class SettingsService {
     private prisma: PrismaService,
   ) {}
 
-  async updateBusinessSettings(settings: BusinessSettings): Promise<BusinessSettings> {
-    const existingSettings = await this.prisma.settings.findFirst();
+  async updateBusinessSettings(tenantId: string, locationId: string, settings: BusinessSettings): Promise<BusinessSettings> {
+    const existingSettings = await this.prisma.settings.findFirst({ where: { tenantId, locationId } });
     if (existingSettings) {
       const updated = await this.prisma.settings.update({
         where: { id: existingSettings.id },
@@ -32,6 +32,8 @@ export class SettingsService {
     } else {
       const created = await this.prisma.settings.create({
         data: {
+          tenantId,
+          locationId,
           businessName: settings.name,
           businessLogo: settings.logo,
         },
@@ -43,19 +45,17 @@ export class SettingsService {
     }
   }
 
-  async getBusinessSettings(): Promise<BusinessSettings> {
-    const settings = await this.prisma.settings.findFirst();
+  async getBusinessSettings(tenantId: string, locationId: string): Promise<BusinessSettings> {
+    let settings = await this.prisma.settings.findFirst({ where: { tenantId, locationId } });
     if (!settings) {
-      const defaultSettings = await this.prisma.settings.create({
+      settings = await this.prisma.settings.create({
         data: {
+          tenantId,
+          locationId,
           businessName: 'Kutchen AI App',
           businessLogo: null,
         },
       });
-      return {
-        name: defaultSettings.businessName,
-        logo: defaultSettings.businessLogo || null,
-      };
     }
     return {
       name: settings.businessName,
@@ -63,12 +63,9 @@ export class SettingsService {
     };
   }
 
-  async updateAISettings(settings: AISettings): Promise<AISettings> {
-    // Get or create settings record
-    const existingSettings = await this.prisma.settings.findFirst();
-    
+  async updateAISettings(tenantId: string, locationId: string, settings: AISettings): Promise<AISettings> {
+    const existingSettings = await this.prisma.settings.findFirst({ where: { tenantId, locationId } });
     if (existingSettings) {
-      // Update existing settings
       const updated = await this.prisma.settings.update({
         where: { id: existingSettings.id },
         data: {
@@ -78,7 +75,6 @@ export class SettingsService {
           deliveryFee: settings.deliveryFee,
         },
       });
-      
       return {
         name: updated.aiName,
         gender: updated.aiGender,
@@ -86,16 +82,16 @@ export class SettingsService {
         deliveryFee: updated.deliveryFee ?? 0,
       };
     } else {
-      // Create new settings
       const created = await this.prisma.settings.create({
         data: {
+          tenantId,
+          locationId,
           aiName: settings.name,
           aiGender: settings.gender,
           aiEnabled: settings.enabled,
           deliveryFee: settings.deliveryFee,
         },
       });
-      
       return {
         name: created.aiName,
         gender: created.aiGender,
@@ -105,28 +101,20 @@ export class SettingsService {
     }
   }
 
-  async getAISettings(): Promise<AISettings> {
-    const settings = await this.prisma.settings.findFirst();
-    
+  async getAISettings(tenantId: string, locationId: string): Promise<AISettings> {
+    let settings = await this.prisma.settings.findFirst({ where: { tenantId, locationId } });
     if (!settings) {
-      // Create default settings if none exist
-      const defaultSettings = await this.prisma.settings.create({
+      settings = await this.prisma.settings.create({
         data: {
+          tenantId,
+          locationId,
           aiName: 'Sandra',
           aiGender: 'female',
           aiEnabled: false,
           deliveryFee: 0,
         },
       });
-      
-      return {
-        name: defaultSettings.aiName,
-        gender: defaultSettings.aiGender,
-        enabled: defaultSettings.aiEnabled,
-        deliveryFee: defaultSettings.deliveryFee ?? 0,
-      };
     }
-    
     return {
       name: settings.aiName,
       gender: settings.aiGender,
@@ -135,15 +123,15 @@ export class SettingsService {
     };
   }
 
-  async getDeliveryFee(): Promise<number> {
-    const settings = await this.prisma.settings.findFirst();
+  async getDeliveryFee(tenantId: string, locationId: string): Promise<number> {
+    const settings = await this.prisma.settings.findFirst({ where: { tenantId, locationId } });
     return settings?.deliveryFee ?? 0;
   }
 
-  async setDeliveryFee(value: number): Promise<void> {
-    let settings = await this.prisma.settings.findFirst();
+  async setDeliveryFee(tenantId: string, locationId: string, value: number): Promise<void> {
+    let settings = await this.prisma.settings.findFirst({ where: { tenantId, locationId } });
     if (!settings) {
-      await this.prisma.settings.create({ data: { deliveryFee: value } });
+      await this.prisma.settings.create({ data: { tenantId, locationId, deliveryFee: value } });
     } else {
       await this.prisma.settings.update({ where: { id: settings.id }, data: { deliveryFee: value } });
     }

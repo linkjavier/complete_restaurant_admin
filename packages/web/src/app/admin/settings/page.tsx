@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react"
 import { ImageUpload } from "@/components/admin/products/image-upload"
 import { CategoryOrderManager } from "@/components/admin/settings/category-order-manager"
 import { API_URL } from '@/lib/api'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function SettingsPage() {
   const [businessName, setBusinessName] = useState("")
@@ -22,6 +23,8 @@ export default function SettingsPage() {
   const [aiGender, setAiGender] = useState("")
   const [aiEnabled, setAiEnabled] = useState(false)
   const [deliveryFee, setDeliveryFee] = useState<number>(0)
+  const { user } = useAuth()
+  const locationId = user?.locationId
 
   const { toast } = useToast()
 
@@ -62,10 +65,11 @@ export default function SettingsPage() {
   const handleSaveBusiness = async () => {
     setIsSaving(true)
     try {
+      if (!locationId) throw new Error('No tienes una ubicación asignada. Contacta al administrador.')
       const response = await fetch(`${API_URL}/settings/business`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: businessName, logo: businessIcon })
+        body: JSON.stringify({ name: businessName, logo: businessIcon, locationId })
       })
       if (!response.ok) throw new Error("Error al guardar la configuración del negocio")
       toast({
@@ -75,7 +79,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Error al guardar la configuración del negocio",
+        description: error instanceof Error ? error.message : "Error al guardar la configuración del negocio",
         variant: "destructive"
       })
     } finally {
@@ -95,6 +99,7 @@ export default function SettingsPage() {
 
     setIsSaving(true)
     try {
+      if (!locationId) throw new Error('No tienes una ubicación asignada. Contacta al administrador.')
       const response = await fetch(`${API_URL}/settings/ai`, {
         method: "POST",
         headers: {
@@ -105,6 +110,7 @@ export default function SettingsPage() {
           gender: aiGender,
           enabled: aiEnabled,
           deliveryFee,
+          locationId,
         }),
       })
 
@@ -119,7 +125,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Error al guardar la configuración",
+        description: error instanceof Error ? error.message : "Error al guardar la configuración",
         variant: "destructive"
       })
     } finally {

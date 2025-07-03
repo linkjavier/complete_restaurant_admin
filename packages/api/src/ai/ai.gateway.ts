@@ -107,8 +107,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       await this.conversationService.getOrCreateConversation(conversationContext);
       
-      const aiSettings = await this.settingsService.getAISettings();
-      const businessSettings = await this.settingsService.getBusinessSettings();
+      const aiSettings = await this.settingsService.getAISettings(tenantId, locationId);
+      const businessSettings = await this.settingsService.getBusinessSettings(tenantId, locationId);
       const businessName = businessSettings.name;
 
       // DEBUG: Verificar el contenido real de customerContext
@@ -229,7 +229,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Check if AI is enabled for WhatsApp
     if (chatType === 'whatsapp') {
       try {
-        const aiSettings = await this.settingsService.getAISettings();
+        const aiSettings = await this.settingsService.getAISettings(await this.getTenantId(locationId), locationId);
         if (!aiSettings?.enabled) {
           console.log(`[AI Gateway] AI is disabled for WhatsApp, not processing message`);
           return '';

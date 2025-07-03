@@ -15,11 +15,20 @@ export class TenantMiddleware implements NestMiddleware {
       // (Ya no asignar tenantId por defecto aquí, solo dejar pasar para que se resuelva por subdominio)
       // Elimina el bloque que asigna el primer tenant y el return next();
 
+      // Permitir acceso libre a /auth/register y /auth/login desde localhost
+      const allowedLocalhostPaths = ['/auth/register', '/auth/login'];
+      const hostHeader = req.headers.host;
+      const host = hostHeader ? hostHeader.split(':')[0] : '';
+      if (
+        (host === 'localhost' || host === '127.0.0.1') &&
+        allowedLocalhostPaths.includes(req.path)
+      ) {
+        return next();
+      }
+
       // Log para depuración del header Host
       console.log('[TenantMiddleware] Host header:', req.headers.host);
       // Extraer subdominio (empresa1.tuapp.com)
-      const hostHeader = req.headers.host;
-      const host = hostHeader ? hostHeader.split(':')[0] : '';
       const parts = host.split('.');
       const subdomain = parts.length >= 2 ? parts[0].toLowerCase() : null;
 

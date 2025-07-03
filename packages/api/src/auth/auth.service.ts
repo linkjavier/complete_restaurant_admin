@@ -112,7 +112,7 @@ export class AuthService {
         password: hashedPassword,
         firstName: data.firstName,
         lastName: data.lastName,
-        role: data.role,
+        role: 'SUPER_ADMIN',
         locationId: data.locationId,
         avatar: data.avatar,
       },

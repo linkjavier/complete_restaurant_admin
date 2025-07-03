@@ -18,17 +18,18 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users     User[]
-  locations Location[]
-  products  Product[]
-  orders    Order[]
-  categories Category[]
-  ingredients Ingredient[]
-  customers Customer[]
-  tables    Table[]
-  payments  Payment[]
+  users                User[]
+  locations            Location[]
+  products             Product[]
+  orders               Order[]
+  categories           Category[]
+  ingredients          Ingredient[]
+  customers            Customer[]
+  tables               Table[]
+  payments             Payment[]
   productVariantGroups ProductVariantGroup[]
   productVariants      ProductVariant[]
+  settings             Settings[]
 }
 
 model User {
@@ -82,6 +83,7 @@ model Location {
   updatedAt        DateTime          @updatedAt
   order            Int               @default(0)
   customers        Customer[]
+  settings         Settings[]
 
   @@index([order])
   @@map("locations")
@@ -144,8 +146,8 @@ model Category {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@index([order])
   @@unique([tenantId, name])
+  @@index([order])
 }
 
 model Ingredient {
@@ -164,8 +166,8 @@ model Ingredient {
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
-  @@index([locationId])
   @@unique([tenantId, name])
+  @@index([locationId])
 }
 
 model ProductIngredient {
@@ -233,10 +235,10 @@ model Order {
   deliveryFee     Float?
   subtotal        Float?
   total           Float?
-  isDeleted       Boolean?   @default(false)
+  isDeleted       Boolean?       @default(false)
   deletedAt       DateTime?
   deletedById     String?
-  deletedBy       User?      @relation("orderDeletedBy", fields: [deletedById], references: [id])
+  deletedBy       User?          @relation("orderDeletedBy", fields: [deletedById], references: [id])
 }
 
 enum OrderStatus {
@@ -363,6 +365,10 @@ model WhatsappChat {
 
 model Settings {
   id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  locationId   String
+  location     Location @relation(fields: [locationId], references: [id])
   aiName       String   @default("Sandra")
   aiGender     String   @default("female")
   aiEnabled    Boolean  @default(false)
@@ -371,6 +377,10 @@ model Settings {
   deliveryFee  Float?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, locationId])
+  @@index([tenantId])
+  @@index([locationId])
 }
 
 model ProductVariantGroup {
@@ -421,8 +431,5 @@ model Customer {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  @@index([phone])
-  @@index([locationId])
-  @@unique([tenantId, phone])
   @@unique([phone, locationId, tenantId], name: "phone_locationId_tenantId")
 }

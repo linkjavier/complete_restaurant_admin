@@ -54,8 +54,8 @@ export class ConversationService {
   }
 
   private async createSystemMessage(context: ConversationContext): Promise<OpenAI.Chat.ChatCompletionMessageParam> {
-    const aiSettings = await this.settingsService.getAISettings();
-    const businessSettings = await this.settingsService.getBusinessSettings();
+    const aiSettings = await this.settingsService.getAISettings(context.tenantId, context.locationId);
+    const businessSettings = await this.settingsService.getBusinessSettings(context.tenantId, context.locationId);
     const businessName = businessSettings.name;
 
     if (context.chatType === 'admin') {

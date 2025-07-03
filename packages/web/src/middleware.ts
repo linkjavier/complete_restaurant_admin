@@ -5,6 +5,19 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
   const { pathname } = request.nextUrl;
 
+  // Detectar subdominio ignorando el puerto
+  const hostHeader = request.headers.get('host') || '';
+  const host = hostHeader.split(':')[0]; // Ignora el puerto
+  const parts = host.split('.');
+  // Para localhost, el subdominio es parts[0] si hay al menos 2 partes y la última es 'localhost'
+  const isLocalhost = host.endsWith('localhost');
+  const hasSubdomain = isLocalhost && parts.length >= 2 && parts[0] !== 'localhost';
+
+  // Si hay subdominio y la ruta es '/', redirigir a /auth/login
+  if (hasSubdomain && pathname === '/') {
+    return NextResponse.redirect(new URL('/auth/login', request.url));
+  }
+
   // Public paths that don't require authentication
   const publicPaths = [ '/',
                         '/auth/login',

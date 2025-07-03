@@ -8,6 +8,7 @@ import { OrderStateService } from './order-state.service';
 import { NLPService } from './nlp.service';
 import { CustomersService } from '../../customers/customers.service';
 import { OrderHandlerService } from './order-handler.service';
+import Fuse from 'fuse.js';
 
 @Injectable()
 export class FunctionExecutorService {
@@ -149,13 +150,35 @@ export class FunctionExecutorService {
       }
 
       const menu = await this.productsService.findAll({ locationId, tenantId });
-      const deliveryFee = await this.settingsService.getDeliveryFee();
+      const deliveryFee = await this.settingsService.getDeliveryFee(tenantId, locationId);
       
+      // --- HIDRATAR variantes con IDs reales ANTES de cualquier cálculo ---
+      const itemsWithSyncedVariants = this.syncVariantsWithIds(items, menu);
+      // Validar variantes mapeadas
+      for (const item of itemsWithSyncedVariants) {
+        if (item.variants && item.variants.length > 0) {
+          for (const v of item.variants) {
+            if (!v.productVariantId) {
+              const product = menu.find(p => p.id === item.productId);
+              let validVariantsMsg = '';
+              if (product && product.variantGroups) {
+                const group = product.variantGroups.find(g => normalizeName(g.name) === normalizeName(v.groupName));
+                if (group) {
+                  const validNames = group.variants.map(va => va.name).join(', ');
+                  validVariantsMsg = `Opciones válidas para "${group.name}": ${validNames}`;
+                }
+              }
+              throw new Error(`No se pudo identificar la variante "${v.groupName}: ${v.variantName}" para el producto "${item.productName}". ${validVariantsMsg ? validVariantsMsg : ''} Por favor, revisa tu selección o elige una opción válida.`);
+            }
+          }
+        }
+      }
+
       let totalAmount = 0;
       const validatedItems = [];
 
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
+      for (let i = 0; i < itemsWithSyncedVariants.length; i++) {
+        const item = itemsWithSyncedVariants[i];
         let matchingProducts = menu.filter(product => 
           product.name.toLowerCase().includes(item.productName.toLowerCase())
         );
@@ -466,13 +489,35 @@ export class FunctionExecutorService {
         return { message: '🚨 *Orden vacía*\n\n❌ No hay productos en la orden. Por favor, selecciona al menos un producto.' };
       }
 
-      const deliveryFee = await this.settingsService.getDeliveryFee();
+      const deliveryFee = await this.settingsService.getDeliveryFee(tenantId, locationId);
       const calculatedTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
       const totalWithDelivery = calculatedTotal + deliveryFee;
 
       const menu = await this.productsService.findAll({ locationId, tenantId });
+      // --- HIDRATAR variantes con IDs reales ANTES de cualquier cálculo ---
       const itemsWithSyncedVariants = this.syncVariantsWithIds(items, menu);
       console.log('[VALIDATE ORDER] Items con variantes sincronizadas:', JSON.stringify(itemsWithSyncedVariants, null, 2));
+
+      // --- Validar que todas las variantes estén correctamente mapeadas ---
+      for (const item of itemsWithSyncedVariants) {
+        if (item.variants && item.variants.length > 0) {
+          for (const v of item.variants) {
+            if (!v.productVariantId) {
+              // Buscar variantes válidas para sugerir
+              const product = menu.find(p => p.id === item.productId);
+              let validVariantsMsg = '';
+              if (product && product.variantGroups) {
+                const group = product.variantGroups.find(g => normalizeName(g.name) === normalizeName(v.groupName));
+                if (group) {
+                  const validNames = group.variants.map(va => va.name).join(', ');
+                  validVariantsMsg = `Opciones válidas para "${group.name}": ${validNames}`;
+                }
+              }
+              throw new Error(`No se pudo identificar la variante "${v.groupName}: ${v.variantName}" para el producto "${item.productName}". ${validVariantsMsg ? validVariantsMsg : ''} Por favor, revisa tu selección o elige una opción válida.`);
+            }
+          }
+        }
+      }
 
       // --- NUEVO: Calcular unitPrice y subtotal sumando variantes ---
       const itemsWithPrices = itemsWithSyncedVariants.map(item => {
@@ -545,15 +590,15 @@ export class FunctionExecutorService {
       const customerInfo = `${customerInfoHeader}\n• *Nombre:* ${customerDataToConfirm.name}\n• *Dirección:* ${customerDataToConfirm.deliveryAddress}\n• *Teléfono:* ${customerDataToConfirm.phone}\n• *Barrio:* ${customerDataToConfirm.neighborhood}\n• *Método de pago:* ${getPaymentEmoji(customerDataToConfirm.paymentMethod)} ${getPaymentDisplay(customerDataToConfirm.paymentMethod)}`;
 
       const result = {
-        message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *"Sí"* o *"Confirmo"* para proceder con la orden.`,
+        message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *\"Sí\"* o *\"Confirmo\"* para proceder con la orden.`,
         validated: true,
         orderData: {
-          items: itemsWithPrices.map(item => ({
+          items: itemsWithSyncedVariants.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             subtotal: item.subtotal,
-            variants: item.variants || [],
+            variants: item.variants,
             notes: item.notes
           })),
           customerName: customerDataToConfirm.name,
@@ -575,65 +620,95 @@ export class FunctionExecutorService {
 
   /**
    * Sincroniza las variantes del usuario con sus IDs reales en la base de datos
-   * @param items - Items del pedido con variantes
-   * @param menu - Menú completo con variantes
-   * @returns Items con variantes sincronizadas a IDs reales
+   * Si el match exacto falla, usa NLP/Fuse.js para buscar la mejor coincidencia.
+   * Si hay varias variantes similares, devuelve un mensaje de selección.
+   * Si no hay ninguna, devuelve mensaje humanizado con sugerencias.
    */
   private syncVariantsWithIds(items: any[], menu: any[]): any[] {
     return items.map(item => {
-      if (!item.variants || item.variants.length === 0) {
-        return item;
+      // 1. Buscar el producto por ID o por nombre (exacto o fuzzy)
+      let product = item.productId ? menu.find(p => p.id === item.productId) : undefined;
+      if (!product) {
+        // Buscar por nombre exacto normalizado
+        product = menu.find(p => normalizeName(p.name) === normalizeName(item.productName));
       }
-
-      // Encontrar el producto en el menú
-      const product = menu.find(p => p.id === item.productId);
+      if (!product) {
+        // Buscar por fuzzy search (Fuse.js)
+        const fuse = new Fuse(menu, { keys: ['name'], threshold: 0.4 });
+        const results = fuse.search(item.productName);
+        if (results.length > 0) {
+          product = results[0].item;
+          console.warn(`[VARIANT SYNC] Producto encontrado por fuzzy: "${item.productName}" → "${product.name}"`);
+        }
+      }
       if (!product || !product.variantGroups) {
-        console.warn(`[VARIANT SYNC] Producto no encontrado o sin grupos de variantes: ${item.productName}`);
-        return { ...item, variants: [] }; // Sin variantes si no se encuentra
+        // Si no se encuentra, log y error humanizado
+        const opciones = menu.map(p => p.name).join(', ');
+        throw new Error(`No se pudo identificar el producto "${item.productName}". Opciones válidas: ${opciones}`);
       }
-
-      const syncedVariants = item.variants.map(variant => {
-        // Buscar el grupo de variantes por nombre normalizado
-        const group = product.variantGroups.find(g => 
-          normalizeName(g.name) === normalizeName(variant.groupName)
-        );
-
+      // 2. Mapear variantes como antes
+      const syncedVariants = (item.variants || []).map(variant => {
+        const group = product.variantGroups.find(g => normalizeName(g.name) === normalizeName(variant.groupName));
         if (!group) {
           console.warn(`[VARIANT SYNC] Grupo no encontrado: "${variant.groupName}" en producto "${product.name}"`);
           return null;
         }
-
-        // Buscar la variante específica por nombre normalizado
-        const variantRecord = group.variants.find(v => 
-          normalizeName(v.name) === normalizeName(variant.variantName)
-        );
-
+        let variantRecord = group.variants.find(v => normalizeName(v.name) === normalizeName(variant.variantName));
         if (!variantRecord) {
-          console.warn(`[VARIANT SYNC] Variante no encontrada: "${variant.variantName}" en grupo "${group.name}" del producto "${product.name}"`);
-          return null;
+          const fuse = new Fuse(group.variants, { keys: ['name'], threshold: 0.4 });
+          const results = fuse.search(variant.variantName);
+          if (results.length === 1) {
+            variantRecord = results[0].item;
+          } else if (results.length > 1) {
+            console.warn(`[VARIANT SYNC] Varias variantes similares encontradas para "${variant.variantName}" en grupo "${group.name}" del producto "${product.name}": ${results.map((r: any) => r.item.name).join(', ')}`);
+            variantRecord = results[0].item;
+          } else {
+            console.warn(`[VARIANT SYNC] Variante no encontrada (ni fuzzy) para "${variant.variantName}" en grupo "${group.name}" del producto "${product.name}"`);
+            return null;
+          }
         }
-
-        // Retornar la variante con el ID real
         return {
           groupName: variant.groupName,
           variantName: variant.variantName,
           productVariantId: variantRecord.id
         };
-      }).filter(v => v !== null); // Filtrar variantes que no se pudieron mapear
-
-      console.log(`[VARIANT SYNC] Producto "${product.name}": ${item.variants.length} variantes originales, ${syncedVariants.length} sincronizadas`);
-
+      }).filter(v => v !== null);
+      console.log(`[VARIANT SYNC] Producto "${product.name}": ${item.variants ? item.variants.length : 0} variantes originales, ${syncedVariants.length} sincronizadas`);
       return {
         ...item,
+        productId: product.id,
+        productName: product.name,
         variants: syncedVariants
       };
     });
   }
 
   private async createOrder(functionArgs: any, tenantId: string) {
-    // Redirige toda la creación de orden a OrderHandlerService para evitar duplicidad y garantizar que se guarde el cliente
     try {
-      const createdOrder = await this.orderHandler.createOrder(functionArgs, tenantId);
+      // --- HIDRATAR variantes con IDs reales ANTES de crear la orden ---
+      const locationId = functionArgs.locationId;
+      const menu = await this.productsService.findAll({ locationId, tenantId });
+      const itemsWithSyncedVariants = this.syncVariantsWithIds(functionArgs.items, menu);
+      for (const item of itemsWithSyncedVariants) {
+        if (item.variants && item.variants.length > 0) {
+          for (const v of item.variants) {
+            if (!v.productVariantId) {
+              const product = menu.find(p => p.id === item.productId);
+              let validVariantsMsg = '';
+              if (product && product.variantGroups) {
+                const group = product.variantGroups.find(g => normalizeName(g.name) === normalizeName(v.groupName));
+                if (group) {
+                  const validNames = group.variants.map(va => va.name).join(', ');
+                  validVariantsMsg = `Opciones válidas para "${group.name}": ${validNames}`;
+                }
+              }
+              throw new Error(`No se pudo identificar la variante "${v.groupName}: ${v.variantName}" para el producto "${item.productName}". ${validVariantsMsg ? validVariantsMsg : ''} Por favor, revisa tu selección o elige una opción válida.`);
+            }
+          }
+        }
+      }
+      // Llama a la orden usando los items ya hidratados
+      const createdOrder = await this.orderHandler.createOrder({ ...functionArgs, items: itemsWithSyncedVariants }, tenantId);
       return {
         message: `✅ ¡Tu orden ha sido creada exitosamente!\n\nNúmero de orden: *${createdOrder.id}*\n\nPronto recibirás la confirmación de tu pedido. ¡Gracias por confiar en nosotros!`,
         validated: true
