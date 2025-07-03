@@ -1,13 +1,25 @@
 function getApiUrl() {
-  if (typeof window === 'undefined') return 'http://localhost:3000'; // SSR fallback
-  const [subdomain, ...rest] = window.location.host.split('.');
-  const backendPort = '3000';
-  // Si el host es "localhost" (sin subdominio), fallback a localhost:3000
-  if (rest.join('.') === 'localhost' || window.location.host === 'localhost:3000') {
-    return `http://localhost:${backendPort}`;
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   }
-  // Si hay subdominio, úsalo para la API
-  return `http://${subdomain}.localhost:${backendPort}`;
+  const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const [subdomain, ...rest] = window.location.host.split('.');
+
+  // Si estamos en localhost (sin subdominio)
+  if (rest.join('.') === 'localhost' || window.location.host === 'localhost:3000') {
+    return `http://localhost:3000`;
+  }
+
+  // Si hay subdominio y estamos en producción
+  if (subdomain && backendBase) {
+    // Elimina el protocolo de backendBase para evitar doble https://
+    const base = backendBase.replace(/^https?:\/\//, '');
+    const protocol = backendBase.startsWith('https://') ? 'https://' : 'http://';
+    return `${protocol}${subdomain}.${base}`;
+  }
+
+  // Fallback
+  return backendBase;
 }
 
 export const API_URL = getApiUrl();
