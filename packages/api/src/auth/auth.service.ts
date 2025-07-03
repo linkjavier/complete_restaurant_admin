@@ -14,15 +14,20 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string, tenantId: string): Promise<LoginUser | null> {
-    console.log("Validando")
+    console.log("[validateUser] tenantId:", tenantId, "email:", email);
     const user = await this.prisma.user.findUnique({ where: { tenantId_email: { tenantId, email } } });
-    if (user && (await bcrypt.compare(password, user.password))) {
-      return {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        locationId: user.locationId,
-      };
+    console.log("[validateUser] user found:", !!user, user ? user.email : null);
+    if (user) {
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      console.log("[validateUser] password match:", passwordMatch);
+      if (passwordMatch) {
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          locationId: user.locationId,
+        };
+      }
     }
     return null;
   }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/use-toast';
+import { API_URL } from '@/lib/api';
 
 interface UseOrderSocketReturn {
   socket: Socket | null;
@@ -22,7 +23,7 @@ export function useOrderSocket(): UseOrderSocketReturn {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || API_URL;
 
     const initSocket = () => {
       console.log('Initializing orders socket connection to', SOCKET_URL);

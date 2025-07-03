@@ -12,40 +12,41 @@ export class TenantMiddleware implements NestMiddleware {
       console.log('[TenantMiddleware] originalUrl:', req.originalUrl, 'path:', req.path);
 
       // Permitir acceso libre a cualquier petición que contenga /tenants, /auth/register, /auth/login, /locations, /categories, /products o /pos/tables
-      if (
-        req.originalUrl.includes('/tenants') ||
-        req.originalUrl.includes('/auth/register') ||
-        req.originalUrl.includes('/auth/login') ||
-        req.originalUrl.includes('/locations') ||
-        req.originalUrl.includes('/categories') ||
-        req.originalUrl.includes('/products') ||
-        req.originalUrl.includes('/pos/tables') ||
-        req.originalUrl.includes('/settings/business')
-      ) {
-        // Asignar tenantId por defecto para pruebas/seed
-        const tenant = await this.prisma.tenant.findFirst();
-        if (tenant) {
-          (req as any).tenantId = tenant.id;
-        }
-        return next();
-      }
+      // (Ya no asignar tenantId por defecto aquí, solo dejar pasar para que se resuelva por subdominio)
+      // Elimina el bloque que asigna el primer tenant y el return next();
 
+      // Log para depuración del header Host
+      console.log('[TenantMiddleware] Host header:', req.headers.host);
       // Extraer subdominio (empresa1.tuapp.com)
       const hostHeader = req.headers.host;
       const host = hostHeader ? hostHeader.split(':')[0] : '';
       const parts = host.split('.');
-      const subdomain = parts.length > 2 ? parts[0] : null;
+      const subdomain = parts.length >= 2 ? parts[0].toLowerCase() : null;
 
       if (!subdomain) {
-        throw new UnauthorizedException('No subdomain found in request');
+        // En vez de lanzar excepción, responde con 401 y termina la request
+        return res.status(401).json({
+          message: 'No subdomain found in request',
+          error: 'Unauthorized',
+          statusCode: 401,
+        });
       }
 
-      // Buscar el tenantId en la base de datos
+      // Buscar el tenantId en la base de datos (normalizando a minúsculas)
       const tenant = await this.prisma.tenant.findFirst({ where: { name: subdomain } });
       if (!tenant) {
-        throw new UnauthorizedException('Tenant not found for subdomain');
+        // Intentar buscar ignorando mayúsculas/minúsculas
+        const tenantInsensitive = await this.prisma.tenant.findFirst({ where: { name: { equals: subdomain, mode: 'insensitive' } } });
+        if (!tenantInsensitive) {
+          return res.status(401).json({
+            message: 'Tenant not found for subdomain',
+            error: 'Unauthorized',
+            statusCode: 401,
+          });
+        }
+        (req as any).tenantId = tenantInsensitive.id;
+        return next();
       }
-
       // Adjuntar tenantId a la request
       (req as any).tenantId = tenant.id;
       next();

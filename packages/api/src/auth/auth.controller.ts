@@ -66,7 +66,6 @@ export class AuthController {
 
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Req() req: any): Promise<LoginResponse> {
-    console.log("Aqui vamos ejecutando LOGIN INVALIDO")
     return this.authService.login(req.user);
   }
 

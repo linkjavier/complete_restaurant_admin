@@ -26,6 +26,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Si el usuario ya está autenticado y accede a la landing o login, redirigir al dashboard
+  if (token && (pathname === '/' || pathname === '/auth/login')) {
+    return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+  }
+
   // Si hay token, permite el acceso
   return NextResponse.next();
 }

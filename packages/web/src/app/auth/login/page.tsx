@@ -89,10 +89,8 @@ export default function LoginPage() {
       localStorage.setItem('token', data.access_token);
       // Guardar el token como cookie accesible por el middleware y subdominios
       document.cookie = `token=${data.access_token}; path=/; max-age=604800; domain=.localhost`;
-      // Esperar a que la cookie se guarde antes de redirigir
-      setTimeout(() => {
-        window.location.href = '/admin/dashboard';
-      }, 100);
+      // Redirigir al dashboard de forma fluida
+      router.push('/admin/dashboard');
     } catch (error) {
       console.error('[LoginPage] Login error:', error);
       toast({
