@@ -431,6 +431,15 @@ chmod +x ./scripts/seed-database-paola.sh && ./scripts/seed-database-paola.sh
 # Script para manejar creación de productos con variantes. Funciona con export 3
 chmod +x ./scripts/seed-database-paola3.sh && ./scripts/seed-database-paola3.sh
 
+chmod +x ./scripts/seed_paola_multytenancy.sh && ./scripts/seed_paola_multytenancy.sh
+
+
+sudo yum update -y
+sudo yum install -y python3 python3-pip
+pip3 install --user csvkit # Para el script multytenancy
+pip3 install --upgrade csvkit
+export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
+
 # Seed database with images
 chmod +x ./scripts/seed-database-with-images.sh && ./scripts/seed-database-with-images.sh
 ```

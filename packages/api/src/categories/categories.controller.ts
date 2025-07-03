@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Req,
+  Query,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { Category as CategoryModel, Prisma } from '@prisma/client';
@@ -37,9 +38,16 @@ export class CategoriesController {
   }
 
   @Get()
-  async getCategories(@Req() req: Request): Promise<CategoryModel[]> {
+  async getCategories(
+    @Req() req: Request,
+    @Query('name') name?: string,
+    @Query('locationId') locationId?: string,
+  ): Promise<CategoryModel[]> {
     const tenantId = (req as any).tenantId;
-    return this.categoriesService.categories({ where: { tenantId } });
+    const where: any = { tenantId };
+    if (name) where.name = name;
+    if (locationId) where.locationId = locationId;
+    return this.categoriesService.categories({ where });
   }
 
   @Get(':id')
