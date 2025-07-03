@@ -707,8 +707,13 @@ export class FunctionExecutorService {
           }
         }
       }
-      // Llama a la orden usando los items ya hidratados
-      const createdOrder = await this.orderHandler.createOrder({ ...functionArgs, items: itemsWithSyncedVariants }, tenantId);
+      // --- Refuerzo: asegurar deliveryFee ---
+      let deliveryFee = functionArgs.deliveryFee;
+      if (typeof deliveryFee !== 'number') {
+        deliveryFee = await this.settingsService.getDeliveryFee(tenantId, locationId);
+      }
+      // Llama a la orden usando los items ya hidratados y deliveryFee seguro
+      const createdOrder = await this.orderHandler.createOrder({ ...functionArgs, items: itemsWithSyncedVariants, deliveryFee }, tenantId);
       return {
         message: `✅ ¡Tu orden ha sido creada exitosamente!\n\nNúmero de orden: *${createdOrder.id}*\n\nPronto recibirás la confirmación de tu pedido. ¡Gracias por confiar en nosotros!`,
         validated: true
