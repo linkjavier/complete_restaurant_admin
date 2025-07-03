@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitch } from "@/components/theme-switch";
 import React, { useEffect, useState } from "react"
+import { API_URL } from '@/lib/api';
 
 const features = [
   {
@@ -55,7 +56,7 @@ export default function HomePage() {
   useEffect(() => {
     const fetchBusiness = async () => {
       try {
-        const res = await fetch("/api/settings/business")
+        const res = await fetch(`${API_URL}/settings/business`)
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")

@@ -61,15 +61,14 @@ export class IngredientsService {
     }
   }
 
-  async findAll() {
+  async findAll(params?: { where?: any }) {
     try {
-      // Obtener todos los ingredientes usando Prisma ORM
       const ingredients = await this.prisma.ingredient.findMany({
+        where: params?.where,
         include: {
           location: true,
         },
       });
-      
       return ingredients;
     } catch (error) {
       this.logger.error(`Error finding all ingredients: ${error.message}`);

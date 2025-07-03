@@ -60,6 +60,8 @@ export interface Table {
 export interface Location {
   id: string;
   name: string;
+  address: string;
+  phone: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -272,7 +274,7 @@ export async function getLocations(): Promise<Location[]> {
   return response.json();
 }
 
-export async function createLocation(data: { name: string }): Promise<Location> {
+export async function createLocation(data: { name: string; address: string; phone: string }): Promise<Location> {
   const response = await fetch(`${API_URL}/locations`, {
     method: 'POST',
     headers: getAuthHeaders(),
@@ -533,7 +535,7 @@ export async function createOrder(data: any) {
     return { ...item, variants: [] };
   });
   const payload = { ...data, items };
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+  const response = await fetch(`${API_URL}/orders`, {
     method: 'POST',
     headers: {
       ...getAuthHeaders(),
@@ -681,7 +683,7 @@ export async function getActiveOrders(tableId: string) {
     //   }
     // });
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?tableId=${tableId}`);
+    const response = await fetch(`${API_URL}/orders?tableId=${tableId}`);
 
     if (!response.ok) {
       // if (response.status === 401) {

@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { TablesService } from './tables.service';
 import { Table as TableModel, Prisma } from '@prisma/client';
@@ -17,6 +18,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { Public } from '../auth/decorators/public.decorator';
+import { Request } from 'express';
 
 
 @ApiTags('tables')
@@ -41,8 +43,9 @@ export class TablesController {
   @Roles('SUPER_ADMIN', 'ADMIN')
   @ApiOperation({ summary: 'Get all tables' })
   @ApiResponse({ status: 200, description: 'Return all tables' })
-  async findAll() {
-    return this.tablesService.findAll();
+  async findAll(@Req() req: Request) {
+    const tenantId = (req as any).tenantId;
+    return this.tablesService.findAll({ where: { tenantId } });
   }
 
   @Public()

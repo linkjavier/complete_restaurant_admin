@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { ThemeSwitch } from "@/components/theme-switch"
 import Head from 'next/head';
+import { API_URL } from '@/lib/api';
 
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
@@ -59,7 +60,7 @@ export default function LoginPage() {
   useEffect(() => {
     const fetchBusiness = async () => {
       try {
-        const res = await fetch("/api/settings/business");
+        const res = await fetch(`${API_URL}/settings/business`);
         if (res.ok) {
           const data = await res.json();
           setBusinessIcon(data.logo || "");

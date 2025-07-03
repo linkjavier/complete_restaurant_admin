@@ -6,10 +6,12 @@ import {
   Patch,
   Param,
   Delete,
+  Req,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { Category as CategoryModel, Prisma } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 
 @ApiTags('categories')
 @Controller('categories')
@@ -18,12 +20,14 @@ export class CategoriesController {
 
   @Post()
   async createCategory(
-    @Body() categoryData: { name: string; description?: string; tenantId: string },
+    @Body() categoryData: { name: string; description?: string },
+    @Req() req: Request,
   ): Promise<CategoryModel> {
+    const tenantId = (req as any).tenantId;
     return this.categoriesService.createCategory({
       name: categoryData.name,
       description: categoryData.description,
-      tenantId: categoryData.tenantId,
+      tenantId,
     });
   }
 
@@ -33,8 +37,9 @@ export class CategoriesController {
   }
 
   @Get()
-  async getCategories(): Promise<CategoryModel[]> {
-    return this.categoriesService.categories({});
+  async getCategories(@Req() req: Request): Promise<CategoryModel[]> {
+    const tenantId = (req as any).tenantId;
+    return this.categoriesService.categories({ where: { tenantId } });
   }
 
   @Get(':id')

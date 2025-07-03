@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { getTable, Table } from "@/lib/api"
+import { getTable, Table, API_URL } from "@/lib/api"
 import { Menu } from "@/components/table/menu"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -35,7 +35,7 @@ export default function TablePage() {
 
     const fetchBusiness = async () => {
       try {
-        const res = await fetch("/api/settings/business")
+        const res = await fetch(`${API_URL}/settings/business`)
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")

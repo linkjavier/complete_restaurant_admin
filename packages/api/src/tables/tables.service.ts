@@ -200,8 +200,9 @@ export class TablesService {
     return notifications[0];
   }
 
-  async findAll(): Promise<Table[]> {
+  async findAll(params?: { where?: Prisma.TableWhereInput }): Promise<Table[]> {
     return this.prisma.table.findMany({
+      where: params?.where,
       include: {
         location: true,
       },

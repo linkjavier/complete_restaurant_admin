@@ -25,6 +25,7 @@ import {
 import { useOrderSocket } from "@/hooks/use-order-socket"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { API_URL } from '@/lib/api'
 
 // Tipos para las órdenes
 type OrderStatus = "PENDING" | "IN_PROGRESS" | "READY" | "CANCELLED" | "PAID"
@@ -241,7 +242,7 @@ export function OrdersManager() {
   // Updated fetchOrders function to include the required kitchen=true query parameter
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?kitchen=false`, {
+      const response = await fetch(`${API_URL}/orders?kitchen=false`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -281,7 +282,7 @@ export function OrdersManager() {
 
   const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/status`, {
+      const response = await fetch(`${API_URL}/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -312,7 +313,7 @@ export function OrdersManager() {
 
   const handleProcessPayment = async (orderId: string, paymentMethod: PaymentMethod) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/payments/process`, {
+      const response = await fetch(`${API_URL}/payments/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -347,7 +348,7 @@ export function OrdersManager() {
 
   const handlePrintReceipt = async (orderId: string) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/receipt`, {
+      const response = await fetch(`${API_URL}/orders/${orderId}/receipt`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -463,7 +464,7 @@ export function OrdersManager() {
   // Fetch deleted orders
   const fetchDeletedOrders = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/deleted/list?locationId=${user?.locationId || ''}`, {
+      const response = await fetch(`${API_URL}/orders/deleted/list?locationId=${user?.locationId || ''}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -482,7 +483,7 @@ export function OrdersManager() {
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/delete`, {
+      const response = await fetch(`${API_URL}/orders/${orderId}/delete`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

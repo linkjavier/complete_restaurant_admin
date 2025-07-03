@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
+import { API_URL } from '@/lib/api'
 
 // Función para renderizar texto como WhatsApp
 const renderWhatsAppText = (text: string) => {
@@ -534,7 +535,7 @@ export default function AIManagerPage() {
   const handleAIToggle = async (checked: boolean) => {
     setIsSavingSettings(true)
     try {
-      const response = await fetch("/api/settings/ai", {
+      const response = await fetch(`${API_URL}/settings/ai`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -563,7 +564,7 @@ export default function AIManagerPage() {
   useEffect(() => {
     const loadAISettings = async () => {
       try {
-        const response = await fetch("/api/settings/ai")
+        const response = await fetch(`${API_URL}/settings/ai`)
         if (!response.ok) {
           throw new Error("Failed to load settings")
         }

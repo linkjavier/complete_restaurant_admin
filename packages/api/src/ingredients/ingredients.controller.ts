@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { IngredientsService } from './ingredients.service';
 import { Ingredient as IngredientModel, Prisma } from '@prisma/client';
@@ -15,6 +16,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Request } from 'express';
 
 @ApiTags('ingredients')
 @Controller('ingredients')
@@ -28,8 +30,9 @@ export class IngredientsController {
   }
 
   @Get()
-  findAll() {
-    return this.ingredientsService.findAll();
+  findAll(@Req() req: Request) {
+    const tenantId = (req as any).tenantId;
+    return this.ingredientsService.findAll({ where: { tenantId } });
   }
 
   @Get(':id')

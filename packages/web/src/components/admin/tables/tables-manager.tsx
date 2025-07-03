@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Trash2, Pencil, ExternalLink, QrCode, Download, X, ChevronUp } from "lucide-react"
-import { getTables, createTable, deleteTable, updateTable, Table, getOrders } from "@/lib/api"
+import { getTables, createTable, deleteTable, updateTable, Table, getOrders, API_URL } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { getLocations, Location } from "@/lib/api"
 import { QRCodeSVG } from 'qrcode.react'
@@ -112,7 +112,7 @@ export function TablesManager() {
 
   const fetchActiveOrders = async () => {
     try {
-      const orders = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?kitchen=true`, {
+      const orders = await fetch(`${API_URL}/orders?kitchen=true`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
@@ -136,7 +136,7 @@ export function TablesManager() {
 
   const fetchLastOrders = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?kitchen=true`, {
+      const response = await fetch(`${API_URL}/orders?kitchen=true`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
@@ -167,7 +167,7 @@ export function TablesManager() {
 
   const fetchTableOrders = async (tableId: string) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?tableId=${tableId}`, {
+      const response = await fetch(`${API_URL}/orders?tableId=${tableId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'

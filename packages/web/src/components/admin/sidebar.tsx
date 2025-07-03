@@ -34,6 +34,7 @@ import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { ThemeSwitch } from "@/components/theme-switch"
 import "@/app/sidebar-scrollbar.css"
+import { API_URL } from '@/lib/api'
 
 interface SidebarProps {
   isMobile?: boolean
@@ -141,7 +142,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     // Obtener logo y nombre del negocio desde la API
     const fetchBusiness = async () => {
       try {
-        const res = await fetch("/api/settings/business")
+        const res = await fetch(`${API_URL}/settings/business`)
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")
