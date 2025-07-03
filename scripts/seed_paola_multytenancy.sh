@@ -5,7 +5,7 @@ API_DOMAIN_ROOT="localhost:3000" # Backend directo para registro (sin subdominio
 API_DOMAIN_SUB="paola.localhost:3000" # Subdominio para el resto
 API_URL_ROOT="http://$API_DOMAIN_ROOT"
 API_URL_SUB="http://$API_DOMAIN_SUB"
-PRODUCTS_CSV="$(dirname "$0")/productos_completos_20250623_020509.csv"
+PRODUCTS_CSV="$(dirname "$0")/productos_completos3_20250703_060323.csv"
 
 # 1. Registrar usuario (SUPER_ADMIN) y crear tenant automáticamente
 TENANT_NAME="paola"
@@ -150,7 +150,12 @@ jq -c '.[]' "$PRODUCTS_JSON" | while read -r product; do
   if ! [[ "$price" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
     price=0
   fi
-  PRODUCT_PAYLOAD=$(jq -n --arg name "$name" --arg price "$price" --arg desc "$description" --arg cat "$categoryId" --arg loc "$LOCATION_ID" --arg img "$imageUrl" '{name: $name, price: ($price|tonumber), description: $desc, categoryId: $cat, locationId: $loc, image: $img}')
+  # Construir el payload dinámicamente
+  if [ -n "$imageUrl" ] && [ "$imageUrl" != "null" ]; then
+    PRODUCT_PAYLOAD=$(jq -n --arg name "$name" --arg price "$price" --arg desc "$description" --arg cat "$categoryId" --arg loc "$LOCATION_ID" --arg img "$imageUrl" '{name: $name, price: ($price|tonumber), description: $desc, categoryId: $cat, locationId: $loc, image: $img}')
+  else
+    PRODUCT_PAYLOAD=$(jq -n --arg name "$name" --arg price "$price" --arg desc "$description" --arg cat "$categoryId" --arg loc "$LOCATION_ID" '{name: $name, price: ($price|tonumber), description: $desc, categoryId: $cat, locationId: $loc}')
+  fi
   RESPONSE=$(curl -s -X POST "$API_URL/products" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
