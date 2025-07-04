@@ -38,22 +38,22 @@ export class TenantMiddleware implements NestMiddleware {
         });
       }
 
-      // Buscar el tenantId en la base de datos (normalizando a minúsculas)
-      const tenant = await this.prisma.tenant.findFirst({ where: { name: subdomain } });
+      // Buscar el tenantId en la base de datos (insensible a mayúsculas/minúsculas)
+      const tenant = await this.prisma.tenant.findFirst({
+        where: {
+          name: {
+            equals: subdomain,
+            mode: 'insensitive',
+          },
+        },
+      });
       if (!tenant) {
-        // Intentar buscar ignorando mayúsculas/minúsculas
-        const tenantInsensitive = await this.prisma.tenant.findFirst({ where: { name: { equals: subdomain, mode: 'insensitive' } } });
-        if (!tenantInsensitive) {
-          return res.status(401).json({
-            message: 'Tenant not found for subdomain',
-            error: 'Unauthorized',
-            statusCode: 401,
-          });
-        }
-        (req as any).tenantId = tenantInsensitive.id;
-        return next();
+        return res.status(401).json({
+          message: 'Tenant not found for subdomain',
+          error: 'Unauthorized',
+          statusCode: 401,
+        });
       }
-      // Adjuntar tenantId a la request
       (req as any).tenantId = tenant.id;
       next();
     } catch (err) {
