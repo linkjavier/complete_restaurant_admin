@@ -8,6 +8,8 @@ export class TenantMiddleware implements NestMiddleware {
 
   async use(req: Request, res: Response, next: NextFunction) {
     try {
+      // LOG: Imprime todas las cabeceras relevantes para debug
+      console.log('[TenantMiddleware] HEADERS:', JSON.stringify(req.headers, null, 2));
       // DEBUG: imprime la URL real para ver cómo llega
       console.log('[TenantMiddleware] originalUrl:', req.originalUrl, 'path:', req.path);
 
@@ -20,6 +22,7 @@ export class TenantMiddleware implements NestMiddleware {
       const hostHeader = req.headers.host;
       const host = hostHeader ? hostHeader.split(':')[0] : '';
       if (allowedLocalhostPaths.includes(req.path)) {
+        console.log('[TenantMiddleware] Ruta permitida sin tenant:', req.path);
         return next();
       }
 
@@ -30,7 +33,7 @@ export class TenantMiddleware implements NestMiddleware {
       const subdomain = parts.length >= 2 ? parts[0].toLowerCase() : null;
 
       if (!subdomain) {
-        // En vez de lanzar excepción, responde con 401 y termina la request
+        console.log('[TenantMiddleware] No subdomain found. Host:', host);
         return res.status(401).json({
           message: 'No subdomain found in request',
           error: 'Unauthorized',
@@ -48,6 +51,7 @@ export class TenantMiddleware implements NestMiddleware {
         },
       });
       if (!tenant) {
+        console.log('[TenantMiddleware] Tenant not found for subdomain:', subdomain);
         return res.status(401).json({
           message: 'Tenant not found for subdomain',
           error: 'Unauthorized',
@@ -55,6 +59,7 @@ export class TenantMiddleware implements NestMiddleware {
         });
       }
       (req as any).tenantId = tenant.id;
+      console.log('[TenantMiddleware] tenantId asignado:', tenant.id, 'para subdominio:', subdomain);
       next();
     } catch (err) {
       console.error('TenantMiddleware error:', err);

@@ -179,15 +179,11 @@ export interface UpdateUserDto {
 
 const getTenantIdFromSubdomain = () => {
   if (typeof window === 'undefined') return null;
-  const host = window.location.hostname; // Usa hostname para evitar el puerto
+  const host = window.location.hostname; // Ej: gluonico.kutchenbrain.xyz
   const parts = host.split('.');
-  console.log('[getTenantIdFromSubdomain] host:', host, 'parts:', parts);
-  if (parts.length >= 2 && parts[1] === 'localhost') {
-    const tenantId = parts[0]; // 'paola' en paola.localhost
-    console.log('[getTenantIdFromSubdomain] tenantId found:', tenantId);
-    return tenantId;
+  if (parts.length >= 2) {
+    return parts[0]; // Siempre toma el subdominio
   }
-  console.log('[getTenantIdFromSubdomain] no tenantId found');
   return null;
 };
 
@@ -199,6 +195,7 @@ const getAuthHeaders = () => {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}),
   };
+  // LOG: Siempre muestra el tenantId y las cabeceras
   console.log('[getAuthHeaders] token:', token ? 'present' : 'missing', 'tenantId:', tenantId, 'headers:', headers);
   return headers;
 };
