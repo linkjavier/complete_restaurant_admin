@@ -5,26 +5,24 @@ function getApiUrl() {
   const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   const backendDomain = backendBase.replace(/^https?:\/\//, '');
   const backendProtocol = backendBase.startsWith('https://') ? 'https://' : 'http://';
-  const host = window.location.host;
-  const [subdomain, ...rest] = host.split('.');
+  const host = window.location.hostname; // gluonico.localhost o gluonico.kutchenbrain.xyz
+  const parts = host.split('.');
+  const subdomain = (parts.length > 2) ? parts[0] : (parts.length === 2 && parts[1] === 'localhost' ? parts[0] : null);
 
-  // LOCALHOST
-  if (host.endsWith('.localhost:3001') || host.endsWith('.localhost:3000') || host.endsWith('.localhost')) {
-    // Si hay subdominio (ej: paola.localhost:3001)
+  // LOCALHOST con subdominio (ej: gluonico.localhost:3001)
+  if (host.endsWith('.localhost') && subdomain) {
     return `http://${subdomain}.localhost:3000`;
   }
-  if (host === 'localhost:3000' || host === 'localhost:3001' || rest.join('.') === 'localhost') {
-    // Sin subdominio
+  // LOCALHOST sin subdominio
+  if (host === 'localhost' || host === 'localhost:3000' || host === 'localhost:3001') {
     return 'http://localhost:3000';
   }
-
-  // PRODUCCIÓN
-  // Si hay subdominio (ej: paola.kutchenbrain.xyz)
-  if (subdomain && rest.length > 1) {
+  // PRODUCCIÓN con subdominio (ej: gluonico.kutchenbrain.xyz)
+  if (subdomain && backendDomain) {
     return `${backendProtocol}${subdomain}.${backendDomain}`;
   }
-  // Sin subdominio
-  return backendBase;
+  // PRODUCCIÓN sin subdominio
+  return `${backendProtocol}${backendDomain}`;
 }
 
 export const API_URL = getApiUrl();
@@ -179,7 +177,7 @@ export interface UpdateUserDto {
 
 const getTenantIdFromSubdomain = () => {
   if (typeof window === 'undefined') return null;
-  const host = window.location.hostname; // Ej: gluonico.kutchenbrain.xyz
+  const host = window.location.hostname; // Ej: gluonico.kutchenbrain.xyz o gluonico.localhost
   const parts = host.split('.');
   if (parts.length >= 2) {
     return parts[0]; // Siempre toma el subdominio
@@ -187,16 +185,19 @@ const getTenantIdFromSubdomain = () => {
   return null;
 };
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+export const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const tenantId = getTenantIdFromSubdomain();
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}),
   };
-  // LOG: Siempre muestra el tenantId y las cabeceras
-  console.log('[getAuthHeaders] token:', token ? 'present' : 'missing', 'tenantId:', tenantId, 'headers:', headers);
+  if (!tenantId) {
+    console.warn('[getAuthHeaders] WARNING: No tenantId detected from subdomain! Host:', window.location.hostname);
+  } else {
+    console.log('[getAuthHeaders] tenantId:', tenantId, 'headers:', headers);
+  }
   return headers;
 };
 
