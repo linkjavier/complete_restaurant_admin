@@ -17,8 +17,8 @@ export class TenantMiddleware implements NestMiddleware {
       // (Ya no asignar tenantId por defecto aquí, solo dejar pasar para que se resuelva por subdominio)
       // Elimina el bloque que asigna el primer tenant y el return next();
 
-      // Permitir acceso libre a /auth/register y /auth/login en cualquier entorno
-      const allowedLocalhostPaths = ['/auth/register', '/auth/login'];
+      // Permitir acceso libre a /auth/register en cualquier entorno
+      const allowedLocalhostPaths = ['/auth/register'];
       const hostHeader = req.headers.host;
       const host = hostHeader ? hostHeader.split(':')[0] : '';
       if (allowedLocalhostPaths.includes(req.path)) {

@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { getAuthToken } from "@/lib/auth";
+import { getAuthHeaders } from "@/lib/api";
 import { getUser, User, API_URL } from "@/lib/api";
 import { useRouter } from 'next/navigation';
 
@@ -49,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ email, password }),
       });
       if (!response.ok) {

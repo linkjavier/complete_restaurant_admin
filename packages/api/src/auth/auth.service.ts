@@ -16,7 +16,7 @@ export class AuthService {
   async validateUser(email: string, password: string, tenantId: string): Promise<LoginUser | null> {
     console.log("[validateUser] tenantId:", tenantId, "email:", email);
     const user = await this.prisma.user.findUnique({ where: { tenantId_email: { tenantId, email } } });
-    console.log("[validateUser] user found:", !!user, user ? user.email : null);
+    console.log("[validateUser] user found:", !!user, user ? user.email : null, user ? user.tenantId : null);
     if (user) {
       const passwordMatch = await bcrypt.compare(password, user.password);
       console.log("[validateUser] password match:", passwordMatch);
@@ -27,7 +27,11 @@ export class AuthService {
           role: user.role,
           locationId: user.locationId,
         };
+      } else {
+        console.log("[validateUser] Password does not match for user:", email);
       }
+    } else {
+      console.log("[validateUser] No user found for email and tenantId:", email, tenantId);
     }
     return null;
   }
