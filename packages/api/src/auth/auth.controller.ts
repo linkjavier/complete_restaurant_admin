@@ -103,14 +103,6 @@ export class AuthController {
   })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   async register(@Body() registerDto: RegisterDto, @Req() req: Request): Promise<LoginResponse> {
-    // Solo permitir registro en localhost (sin subdominio)
-    const hostHeader = req.headers.host || '';
-    const host = hostHeader.split(':')[0];
-    const parts = host.split('.');
-    const isLocalhost = host === 'localhost';
-    if (!isLocalhost) {
-      throw new UnauthorizedException('Registration is only allowed from localhost');
-    }
     if (!registerDto['tenantName']) {
       throw new UnauthorizedException('tenantName is required');
     }

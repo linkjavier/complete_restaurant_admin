@@ -99,7 +99,13 @@ export default function HomePage() {
             <Link href="#funcionalidades">Ver funcionalidades</Link>
           </Button>
         </div>
-        <Image src="/assets/hero-restaurant-ai.svg" alt="Hero KutchenAI" width={500} height={320} className="rounded-xl shadow-xl" />
+        <Image
+          src="/assets/tablet.png"
+          alt="Mesero tomando pedido en tablet"
+          width={500}
+          height={320}
+          className="rounded-xl shadow-xl mb-8"
+        />
       </section>
 
       {/* Confianza */}
