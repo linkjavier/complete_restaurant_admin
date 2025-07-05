@@ -13,6 +13,9 @@ import { useAuth } from '@/hooks/use-auth';
 import { ThemeSwitch } from "@/components/theme-switch"
 import Head from 'next/head';
 import { API_URL } from '@/lib/api';
+import { Dialog } from '@/components/ui/dialog';
+import { useLanguage } from '@/hooks/use-language';
+import { translations } from '@/lib/translations';
 
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
@@ -46,6 +49,18 @@ function useMobileViewportHeight() {
   return vh;
 }
 
+function getSubdomain(hostname: string) {
+  // Ejemplo: negociojavier.localhost o negociojavier.127.0.0.1
+  const parts = hostname.split('.');
+  if (
+    (hostname.endsWith('localhost') || hostname.match(/\d+\.\d+\.\d+\.\d+/)) &&
+    parts.length > 2
+  ) {
+    return parts[0];
+  }
+  return null;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -56,6 +71,10 @@ export default function LoginPage() {
   const vh = useMobileViewportHeight();
   const [businessIcon, setBusinessIcon] = useState<string>("");
   const [businessName, setBusinessName] = useState<string>("Kutchen AI");
+  const [showSubdomainModal, setShowSubdomainModal] = useState(false);
+  const [subdomainInput, setSubdomainInput] = useState('');
+  const { language } = useLanguage();
+  const t = translations[language as keyof typeof translations] || translations.es;
 
   useEffect(() => {
     const fetchBusiness = async () => {
@@ -69,6 +88,14 @@ export default function LoginPage() {
       } catch {}
     };
     fetchBusiness();
+
+    // Detectar subdominio
+    if (typeof window !== 'undefined') {
+      const subdomain = getSubdomain(window.location.hostname);
+      if (!subdomain) {
+        setShowSubdomainModal(true);
+      }
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,6 +144,14 @@ export default function LoginPage() {
       });
       setIsLoading(false);
     }
+  };
+
+  const handleSubdomainNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subdomainInput) return;
+    // Redirigir a subdominio.localhost:3001/auth/login
+    const port = window.location.port ? `:${window.location.port}` : '';
+    window.location.href = `http://${subdomainInput}.localhost${port}/auth/login`;
   };
 
   return (
@@ -230,6 +265,40 @@ export default function LoginPage() {
           </Card>
         </div>
       </div>
+
+      {/* Modal de subdominio */}
+      {showSubdomainModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm transition-all duration-500">
+          <form
+            onSubmit={handleSubdomainNext}
+            className="flex flex-col items-center gap-6 w-full max-w-xs mx-auto animate-fade-in"
+          >
+            <Image
+              src={businessIcon || "/assets/kutchen_app_logo.png"}
+              alt="Logo KutchenAI"
+              width={96}
+              height={96}
+              className="mb-2"
+              priority
+            />
+            <h2 className="text-2xl font-bold text-center">{t.loginSubdomainTitle}</h2>
+            <Input
+              autoFocus
+              placeholder={t.loginSubdomainPlaceholder}
+              value={subdomainInput}
+              onChange={e => setSubdomainInput(e.target.value)}
+              className="text-center text-lg"
+              required
+            />
+            <Button type="submit" size="lg" className="w-full text-lg font-bold">{t.loginSubdomainButton}</Button>
+          </form>
+        </div>
+      )}
     </>
   );
 }
+
+// Animación fade-in para el modal
+// Agrega esto a tu CSS global o tailwind.config.js:
+// .animate-fade-in { @apply opacity-0 scale-95; animation: fadeIn 0.4s forwards; }
+// @keyframes fadeIn { to { opacity: 1; scale: 1; } }
