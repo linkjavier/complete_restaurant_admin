@@ -28,6 +28,7 @@ import {
 import { Cart } from "@/components/admin/pos/cart"
 import { ProductGrid, CategoryTitle } from "@/components/admin/pos/product-grid"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function PosPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -48,6 +49,7 @@ export default function PosPage() {
   const [activeOrders, setActiveOrders] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchData()
@@ -231,10 +233,17 @@ export default function PosPage() {
         }
       })
 
-      // Si es para llevar o domicilio, usar el locationId de cualquier mesa disponible
-      const locationId = orderType === "table" 
-        ? selectedTableData?.locationId 
-        : tables[0]?.locationId
+      // Usar locationId del usuario autenticado, o fallback a la primera mesa
+      const locationId = user?.locationId || tables[0]?.locationId
+      if (!locationId) {
+        toast({
+          title: "Error",
+          description: "No se pudo determinar la ubicación. Por favor, asegúrate de tener una ubicación asignada o al menos una mesa creada.",
+          variant: "destructive",
+        })
+        setSubmitting(false)
+        return
+      }
 
       const orderData = {
         tableId: orderType === "table" ? selectedTable : undefined,

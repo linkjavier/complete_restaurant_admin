@@ -145,10 +145,9 @@ export class OrdersGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       const clientCount = this.clientsMap.get(locationId)?.size || 0;
       this.logger.log(`Event new_order_created sent to ${clientCount} clients in kitchen-${locationId}`);
       
-      // If no clients in room, broadcast to all in namespace as fallback
+      // No broadcast global. Si no hay clientes, solo loguear.
       if (clientCount === 0) {
-        this.logger.log('No clients in kitchen room, broadcasting to all clients in namespace');
-        this.server.emit('new_order_created', order);
+        this.logger.log('No clients in kitchen room for this location. No event broadcasted globally.');
       }
     } catch (error) {
       this.logger.error(`Error emitting new_order_created for location ${locationId}: ${error.message}`, error.stack);

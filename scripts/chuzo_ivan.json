@@ -1,0 +1,199 @@
+{
+    "bebidas": {
+      "h2o": {
+        "agua": 3500,
+        "agua_en_gas": 4000
+      },
+      "jugos": {
+        "maracumango": 11000,
+        "jugo_de_piña_colada": 11000,
+        "jugo_con_maracuya": 11000,
+        "jugo_con_mandarina": 11000,
+        "jugos_naturales": 11000,
+        "malted": "Fresa - Vainilla - Brownie",
+        "precio": 11000
+      },
+      "frappes": {
+        "en_agua": 12000,
+        "en_leche": 13000,
+        "cafe": 12000,
+        "mandarina": 12000,
+        "maracuya": 12000,
+        "mango": 12000
+      },
+      "limonadas": {
+        "de_coco": 12000,
+        "coco_cerezada": 12000,
+        "cerezada": 12000,
+        "frutos_rojos": 12000
+      },
+      "gaseosas": {
+        "personal_postobon_20_onzas": 5000,
+        "coca_cola_400ml": 5500,
+        "litro_y_medio_postobon": 6000,
+        "litro_y_medio_coca_cola": 6500
+      },
+      "cervezas": {
+        "andina": 6500,
+        "miller_lite": 6500
+      }
+    },
+    "tostadas": {
+      "especial": {
+        "ingredientes": [
+          "Carne", "Pollo", "Chicharrón", "Tocineta", "Queso", "Salsa Rosada", "Salsa de la Casa"
+        ],
+        "precio": 25000
+      },
+      "mixta": {
+        "ingredientes": [
+          "Carne", "Pollo", "Chicharrón", "Queso", "Salsa Rosada", "Salsa de la Casa"
+        ],
+        "precio": 21000
+      },
+      "ranchera": {
+        "ingredientes": [
+          "Tocineta", "Salchicha Ranchera", "Queso", "Salsa Rosada", "Salsa de la Casa"
+        ],
+        "precio": 21000
+      },
+      "pollo_y_queso": {
+        "ingredientes": [
+          "Pollo", "Queso", "Salsa Rosada", "Salsa de la Casa"
+        ],
+        "precio": 20000
+      }
+    },
+    "salchipapas": {
+      "normal": {
+        "ingredientes": ["Salchicha Ranchera", "Papas a la Francesa"],
+        "precio": 18000
+      },
+      "especial": {
+        "ingredientes": ["Salchicha Ranchera", "Pollo Desmechado", "Tocineta", "Queso", "Papas a la Francesa", "Salsas de la Casa"],
+        "precio": 25000
+      },
+      "supespecial": {
+        "ingredientes": ["Salchicha Ranchera", "Pollo Desmechado", "Costilla", "Tocineta", "Queso", "Papas a la Francesa", "Salsas de la Casa"],
+        "precio": 29000
+      },
+      "gratinda": {
+        "precio": 18000
+      }
+    },
+    "porciones": {
+      "papas_a_la_francesa": 6000,
+      "queso": 5500,
+      "tocineta": 5500,
+      "maiz": 5000,
+      "ensalada": 4500,
+      "queso_loncha": 5000
+    },
+    "sandwiches": {
+      "superespecial": {
+        "ingredientes": ["Pollo", "Cordero", "Jamón", "Queso", "Lechuga", "Kabano", "Salsa de la casa"],
+        "precio": 27000
+      },
+      "pollo": {
+        "ingredientes": ["Pollo", "Queso", "Lechuga", "Salsa de la casa"],
+        "precio": 21500
+      },
+      "ranchero": {
+        "ingredientes": ["Ranchero", "Queso", "Lechuga", "Salsa de la casa"],
+        "precio": 23500
+      },
+      "cordero": {
+        "ingredientes": ["Cordero", "Tocineta", "Queso", "Lechuga", "Salsa de la casa"],
+        "precio": 21500
+      },
+      "kabano": {
+        "ingredientes": ["Kabano", "Queso", "Lechuga", "Salsa de la casa"],
+        "precio": 21500
+      },
+      "hawaiano": {
+        "ingredientes": ["Jamón", "Queso", "Trocitos de Piña", "Salsa de la casa"],
+        "precio": 19000
+      },
+      "jamon_y_queso": {
+        "ingredientes": ["Jamón", "Queso", "Salsa de la casa"],
+        "precio": 17000
+      }
+    },
+    "aplastados": {
+      "pollo": {
+        "ingredientes": ["Pollo", "Queso", "Lechuga", "Salsa de ajo"],
+        "precio": 9500
+      },
+      "superespecial": {
+        "ingredientes": ["Jamón", "Pollo", "Kabano", "Lechuga", "Queso", "Salsa de ajo"],
+        "precio": 13000
+      },
+      "ranchero": {
+        "ingredientes": ["Tocineta", "Salchicha Ranchera", "Queso", "Lechuga", "Salsa de la casa"],
+        "precio": 12000
+      },
+      "hawaiano": {
+        "ingredientes": ["Jamón", "Piña", "Queso"],
+        "precio": 9000
+      },
+      "jamon_y_queso": {
+        "ingredientes": ["Jamón", "Queso crema", "Salsa de ajo"],
+        "precio": 8000
+      }
+    },
+    "carnes": {
+      "baby_beef": {
+        "porcion": "400 gr",
+        "acompañamientos": ["Ensalada", "Arepa", "Papas a la Francesa"],
+        "precio": 53000
+      },
+      "churrasco": {
+        "porcion": "300 gr",
+        "acompañamientos": ["Ensalada", "Arepa", "Papas a la Francesa"],
+        "precio": 47000
+      },
+      "punta_de_anca": {
+        "porcion": "330 gr",
+        "acompañamientos": ["Ensalada", "Arepa", "Papas a la Francesa"],
+        "precio": 47000
+      },
+      "filete_de_pollo": {
+        "porcion": "400 gr",
+        "acompañamientos": ["Queso", "Papas a la Francesa"],
+        "precio": 47000
+      },
+      "filete_gratinado": {
+        "porcion": "400 gr",
+        "acompañamientos": ["Ensalada", "Arepa", "Papas a la Francesa"],
+        "precio": 48000
+      },
+      "costilla_ahumada": {
+        "porcion": "300 gr",
+        "acompañamientos": ["Ensalada", "Arepa", "Papas a la Francesa"],
+        "precio": 45000
+      }
+    },
+    "chuzos": {
+      "de_res": {
+        "porcion": "230 gr",
+        "acompañamientos": ["Ensalada", "Arepa", "Papas a la Francesa"],
+        "precio": 26500
+      },
+      "de_pollo": {
+        "porcion": "230 gr",
+        "acompañamientos": ["Ensalada", "Arepa", "Papas a la Francesa"],
+        "precio": 26500
+      },
+      "mixto": {
+        "porcion": "230 gr",
+        "acompañamientos": ["Ensalada", "Arepa", "Papas a la Francesa"],
+        "precio": 28500
+      },
+      "costilla": {
+        "porcion": "230 gr",
+        "acompañamientos": ["Ensalada", "Arepa", "Papas a la Francesa"],
+        "precio": 25000
+      }
+    }
+  }
+  
