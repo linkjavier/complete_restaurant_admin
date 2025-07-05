@@ -178,11 +178,10 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
 
   return (
     <div className={cn(
-      "flex h-full flex-col bg-[#111827] text-white relative overflow-x-hidden",
-      isCollapsed ? "w-[70px]" : "w-[280px]",
-      isMobile ? "overflow-y-auto" : "overflow-hidden"
+      "flex h-full flex-col bg-[#111827] text-white relative overflow-y-auto sidebar-scrollbar",
+      isCollapsed ? "w-[70px]" : "w-[280px]"
     )}>
-      <div className="space-y-4 py-4 flex flex-col h-full">
+      <div className="space-y-4 py-4 flex flex-col">
         <div className="px-3 py-2 flex-1">
           <div className="flex items-center justify-between pl-3 mb-4 sticky top-0 bg-[#111827] z-10">
             <div className="flex items-center gap-3">
