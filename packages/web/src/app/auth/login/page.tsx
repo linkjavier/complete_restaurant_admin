@@ -16,6 +16,7 @@ import { API_URL } from '@/lib/api';
 import { Dialog } from '@/components/ui/dialog';
 import { useLanguage } from '@/hooks/use-language';
 import { translations } from '@/lib/translations';
+import { LanguageSwitch } from '@/components/language-switch';
 
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
@@ -50,12 +51,19 @@ function useMobileViewportHeight() {
 }
 
 function getSubdomain(hostname: string) {
-  // Ejemplo: negociojavier.localhost o negociojavier.127.0.0.1
   const parts = hostname.split('.');
+  // localhost o IP: subdominio.localhost o subdominio.127.0.0.1
   if (
-    (hostname.endsWith('localhost') || hostname.match(/\d+\.\d+\.\d+\.\d+/)) &&
-    parts.length > 2
+    (hostname.endsWith('localhost') || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) &&
+    parts.length >= 2
   ) {
+    // Si es localhost y tiene dos partes, el primero es el subdominio
+    if (parts.length === 2) return parts[0];
+    // Si es IP y tiene más de 2 partes, el primero es el subdominio
+    if (parts.length > 2) return parts[0];
+  }
+  // Producción: subdominio.tudominio.com
+  if (parts.length > 2) {
     return parts[0];
   }
   return null;
@@ -73,8 +81,9 @@ export default function LoginPage() {
   const [businessName, setBusinessName] = useState<string>("Kutchen AI");
   const [showSubdomainModal, setShowSubdomainModal] = useState(false);
   const [subdomainInput, setSubdomainInput] = useState('');
-  const { language } = useLanguage();
+  const { language, changeLanguage } = useLanguage();
   const t = translations[language as keyof typeof translations] || translations.es;
+  const [subdomainChecked, setSubdomainChecked] = useState(false);
 
   useEffect(() => {
     const fetchBusiness = async () => {
@@ -89,12 +98,16 @@ export default function LoginPage() {
     };
     fetchBusiness();
 
-    // Detectar subdominio
+    // Detectar subdominio solo en el primer render
     if (typeof window !== 'undefined') {
       const subdomain = getSubdomain(window.location.hostname);
-      if (!subdomain) {
+      // Solo mostrar el modal si NO hay subdominio o es www
+      if (!subdomain || subdomain === 'www') {
         setShowSubdomainModal(true);
+      } else {
+        setShowSubdomainModal(false);
       }
+      setSubdomainChecked(true);
     }
   }, []);
 
@@ -149,125 +162,30 @@ export default function LoginPage() {
   const handleSubdomainNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!subdomainInput) return;
-    // Redirigir a subdominio.localhost:3001/auth/login
-    const port = window.location.port ? `:${window.location.port}` : '';
-    window.location.href = `http://${subdomainInput}.localhost${port}/auth/login`;
+    const { protocol, hostname, port } = window.location;
+    const domainParts = hostname.split('.');
+    let baseDomain = hostname;
+    // Si es localhost o IP, mantener el comportamiento local
+    if (
+      hostname.endsWith('localhost') ||
+      /^\d+\.\d+\.\d+\.\d+$/.test(hostname)
+    ) {
+      baseDomain = hostname.replace(/^[^.]+\./, ''); // quita el subdominio si existe
+    } else {
+      // Para prod: quita el subdominio si existe (ej: sub.tudominio.com -> tudominio.com)
+      baseDomain = domainParts.slice(-2).join('.');
+    }
+    const portPart = port ? `:${port}` : '';
+    const url = `${protocol}//${subdomainInput}.${baseDomain}${portPart}/auth/login`;
+    window.location.href = url;
   };
 
-  return (
-    <>
-      <Head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-      </Head>
-      <div 
-        className="min-h-[100vh] min-h-[calc(var(--vh,1vh)*100)] w-full overflow-x-hidden"
-        style={{ minHeight: vh }}
-      >
-        <div className="container relative flex w-full min-h-[100vh] min-h-[calc(var(--vh,1vh)*100)] flex-col items-center justify-center px-4">
-          <div className="fixed top-4 right-4 z-50">
-            <ThemeSwitch />
-          </div>
-          <Card className="w-full max-w-md mx-auto">
-            <CardHeader className="space-y-1">
-              <div className="flex justify-center mb-6">
-                <Image
-                  src={businessIcon || "/assets/kutchen_app_logo.png"}
-                  alt="Logo Negocio"
-                  width={120}
-                  height={120}
-                  priority
-                />
-              </div>
-              <CardTitle className="text-2xl">{businessName}</CardTitle>
-              <CardDescription>
-                Enter your email to sign in to your account
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <div className="grid grid-cols-2 gap-6">
-                <Button 
-                  variant="outline" 
-                  disabled={isLoading}
-                  onClick={() => handleSocialLogin('google')}
-                >
-                  {isLoading ? (
-                    <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Icons.google className="mr-2 h-4 w-4" />
-                  )}
-                  Google
-                </Button>
-                <Button 
-                  variant="outline" 
-                  disabled={isLoading}
-                  onClick={() => handleSocialLogin('facebook')}
-                >
-                  {isLoading ? (
-                    <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Icons.facebook className="mr-2 h-4 w-4" />
-                  )}
-                  Facebook
-                </Button>
-              </div>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-              <form onSubmit={handleSubmit} className="grid gap-2">
-                <Input
-                  id="email"
-                  placeholder="name@example.com"
-                  type="email"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  autoCorrect="off"
-                  disabled={isLoading}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-                <Input
-                  id="password"
-                  placeholder="Password"
-                  type="password"
-                  autoComplete="current-password"
-                  disabled={isLoading}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <Button disabled={isLoading}>
-                  {isLoading && (
-                    <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Sign In
-                </Button>
-              </form>
-            </CardContent>
-            <CardFooter>
-              <p className="text-center text-sm text-muted-foreground">
-                Don&apos;t have an account?{' '}
-                <Link
-                  href="/auth/register"
-                  className="underline underline-offset-4 hover:text-primary"
-                >
-                  Sign up
-                </Link>
-              </p>
-            </CardFooter>
-          </Card>
-        </div>
-      </div>
+  if (!subdomainChecked) return null;
 
-      {/* Modal de subdominio */}
-      {showSubdomainModal && (
+  if (showSubdomainModal) {
+    return (
+      <div className="min-h-screen w-screen flex items-center justify-center bg-background">
+        {/* Modal de subdominio */}
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm transition-all duration-500">
           <form
             onSubmit={handleSubdomainNext}
@@ -293,7 +211,136 @@ export default function LoginPage() {
             <Button type="submit" size="lg" className="w-full text-lg font-bold">{t.loginSubdomainButton}</Button>
           </form>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+      </Head>
+      <div 
+        className="min-h-[100vh] min-h-[calc(var(--vh,1vh)*100)] w-full overflow-x-hidden"
+        style={{ minHeight: vh }}
+      >
+        <div className="absolute top-0 left-0 w-full flex items-center justify-between px-2 py-2 md:px-8 md:py-4 z-10">
+          <div className="flex items-center gap-2">
+            <Link href="/">
+              <Image
+                src={businessIcon || "/assets/kutchen_app_logo.png"}
+                alt="Logo KutchenAI"
+                width={56}
+                height={56}
+                priority
+                className="cursor-pointer"
+              />
+            </Link>
+          </div>
+          <div className="flex items-center gap-1 md:gap-4">
+            <LanguageSwitch currentLanguage={language} onLanguageChange={changeLanguage} />
+            <ThemeSwitch />
+          </div>
+        </div>
+        <div className="container relative flex w-full min-h-[100vh] min-h-[calc(var(--vh,1vh)*100)] flex-col items-center justify-center px-4">
+          <Card className="w-full max-w-md mx-auto">
+            <CardHeader className="space-y-1">
+              <div className="flex justify-center mb-6">
+                <Image
+                  src={businessIcon || "/assets/kutchen_app_logo.png"}
+                  alt="Logo Negocio"
+                  width={120}
+                  height={120}
+                  priority
+                />
+              </div>
+              <CardTitle className="text-2xl">{businessName}</CardTitle>
+              <CardDescription>
+                {t.loginDescription}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div className="grid grid-cols-2 gap-6">
+                <Button 
+                  variant="outline" 
+                  disabled={isLoading}
+                  onClick={() => handleSocialLogin('google')}
+                >
+                  {isLoading ? (
+                    <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Icons.google className="mr-2 h-4 w-4" />
+                  )}
+                  {t.loginGoogle}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  disabled={isLoading}
+                  onClick={() => handleSocialLogin('facebook')}
+                >
+                  {isLoading ? (
+                    <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Icons.facebook className="mr-2 h-4 w-4" />
+                  )}
+                  {t.loginFacebook}
+                </Button>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    {t.loginOrContinue}
+                  </span>
+                </div>
+              </div>
+              <form onSubmit={handleSubmit} className="grid gap-2">
+                <Input
+                  id="email"
+                  placeholder={t.loginEmail}
+                  type="email"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  autoCorrect="off"
+                  disabled={isLoading}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <Input
+                  id="password"
+                  placeholder={t.loginPassword}
+                  type="password"
+                  autoComplete="current-password"
+                  disabled={isLoading}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <Button disabled={isLoading}>
+                  {isLoading && (
+                    <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {t.loginButton}
+                </Button>
+              </form>
+            </CardContent>
+            <CardFooter>
+              <p className="text-center text-sm text-muted-foreground">
+                {t.loginNoAccount}{' '}
+                <Link
+                  href="/auth/register"
+                  className="underline underline-offset-4 hover:text-primary"
+                >
+                  {t.loginSignUp}
+                </Link>
+              </p>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
     </>
   );
 }
