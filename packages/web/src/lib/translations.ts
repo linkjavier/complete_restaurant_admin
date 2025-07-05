@@ -76,7 +76,25 @@ export const translations = {
     
     // Footer
     platformDescription: "Plataforma de gestión inteligente para restaurantes.",
-    termsAndConditions: "Términos y condiciones"
+    termsAndConditions: "Términos y condiciones",
+    
+    // Register Page
+    registerTitle: "Crea una cuenta",
+    registerDescription: "Ingresa tu información para crear tu cuenta",
+    registerBusinessPlaceholder: "Nombre del negocio",
+    registerBusinessExample: "Ejemplo: Restaurante Paola, Cafetería Central...",
+    registerFirstName: "Nombre",
+    registerLastName: "Apellido",
+    registerEmail: "Correo electrónico",
+    registerPassword: "Contraseña",
+    registerButton: "Crear cuenta",
+    registerAlreadyHave: "¿Ya tienes una cuenta?",
+    registerSignIn: "Inicia sesión",
+    
+    // Login Subdomain Modal
+    loginSubdomainTitle: "¿Cuál es tu subdominio?",
+    loginSubdomainPlaceholder: "Ej: miempresa",
+    loginSubdomainButton: "Siguiente"
   },
   
   en: {
@@ -156,6 +174,24 @@ export const translations = {
     
     // Footer
     platformDescription: "Intelligent management platform for restaurants.",
-    termsAndConditions: "Terms and conditions"
+    termsAndConditions: "Terms and conditions",
+    
+    // Register Page
+    registerTitle: "Create an account",
+    registerDescription: "Enter your information below to create your account",
+    registerBusinessPlaceholder: "Business name",
+    registerBusinessExample: "Example: Paola Restaurant, Central Coffee...",
+    registerFirstName: "First name",
+    registerLastName: "Last name",
+    registerEmail: "Email",
+    registerPassword: "Password",
+    registerButton: "Create Account",
+    registerAlreadyHave: "Already have an account?",
+    registerSignIn: "Sign in",
+    
+    // Login Subdomain Modal
+    loginSubdomainTitle: "What is your subdomain?",
+    loginSubdomainPlaceholder: "E.g. mybusiness",
+    loginSubdomainButton: "Next"
   }
 } 

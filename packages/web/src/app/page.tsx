@@ -96,18 +96,18 @@ export default function HomePage() {
       
       <div className="flex min-h-screen flex-col bg-gradient-to-b from-background to-muted/20 dark:from-background dark:to-muted/10">
         {/* Header */}
-        <header className="flex items-center justify-between px-8 py-6" role="banner">
-          <div className="flex items-center gap-3">
+        <header className="flex items-center justify-between px-2 py-2 md:px-8 md:py-6" role="banner">
+          <div className="flex items-center gap-1 md:gap-3">
             <Image 
               src={businessIcon || "/assets/kutchen_app_logo.png"} 
               alt="KutchenAI - Logo de la plataforma de gestión de restaurantes" 
-              width={48} 
-              height={48}
+              width={72} 
+              height={72}
               priority
             />
             <span className="text-2xl font-bold text-foreground hidden md:block">KutchenAI</span>
           </div>
-          <nav className="flex items-center gap-4" role="navigation" aria-label="Navegación principal">
+          <nav className="flex items-center gap-1 md:gap-4" role="navigation" aria-label="Navegación principal">
             <LanguageSwitch 
               currentLanguage={language} 
               onLanguageChange={changeLanguage} 
@@ -121,7 +121,7 @@ export default function HomePage() {
 
         {/* Hero Section */}
         <main role="main">
-          <section className="flex flex-col items-center justify-center text-center py-16 px-4" aria-labelledby="hero-title">
+          <section className="flex flex-col items-center justify-center text-center pt-4 md:pt-16 pb-8 md:pb-16 px-4" aria-labelledby="hero-title">
             <h1 id="hero-title" className="text-5xl md:text-6xl font-extrabold text-foreground max-w-3xl mb-6 leading-tight">
               {t.heroTitle}
             </h1>

@@ -115,4 +115,17 @@ input, textarea {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    @apply opacity-0 scale-95;
+    animation: fadeIn 0.4s forwards;
+  }
+  @keyframes fadeIn {
+    to {
+      opacity: 1;
+      scale: 1;
+    }
+  }
 } 
