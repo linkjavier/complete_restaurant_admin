@@ -94,7 +94,19 @@ export const translations = {
     // Login Subdomain Modal
     loginSubdomainTitle: "¿Cuál es tu subdominio?",
     loginSubdomainPlaceholder: "Ej: miempresa",
-    loginSubdomainButton: "Siguiente"
+    loginSubdomainButton: "Siguiente",
+    
+    // Login Page
+    loginTitle: "Inicia sesión en tu cuenta",
+    loginDescription: "Ingresa tu correo electrónico para acceder a tu cuenta",
+    loginEmail: "Correo electrónico",
+    loginPassword: "Contraseña",
+    loginButton: "Iniciar sesión",
+    loginOrContinue: "O continúa con",
+    loginGoogle: "Google",
+    loginFacebook: "Facebook",
+    loginNoAccount: "¿No tienes una cuenta?",
+    loginSignUp: "Regístrate"
   },
   
   en: {
@@ -192,6 +204,18 @@ export const translations = {
     // Login Subdomain Modal
     loginSubdomainTitle: "What is your subdomain?",
     loginSubdomainPlaceholder: "E.g. mybusiness",
-    loginSubdomainButton: "Next"
+    loginSubdomainButton: "Next",
+    
+    // Login Page
+    loginTitle: "Sign in to your account",
+    loginDescription: "Enter your email to sign in to your account",
+    loginEmail: "Email",
+    loginPassword: "Password",
+    loginButton: "Sign In",
+    loginOrContinue: "Or continue with",
+    loginGoogle: "Google",
+    loginFacebook: "Facebook",
+    loginNoAccount: "Don't have an account?",
+    loginSignUp: "Sign up"
   }
 } 

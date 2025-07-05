@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,22 @@ export default function RegisterPage() {
   });
   const { language, changeLanguage } = useLanguage();
   const t = translations[language as keyof typeof translations] || translations.es;
+  const [businessIcon, setBusinessIcon] = useState<string>("/assets/kutchen_app_logo.png");
+  const [businessName, setBusinessName] = useState<string>("Kutchen AI");
+
+  useEffect(() => {
+    const fetchBusiness = async () => {
+      try {
+        const res = await fetch('/api/settings/business');
+        if (res.ok) {
+          const data = await res.json();
+          setBusinessIcon(data.logo || "/assets/kutchen_app_logo.png");
+          setBusinessName(data.name || "Kutchen AI");
+        }
+      } catch {}
+    };
+    fetchBusiness();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,13 +123,16 @@ export default function RegisterPage() {
       {/* Barra superior con selectores y logo */}
       <div className="absolute top-0 left-0 w-full flex items-center justify-between px-2 py-2 md:px-8 md:py-4 z-10">
         <div className="flex items-center gap-2">
-          <Image
-            src={"/assets/kutchen_app_logo.png"}
-            alt="Logo KutchenAI"
-            width={56}
-            height={56}
-            priority
-          />
+          <Link href="/">
+            <Image
+              src={businessIcon}
+              alt="Logo KutchenAI"
+              width={56}
+              height={56}
+              priority
+              className="cursor-pointer"
+            />
+          </Link>
         </div>
         <div className="flex items-center gap-1 md:gap-4">
           <LanguageSwitch currentLanguage={language} onLanguageChange={changeLanguage} />
