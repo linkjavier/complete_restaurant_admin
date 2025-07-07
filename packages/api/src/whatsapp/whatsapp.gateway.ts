@@ -73,29 +73,95 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   async handleConnection(client: Socket) {
-    // this.logger.log(`Client connected: ${client.id}`);
+    const tenantId = client.handshake.query.tenantId as string;
+    const locationId = client.handshake.query.locationId as string;
+    if (!tenantId || !locationId) {
+      client.emit('whatsapp:error', { message: 'Faltan tenantId o locationId en la conexión.' });
+      client.disconnect();
+      return;
+    }
+    // Suscribirse a eventos específicos de este cliente
+    const key = `${tenantId}:${locationId}`;
+    const qrListener = (qrCode: string) => {
+      this.logger.log(`[${key}] Enviando QR al cliente ${client.id}`);
+      client.emit('whatsapp:qr', { qrCode });
+    };
+    const readyListener = () => {
+      this.logger.log(`[${key}] WhatsApp listo para cliente ${client.id}`);
+      client.emit('whatsapp:status', { isConnected: true });
+    };
+    const authenticatingListener = () => {
+      this.logger.log(`[${key}] WhatsApp autenticando para cliente ${client.id}`);
+      client.emit('whatsapp:authenticating');
+    };
+    const authFailureListener = (error: any) => {
+      this.logger.error(`[${key}] Fallo de autenticación para cliente ${client.id}:`, error);
+      client.emit('whatsapp:status', { isConnected: false });
+    };
+    const disconnectedListener = (reason: string) => {
+      this.logger.log(`[${key}] WhatsApp desconectado para cliente ${client.id}: ${reason}`);
+      client.emit('whatsapp:status', { isConnected: false });
+    };
+    const errorListener = (error: any) => {
+      this.logger.error(`[${key}] Error de WhatsApp para cliente ${client.id}:`, error);
+      client.emit('whatsapp:error', { message: error?.message || 'Error desconocido en WhatsApp', details: error });
+    };
+    const messageListener = (message: any) => {
+      this.logger.log(`[${key}] Mensaje de WhatsApp para cliente ${client.id}:`, message);
+      client.emit('whatsapp:message', message);
+    };
+    this.eventEmitter.on(`whatsapp.qr.${key}`, qrListener);
+    this.eventEmitter.on(`whatsapp.ready.${key}`, readyListener);
+    this.eventEmitter.on(`whatsapp.authenticated.${key}`, authenticatingListener);
+    this.eventEmitter.on(`whatsapp.auth_failure.${key}`, authFailureListener);
+    this.eventEmitter.on(`whatsapp.disconnected.${key}`, disconnectedListener);
+    this.eventEmitter.on(`whatsapp.error.${key}`, errorListener);
+    this.eventEmitter.on(`whatsapp.message.${key}`, messageListener);
+    // Guardar listeners para quitarlos al desconectar
+    (client as any)._whatsappListeners = [
+      [`whatsapp.qr.${key}`, qrListener],
+      [`whatsapp.ready.${key}`, readyListener],
+      [`whatsapp.authenticated.${key}`, authenticatingListener],
+      [`whatsapp.auth_failure.${key}`, authFailureListener],
+      [`whatsapp.disconnected.${key}`, disconnectedListener],
+      [`whatsapp.error.${key}`, errorListener],
+      [`whatsapp.message.${key}`, messageListener],
+    ];
     this.connectedClients.set(client.id, client);
-    await this.sendStatus(client);
-
+    await this.whatsappService.initializeWhatsApp(tenantId, locationId);
+    const isConnected = await this.whatsappService.isWhatsAppConnected(tenantId, locationId);
+    const isAuthenticating = await this.whatsappService.isWhatsAppAuthenticating(tenantId, locationId);
+    if (isConnected) {
+      client.emit('whatsapp:status', { isConnected: true });
+      try {
+        const chats = await this.whatsappService.getChats(tenantId, locationId);
+        client.emit('whatsapp:chats', { chats });
+      } catch (error) {
+        client.emit('whatsapp:error', { message: 'Error getting initial chats' });
+      }
+    } else if (isAuthenticating) {
+      client.emit('whatsapp:authenticating');
+    } else {
+      client.emit('whatsapp:status', { isConnected: false });
+      const qrCode = await this.whatsappService.getQRCode(tenantId, locationId);
+      if (qrCode) {
+        client.emit('whatsapp:qr', { qrCode });
+      }
+    }
     // --- SALUDO PERSONALIZADO ---
     try {
-      // Intenta obtener el chatId y locationId del handshake (ajusta según tu frontend)
       const chatId = client.handshake.query.chatId as string;
-      const locationId = client.handshake.query.locationId as string;
-      if (chatId && locationId) {
-        // Obtener tenantId a partir de locationId
-        const location = await this.whatsappService['prisma'].location.findUnique({ where: { id: locationId } });
-        const tenantId = location ? location.tenantId : undefined;
-        const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId, tenantId);
-        const cleanName = customerContext && customerContext.name ? customerContext.name.trim() : '';
-        let welcomeMessage = '';
-        if (cleanName.length > 0) {
-          welcomeMessage = `👋 ¡Hola, *${cleanName}*! Soy tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
-        } else {
-          welcomeMessage = `👋 ¡Hola! Soy tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
-        }
-        client.emit('whatsapp:welcome', { message: welcomeMessage });
+      const location = await this.whatsappService['prisma'].location.findUnique({ where: { id: locationId } });
+      const tenantIdFromLocation = location ? location.tenantId : undefined;
+      const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId, tenantIdFromLocation);
+      const cleanName = customerContext && customerContext.name ? customerContext.name.trim() : '';
+      let welcomeMessage = '';
+      if (cleanName.length > 0) {
+        welcomeMessage = `👋 ¡Hola, *${cleanName}*! Soy tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
+      } else {
+        welcomeMessage = `👋 ¡Hola! Soy tu asistente personal. 😊\n\n🍽️ ¿En qué puedo ayudarte hoy? ¿Te gustaría ver el menú o tienes un antojo especial?`;
       }
+      client.emit('whatsapp:welcome', { message: welcomeMessage });
     } catch (err) {
       this.logger.error('Error enviando saludo personalizado:', err);
     }
@@ -104,152 +170,104 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
   handleDisconnect(client: Socket) {
     // this.logger.log(`Client disconnected: ${client.id}`);
     this.connectedClients.delete(client.id);
+    // Remover listeners específicos de este cliente
+    if ((client as any)._whatsappListeners) {
+      for (const [event, listener] of (client as any)._whatsappListeners) {
+        this.eventEmitter.off(event, listener);
+      }
+    }
+  }
+
+  private getTenantAndLocation(client: Socket, data?: any): { tenantId: string, locationId: string } {
+    // Prefer message body, fallback to handshake query
+    const locationId = (data && data.locationId) || client.handshake.query.locationId;
+    const tenantId = (data && data.tenantId) || client.handshake.query.tenantId;
+    if (!tenantId || !locationId) throw new Error('tenantId and locationId are required');
+    return { tenantId, locationId };
   }
 
   @SubscribeMessage('whatsapp:getStatus')
-  async handleGetStatus(@ConnectedSocket() client: Socket) {
-    await this.sendStatus(client);
-  }
-
-  private async sendStatus(client: Socket) {
-    try {
-      await this.whatsappService.initializeWhatsApp();
-      const isConnected = await this.whatsappService.isWhatsAppConnected();
-      const isAuthenticating = await this.whatsappService.isWhatsAppAuthenticating();
-
-      // this.logger.log(`Sending status - Connected: ${isConnected}, Authenticating: ${isAuthenticating}`);
-
-      if (isConnected) {
-        client.emit('whatsapp:status', { isConnected: true });
-        // this.logger.log('WhatsApp is connected, sending initial chats');
-        try {
-          const chats = await this.whatsappService.getChats();
-          // this.logger.log(`Sending ${chats.length} initial chats`);
-          client.emit('whatsapp:chats', { chats });
-        } catch (error) {
-          // this.logger.error(`Error getting initial chats: ${error.message}`);
-          client.emit('whatsapp:error', { message: 'Error getting initial chats' });
-        }
-      } else if (isAuthenticating) {
-        // this.logger.log('WhatsApp is authenticating');
-        client.emit('whatsapp:authenticating');
-      } else {
-        // this.logger.log('WhatsApp is not connected, requesting QR code');
-        client.emit('whatsapp:status', { isConnected: false });
-        const qrCode = await this.whatsappService.getQRCode();
-        if (qrCode) {
-          client.emit('whatsapp:qr', { qrCode });
-        } else {
-          // this.logger.log('No QR code available, client will wait.');
-        }
+  async handleGetStatus(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const { tenantId, locationId } = this.getTenantAndLocation(client, data);
+    await this.whatsappService.initializeWhatsApp(tenantId, locationId);
+    const isConnected = await this.whatsappService.isWhatsAppConnected(tenantId, locationId);
+    const isAuthenticating = await this.whatsappService.isWhatsAppAuthenticating(tenantId, locationId);
+    if (isConnected) {
+      client.emit('whatsapp:status', { isConnected: true });
+      try {
+        const chats = await this.whatsappService.getChats(tenantId, locationId);
+        client.emit('whatsapp:chats', { chats });
+      } catch (error) {
+        client.emit('whatsapp:error', { message: 'Error getting initial chats' });
       }
-    } catch (error) {
-      // this.logger.error(`Error sending WhatsApp status: ${error.message}`);
+    } else if (isAuthenticating) {
+      client.emit('whatsapp:authenticating');
+    } else {
       client.emit('whatsapp:status', { isConnected: false });
-      client.emit('whatsapp:error', { message: 'Error getting WhatsApp status' });
+      const qrCode = await this.whatsappService.getQRCode(tenantId, locationId);
+      if (qrCode) {
+        client.emit('whatsapp:qr', { qrCode });
+      }
     }
   }
 
   @SubscribeMessage('whatsapp:getChats')
-  async handleGetChats(@ConnectedSocket() client: Socket) {
-    try {
-      const isConnected = await this.whatsappService.isWhatsAppConnected();
-      if (!isConnected) {
-        // this.logger.error('Cannot get chats: WhatsApp is not connected');
-        throw new Error('WhatsApp is not connected');
-      }
-
-      const chats = await this.whatsappService.getChats();
-      // this.logger.log(`Sending ${chats.length} chats to client`);
-      client.emit('whatsapp:chats', { chats });
-    } catch (error) {
-      // this.logger.error(`Error getting chats: ${error.message}`);
-      client.emit('whatsapp:error', { message: error.message });
-    }
+  async handleGetChats(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const { tenantId, locationId } = this.getTenantAndLocation(client, data);
+    const isConnected = await this.whatsappService.isWhatsAppConnected(tenantId, locationId);
+    if (!isConnected) throw new Error('WhatsApp is not connected');
+    const chats = await this.whatsappService.getChats(tenantId, locationId);
+    client.emit('whatsapp:chats', { chats });
   }
 
   @SubscribeMessage('whatsapp:getQR')
-  async handleGetQR(@ConnectedSocket() client: Socket) {
-    try {
-      // this.logger.log('Client requested QR code');
-      const qrCode = await this.whatsappService.getQRCode();
-      if (qrCode) {
-        client.emit('whatsapp:qr', { qrCode });
-      } else {
-        client.emit('whatsapp:error', { message: 'No QR code available' });
-      }
-    } catch (error) {
-      // this.logger.error(`Error getting QR code: ${error.message}`);
-      client.emit('whatsapp:error', { message: error.message });
+  async handleGetQR(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const { tenantId, locationId } = this.getTenantAndLocation(client, data);
+    const qrCode = await this.whatsappService.getQRCode(tenantId, locationId);
+    if (qrCode) {
+      client.emit('whatsapp:qr', { qrCode });
+    } else {
+      client.emit('whatsapp:error', { message: 'No QR code available' });
     }
   }
 
   @SubscribeMessage('whatsapp:getChatMessages')
   async handleGetChatMessages(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { chatId: string },
+    @MessageBody() data: { tenantId: string; locationId: string; chatId: string },
   ) {
-    try {
-      const isConnected = await this.whatsappService.isWhatsAppConnected();
-      if (!isConnected) {
-        throw new Error('WhatsApp is not connected');
-      }
-
-      const messages = await this.whatsappService.getChatMessages(data.chatId);
-      client.emit('whatsapp:chatMessages', { messages });
-    } catch (error) {
-      // this.logger.error(`Error getting chat messages: ${error.message}`);
-      client.emit('whatsapp:error', { message: error.message });
-    }
+    const { tenantId, locationId } = this.getTenantAndLocation(client, data);
+    const isConnected = await this.whatsappService.isWhatsAppConnected(tenantId, locationId);
+    if (!isConnected) throw new Error('WhatsApp is not connected');
+    const messages = await this.whatsappService.getChatMessages(tenantId, locationId, data.chatId);
+    client.emit('whatsapp:chatMessages', { messages });
   }
 
   @SubscribeMessage('whatsapp:toggleAIChat')
   async handleToggleAIChat(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { chatId: string; locationId: string },
+    @MessageBody() data: { tenantId: string; locationId: string; chatId: string },
   ) {
-    try {
-      // this.logger.log(
-      //   `Received toggle AI request for chat ${data.chatId} in location ${data.locationId}`,
-      // );
-      const updatedChat = await this.whatsappService.toggleAIChat(
-        data.chatId,
-        data.locationId,
-      );
-      // Emit back to the calling client
-      client.emit('whatsapp:chatUpdated', updatedChat);
-      // Broadcast to all clients to update the chat list
-      this.broadcastToAll('whatsapp:chatUpdated', updatedChat);
-    } catch (error) {
-      // this.logger.error(`Error toggling AI for chat: ${error.message}`);
-      client.emit('whatsapp:error', {
-        message: 'Error toggling AI for chat',
-        details: error.message,
-      });
-    }
+    const { tenantId, locationId } = this.getTenantAndLocation(client, data);
+    const updatedChat = await this.whatsappService.toggleAIChat(tenantId, locationId, data.chatId);
+    client.emit('whatsapp:chatUpdated', updatedChat);
+    this.broadcastToAll('whatsapp:chatUpdated', updatedChat);
   }
 
   @SubscribeMessage('whatsapp:sendMessage')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { to: string; message: string },
+    @MessageBody() data: { tenantId: string; locationId: string; to: string; message: string },
   ) {
-    try {
-      const isConnected = await this.whatsappService.isWhatsAppConnected();
-      if (!isConnected) {
-        throw new Error('WhatsApp is not connected');
-      }
-
-      await this.whatsappService.sendMessage(data.to, data.message);
-      client.emit('whatsapp:message', {
-        from: data.to,
-        body: data.message,
-        timestamp: Date.now() / 1000,
-        fromMe: true,
-      });
-    } catch (error) {
-      // this.logger.error(`Error sending message: ${error.message}`);
-      client.emit('whatsapp:error', { message: error.message });
-    }
+    const { tenantId, locationId } = this.getTenantAndLocation(client, data);
+    const isConnected = await this.whatsappService.isWhatsAppConnected(tenantId, locationId);
+    if (!isConnected) throw new Error('WhatsApp is not connected');
+    await this.whatsappService.sendMessage(tenantId, locationId, data.to, data.message);
+    client.emit('whatsapp:message', {
+      from: data.to,
+      body: data.message,
+      timestamp: Date.now() / 1000,
+      fromMe: true,
+    });
   }
 } 

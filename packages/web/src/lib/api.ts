@@ -175,7 +175,7 @@ export interface UpdateUserDto {
   avatar?: string;
 }
 
-const getTenantIdFromSubdomain = () => {
+export const getTenantIdFromSubdomain = () => {
   if (typeof window === 'undefined') return null;
   const host = window.location.hostname; // Ej: gluonico.kutchenbrain.xyz o gluonico.localhost
   const parts = host.split('.');

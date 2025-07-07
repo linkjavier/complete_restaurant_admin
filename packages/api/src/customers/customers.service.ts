@@ -69,7 +69,7 @@ export class CustomersService {
   async syncFromWhatsApp(locationId: string, tenantId: string) {
     try {
       // Llama a WhatsappService.getChats para forzar la captura de clientes
-      const chats = await this.whatsappService.getChats(locationId);
+      const chats = await this.whatsappService.getChats(tenantId, locationId);
       // Devuelve un resumen
       const total = await this.prisma.customer.count({ where: { locationId, tenantId } });
       return {

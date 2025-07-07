@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
-import { API_URL } from '@/lib/api'
+import { API_URL, getTenantIdFromSubdomain } from '@/lib/api'
 
 // Función para renderizar texto como WhatsApp
 const renderWhatsAppText = (text: string) => {
@@ -87,6 +87,7 @@ export default function AIManagerPage() {
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const animationFrameRef = useRef<number>()
+  const [whatsappError, setWhatsappError] = useState<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -129,10 +130,13 @@ export default function AIManagerPage() {
       return;
     }
 
+    const tenantId = getTenantIdFromSubdomain();
+
     // Initialize main socket connection
     const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
       transports: ['websocket'],
       query: {
+        tenantId, // <--- AGREGADO
         locationId: user.locationId,
         chatType: 'ai',
         chatId: 'admin-chat',
@@ -202,6 +206,7 @@ export default function AIManagerPage() {
     socketInstance.on('error', ({ message, details }) => {
       console.error('Socket error:', message, details);
       setIsLoading(false);
+      setWhatsappError(message || 'Error en la conexión');
       toast.error(message || 'Error en la conexión');
     });
 
@@ -424,12 +429,18 @@ export default function AIManagerPage() {
   // Modificar el efecto para la pestaña de WhatsApp
   useEffect(() => {
     if (mainSocket && isConnected) {
+      const tenantId = getTenantIdFromSubdomain();
+      if (!tenantId || !user.locationId) {
+        setIsLoadingChats(false);
+        toast.error('No se puede verificar el estado de WhatsApp: falta tenantId o locationId.');
+        return;
+      }
       console.log('Tab changed to WhatsApp, checking WhatsApp status...');
       setIsLoadingChats(true);
       // Primero verificar el estado de WhatsApp
-      mainSocket.emit('whatsapp:getStatus');
+      mainSocket.emit('whatsapp:getStatus', { tenantId, locationId: user.locationId });
     }
-  }, [mainSocket, isConnected]);
+  }, [mainSocket, isConnected, user.locationId]);
 
   const handleSendMessage = () => {
     if (!input.trim() || !mainSocket || !isConnected || isLoading) return
@@ -451,10 +462,15 @@ export default function AIManagerPage() {
   }
 
   const handleWhatsAppConnect = () => {
+    setWhatsappError(null);
     if (!mainSocket) return;
-    
+    const tenantId = getTenantIdFromSubdomain();
+    if (!tenantId || !user.locationId) {
+      toast.error('No se puede conectar a WhatsApp: falta tenantId o locationId.');
+      return;
+    }
     if (!isWhatsAppConnected) {
-      mainSocket.emit('whatsapp:getQR');
+      mainSocket.emit('whatsapp:getQR', { tenantId, locationId: user.locationId });
       setShowQR(true);
     } else {
       // Si ya está conectado, podemos mostrar un mensaje o hacer algo más
@@ -478,10 +494,10 @@ export default function AIManagerPage() {
     // Usar el socket principal para obtener los mensajes y notificar que se leyó el chat
     if (mainSocket && isConnected) {
       console.log('Requesting chat messages for:', chatId);
-      mainSocket.emit('whatsapp:getChatMessages', { chatId });
+      mainSocket.emit('whatsapp:getChatMessages', { tenantId: getTenantIdFromSubdomain(), locationId: user.locationId, chatId });
 
       console.log('Marking chat as read:', chatId);
-      mainSocket.emit('whatsapp:markChatAsRead', { chatId });
+      mainSocket.emit('whatsapp:markChatAsRead', { tenantId: getTenantIdFromSubdomain(), locationId: user.locationId, chatId });
     }
   }
 
@@ -519,6 +535,8 @@ export default function AIManagerPage() {
     });
     
     mainSocket.emit('whatsapp:sendMessage', {
+      tenantId: getTenantIdFromSubdomain(),
+      locationId: user.locationId,
       to: selectedChat,
       message
     });
@@ -527,8 +545,9 @@ export default function AIManagerPage() {
   const handleToggleAIChat = (chatId: string) => {
     if (!mainSocket || !user?.locationId) return;
     mainSocket.emit('whatsapp:toggleAIChat', {
-      chatId,
+      tenantId: getTenantIdFromSubdomain(),
       locationId: user.locationId,
+      chatId,
     });
   };
 
@@ -770,6 +789,14 @@ export default function AIManagerPage() {
               <TabsTrigger value="chat">Chat IA</TabsTrigger>
             </TabsList>
           </div>
+          {whatsappError && (
+            <div className="p-4 bg-red-100 text-red-700 rounded mb-2 flex flex-col items-center">
+              <span>{whatsappError}</span>
+              <Button variant="outline" className="mt-2" onClick={handleWhatsAppConnect}>
+                Reintentar conexión
+              </Button>
+            </div>
+          )}
           
           {activeTab === "whatsapp" && (
             <TabsContent value="whatsapp" className="flex-1 flex flex-col min-h-0">
@@ -792,7 +819,7 @@ export default function AIManagerPage() {
 
                           {isAuthenticating ? (
                             <div className="flex flex-col items-center gap-4 p-4 border rounded-lg mt-4">
-                              <p className="text-sm text-center">Conectando, por favor espera...</p>
+                              <p className="text-sm text-center">Conectando IA con WhatsApp...</p>
                             </div>
                           ) : showQR && qrCode && (
                             <div className="flex flex-col items-center gap-4 p-4 border rounded-lg mt-4">
