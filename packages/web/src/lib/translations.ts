@@ -10,53 +10,49 @@ export const translations = {
     viewFeatures: "Ver funcionalidades",
     
     // Trust Section
-    trustText: "Más de",
-    restaurants: "500 restaurantes",
-    trustIn: "confían en KutchenAI",
+    trustText: "Cada vez son",
+    restaurants: "más restaurantes",
+    trustIn: "que confían en KutchenAI",
     
     // Features Section
     featuresTitle: "Todo lo que tu restaurante necesita",
     features: [
       {
         title: "Dashboard en Tiempo Real",
-        desc: "Control total de tu restaurante con métricas y reportes instantáneos.",
-        icon: "/assets/dashboard.svg"
+        desc: "Control total de tu restaurante con métricas y reportes instantáneos."
       },
       {
         title: "Asistente de Inteligencia Artificial",
-        desc: "Atiende clientes, toma pedidos y responde automáticamente 24/7.",
-        icon: "/assets/ai.svg"
+        desc: "Atiende clientes, toma pedidos y responde automáticamente 24/7."
       },
       {
         title: "POS y Ventas",
-        desc: "Punto de venta rápido, control de caja y facturación fácil.",
-        icon: "/assets/pos.svg"
+        desc: "Punto de venta rápido, control de caja y facturación fácil."
       },
       {
         title: "Gestión de Órdenes y Cocina",
-        desc: "Pedidos claros, sin errores y panel especial para chefs y staff.",
-        icon: "/assets/orders.svg"
+        desc: "Pedidos claros, sin errores y panel especial para chefs y staff."
       },
       {
         title: "Inventario e Ingredientes",
-        desc: "Controla tu stock, costos y evita pérdidas.",
-        icon: "/assets/inventory.svg"
+        desc: "Controla tu stock, costos y evita pérdidas."
       },
       {
         title: "Multi-Sucursal y Usuarios",
-        desc: "Administra todas tus ubicaciones y tu equipo desde un solo lugar.",
-        icon: "/assets/multilocation.svg"
+        desc: "Administra todas tus ubicaciones y tu equipo desde un solo lugar."
       },
+      // {
+      //   title: "Clientes y CRM",
+      //   desc: "Historial, preferencias y marketing inteligente para tus clientes."
+      // },
       {
-        title: "Clientes y CRM",
-        desc: "Historial, preferencias y marketing inteligente para tus clientes.",
-        icon: "/assets/customers.svg"
+        title: "Menú QR Inteligente",
+        desc: "Tus clientes pueden ver el menú y ordenar desde su móvil."
       },
-      {
-        title: "Configuración Flexible",
-        desc: "Personaliza la plataforma a tu medida, sin límites.",
-        icon: "/assets/settings.svg"
-      }
+      // {
+      //   title: "Configuración Flexible",
+      //   desc: "Personaliza la plataforma a tu medida, sin límites."
+      // },
     ],
     
     // Benefits Section
@@ -65,7 +61,7 @@ export const translations = {
       "Ahorra tiempo y dinero automatizando tareas repetitivas.",
       "Mejora la experiencia de tus clientes con atención 24/7 y pedidos sin errores.",
       "Toma decisiones inteligentes con reportes y métricas en tiempo real.",
-      "Seguridad y privacidad de nivel bancario.",
+      "Arquitecturado para mantener salvo la Seguridad y la privacidad.",
       "Plataforma flexible, escalable y fácil de usar."
     ],
     
@@ -120,53 +116,50 @@ export const translations = {
     viewFeatures: "View features",
     
     // Trust Section
-    trustText: "More than",
-    restaurants: "500 restaurants",
+    trustText: "More and more",
+    restaurants: "restaurants",
     trustIn: "trust KutchenAI",
+
     
     // Features Section
     featuresTitle: "Everything your restaurant needs",
     features: [
       {
         title: "Real-time Dashboard",
-        desc: "Total control of your restaurant with instant metrics and reports.",
-        icon: "/assets/dashboard.svg"
+        desc: "Total control of your restaurant with instant metrics and reports."
       },
       {
         title: "Artificial Intelligence Assistant",
-        desc: "Attend customers, take orders and respond automatically 24/7.",
-        icon: "/assets/ai.svg"
+        desc: "Attend customers, take orders and respond automatically 24/7."
       },
       {
         title: "POS and Sales",
-        desc: "Fast point of sale, cash control and easy billing.",
-        icon: "/assets/pos.svg"
+        desc: "Fast point of sale, cash control and easy billing."
       },
       {
         title: "Order and Kitchen Management",
-        desc: "Clear orders, no errors and special panel for chefs and staff.",
-        icon: "/assets/orders.svg"
+        desc: "Clear orders, no errors and special panel for chefs and staff."
       },
       {
         title: "Inventory and Ingredients",
-        desc: "Control your stock, costs and avoid losses.",
-        icon: "/assets/inventory.svg"
+        desc: "Control your stock, costs and avoid losses."
       },
       {
         title: "Multi-Location and Users",
-        desc: "Manage all your locations and your team from one place.",
-        icon: "/assets/multilocation.svg"
+        desc: "Manage all your locations and your team from one place."
       },
+      // {
+      //   title: "Customers and CRM",
+      //   desc: "History, preferences and intelligent marketing for your customers."
+      // },
       {
-        title: "Customers and CRM",
-        desc: "History, preferences and intelligent marketing for your customers.",
-        icon: "/assets/customers.svg"
+        title: "Smart QR Menu",
+        desc: "Let your customers view the menu and order from their phone."
       },
-      {
-        title: "Flexible Configuration",
-        desc: "Customize the platform to your needs, without limits.",
-        icon: "/assets/settings.svg"
-      }
+      // {
+      //   title: "Flexible Configuration",
+      //   desc: "Customize the platform to your needs, without limits."
+      // },
     ],
     
     // Benefits Section

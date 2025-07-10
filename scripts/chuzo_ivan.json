@@ -40,41 +40,33 @@
     },
     "tostadas": {
       "especial": {
-        "ingredientes": [
-          "Carne", "Pollo", "Chicharrón", "Tocineta", "Queso", "Salsa Rosada", "Salsa de la Casa"
-        ],
+        "descripcion": "Carne, Pollo, Chicharrón, Tocineta, Queso, Salsa Rosada, Salsa de la Casa",
         "precio": 25000
       },
       "mixta": {
-        "ingredientes": [
-          "Carne", "Pollo", "Chicharrón", "Queso", "Salsa Rosada", "Salsa de la Casa"
-        ],
+        "descripcion": "Carne, Pollo, Chicharrón, Queso, Salsa Rosada, Salsa de la Casa",
         "precio": 21000
       },
       "ranchera": {
-        "ingredientes": [
-          "Tocineta", "Salchicha Ranchera", "Queso", "Salsa Rosada", "Salsa de la Casa"
-        ],
+        "descripcion": "Tocineta, Salchicha Ranchera, Queso, Salsa Rosada, Salsa de la Casa",
         "precio": 21000
       },
       "pollo_y_queso": {
-        "ingredientes": [
-          "Pollo", "Queso", "Salsa Rosada", "Salsa de la Casa"
-        ],
+        "descripcion": "Pollo, Queso, Salsa Rosada, Salsa de la Casa",
         "precio": 20000
       }
     },
     "salchipapas": {
       "normal": {
-        "ingredientes": ["Salchicha Ranchera", "Papas a la Francesa"],
+        "descripcion": "Salchicha Ranchera, Papas a la Francesa",
         "precio": 18000
       },
       "especial": {
-        "ingredientes": ["Salchicha Ranchera", "Pollo Desmechado", "Tocineta", "Queso", "Papas a la Francesa", "Salsas de la Casa"],
+        "descripcion": "Salchicha Ranchera, Pollo Desmechado, Tocineta, Queso, Papas a la Francesa, Salsas de la Casa",
         "precio": 25000
       },
       "supespecial": {
-        "ingredientes": ["Salchicha Ranchera", "Pollo Desmechado", "Costilla", "Tocineta", "Queso", "Papas a la Francesa", "Salsas de la Casa"],
+        "descripcion": "Salchicha Ranchera, Pollo Desmechado, Costilla, Tocineta, Queso, Papas a la Francesa, Salsas de la Casa",
         "precio": 29000
       },
       "gratinda": {
@@ -91,53 +83,53 @@
     },
     "sandwiches": {
       "superespecial": {
-        "ingredientes": ["Pollo", "Cordero", "Jamón", "Queso", "Lechuga", "Kabano", "Salsa de la casa"],
+        "descripcion": "Pollo, Cordero, Jamón, Queso, Lechuga, Kabano, Salsa de la casa",
         "precio": 27000
       },
       "pollo": {
-        "ingredientes": ["Pollo", "Queso", "Lechuga", "Salsa de la casa"],
+        "descripcion": "Pollo, Queso, Lechuga, Salsa de la casa",
         "precio": 21500
       },
       "ranchero": {
-        "ingredientes": ["Ranchero", "Queso", "Lechuga", "Salsa de la casa"],
+        "descripcion": "Ranchero, Queso, Lechuga, Salsa de la casa",
         "precio": 23500
       },
       "cordero": {
-        "ingredientes": ["Cordero", "Tocineta", "Queso", "Lechuga", "Salsa de la casa"],
+        "descripcion": "Cordero, Tocineta, Queso, Lechuga, Salsa de la casa",
         "precio": 21500
       },
       "kabano": {
-        "ingredientes": ["Kabano", "Queso", "Lechuga", "Salsa de la casa"],
+        "descripcion": "Kabano, Queso, Lechuga, Salsa de la casa",
         "precio": 21500
       },
       "hawaiano": {
-        "ingredientes": ["Jamón", "Queso", "Trocitos de Piña", "Salsa de la casa"],
+        "descripcion": "Jamón, Queso, Trocitos de Piña, Salsa de la casa",
         "precio": 19000
       },
       "jamon_y_queso": {
-        "ingredientes": ["Jamón", "Queso", "Salsa de la casa"],
+        "descripcion": "Jamón, Queso, Salsa de la casa",
         "precio": 17000
       }
     },
     "aplastados": {
       "pollo": {
-        "ingredientes": ["Pollo", "Queso", "Lechuga", "Salsa de ajo"],
+        "descripcion": "Pollo, Queso, Lechuga, Salsa de ajo",
         "precio": 9500
       },
       "superespecial": {
-        "ingredientes": ["Jamón", "Pollo", "Kabano", "Lechuga", "Queso", "Salsa de ajo"],
+        "descripcion": "Jamón, Pollo, Kabano, Lechuga, Queso, Salsa de ajo",
         "precio": 13000
       },
       "ranchero": {
-        "ingredientes": ["Tocineta", "Salchicha Ranchera", "Queso", "Lechuga", "Salsa de la casa"],
+        "descripcion": "Tocineta, Salchicha Ranchera, Queso, Lechuga, Salsa de la casa",
         "precio": 12000
       },
       "hawaiano": {
-        "ingredientes": ["Jamón", "Piña", "Queso"],
+        "descripcion": "Jamón, Piña, Queso",
         "precio": 9000
       },
       "jamon_y_queso": {
-        "ingredientes": ["Jamón", "Queso crema", "Salsa de ajo"],
+        "descripcion": "Jamón, Queso crema, Salsa de ajo",
         "precio": 8000
       }
     },
