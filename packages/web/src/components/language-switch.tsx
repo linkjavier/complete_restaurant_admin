@@ -9,19 +9,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useLanguage } from "@/hooks/use-language"
 
-interface LanguageSwitchProps {
-  currentLanguage: string
-  onLanguageChange: (language: string) => void
-}
+export function LanguageSwitch() {
+  const { language, changeLanguage } = useLanguage()
 
-export function LanguageSwitch({ currentLanguage, onLanguageChange }: LanguageSwitchProps) {
   const languages = [
     { code: 'es', name: 'Español', flag: '🇪🇸' },
     { code: 'en', name: 'English', flag: '🇺🇸' }
   ]
 
-  const currentLang = languages.find(lang => lang.code === currentLanguage) || languages[0]
+  const currentLang = languages.find(lang => lang.code === language) || languages[0]
 
   return (
     <DropdownMenu>
@@ -36,14 +34,14 @@ export function LanguageSwitch({ currentLanguage, onLanguageChange }: LanguageSw
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {languages.map((language) => (
+        {languages.map((lang) => (
           <DropdownMenuItem
-            key={language.code}
-            onClick={() => onLanguageChange(language.code)}
+            key={lang.code}
+            onClick={() => changeLanguage(lang.code as 'es' | 'en')}
             className="flex items-center gap-2"
           >
-            <span className="text-lg">{language.flag}</span>
-            <span>{language.name}</span>
+            <span className="text-lg">{lang.flag}</span>
+            <span>{lang.name}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

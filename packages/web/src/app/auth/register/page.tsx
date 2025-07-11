@@ -13,7 +13,6 @@ import Image from 'next/image';
 import { ThemeSwitch } from '@/components/theme-switch';
 import { LanguageSwitch } from '@/components/language-switch';
 import { useLanguage } from '@/hooks/use-language';
-import { translations } from '@/lib/translations';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -27,8 +26,7 @@ export default function RegisterPage() {
     lastName: '',
     avatar: '',
   });
-  const { language, changeLanguage } = useLanguage();
-  const t = translations[language as keyof typeof translations] || translations.es;
+  const { t } = useLanguage();
   const [businessIcon, setBusinessIcon] = useState<string>("/assets/kutchen_app_logo.png");
   const [businessName, setBusinessName] = useState<string>("Kutchen AI");
 
@@ -135,106 +133,136 @@ export default function RegisterPage() {
           </Link>
         </div>
         <div className="flex items-center gap-1 md:gap-4">
-          <LanguageSwitch currentLanguage={language} onLanguageChange={changeLanguage} />
+          <LanguageSwitch />
           <ThemeSwitch />
         </div>
       </div>
       {/* Contenido principal */}
-      <div className="flex flex-1 items-center justify-center w-full">
-        <Card className="w-full max-w-md mt-20 md:mt-0">
+      <div className="flex items-center justify-center min-h-screen px-4">
+        <Card className="w-full max-w-md">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl">{t.registerTitle}</CardTitle>
-            <CardDescription>
-              {t.registerDescription}
+            <CardTitle className="text-2xl text-center">{t('registerTitle')}</CardTitle>
+            <CardDescription className="text-center">
+              {t('registerDescription')}
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4">
-            <form onSubmit={handleSubmit} className="grid gap-4">
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="tenantName" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                {t('registerBusinessPlaceholder')}
+              </label>
               <Input
                 id="tenantName"
-                name="tenantName"
-                placeholder={t.registerBusinessPlaceholder}
-                type="text"
-                autoCapitalize="words"
-                autoComplete="organization"
-                autoCorrect="off"
-                disabled={isLoading}
+                placeholder={t('registerBusinessExample')}
                 value={formData.tenantName}
-                onChange={handleChange}
+                onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
+                disabled={isLoading}
               />
-              <span className="text-xs text-muted-foreground mb-2">{t.registerBusinessExample}</span>
-              <AvatarUpload
-                onImageUploaded={(url) => setFormData(prev => ({ ...prev, avatar: url }))}
-                currentImage={formData.avatar}
-                initials={getInitials()}
-              />
-              <div className="grid grid-cols-2 gap-2">
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="firstName" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  {t('registerFirstName')}
+                </label>
                 <Input
                   id="firstName"
-                  name="firstName"
-                  placeholder={t.registerFirstName}
-                  type="text"
-                  autoCapitalize="none"
-                  autoComplete="given-name"
-                  autoCorrect="off"
-                  disabled={isLoading}
                   value={formData.firstName}
-                  onChange={handleChange}
-                />
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  placeholder={t.registerLastName}
-                  type="text"
-                  autoCapitalize="none"
-                  autoComplete="family-name"
-                  autoCorrect="off"
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                   disabled={isLoading}
-                  value={formData.lastName}
-                  onChange={handleChange}
                 />
               </div>
+              <div className="space-y-2">
+                <label htmlFor="lastName" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  {t('registerLastName')}
+                </label>
+                <Input
+                  id="lastName"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                {t('registerEmail')}
+              </label>
               <Input
                 id="email"
-                name="email"
-                placeholder={t.registerEmail}
                 type="email"
-                autoCapitalize="none"
-                autoComplete="email"
-                autoCorrect="off"
-                disabled={isLoading}
+                placeholder="m@example.com"
                 value={formData.email}
-                onChange={handleChange}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                disabled={isLoading}
               />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                {t('registerPassword')}
+              </label>
               <Input
                 id="password"
-                name="password"
-                placeholder={t.registerPassword}
                 type="password"
-                autoComplete="new-password"
-                disabled={isLoading}
                 value={formData.password}
-                onChange={handleChange}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                disabled={isLoading}
               />
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && (
-                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                {t.registerButton}
-              </Button>
-            </form>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Avatar
+              </label>
+              <AvatarUpload
+                onImageUploaded={(url) => setFormData({ ...formData, avatar: url })}
+                currentImage={formData.avatar}
+                initials={`${formData.firstName.charAt(0)}${formData.lastName.charAt(0)}`.toUpperCase()}
+              />
+            </div>
           </CardContent>
           <CardFooter>
-            <p className="text-center text-sm text-muted-foreground">
-              {t.registerAlreadyHave}{' '}
-              <Link
-                href="/auth/login"
-                className="underline underline-offset-4 hover:text-primary"
-              >
-                {t.registerSignIn}
-              </Link>
-            </p>
+            <Button className="w-full" disabled={isLoading} onClick={handleSubmit}>
+              {isLoading && (
+                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {t('registerButton')}
+            </Button>
           </CardFooter>
+          <div className="px-6 pb-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  {t('loginOrContinue')}
+                </span>
+              </div>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              <Button variant="outline" disabled={isLoading}>
+                {isLoading ? (
+                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Icons.google className="mr-2 h-4 w-4" />
+                )}
+                {t('loginGoogle')}
+              </Button>
+              <Button variant="outline" disabled={isLoading}>
+                {isLoading ? (
+                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Icons.facebook className="mr-2 h-4 w-4" />
+                )}
+                {t('loginFacebook')}
+              </Button>
+            </div>
+            <div className="mt-6 text-center text-sm">
+              {t('registerAlreadyHave')}{" "}
+              <Link href="/auth/login" className="underline underline-offset-4 hover:text-primary">
+                {t('registerSignIn')}
+              </Link>
+            </div>
+          </div>
         </Card>
       </div>
     </div>

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { API_URL } from '@/lib/api'
+import { useLanguage } from "@/hooks/use-language"
 
 interface Order {
   id: string
@@ -128,6 +129,9 @@ interface CartAbandonment {
 }
 
 export default function AdminDashboard() {
+  const { tNested } = useLanguage()
+  const dashboardTranslations = tNested('dashboard')
+  
   const [orderStats, setOrderStats] = useState<OrderStats>({
     activeOrders: { count: 0, total: 0 },
     paidOrders: { count: 0, total: 0 },
@@ -549,91 +553,94 @@ export default function AdminDashboard() {
     orders.filter(order => !(order as any).source || !['POS','WHATSAPP','QR','DIDDI','RAPPI'].includes((order as any).source)).reduce((sum, order) => sum + calculateOrderTotal(order), 0)
 
   // Utilidad para pluralizar 'órden/órdenes'
-  const ordenesLabel = (count: number) => `${count} ${count === 1 ? 'órden' : 'órdenes'}`
+  const ordenesLabel = (count: number) => {
+    const orderText = count === 1 ? dashboardTranslations.order : dashboardTranslations.orders
+    return `${count} ${orderText}`
+  }
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+        <h2 className="text-3xl font-bold tracking-tight">{dashboardTranslations.title}</h2>
         <div className="flex items-center space-x-2">
-          <Button>Nueva Sede</Button>
+          <Button>{dashboardTranslations.newLocation}</Button>
         </div>
       </div>
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Resumen</TabsTrigger>
-          <TabsTrigger value="analytics">Analíticas</TabsTrigger>
-          <TabsTrigger value="reports">Reportes</TabsTrigger>
+          <TabsTrigger value="overview">{dashboardTranslations.overview}</TabsTrigger>
+          <TabsTrigger value="analytics">{dashboardTranslations.analytics}</TabsTrigger>
+          <TabsTrigger value="reports">{dashboardTranslations.reports}</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Ventas Totales
+                  {dashboardTranslations.totalSales}
                 </CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">${totalSales.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</div>
                 <p className="text-xs text-muted-foreground">
-                  +20.1% desde el mes pasado
+                  +20.1% {dashboardTranslations.sinceLastMonth}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Pedidos Activos
+                  {dashboardTranslations.activeOrders}
                 </CardTitle>
                 <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{orderStats.activeOrders.count}</div>
                 <p className="text-xs text-muted-foreground">
-                  Total: ${orderStats.activeOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                  {dashboardTranslations.total}: ${orderStats.activeOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Pedidos Pagados
+                  {dashboardTranslations.paidOrders}
                 </CardTitle>
                 <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{orderStats.paidOrders.count}</div>
                 <p className="text-xs text-muted-foreground">
-                  Total: ${orderStats.paidOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                  {dashboardTranslations.total}: ${orderStats.paidOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Pedidos sin Pagar
+                  {dashboardTranslations.unpaidOrders}
                 </CardTitle>
                 <CreditCard className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{unpaidOrders.count}</div>
                 <p className="text-xs text-muted-foreground">
-                  Total: ${unpaidOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                  {dashboardTranslations.total}: ${unpaidOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Pedidos Cancelados
+                  {dashboardTranslations.cancelledOrders}
                 </CardTitle>
                 <XCircle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{orderStats.cancelledOrders.count}</div>
                 <p className="text-xs text-muted-foreground">
-                  Total: ${orderStats.cancelledOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                  {dashboardTranslations.total}: ${orderStats.cancelledOrders.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                 </p>
               </CardContent>
             </Card>
@@ -642,7 +649,7 @@ export default function AdminDashboard() {
           {/* Canales de Pedido - ORDEN PERSONALIZADO */}
           <Card>
             <CardHeader>
-              <CardTitle>Canales de Pedido</CardTitle>
+              <CardTitle>{dashboardTranslations.orderChannels}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -650,7 +657,7 @@ export default function AdminDashboard() {
                 <Card>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">POS</CardTitle>
+                      <CardTitle className="text-sm font-medium">{dashboardTranslations.pos}</CardTitle>
                       <ShoppingCart className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </CardHeader>
@@ -663,7 +670,7 @@ export default function AdminDashboard() {
                 <Card>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">IA WhatsApp</CardTitle>
+                      <CardTitle className="text-sm font-medium">{dashboardTranslations.aiWhatsapp}</CardTitle>
                       <MessageCircle className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </CardHeader>
@@ -676,7 +683,7 @@ export default function AdminDashboard() {
                 <Card>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">QR Mesas</CardTitle>
+                      <CardTitle className="text-sm font-medium">{dashboardTranslations.qrTables}</CardTitle>
                       <QrCode className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </CardHeader>
@@ -689,7 +696,7 @@ export default function AdminDashboard() {
                 <Card>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">Meseros</CardTitle>
+                      <CardTitle className="text-sm font-medium">{dashboardTranslations.waiters}</CardTitle>
                       <Users className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </CardHeader>
@@ -702,7 +709,7 @@ export default function AdminDashboard() {
                 <Card>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">Diddi</CardTitle>
+                      <CardTitle className="text-sm font-medium">{dashboardTranslations.diddi}</CardTitle>
                       <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </CardHeader>
@@ -715,7 +722,7 @@ export default function AdminDashboard() {
                 <Card>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">Rappi</CardTitle>
+                      <CardTitle className="text-sm font-medium">{dashboardTranslations.rappi}</CardTitle>
                       <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </CardHeader>
@@ -731,7 +738,7 @@ export default function AdminDashboard() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
             <Card className="col-span-4">
               <CardHeader>
-                <CardTitle>Ventas por Sede</CardTitle>
+                <CardTitle>{dashboardTranslations.salesByLocation}</CardTitle>
               </CardHeader>
               <CardContent className="pl-2">
                 <Overview />
@@ -740,7 +747,7 @@ export default function AdminDashboard() {
             <Card className="col-span-3">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Top 5 Productos Más Vendidos</CardTitle>
+                  <CardTitle>{dashboardTranslations.topProducts}</CardTitle>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </div>
               </CardHeader>
@@ -755,7 +762,7 @@ export default function AdminDashboard() {
                         <div>
                           <p className="text-sm font-medium">{product.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {product.quantity} unidades vendidas
+                            {product.quantity} {dashboardTranslations.unitsSold}
                           </p>
                         </div>
                       </div>
@@ -773,16 +780,16 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Ventas y Pareto de Productos</CardTitle>
+                <CardTitle>{dashboardTranslations.salesAndPareto}</CardTitle>
                 <div className="flex items-center gap-2">
                   <Select value={timeRange} onValueChange={setTimeRange}>
                     <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Seleccionar período" />
+                      <SelectValue placeholder={dashboardTranslations.selectPeriod} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="week">Última Semana</SelectItem>
-                      <SelectItem value="month">Último Mes</SelectItem>
-                      <SelectItem value="custom">Rango Personalizado</SelectItem>
+                      <SelectItem value="week">{dashboardTranslations.lastWeek}</SelectItem>
+                      <SelectItem value="month">{dashboardTranslations.lastMonth}</SelectItem>
+                      <SelectItem value="custom">{dashboardTranslations.customRange}</SelectItem>
                     </SelectContent>
                   </Select>
                   {timeRange === "custom" && (
@@ -810,13 +817,13 @@ export default function AdminDashboard() {
                     <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
                     <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
                     <Tooltip />
-                    <Bar yAxisId="left" dataKey="revenue" fill="#8884d8" name="Ingresos" />
+                    <Bar yAxisId="left" dataKey="revenue" fill="#8884d8" name={dashboardTranslations.revenueByProduct} />
                     <Line
                       yAxisId="right"
                       type="monotone"
                       dataKey="cumulativePercentage"
                       stroke="#82ca9d"
-                      name="Porcentaje Acumulado"
+                      name={dashboardTranslations.cumulativePercentage}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -824,11 +831,11 @@ export default function AdminDashboard() {
               <div className="mt-4 flex justify-center gap-4">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 bg-[#8884d8] rounded"></div>
-                  <span className="text-sm">Ingresos por Producto</span>
+                  <span className="text-sm">{dashboardTranslations.revenueByProduct}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 bg-[#82ca9d] rounded"></div>
-                  <span className="text-sm">Porcentaje Acumulado</span>
+                  <span className="text-sm">{dashboardTranslations.cumulativePercentage}</span>
                 </div>
               </div>
             </CardContent>
@@ -838,16 +845,16 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Tiempos de Cocina y Cuellos de Botella</CardTitle>
+                <CardTitle>{dashboardTranslations.kitchenTimes}</CardTitle>
                 <div className="flex items-center gap-2">
                   <Select value={timeRange} onValueChange={setTimeRange}>
                     <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Seleccionar período" />
+                      <SelectValue placeholder={dashboardTranslations.selectPeriod} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="week">Última Semana</SelectItem>
-                      <SelectItem value="month">Último Mes</SelectItem>
-                      <SelectItem value="custom">Rango Personalizado</SelectItem>
+                      <SelectItem value="week">{dashboardTranslations.lastWeek}</SelectItem>
+                      <SelectItem value="month">{dashboardTranslations.lastMonth}</SelectItem>
+                      <SelectItem value="custom">{dashboardTranslations.customRange}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -857,7 +864,7 @@ export default function AdminDashboard() {
               <div className="grid gap-6">
                 {/* Heatmap Section */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Actividad por Hora y Categoría</h3>
+                  <h3 className="text-lg font-semibold mb-4">{dashboardTranslations.activityByHour}</h3>
                   <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
@@ -889,7 +896,7 @@ export default function AdminDashboard() {
                               return (
                                 <div className="bg-white p-2 border rounded shadow">
                                   <p className="font-medium">{label}</p>
-                                  <p className="text-sm">{`${hour}:00 - ${value} órdenes`}</p>
+                                  <p className="text-sm">{`${hour}:00 - ${value} ${dashboardTranslations.orders}`}</p>
                                 </div>
                               );
                             }
@@ -911,7 +918,7 @@ export default function AdminDashboard() {
 
                 {/* Boxplot Section */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Tiempos de Preparación por Ítem</h3>
+                  <h3 className="text-lg font-semibold mb-4">{dashboardTranslations.preparationTimes}</h3>
                   <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart
@@ -925,11 +932,11 @@ export default function AdminDashboard() {
                       >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" />
-                        <YAxis label={{ value: 'Minutos', angle: -90, position: 'insideLeft' }} />
+                        <YAxis label={{ value: dashboardTranslations.minutes, angle: -90, position: 'insideLeft' }} />
                         <Tooltip />
-                        <Bar dataKey="median" fill="#8884d8" name="Tiempo Promedio" />
-                        <Line type="monotone" dataKey="max" stroke="#ff7300" name="Máximo" />
-                        <Line type="monotone" dataKey="min" stroke="#82ca9d" name="Mínimo" />
+                        <Bar dataKey="median" fill="#8884d8" name={dashboardTranslations.averageTime} />
+                        <Line type="monotone" dataKey="max" stroke="#ff7300" name={dashboardTranslations.maximum} />
+                        <Line type="monotone" dataKey="min" stroke="#82ca9d" name={dashboardTranslations.minimum} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
@@ -937,28 +944,28 @@ export default function AdminDashboard() {
 
                 {/* Congestion Indicator Section */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Congestionamiento por Hora</h3>
+                  <h3 className="text-lg font-semibold mb-4">{dashboardTranslations.congestionByHour}</h3>
                   <div className="grid grid-cols-15 gap-2">
                     {congestionData.map((data) => (
                       <div key={data.hour} className="flex flex-col items-center">
                         <div className={`w-full h-8 ${getCongestionColor(data.level)} rounded-t`} />
                         <div className="text-sm font-medium mt-1">{data.hour}:00</div>
-                        <div className="text-xs text-muted-foreground">{data.orders} órdenes</div>
+                        <div className="text-xs text-muted-foreground">{data.orders} {dashboardTranslations.orders}</div>
                       </div>
                     ))}
                   </div>
                   <div className="mt-4 flex justify-center gap-4">
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-green-500 rounded"></div>
-                      <span className="text-sm">Bajo</span>
+                      <span className="text-sm">{dashboardTranslations.low}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-orange-500 rounded"></div>
-                      <span className="text-sm">Medio</span>
+                      <span className="text-sm">{dashboardTranslations.medium}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-red-500 rounded"></div>
-                      <span className="text-sm">Alto</span>
+                      <span className="text-sm">{dashboardTranslations.high}</span>
                     </div>
                   </div>
                 </div>
@@ -969,7 +976,7 @@ export default function AdminDashboard() {
           {/* New Inventory Analysis Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Ingredientes y Desperdicio</CardTitle>
+              <CardTitle>{dashboardTranslations.ingredientsAndWaste}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-6">
@@ -980,21 +987,23 @@ export default function AdminDashboard() {
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-sm font-medium">
-                            Categoría {category}
+                            {dashboardTranslations.category} {category}
                           </CardTitle>
                           <Badge className={getCategoryColor(category)}>
-                            {getCategoryLabel(category)}
+                            {category === "A" ? dashboardTranslations.highValue :
+                             category === "B" ? dashboardTranslations.mediumValue :
+                             dashboardTranslations.lowValue}
                           </Badge>
                         </div>
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">
-                          {inventoryItems.filter(item => item.category === category).length} items
+                          {inventoryItems.filter(item => item.category === category).length} {dashboardTranslations.items}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {category === "A" ? "Alto valor, bajo volumen" :
-                           category === "B" ? "Valor y volumen medio" :
-                           "Bajo valor, alto volumen"}
+                          {category === "A" ? dashboardTranslations.highValueDesc :
+                           category === "B" ? dashboardTranslations.mediumValueDesc :
+                           dashboardTranslations.lowValueDesc}
                         </p>
                       </CardContent>
                     </Card>
@@ -1005,7 +1014,7 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Distribución del Inventario</CardTitle>
+                      <CardTitle>{dashboardTranslations.inventoryDistribution}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="h-[300px]">
@@ -1043,7 +1052,7 @@ export default function AdminDashboard() {
                   {/* Inventory Table */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Consumo vs Stock vs Predicción</CardTitle>
+                      <CardTitle>{dashboardTranslations.consumptionVsStock}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="h-[300px] overflow-auto">
@@ -1051,10 +1060,10 @@ export default function AdminDashboard() {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Item</TableHead>
-                              <TableHead>Categoría</TableHead>
-                              <TableHead>Stock Actual</TableHead>
-                              <TableHead>Consumo</TableHead>
-                              <TableHead>Predicción</TableHead>
+                              <TableHead>{dashboardTranslations.category}</TableHead>
+                              <TableHead>{dashboardTranslations.currentStock}</TableHead>
+                              <TableHead>{dashboardTranslations.consumption}</TableHead>
+                              <TableHead>{dashboardTranslations.prediction}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1099,7 +1108,7 @@ export default function AdminDashboard() {
         <TabsContent value="reports" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Predicciones y Recomendaciones</CardTitle>
+              <CardTitle>{dashboardTranslations.predictionsAndRecommendations}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-6">
@@ -1113,7 +1122,7 @@ export default function AdminDashboard() {
                             {prediction.product}
                           </CardTitle>
                           <Badge variant={prediction.type === "high_demand" ? "success" : "warning"}>
-                            {prediction.confidence}% confianza
+                            {prediction.confidence}% {dashboardTranslations.confidence}
                           </Badge>
                         </div>
                       </CardHeader>
@@ -1147,10 +1156,10 @@ export default function AdminDashboard() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle>Alertas del Sistema</CardTitle>
+                      <CardTitle>{dashboardTranslations.systemAlerts}</CardTitle>
                       <Badge variant="outline" className="flex items-center gap-1">
                         <Bell className="h-4 w-4" />
-                        {alerts.length} alertas
+                        {alerts.length} {dashboardTranslations.alerts}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -1168,7 +1177,7 @@ export default function AdminDashboard() {
                             <p className="font-medium">{alert.message}</p>
                             {alert.daysLeft && (
                               <p className="text-sm text-muted-foreground">
-                                {alert.daysLeft} días restantes
+                                {alert.daysLeft} {dashboardTranslations.daysLeft}
                               </p>
                             )}
                           </div>
@@ -1186,26 +1195,26 @@ export default function AdminDashboard() {
                 {/* Order Analysis Card */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Análisis de Pedidos y Comportamiento</CardTitle>
+                    <CardTitle>{dashboardTranslations.orderAnalysis}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-6">
                       {/* Conversion Funnel */}
                       <div>
-                        <h3 className="text-lg font-semibold mb-4">Embudo de Conversión</h3>
+                        <h3 className="text-lg font-semibold mb-4">{dashboardTranslations.conversionFunnel}</h3>
                         <div className="grid grid-cols-4 gap-4">
                           {conversionFunnel.map((stage, index) => (
                             <div key={stage.stage} className="relative">
                               <Card>
                                 <CardHeader className="pb-2">
                                   <CardTitle className="text-sm font-medium">
-                                    {stage.stage}
+                                    {dashboardTranslations[stage.stage.toLowerCase() as keyof typeof dashboardTranslations] || stage.stage}
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                   <div className="text-2xl font-bold">{stage.value}</div>
                                   <p className="text-xs text-muted-foreground">
-                                    {stage.percentage}% de conversión
+                                    {stage.percentage}% {dashboardTranslations.conversionRate}
                                   </p>
                                 </CardContent>
                               </Card>
@@ -1223,7 +1232,7 @@ export default function AdminDashboard() {
                       <div className="grid grid-cols-2 gap-4">
                         <Card>
                           <CardHeader>
-                            <CardTitle>Tiempo Promedio por Sección</CardTitle>
+                            <CardTitle>{dashboardTranslations.averageTimeBySection}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="h-[300px]">
@@ -1231,9 +1240,9 @@ export default function AdminDashboard() {
                                 <BarChart data={menuSections}>
                                   <CartesianGrid strokeDasharray="3 3" />
                                   <XAxis dataKey="name" />
-                                  <YAxis label={{ value: 'Segundos', angle: -90, position: 'insideLeft' }} />
+                                  <YAxis label={{ value: dashboardTranslations.seconds, angle: -90, position: 'insideLeft' }} />
                                   <Tooltip />
-                                  <Bar dataKey="avgTime" fill="#8884d8" name="Tiempo Promedio" />
+                                  <Bar dataKey="avgTime" fill="#8884d8" name={dashboardTranslations.averageTime} />
                                 </BarChart>
                               </ResponsiveContainer>
                             </div>
@@ -1243,7 +1252,7 @@ export default function AdminDashboard() {
                         {/* Cart Abandonment */}
                         <Card>
                           <CardHeader>
-                            <CardTitle>Tasa de Abandono de Carrito</CardTitle>
+                            <CardTitle>{dashboardTranslations.cartAbandonmentRate}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="h-[300px]">
@@ -1251,14 +1260,14 @@ export default function AdminDashboard() {
                                 <ComposedChart data={cartAbandonment}>
                                   <CartesianGrid strokeDasharray="3 3" />
                                   <XAxis dataKey="date" />
-                                  <YAxis label={{ value: 'Porcentaje', angle: -90, position: 'insideLeft' }} />
+                                  <YAxis label={{ value: dashboardTranslations.percentage, angle: -90, position: 'insideLeft' }} />
                                   <Tooltip />
-                                  <Bar dataKey="rate" fill="#ef4444" name="Tasa de Abandono" />
+                                  <Bar dataKey="rate" fill="#ef4444" name={dashboardTranslations.abandonmentRate} />
                                   <Line
                                     type="monotone"
                                     dataKey="trend"
                                     stroke="#8884d8"
-                                    name="Tendencia"
+                                    name={dashboardTranslations.trend}
                                     dot={false}
                                   />
                                 </ComposedChart>

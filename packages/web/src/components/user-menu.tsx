@@ -11,13 +11,16 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
+import { useLanguage } from "@/hooks/use-language"
 
 export function UserMenu() {
   const { user, logout } = useAuth()
+  const { tNested } = useLanguage()
 
   if (!user) return null
 
   const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
+  const userMenuTranslations = tNested('userMenu')
 
   return (
     <DropdownMenu>
@@ -41,7 +44,7 @@ export function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => logout()}>
-          Log out
+          {userMenuTranslations.logout}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

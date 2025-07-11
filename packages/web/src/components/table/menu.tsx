@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Minus, Clock, Package, ShoppingCart, RefreshCw, Maximize2, X } from "lucide-react"
+import { Plus, Minus, Clock, Package, ShoppingCart, RefreshCw, Maximize2, X, Moon, Sun } from "lucide-react"
 import { getProducts, Product, Category, getActiveOrders, getCategories } from "@/lib/api"
 import { Cart } from "./cart"
 import Image from "next/image"
@@ -16,6 +16,9 @@ interface MenuProps {
   locationId: string
   tableId: string
   customerName: string
+  businessIcon?: string
+  menuTheme?: 'light' | 'dark';
+  setMenuTheme?: (theme: 'light' | 'dark') => void;
 }
 
 // Custom hook for mobile viewport height
@@ -81,7 +84,25 @@ const CategoryTitle = ({ title }: { title: string }) => {
   )
 }
 
-export function Menu({ locationId, tableId, customerName }: MenuProps) {
+// Componente reutilizable para el switch de tema del menú
+function MenuThemeSwitch({ menuTheme, toggleMenuTheme }: { menuTheme: 'light' | 'dark', toggleMenuTheme: () => void }) {
+  return (
+    <button
+      onClick={toggleMenuTheme}
+      className={`bg-background/80 rounded-full p-2 shadow hover:bg-background border transition-colors ${menuTheme === 'dark' ? 'bg-zinc-900 text-yellow-300' : 'bg-white text-yellow-500'}`}
+      aria-label="Cambiar tema del menú"
+      type="button"
+    >
+      {menuTheme === 'dark' ? (
+        <Moon className="h-5 w-5" />
+      ) : (
+        <Sun className="h-5 w-5" />
+      )}
+    </button>
+  );
+}
+
+export function Menu({ locationId, tableId, customerName, businessIcon, menuTheme: menuThemeProp, setMenuTheme }: MenuProps) {
   const vh = useMobileViewportHeight();
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [cart, setCart] = useState<Record<string, number>>({})
@@ -91,12 +112,24 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   const [activeOrders, setActiveOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'menu' | 'orders'>('menu')
+  const [activeTab, setActiveTab] = useState<'menu' | 'orders'>("menu")
   const [isCartVisible, setIsCartVisible] = useState(false)
   const cartRef = useRef<HTMLDivElement>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null)
+  // Estado para dark/light local (usando prop si viene, si no, local)
+  const [menuThemeLocal, setMenuThemeLocal] = useState<'light' | 'dark'>(
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  );
+  const menuTheme = menuThemeProp ?? menuThemeLocal;
+  const toggleMenuTheme = () => {
+    if (setMenuTheme) {
+      setMenuTheme(menuTheme === 'light' ? 'dark' : 'light');
+    } else {
+      setMenuThemeLocal(menuTheme === 'light' ? 'dark' : 'light');
+    }
+  }
 
   const handleScroll = () => {
     if (!cartRef.current) return;
@@ -317,15 +350,15 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
   }
 
   return (
-    <>
+    <div className={`relative ${menuTheme === 'dark' ? 'menu-dark' : 'menu-light'}`}>
       {/* Dialog de producto ampliado */}
       <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
         <DialogContent
-          className="max-w-2xl w-[calc(100vw-2rem)] md:w-[600px] p-0 overflow-hidden animate-product-grow"
+          className="max-w-2xl w-[calc(100vw-2rem)] md:w-[600px] p-0 overflow-hidden animate-product-grow rounded-lg"
           style={{ maxHeight: 'calc(var(--vh, 1vh) * 95)', height: 'auto' }}
         >
           {selectedProduct && (
-            <div className="relative flex flex-col items-center justify-center w-full h-full bg-background">
+            <div className="relative flex flex-col items-center justify-center w-full h-full bg-background/95">
               <DialogTitle className="sr-only">{selectedProduct.name}</DialogTitle>
               <DialogClose asChild>
                 <button className="absolute right-4 top-4 z-10 bg-white/80 rounded-full p-2 shadow hover:bg-white">
@@ -425,10 +458,13 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
 
         <div className="md:col-span-2">
           <div className="space-y-4 pb-20 md:pb-4">
-            {/* Welcome Message with Logo */}
+            {/* Welcome Message with Theme Switch */}
             <Card>
               <CardContent className="pt-2">
-                <div className="flex justify-between items-center">
+                <div className="relative">
+                  <div className="absolute top-0 right-0 z-10">
+                    <MenuThemeSwitch menuTheme={menuTheme} toggleMenuTheme={toggleMenuTheme} />
+                  </div>
                   <div className="space-y-2">
                     <h2 className="text-2xl font-bold">¡Hola {customerName}!</h2>
                     <p className="text-muted-foreground">
@@ -445,7 +481,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                 <Button
                   variant={activeTab === 'menu' ? 'default' : 'outline'}
                   onClick={() => setActiveTab('menu')}
-                  className="flex items-center gap-2"
+                  className={`flex items-center gap-2 ${menuTheme === 'dark' && activeTab === 'menu' ? 'bg-zinc-900 text-white' : ''}`}
                 >
                   <Package className="h-4 w-4" />
                   Menú
@@ -560,13 +596,27 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                         {groupProducts.map((product) => (
                           <Card 
                             key={product.id}
-                            className={`cursor-pointer transition-transform hover:scale-[1.03] ${cart[product.id] ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950' : ''}`}
+                            className={`relative overflow-hidden cursor-pointer transition-transform hover:scale-[1.03] ${cart[product.id]
+                              ? (menuTheme === 'dark'
+                                  ? 'bg-gradient-to-r from-blue-950 to-purple-950'
+                                  : 'bg-gradient-to-r from-yellow-100 to-orange-100')
+                              : ''}`}
                             onClick={() => setSelectedProduct(product)}
                           >
-                            <CardHeader className="pb-1 pt-2">
-                              <CardTitle className="text-base">{product.name}</CardTitle>
+                            {/* Background blurry */}
+                            {product.image && (
+                              <div className="absolute inset-0 w-full h-full z-0">
+                                <img
+                                  src={product.image}
+                                  alt="bg-blur"
+                                  className="w-full h-full object-cover blur-sm scale-110 opacity-40"
+                                />
+                              </div>
+                            )}
+                            <CardHeader className="pb-1 pt-2 relative z-10">
+                              <CardTitle className={`text-base ${cart[product.id] ? (menuTheme === 'dark' ? 'text-zinc-100' : 'text-zinc-900') : ''}`}>{product.name}</CardTitle>
                             </CardHeader>
-                            <CardContent className="pt-0">
+                            <CardContent className="pt-0 relative z-10">
                               <div className="space-y-2">
                                 {product.image ? (
                                   <div className="relative w-full h-40">
@@ -591,11 +641,11 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
                                   </div>
                                 )}
                                 <div className="space-y-1.5">
-                                  <p className="text-sm text-muted-foreground">
+                                  <p className={`text-sm text-muted-foreground ${cart[product.id] ? (menuTheme === 'dark' ? 'text-zinc-100/80' : 'text-zinc-950') : ''}`}>
                                     {product.description}
                                   </p>
                                   <div className="flex items-center justify-between">
-                                    <p className="font-bold">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
+                                    <p className={`font-bold ${cart[product.id] ? (menuTheme === 'dark' ? 'text-zinc-100' : 'text-zinc-900') : ''}`}>${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
                                     <div className="flex items-center gap-2">
                                       <Button
                                         variant="outline"
@@ -646,7 +696,7 @@ export function Menu({ locationId, tableId, customerName }: MenuProps) {
           />
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
