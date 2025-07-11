@@ -77,10 +77,7 @@ export default function HomePage() {
             <span className="text-2xl font-bold text-foreground hidden md:block">KutchenAI</span>
           </div>
           <nav className="flex items-center gap-1 md:gap-4" role="navigation" aria-label="Navegación principal">
-            <LanguageSwitch 
-              currentLanguage={language} 
-              onLanguageChange={changeLanguage} 
-            />
+            <LanguageSwitch />
             <ThemeSwitch />
             <Button asChild variant="outline" className="font-semibold">
               <Link href="/auth/login">{t.login}</Link>
