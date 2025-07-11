@@ -21,7 +21,7 @@ import {
   ChevronRight,
   Receipt,
   Bot,
-  MessageSquare,
+  MessageCircle,
   ContactRound
 } from "lucide-react"
 import {
@@ -33,8 +33,10 @@ import {
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { ThemeSwitch } from "@/components/theme-switch"
+import { LanguageSwitch } from "@/components/language-switch"
 import "@/app/sidebar-scrollbar.css"
 import { API_URL } from '@/lib/api'
+import { useLanguage } from "@/hooks/use-language"
 
 interface SidebarProps {
   isMobile?: boolean
@@ -43,80 +45,80 @@ interface SidebarProps {
 
 const routes = [
   {
-    label: "Dashboard",
+    label: "dashboard",
     icon: LayoutDashboard,
     href: "/admin/dashboard",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
-    label: "Inteligencia Artificial",
+    label: "ai",
     icon: Bot,
     href: "/admin/ai-manager",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
-    label: "POS",
+    label: "pos",
     icon: ShoppingCart,
     href: "/admin/pos",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
-    label: "Órdenes",
+    label: "orders",
     icon: Receipt,
     href: "/admin/orders",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
-    label: "Mesas",
+    label: "tables",
     icon: Table,
     href: "/admin/tables",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
-    label: "Cocina",
+    label: "kitchen",
     icon: ChefHat,
     href: "/admin/kitchen-manager",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF'],
   },
   {
-    label: "Categorías",
+    label: "categories",
     icon: Tag,
     href: "/admin/categories",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
-    label: "Productos",
+    label: "products",
     icon: Package,
     href: "/admin/products",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
-    label: "Ingredientes",
+    label: "ingredients",
     icon: Utensils,
     href: "/admin/ingredients",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
-    label: "Ubicaciones",
+    label: "locations",
     icon: MapPin,
     href: "/admin/locations",
     roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
-    label: "Clientes",
+    label: "customers",
     icon: ContactRound,
     href: "/admin/customers",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
-    label: "Usuarios",
+    label: "users",
     icon: Users,
     href: "/admin/users",
     roles: ['SUPER_ADMIN', 'ADMIN'],
   },
 
   {
-    label: "Configuración",
+    label: "settings",
     icon: Settings,
     href: "/admin/settings",
     roles: ['SUPER_ADMIN', 'ADMIN'],
@@ -127,10 +129,13 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useAuth()
+  const { tNested } = useLanguage()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [businessIcon, setBusinessIcon] = useState<string>("")
   const [businessName, setBusinessName] = useState<string>("Admin Panel")
+
+  const sidebarTranslations = tNested('sidebar')
 
   useEffect(() => {
     setMounted(true)
@@ -208,6 +213,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <LanguageSwitch />
               <ThemeSwitch />
             </div>
           </div>
@@ -246,7 +252,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                 >
                   <div className="flex items-center">
                     <route.icon className="h-5 w-5" />
-                    {!isCollapsed && <span className="ml-3">{route.label}</span>}
+                    {!isCollapsed && <span className="ml-3">{sidebarTranslations[route.label] || route.label}</span>}
                   </div>
                 </div>
               );
@@ -258,7 +264,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                       {linkContent}
                     </TooltipTrigger>
                     <TooltipContent side="right" className="bg-[#111827] text-white border-none">
-                      {route.label}
+                      {sidebarTranslations[route.label] || route.label}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

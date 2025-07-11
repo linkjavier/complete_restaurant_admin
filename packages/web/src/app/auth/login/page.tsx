@@ -13,9 +13,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { ThemeSwitch } from "@/components/theme-switch"
 import Head from 'next/head';
 import { API_URL } from '@/lib/api';
-import { Dialog } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useLanguage } from '@/hooks/use-language';
-import { translations } from '@/lib/translations';
 import { LanguageSwitch } from '@/components/language-switch';
 
 // Custom hook for mobile viewport height
@@ -81,8 +80,7 @@ export default function LoginPage() {
   const [businessName, setBusinessName] = useState<string>("Kutchen AI");
   const [showSubdomainModal, setShowSubdomainModal] = useState(false);
   const [subdomainInput, setSubdomainInput] = useState('');
-  const { language, changeLanguage } = useLanguage();
-  const t = translations[language as keyof typeof translations] || translations.es;
+  const { t } = useLanguage();
   const [subdomainChecked, setSubdomainChecked] = useState(false);
 
   useEffect(() => {
@@ -199,16 +197,16 @@ export default function LoginPage() {
               className="mb-2"
               priority
             />
-            <h2 className="text-2xl font-bold text-center">{t.loginSubdomainTitle}</h2>
+            <h2 className="text-2xl font-bold text-center">{t('loginSubdomainTitle')}</h2>
             <Input
               autoFocus
-              placeholder={t.loginSubdomainPlaceholder}
+              placeholder={t('loginSubdomainPlaceholder')}
               value={subdomainInput}
               onChange={e => setSubdomainInput(e.target.value)}
               className="text-center text-lg"
               required
             />
-            <Button type="submit" size="lg" className="w-full text-lg font-bold">{t.loginSubdomainButton}</Button>
+            <Button type="submit" size="lg" className="w-full text-lg font-bold">{t('loginSubdomainButton')}</Button>
           </form>
         </div>
       </div>
@@ -238,7 +236,7 @@ export default function LoginPage() {
             </Link>
           </div>
           <div className="flex items-center gap-1 md:gap-4">
-            <LanguageSwitch currentLanguage={language} onLanguageChange={changeLanguage} />
+            <LanguageSwitch />
             <ThemeSwitch />
           </div>
         </div>
@@ -256,7 +254,7 @@ export default function LoginPage() {
               </div>
               <CardTitle className="text-2xl">{businessName}</CardTitle>
               <CardDescription>
-                {t.loginDescription}
+                {t('loginDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
@@ -271,7 +269,7 @@ export default function LoginPage() {
                   ) : (
                     <Icons.google className="mr-2 h-4 w-4" />
                   )}
-                  {t.loginGoogle}
+                  {t('loginGoogle')}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -283,7 +281,7 @@ export default function LoginPage() {
                   ) : (
                     <Icons.facebook className="mr-2 h-4 w-4" />
                   )}
-                  {t.loginFacebook}
+                  {t('loginFacebook')}
                 </Button>
               </div>
               <div className="relative">
@@ -292,14 +290,14 @@ export default function LoginPage() {
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
                   <span className="bg-background px-2 text-muted-foreground">
-                    {t.loginOrContinue}
+                    {t('loginOrContinue')}
                   </span>
                 </div>
               </div>
               <form onSubmit={handleSubmit} className="grid gap-2">
                 <Input
                   id="email"
-                  placeholder={t.loginEmail}
+                  placeholder={t('loginEmail')}
                   type="email"
                   autoCapitalize="none"
                   autoComplete="email"
@@ -311,7 +309,7 @@ export default function LoginPage() {
                 />
                 <Input
                   id="password"
-                  placeholder={t.loginPassword}
+                  placeholder={t('loginPassword')}
                   type="password"
                   autoComplete="current-password"
                   disabled={isLoading}
@@ -323,18 +321,18 @@ export default function LoginPage() {
                   {isLoading && (
                     <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  {t.loginButton}
+                  {t('loginButton')}
                 </Button>
               </form>
             </CardContent>
             <CardFooter>
               <p className="text-center text-sm text-muted-foreground">
-                {t.loginNoAccount}{' '}
+                {t('loginNoAccount')}{' '}
                 <Link
                   href="/auth/register"
                   className="underline underline-offset-4 hover:text-primary"
                 >
-                  {t.loginSignUp}
+                  {t('loginSignUp')}
                 </Link>
               </p>
             </CardFooter>

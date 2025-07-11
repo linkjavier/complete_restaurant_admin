@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 import { API_URL, getTenantIdFromSubdomain } from '@/lib/api'
+import { useLanguage } from "@/hooks/use-language"
 
 // Función para renderizar texto como WhatsApp
 const renderWhatsAppText = (text: string) => {
@@ -57,6 +58,7 @@ interface WhatsAppChat {
 export default function AIManagerPage() {
   const { user, isLoading: isAuthLoading } = useAuth()
   const router = useRouter()
+  const { t } = useLanguage()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -122,7 +124,7 @@ export default function AIManagerPage() {
     if (!user.locationId) {
       const errorMessage: Message = {
         id: Date.now().toString(),
-        content: "No tienes una ubicación asignada. Por favor, contacta al administrador para que te asigne una ubicación.",
+        content: `${t('aiManager.noLocationAssigned')}. ${t('aiManager.contactAdmin')}`,
         role: "assistant",
         timestamp: new Date()
       };
@@ -368,7 +370,9 @@ export default function AIManagerPage() {
         console.log('STATE UPDATE: New chats:', newChats.map(c => ({id: c.id, aiEnabled: c.aiEnabled})));
     
         if (chatToUpdate) {
-          const toastMessage = `IA para ${chatToUpdate.name} ahora está ${updatedChat.aiEnabled ? 'activa' : 'inactiva'}.`;
+          const toastMessage = updatedChat.aiEnabled 
+            ? t('aiManager.chat.aiEnabledForChat').replace('{name}', chatToUpdate.name)
+            : t('aiManager.chat.aiDisabledForChat').replace('{name}', chatToUpdate.name);
           console.log('TOAST:', toastMessage);
           toast.info(toastMessage);
         }
@@ -412,12 +416,11 @@ export default function AIManagerPage() {
               : chat
           )
         );
-        toast.info(
-          `IA para el chat con ${
-            whatsappChats.find((c) => c.id === updatedChat.id)?.name ||
-            'un usuario'
-          } ha sido ${updatedChat.aiEnabled ? 'activada' : 'desactivada'}.`,
-        );
+              const chatName = whatsappChats.find((c) => c.id === updatedChat.id)?.name || 'un usuario';
+      const toastMessage = updatedChat.aiEnabled 
+        ? t('aiManager.chat.aiEnabledForChat').replace('{name}', chatName)
+        : t('aiManager.chat.aiDisabledForChat').replace('{name}', chatName);
+      toast.info(toastMessage);
       });
 
       return () => {
@@ -432,7 +435,7 @@ export default function AIManagerPage() {
       const tenantId = getTenantIdFromSubdomain();
       if (!tenantId || !user.locationId) {
         setIsLoadingChats(false);
-        toast.error('No se puede verificar el estado de WhatsApp: falta tenantId o locationId.');
+        toast.error(t('aiManager.error.cannotVerifyWhatsApp'));
         return;
       }
       console.log('Tab changed to WhatsApp, checking WhatsApp status...');
@@ -466,7 +469,7 @@ export default function AIManagerPage() {
     if (!mainSocket) return;
     const tenantId = getTenantIdFromSubdomain();
     if (!tenantId || !user.locationId) {
-      toast.error('No se puede conectar a WhatsApp: falta tenantId o locationId.');
+      toast.error(t('aiManager.error.cannotConnectWhatsApp'));
       return;
     }
     if (!isWhatsAppConnected) {
@@ -571,9 +574,9 @@ export default function AIManagerPage() {
       }
 
       setAiEnabled(checked)
-      toast.success(checked ? "IA activada" : "IA desactivada")
+      toast.success(checked ? t('aiManager.aiActivated') : t('aiManager.aiDeactivated'))
     } catch (error) {
-      toast.error("Error al actualizar la configuración")
+      toast.error(t('aiManager.errorUpdatingSettings'))
     } finally {
       setIsSavingSettings(false)
     }
@@ -666,7 +669,7 @@ export default function AIManagerPage() {
           }
         } catch (error) {
           console.error('Error processing audio:', error);
-          toast.error('Error al procesar el audio');
+          toast.error(t('aiManager.voice.errorProcessingAudio'));
           setIsTranscribing(false);
         }
       };
@@ -675,7 +678,7 @@ export default function AIManagerPage() {
       setIsRecording(true);
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      toast.error('Error al acceder al micrófono');
+      toast.error(t('aiManager.voice.errorAccessingMicrophone'));
     }
   };
 
@@ -733,7 +736,7 @@ export default function AIManagerPage() {
     <div className="h-[calc(100vh-4rem)] overflow-hidden p-4 md:p-8 w-full flex flex-col">
       <div className="flex-none flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl md:text-3xl font-bold">Inteligencia Artificial v.3.0</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">{t('aiManager.title')}</h1>
           <Button
             variant={isWhatsAppConnected ? "default" : "outline"}
             onClick={handleWhatsAppConnect}
@@ -741,7 +744,7 @@ export default function AIManagerPage() {
           >
             <Phone className="h-3 w-3 md:h-4 md:w-4" />
             <span className="text-[10px] leading-none md:text-base md:leading-normal">
-              {isWhatsAppConnected ? "WhatsApp Conectado" : "Conectar"}
+              {isWhatsAppConnected ? t('aiManager.whatsappConnected') : t('aiManager.connect')}
             </span>
           </Button>
         </div>
@@ -753,7 +756,7 @@ export default function AIManagerPage() {
               onCheckedChange={handleAIToggle}
               disabled={isSavingSettings}
             />
-            <Label htmlFor="ai-enabled">Activar Agente IA</Label>
+            <Label htmlFor="ai-enabled">{t('aiManager.activateAI')}</Label>
           </div>
           <Button
             variant={isWhatsAppConnected ? "default" : "outline"}
@@ -761,20 +764,20 @@ export default function AIManagerPage() {
             className="hidden md:flex items-center gap-2"
           >
             <Phone className="h-4 w-4" />
-            {isWhatsAppConnected ? "WhatsApp Conectado" : "Conectar WhatsApp"}
+            {isWhatsAppConnected ? t('aiManager.whatsappConnected') : t('aiManager.connectWhatsApp')}
           </Button>
         </div>
       </div>
 
       {isAuthLoading ? (
-        <div className="flex-1 flex items-center justify-center">Cargando...</div>
+        <div className="flex-1 flex items-center justify-center">{t('aiManager.loading')}</div>
       ) : !user ? (
-        <div className="flex-1 flex items-center justify-center">Redirigiendo al inicio de sesión...</div>
+        <div className="flex-1 flex items-center justify-center">{t('aiManager.redirectingToLogin')}</div>
       ) : !user.locationId ? (
         <Card className="flex-1 flex items-center justify-center p-4">
           <div className="text-center text-red-500">
-            <p className="font-medium">No tienes una ubicación asignada</p>
-            <p className="text-sm mt-2">Por favor, contacta al administrador para que te asigne una ubicación.</p>
+            <p className="font-medium">{t('aiManager.noLocationAssigned')}</p>
+            <p className="text-sm mt-2">{t('aiManager.contactAdmin')}</p>
           </div>
         </Card>
       ) : (
@@ -785,15 +788,15 @@ export default function AIManagerPage() {
         >
           <div className="flex-none flex items-center justify-between">
             <TabsList>
-              <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-              <TabsTrigger value="chat">Chat IA</TabsTrigger>
+              <TabsTrigger value="whatsapp">{t('aiManager.tabs.whatsapp')}</TabsTrigger>
+              <TabsTrigger value="chat">{t('aiManager.tabs.chat')}</TabsTrigger>
             </TabsList>
           </div>
           {whatsappError && (
             <div className="p-4 bg-red-100 text-red-700 rounded mb-2 flex flex-col items-center">
               <span>{whatsappError}</span>
               <Button variant="outline" className="mt-2" onClick={handleWhatsAppConnect}>
-                Reintentar conexión
+                {t('aiManager.error.retryConnection')}
               </Button>
             </div>
           )}
@@ -814,16 +817,16 @@ export default function AIManagerPage() {
                       <Card className="h-full flex flex-col">
                         <div className="flex-none p-4 border-b">
                           <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-semibold">Chats</h2>
+                            <h2 className="text-lg font-semibold">{t('aiManager.chats.title')}</h2>
                           </div>
 
                           {isAuthenticating ? (
                             <div className="flex flex-col items-center gap-4 p-4 border rounded-lg mt-4">
-                              <p className="text-sm text-center">Conectando IA con WhatsApp...</p>
+                              <p className="text-sm text-center">{t('aiManager.chats.connectingAI')}</p>
                             </div>
                           ) : showQR && qrCode && (
                             <div className="flex flex-col items-center gap-4 p-4 border rounded-lg mt-4">
-                              <p className="text-sm text-center">Escanea el código QR con WhatsApp</p>
+                              <p className="text-sm text-center">{t('aiManager.chats.scanQR')}</p>
                               <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
                             </div>
                           )}
@@ -833,11 +836,11 @@ export default function AIManagerPage() {
                           <div className="p-4 space-y-2">
                             {isLoadingChats ? (
                               <div className="flex items-center justify-center p-4">
-                                <p className="text-muted-foreground">Cargando chats...</p>
+                                <p className="text-muted-foreground">{t('aiManager.chats.loadingChats')}</p>
                               </div>
                             ) : whatsappChats.length === 0 ? (
                               <div className="flex items-center justify-center p-4">
-                                <p className="text-muted-foreground">No hay chats disponibles</p>
+                                <p className="text-muted-foreground">{t('aiManager.chats.noChatsAvailable')}</p>
                               </div>
                             ) : (
                               whatsappChats.map((chat) => (
@@ -864,7 +867,7 @@ export default function AIManagerPage() {
                                       </div>
                                       <div className="flex items-center justify-between mt-1">
                                         <p className="text-sm text-muted-foreground truncate">
-                                          {chat.lastMessage || 'Sin mensajes'}
+                                          {chat.lastMessage || t('aiManager.chats.noMessages')}
                                         </p>
                                         {chat.unreadCount > 0 && (
                                           <Badge variant="secondary" className="flex-shrink-0 ml-2">
@@ -933,13 +936,13 @@ export default function AIManagerPage() {
                                 )}
                                 title={
                                   isAIEnabled
-                                    ? "Desactivar IA para este chat"
-                                    : "Activar IA para este chat"
+                                    ? t('aiManager.chat.deactivateAIForChat')
+                                    : t('aiManager.chat.activateAIForChat')
                                 }
                               >
                                 <Bot className="h-4 w-4 md:h-5 md:w-5" />
                                 <span className="font-semibold text-xs md:text-sm hidden sm:inline">
-                                  {isAIEnabled ? 'IA Activa' : 'IA Inactiva'}
+                                  {isAIEnabled ? t('aiManager.chat.aiActive') : t('aiManager.chat.aiInactive')}
                                 </span>
                                 <span className="font-semibold text-xs sm:hidden">
                                   {isAIEnabled ? 'ACTIVA' : 'INACTIVA'}
@@ -950,11 +953,11 @@ export default function AIManagerPage() {
                               <div className="p-4 space-y-4">
                                 {isLoadingMessages ? (
                                   <div className="flex items-center justify-center h-full">
-                                    <p className="text-muted-foreground">Cargando mensajes...</p>
+                                    <p className="text-muted-foreground">{t('aiManager.chat.loadingMessages')}</p>
                                   </div>
                                 ) : chatMessages.length === 0 ? (
                                   <div className="flex items-center justify-center h-full">
-                                    <p className="text-muted-foreground">No hay mensajes en este chat</p>
+                                    <p className="text-muted-foreground">{t('aiManager.chat.noMessagesInChat')}</p>
                                   </div>
                                 ) : (
                                   <>
@@ -1013,7 +1016,7 @@ export default function AIManagerPage() {
                                       setInput("");
                                     }
                                   }}
-                                  placeholder="Escribe un mensaje..."
+                                  placeholder={t('aiManager.chat.typeMessage')}
                                   className="flex-1"
                                 />
                                 <Button
@@ -1024,13 +1027,14 @@ export default function AIManagerPage() {
                                   disabled={!input.trim()}
                                 >
                                   <Send className="h-4 w-4" />
+                                  <span className="sr-only">{t('aiManager.chat.sendMessage')}</span>
                                 </Button>
                               </div>
                             </div>
                           </div>
                         ) : (
                           <div className="h-full flex items-center justify-center text-muted-foreground">
-                            Selecciona un chat para comenzar
+                            {t('aiManager.chat.selectChatToStart')}
                           </div>
                         )}
                       </Card>
@@ -1083,7 +1087,7 @@ export default function AIManagerPage() {
                           <AvatarFallback>AI</AvatarFallback>
                         </Avatar>
                         <div className="rounded-lg p-4 bg-muted">
-                          <p>Escribiendo...</p>
+                          <p>{t('aiManager.voice.writing')}</p>
                         </div>
                       </div>
                     )}
@@ -1094,7 +1098,7 @@ export default function AIManagerPage() {
                   <div className="flex-1 relative">
                     <Input
                       ref={inputRef}
-                      placeholder={isRecording ? "Escuchando..." : "Escribe tu mensaje..."}
+                      placeholder={isRecording ? t('aiManager.voice.listening') : t('aiManager.voice.typeMessage')}
                       value={isRecording ? "" : input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={(e) => {
