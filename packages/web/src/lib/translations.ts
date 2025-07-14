@@ -520,5 +520,515 @@ export const translations = {
         writing: "Writing..."
       }
     }
+  },
+  ja: {
+    // Header
+    login: "ログイン",
+
+    // Hero Section
+    heroTitle: "レストラン管理を革新するAI",
+    heroSubtitle: "レストランオーナーの皆様へ、ビジネス最適化の最良の選択肢をご提案します。KutchenAIは自動化、売上向上、完全なコントロールを実現するインテリジェントアシスタントです。リーディングプラットフォームを信頼し、レストランを次のレベルへ！",
+    requestDemo: "デモをリクエスト",
+    viewFeatures: "機能を見る",
+
+    // Trust Section
+    trustText: "ますます多くの",
+    restaurants: "レストラン",
+    trustIn: "がKutchenAIを信頼しています",
+
+    // Features Section
+    featuresTitle: "レストランに必要なすべて",
+    features: [
+      {
+        title: "リアルタイムダッシュボード",
+        desc: "即時の指標とレポートでレストランを完全管理。"
+      },
+      {
+        title: "AIアシスタント",
+        desc: "24時間365日、顧客対応・注文受付・自動応答。"
+      },
+      {
+        title: "POSと販売",
+        desc: "高速POS、キャッシュ管理、簡単な請求書発行。"
+      },
+      {
+        title: "注文・キッチン管理",
+        desc: "明確な注文、エラーなし、シェフ・スタッフ専用パネル。"
+      },
+      {
+        title: "在庫・食材管理",
+        desc: "在庫・コストを管理し、損失を防止。"
+      },
+      {
+        title: "多店舗・ユーザー管理",
+        desc: "すべての拠点とチームを一元管理。"
+      },
+      {
+        title: "スマートQRメニュー",
+        desc: "顧客はスマホでメニューを見て注文可能。"
+      },
+    ],
+
+    // Benefits Section
+    whyTitle: "なぜKutchenAI？",
+    benefits: [
+      "繰り返し作業を自動化し、時間とコストを削減。",
+      "24時間365日対応とエラーのない注文で顧客体験を向上。",
+      "リアルタイムのレポートと指標で賢い意思決定。",
+      "銀行レベルのセキュリティとプライバシー。",
+      "柔軟で拡張性があり、使いやすいプラットフォーム。"
+    ],
+
+    // CTA Section
+    readyTitle: "レストランを変革する準備はできていますか？",
+    startFree: "今すぐ無料で始める",
+    noCreditCard: "クレジットカード不要。契約不要。",
+
+    // Footer
+    platformDescription: "レストラン向けインテリジェント管理プラットフォーム。",
+    termsAndConditions: "利用規約",
+
+    // Register Page
+    registerTitle: "アカウント作成",
+    registerDescription: "アカウント作成のため情報を入力してください",
+    registerBusinessPlaceholder: "店舗名",
+    registerBusinessExample: "例：レストランパオラ、セントラルカフェ...",
+    registerFirstName: "名",
+    registerLastName: "姓",
+    registerEmail: "メールアドレス",
+    registerPassword: "パスワード",
+    registerButton: "アカウント作成",
+    registerAlreadyHave: "すでにアカウントをお持ちですか？",
+    registerSignIn: "ログイン",
+
+    // Login Subdomain Modal
+    loginSubdomainTitle: "サブドメインは何ですか？",
+    loginSubdomainPlaceholder: "例：mybusiness",
+    loginSubdomainButton: "次へ",
+
+    // Login Page
+    loginTitle: "アカウントにログイン",
+    loginDescription: "メールアドレスを入力してログイン",
+    loginEmail: "メールアドレス",
+    loginPassword: "パスワード",
+    loginButton: "ログイン",
+    loginOrContinue: "または次で続行",
+    loginGoogle: "Google",
+    loginFacebook: "Facebook",
+    loginNoAccount: "アカウントをお持ちでないですか？",
+    loginSignUp: "新規登録",
+
+    // Dashboard
+    dashboard: {
+      title: "ダッシュボード",
+      overview: "概要",
+      analytics: "分析",
+      reports: "レポート",
+      newLocation: "新しい拠点",
+      totalSales: "総売上",
+      activeOrders: "アクティブ注文",
+      paidOrders: "支払済み注文",
+      unpaidOrders: "未払い注文",
+      cancelledOrders: "キャンセル注文",
+      orderChannels: "注文チャネル",
+      salesByLocation: "拠点別売上",
+      topProducts: "売上トップ5商品",
+      unitsSold: "販売数",
+      sinceLastMonth: "前月比",
+      total: "合計",
+      orders: "注文",
+      order: "注文",
+      // Analytics
+      salesAndPareto: "売上とパレート分析",
+      selectPeriod: "期間を選択",
+      lastWeek: "先週",
+      lastMonth: "先月",
+      customRange: "カスタム範囲",
+      revenueByProduct: "商品別収益",
+      cumulativePercentage: "累積パーセンテージ",
+      // Kitchen Analytics
+      kitchenTimes: "キッチン時間とボトルネック",
+      activityByHour: "時間帯・カテゴリ別活動",
+      preparationTimes: "商品別調理時間",
+      congestionByHour: "時間帯別混雑",
+      averageTime: "平均時間",
+      maximum: "最大",
+      minimum: "最小",
+      low: "低",
+      medium: "中",
+      high: "高",
+      minutes: "分",
+      // Inventory Analysis
+      ingredientsAndWaste: "食材と廃棄",
+      inventoryDistribution: "在庫分布",
+      consumptionVsStock: "消費量・在庫・予測",
+      category: "カテゴリ",
+      currentStock: "現在の在庫",
+      consumption: "消費量",
+      prediction: "予測",
+      highValue: "高価値",
+      mediumValue: "中価値",
+      lowValue: "低価値",
+      highValueDesc: "高価値・低ボリューム",
+      mediumValueDesc: "中価値・中ボリューム",
+      lowValueDesc: "低価値・高ボリューム",
+      items: "アイテム",
+      // Reports
+      predictionsAndRecommendations: "予測と推奨",
+      systemAlerts: "システムアラート",
+      orderAnalysis: "注文分析・行動",
+      conversionFunnel: "コンバージョンファネル",
+      averageTimeBySection: "セクション別平均時間",
+      cartAbandonmentRate: "カート放棄率",
+      views: "閲覧数",
+      clicks: "クリック数",
+      payments: "支払い数",
+      conversionRate: "コンバージョン率",
+      seconds: "秒",
+      percentage: "パーセンテージ",
+      abandonmentRate: "放棄率",
+      trend: "トレンド",
+      confidence: "信頼度",
+      daysLeft: "残り日数",
+      alerts: "アラート",
+      // Order Channels
+      pos: "POS",
+      aiWhatsapp: "AI WhatsApp",
+      qrTables: "QRテーブル",
+      waiters: "ウェイター",
+      diddi: "Diddi",
+      rappi: "Rappi"
+    },
+
+    // Sidebar
+    sidebar: {
+      dashboard: "ダッシュボード",
+      ai: "AI",
+      pos: "POS",
+      orders: "注文",
+      tables: "テーブル",
+      kitchen: "キッチン",
+      categories: "カテゴリ",
+      products: "商品",
+      ingredients: "食材",
+      locations: "拠点",
+      customers: "顧客",
+      users: "ユーザー",
+      settings: "設定"
+    },
+
+    // User Menu
+    userMenu: {
+      logout: "ログアウト"
+    },
+
+    // AI Manager
+    aiManager: {
+      title: "AI v.3.0",
+      whatsappConnected: "WhatsApp接続済み",
+      connect: "接続",
+      connectWhatsApp: "WhatsAppを接続",
+      activateAI: "AIエージェントを有効化",
+      aiActivated: "AI有効化済み",
+      aiDeactivated: "AI無効化済み",
+      errorUpdatingSettings: "設定更新エラー",
+      loading: "読み込み中...",
+      redirectingToLogin: "ログイン画面にリダイレクト中...",
+      noLocationAssigned: "割り当てられた拠点がありません",
+      contactAdmin: "管理者に拠点割り当てを依頼してください。",
+      tabs: {
+        whatsapp: "WhatsApp",
+        chat: "AIチャット"
+      },
+      error: {
+        retryConnection: "再接続",
+        cannotVerifyWhatsApp: "WhatsAppの状態を確認できません：tenantIdまたはlocationIdがありません。",
+        cannotConnectWhatsApp: "WhatsAppに接続できません：tenantIdまたはlocationIdがありません。"
+      },
+      chats: {
+        title: "チャット",
+        connectingAI: "AIとWhatsAppを接続中...",
+        scanQR: "WhatsAppでQRコードをスキャン",
+        loadingChats: "チャット読み込み中...",
+        noChatsAvailable: "利用可能なチャットはありません",
+        noMessages: "メッセージなし",
+        unreadCount: "未読メッセージ"
+      },
+      chat: {
+        selectChatToStart: "チャットを選択して開始",
+        loadingMessages: "メッセージ読み込み中...",
+        noMessagesInChat: "このチャットにメッセージはありません",
+        aiActive: "AI有効",
+        aiInactive: "AI無効",
+        activateAIForChat: "このチャットでAIを有効化",
+        deactivateAIForChat: "このチャットでAIを無効化",
+        typeMessage: "メッセージを入力...",
+        sendMessage: "送信",
+        aiEnabledForChat: "{name}のAIが有効になりました。",
+        aiDisabledForChat: "{name}のAIが無効になりました。"
+      },
+      voice: {
+        listening: "リスニング中...",
+        typeMessage: "メッセージを入力...",
+        errorAccessingMicrophone: "マイクへのアクセスエラー",
+        errorProcessingAudio: "音声処理エラー",
+        writing: "入力中..."
+      }
+    }
+  },
+  de: {
+    // Header
+    login: "Anmelden",
+
+    // Hero Section
+    heroTitle: "Die KI, die Ihr Restaurantmanagement revolutioniert",
+    heroSubtitle: "Wenn Sie ein Restaurant besitzen, haben wir die beste Option, um Ihr Geschäft zu optimieren. KutchenAI ist der intelligente Assistent, der automatisiert, mehr verkauft und Ihnen die volle Kontrolle gibt. Vertrauen Sie der führenden Plattform und bringen Sie Ihr Restaurant auf das nächste Level!",
+    requestDemo: "Demo anfordern",
+    viewFeatures: "Funktionen anzeigen",
+
+    // Trust Section
+    trustText: "Immer mehr",
+    restaurants: "Restaurants",
+    trustIn: "vertrauen auf KutchenAI",
+
+    // Features Section
+    featuresTitle: "Alles, was Ihr Restaurant braucht",
+    features: [
+      {
+        title: "Echtzeit-Dashboard",
+        desc: "Volle Kontrolle über Ihr Restaurant mit sofortigen Kennzahlen und Berichten."
+      },
+      {
+        title: "Künstliche Intelligenz Assistent",
+        desc: "Kunden betreuen, Bestellungen aufnehmen und automatisch 24/7 antworten."
+      },
+      {
+        title: "POS und Verkauf",
+        desc: "Schneller Point of Sale, Kassenkontrolle und einfache Abrechnung."
+      },
+      {
+        title: "Bestell- und Küchenmanagement",
+        desc: "Klare Bestellungen, keine Fehler und spezielles Panel für Köche und Personal."
+      },
+      {
+        title: "Inventar und Zutaten",
+        desc: "Bestände, Kosten kontrollieren und Verluste vermeiden."
+      },
+      {
+        title: "Multi-Standort und Benutzer",
+        desc: "Verwalten Sie alle Standorte und Ihr Team an einem Ort."
+      },
+      {
+        title: "Intelligente QR-Speisekarte",
+        desc: "Ihre Kunden können die Speisekarte ansehen und direkt vom Handy bestellen."
+      },
+    ],
+
+    // Benefits Section
+    whyTitle: "Warum KutchenAI?",
+    benefits: [
+      "Sparen Sie Zeit und Geld durch Automatisierung wiederkehrender Aufgaben.",
+      "Verbessern Sie das Kundenerlebnis mit 24/7-Service und fehlerfreien Bestellungen.",
+      "Treffen Sie intelligente Entscheidungen mit Berichten und Kennzahlen in Echtzeit.",
+      "Sicherheits- und Datenschutz auf Bankniveau.",
+      "Flexible, skalierbare und benutzerfreundliche Plattform."
+    ],
+
+    // CTA Section
+    readyTitle: "Bereit, Ihr Restaurant zu transformieren?",
+    startFree: "Jetzt kostenlos starten",
+    noCreditCard: "Keine Kreditkarte. Keine Verpflichtung.",
+
+    // Footer
+    platformDescription: "Intelligente Managementplattform für Restaurants.",
+    termsAndConditions: "Allgemeine Geschäftsbedingungen",
+
+    // Register Page
+    registerTitle: "Konto erstellen",
+    registerDescription: "Geben Sie Ihre Informationen ein, um Ihr Konto zu erstellen",
+    registerBusinessPlaceholder: "Name des Unternehmens",
+    registerBusinessExample: "Beispiel: Restaurant Paola, Central Café...",
+    registerFirstName: "Vorname",
+    registerLastName: "Nachname",
+    registerEmail: "E-Mail",
+    registerPassword: "Passwort",
+    registerButton: "Konto erstellen",
+    registerAlreadyHave: "Sie haben bereits ein Konto?",
+    registerSignIn: "Anmelden",
+
+    // Login Subdomain Modal
+    loginSubdomainTitle: "Was ist Ihre Subdomain?",
+    loginSubdomainPlaceholder: "Z.B. meinunternehmen",
+    loginSubdomainButton: "Weiter",
+
+    // Login Page
+    loginTitle: "Melden Sie sich bei Ihrem Konto an",
+    loginDescription: "Geben Sie Ihre E-Mail-Adresse ein, um sich anzumelden",
+    loginEmail: "E-Mail",
+    loginPassword: "Passwort",
+    loginButton: "Anmelden",
+    loginOrContinue: "Oder weiter mit",
+    loginGoogle: "Google",
+    loginFacebook: "Facebook",
+    loginNoAccount: "Sie haben noch kein Konto?",
+    loginSignUp: "Registrieren",
+
+    // Dashboard
+    dashboard: {
+      title: "Dashboard",
+      overview: "Übersicht",
+      analytics: "Analytik",
+      reports: "Berichte",
+      newLocation: "Neuer Standort",
+      totalSales: "Gesamtumsatz",
+      activeOrders: "Aktive Bestellungen",
+      paidOrders: "Bezahlte Bestellungen",
+      unpaidOrders: "Unbezahlte Bestellungen",
+      cancelledOrders: "Stornierte Bestellungen",
+      orderChannels: "Bestellkanäle",
+      salesByLocation: "Umsatz nach Standort",
+      topProducts: "Top 5 meistverkaufte Produkte",
+      unitsSold: "verkaufte Einheiten",
+      sinceLastMonth: "seit letztem Monat",
+      total: "Gesamt",
+      orders: "Bestellungen",
+      order: "Bestellung",
+      // Analytics
+      salesAndPareto: "Umsatz und Produkt-Pareto",
+      selectPeriod: "Zeitraum auswählen",
+      lastWeek: "Letzte Woche",
+      lastMonth: "Letzter Monat",
+      customRange: "Benutzerdefinierter Zeitraum",
+      revenueByProduct: "Umsatz nach Produkt",
+      cumulativePercentage: "Kumulierter Prozentsatz",
+      // Kitchen Analytics
+      kitchenTimes: "Küchenzeiten und Engpässe",
+      activityByHour: "Aktivität nach Stunde und Kategorie",
+      preparationTimes: "Vorbereitungszeiten pro Artikel",
+      congestionByHour: "Stau nach Stunde",
+      averageTime: "Durchschnittszeit",
+      maximum: "Maximum",
+      minimum: "Minimum",
+      low: "Niedrig",
+      medium: "Mittel",
+      high: "Hoch",
+      minutes: "Minuten",
+      // Inventory Analysis
+      ingredientsAndWaste: "Zutaten und Abfall",
+      inventoryDistribution: "Inventarverteilung",
+      consumptionVsStock: "Verbrauch vs. Bestand vs. Prognose",
+      category: "Kategorie",
+      currentStock: "Aktueller Bestand",
+      consumption: "Verbrauch",
+      prediction: "Prognose",
+      highValue: "Hoher Wert",
+      mediumValue: "Mittlerer Wert",
+      lowValue: "Niedriger Wert",
+      highValueDesc: "Hoher Wert, geringes Volumen",
+      mediumValueDesc: "Mittlerer Wert und Volumen",
+      lowValueDesc: "Niedriger Wert, hohes Volumen",
+      items: "Artikel",
+      // Reports
+      predictionsAndRecommendations: "Prognosen und Empfehlungen",
+      systemAlerts: "Systemwarnungen",
+      orderAnalysis: "Bestellanalyse und Verhalten",
+      conversionFunnel: "Conversion-Funnel",
+      averageTimeBySection: "Durchschnittszeit pro Abschnitt",
+      cartAbandonmentRate: "Warenkorbabbruchrate",
+      views: "Ansichten",
+      clicks: "Klicks",
+      payments: "Zahlungen",
+      conversionRate: "Konversionsrate",
+      seconds: "Sekunden",
+      percentage: "Prozentsatz",
+      abandonmentRate: "Abbruchrate",
+      trend: "Trend",
+      confidence: "Vertrauen",
+      daysLeft: "verbleibende Tage",
+      alerts: "Warnungen",
+      // Order Channels
+      pos: "POS",
+      aiWhatsapp: "AI WhatsApp",
+      qrTables: "QR-Tische",
+      waiters: "Kellner",
+      diddi: "Diddi",
+      rappi: "Rappi"
+    },
+
+    // Sidebar
+    sidebar: {
+      dashboard: "Dashboard",
+      ai: "Künstliche Intelligenz",
+      pos: "POS",
+      orders: "Bestellungen",
+      tables: "Tische",
+      kitchen: "Küche",
+      categories: "Kategorien",
+      products: "Produkte",
+      ingredients: "Zutaten",
+      locations: "Standorte",
+      customers: "Kunden",
+      users: "Benutzer",
+      settings: "Einstellungen"
+    },
+
+    // User Menu
+    userMenu: {
+      logout: "Abmelden"
+    },
+
+    // AI Manager
+    aiManager: {
+      title: "Künstliche Intelligenz v.3.0",
+      whatsappConnected: "WhatsApp verbunden",
+      connect: "Verbinden",
+      connectWhatsApp: "WhatsApp verbinden",
+      activateAI: "KI-Agent aktivieren",
+      aiActivated: "KI aktiviert",
+      aiDeactivated: "KI deaktiviert",
+      errorUpdatingSettings: "Fehler beim Aktualisieren der Einstellungen",
+      loading: "Lädt...",
+      redirectingToLogin: "Weiterleitung zum Login...",
+      noLocationAssigned: "Ihnen ist kein Standort zugewiesen",
+      contactAdmin: "Bitte wenden Sie sich an den Administrator, um Ihnen einen Standort zuzuweisen.",
+      tabs: {
+        whatsapp: "WhatsApp",
+        chat: "KI-Chat"
+      },
+      error: {
+        retryConnection: "Verbindung erneut versuchen",
+        cannotVerifyWhatsApp: "WhatsApp-Status kann nicht überprüft werden: tenantId oder locationId fehlt.",
+        cannotConnectWhatsApp: "Verbindung zu WhatsApp nicht möglich: tenantId oder locationId fehlt."
+      },
+      chats: {
+        title: "Chats",
+        connectingAI: "KI wird mit WhatsApp verbunden...",
+        scanQR: "Scannen Sie den QR-Code mit WhatsApp",
+        loadingChats: "Chats werden geladen...",
+        noChatsAvailable: "Keine Chats verfügbar",
+        noMessages: "Keine Nachrichten",
+        unreadCount: "ungelesene Nachrichten"
+      },
+      chat: {
+        selectChatToStart: "Wählen Sie einen Chat zum Starten aus",
+        loadingMessages: "Nachrichten werden geladen...",
+        noMessagesInChat: "Keine Nachrichten in diesem Chat",
+        aiActive: "KI aktiv",
+        aiInactive: "KI inaktiv",
+        activateAIForChat: "KI für diesen Chat aktivieren",
+        deactivateAIForChat: "KI für diesen Chat deaktivieren",
+        typeMessage: "Nachricht eingeben...",
+        sendMessage: "Nachricht senden",
+        aiEnabledForChat: "KI für {name} ist jetzt aktiv.",
+        aiDisabledForChat: "KI für {name} ist jetzt inaktiv."
+      },
+      voice: {
+        listening: "Hört zu...",
+        typeMessage: "Nachricht eingeben...",
+        errorAccessingMicrophone: "Fehler beim Zugriff auf das Mikrofon",
+        errorProcessingAudio: "Fehler bei der Audioverarbeitung",
+        writing: "Schreibt..."
+      }
+    }
   }
 } 
