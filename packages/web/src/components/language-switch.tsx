@@ -19,6 +19,10 @@ export function LanguageSwitch() {
     { code: 'en', name: 'English', flag: '🇺🇸' },
     { code: 'ja', name: '日本語', flag: '🇯🇵' },
     { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+    { code: 'fr', name: 'Français', flag: '🇫🇷' },
+    { code: 'zh', name: '中文', flag: '🇨🇳' },
+    { code: 'it', name: 'Italiano', flag: '🇮🇹' },
+    { code: 'hi', name: 'हिन्दी', flag: '🇮🇳' },
   ]
 
   const currentLang = languages.find(lang => lang.code === language) || languages[0]
@@ -39,7 +43,7 @@ export function LanguageSwitch() {
         {languages.map((lang) => (
           <DropdownMenuItem
             key={lang.code}
-            onClick={() => changeLanguage(lang.code as 'es' | 'en' | 'ja' | 'de')}
+            onClick={() => changeLanguage(lang.code as 'es' | 'en' | 'ja' | 'de' | 'fr' | 'zh' | 'it' | 'hi')}
             className="flex items-center gap-2"
           >
             <span className="text-lg">{lang.flag}</span>

@@ -4,13 +4,86 @@ import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Minus, Clock, Package, ShoppingCart, RefreshCw, Maximize2, X, Moon, Sun } from "lucide-react"
+import { Plus, Minus, Clock, Package, ShoppingCart, RefreshCw, Maximize2, X, Moon, Sun, Globe } from "lucide-react"
 import { getProducts, Product, Category, getActiveOrders, getCategories } from "@/lib/api"
 import { Cart } from "./cart"
 import Image from "next/image"
 import { toast } from "sonner"
 import { io } from "socket.io-client"
 import { Dialog, DialogContent, DialogClose, DialogTitle } from "@/components/ui/dialog"
+import { useLanguage } from '@/hooks/use-language'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { translations } from '@/lib/translations'
+
+// Local language type and translations
+const languages = [
+  { code: 'es', name: 'Español', flag: '🇪🇸' },
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'ja', name: '日本語', flag: '🇯🇵' },
+  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'zh', name: '中文', flag: '🇨🇳' },
+  { code: 'it', name: 'Italiano', flag: '🇮🇹' },
+  { code: 'hi', name: 'हिन्दी', flag: '🇮🇳' },
+]
+type MenuLanguage = typeof languages[number]['code']
+
+function useMenuLanguage(defaultLang: MenuLanguage = 'es') {
+  const [language, setLanguageState] = useState<MenuLanguage>(defaultLang)
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('menuLanguage') : null
+    if (stored && languages.some(l => l.code === stored)) {
+      setLanguageState(stored as MenuLanguage)
+    }
+  }, [])
+
+  // Save to localStorage on change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('menuLanguage', language)
+    }
+  }, [language])
+
+  const setLanguage = (lang: MenuLanguage) => setLanguageState(lang)
+
+  const t = (key: string): string => {
+    const currentTranslations = translations[language] || translations.es
+    return key.split('.').reduce((obj, key) => obj?.[key], currentTranslations) || key
+  }
+  const tNested = (path: string): any => {
+    const currentTranslations = translations[language] || translations.es
+    return path.split('.').reduce((obj, key) => obj?.[key], currentTranslations) || {}
+  }
+  return { language, setLanguage, t, tNested }
+}
+
+function MenuLanguageSwitch({ language, setLanguage }: { language: MenuLanguage, setLanguage: (lang: MenuLanguage) => void }) {
+  const currentLang = languages.find(lang => lang.code === language) || languages[0]
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <span className="text-lg">{currentLang.flag}</span>
+          <span className="sr-only">Switch language</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {languages.map((lang) => (
+          <DropdownMenuItem
+            key={lang.code}
+            onClick={() => setLanguage(lang.code as MenuLanguage)}
+            className="flex items-center gap-2"
+          >
+            <span className="text-lg">{lang.flag}</span>
+            <span>{lang.name}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 interface MenuProps {
   locationId: string
@@ -102,7 +175,10 @@ function MenuThemeSwitch({ menuTheme, toggleMenuTheme }: { menuTheme: 'light' | 
   );
 }
 
+export { useMenuLanguage, MenuLanguageSwitch }
+
 export function Menu({ locationId, tableId, customerName, businessIcon, menuTheme: menuThemeProp, setMenuTheme }: MenuProps) {
+  const { language, setLanguage, t, tNested } = useMenuLanguage();
   const vh = useMobileViewportHeight();
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [cart, setCart] = useState<Record<string, number>>({})
@@ -323,7 +399,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
       <div className="flex items-center justify-center min-h-[calc(var(--vh,1vh)*100)] w-full overflow-x-hidden">
         <div className="text-center space-y-2">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Cargando menú y órdenes...</p>
+          <p className="text-muted-foreground">{t('menu.loading') || 'Cargando menú y órdenes...'}</p>
         </div>
       </div>
     )
@@ -334,7 +410,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
       <div className="flex items-center justify-center min-h-[calc(var(--vh,1vh)*100)] w-full overflow-x-hidden">
         <div className="text-center space-y-4">
           <div className="text-red-500">
-            <p className="font-medium">Error al cargar los datos</p>
+            <p className="font-medium">{t('menu.errorLoading') || 'Error al cargar los datos'}</p>
             <p className="text-sm text-muted-foreground">{error}</p>
           </div>
           <Button onClick={() => {
@@ -342,7 +418,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
             setLoading(true)
             fetchData()
           }}>
-            Reintentar
+            {t('menu.retry') || 'Reintentar'}
           </Button>
         </div>
       </div>
@@ -385,7 +461,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
                 </div>
               ) : (
                 <div className="relative w-full h-64 md:h-96 flex items-center justify-center bg-muted rounded-b-none rounded-t-lg border border-dashed border-gray-300">
-                  <span className="text-lg text-gray-400">Producto sin imagen</span>
+                  <span className="text-lg text-gray-400">{t('menu.noImage') || 'Producto sin imagen'}</span>
                 </div>
               )}
               <div className="w-full p-6 flex flex-col gap-4">
@@ -462,13 +538,14 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
             <Card>
               <CardContent className="pt-2">
                 <div className="relative">
-                  <div className="absolute top-0 right-0 z-10">
+                  <div className="absolute top-0 right-0 z-10 flex gap-2">
+                    <MenuLanguageSwitch language={language} setLanguage={setLanguage} />
                     <MenuThemeSwitch menuTheme={menuTheme} toggleMenuTheme={toggleMenuTheme} />
                   </div>
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-bold">¡Hola {customerName}!</h2>
+                    <h2 className="text-2xl font-bold">{t('menu.welcome') || `¡Hola ${customerName}!`}</h2>
                     <p className="text-muted-foreground">
-                      Aquí podrás ver nuestro menú, ordenar productos, ver tus pedidos y pagar la cuenta.
+                      {t('menu.intro') || 'Aquí podrás ver nuestro menú, ordenar productos, ver tus pedidos y pagar la cuenta.'}
                     </p>
                   </div>
                 </div>
@@ -484,7 +561,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
                   className={`flex items-center gap-2 ${menuTheme === 'dark' && activeTab === 'menu' ? 'bg-zinc-900 text-white' : ''}`}
                 >
                   <Package className="h-4 w-4" />
-                  Menú
+                  {t('menu.menuTab') || 'Menú'}
                 </Button>
                 <Button
                   variant={activeTab === 'orders' ? 'default' : 'outline'}
@@ -492,7 +569,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
                   className="flex items-center gap-2"
                 >
                   <Clock className="h-4 w-4" />
-                  Tus órdenes
+                  {t('menu.ordersTab') || 'Tus órdenes'}
                 </Button>
               </div>
             </div>
@@ -500,7 +577,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
             {activeTab === 'orders' ? (
               <>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold">Órdenes Activas</h2>
+                  <h2 className="text-2xl font-bold">{t('menu.activeOrders') || 'Órdenes Activas'}</h2>
                   <Button
                     variant="outline"
                     size="icon"
@@ -514,19 +591,19 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
                   <CardContent>
                     <div className="space-y-4">
                       {activeOrders.length === 0 ? (
-                        <p className="text-center text-muted-foreground">No tienes órdenes</p>
+                        <p className="text-center text-muted-foreground">{t('menu.noOrders') || 'No tienes órdenes'}</p>
                       ) : (
                         activeOrders.map((order) => (
                           <div key={order.id} className="border rounded-lg p-4">
                             <div className="flex justify-between items-start mb-2">
                               <div>
-                                <p className="font-medium">Orden #{order.id.substring(0, 8)}</p>
+                                <p className="font-medium">{t('menu.order') || 'Orden'} #{order.id.substring(0, 8)}</p>
                                 <p className="text-sm text-muted-foreground">
                                   {new Date(order.createdAt).toLocaleTimeString()}
                                 </p>
                               </div>
                               <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded-full">
-                                {order.items.reduce((sum, item) => sum + item.quantity, 0)} items
+                                {order.items.reduce((sum, item) => sum + item.quantity, 0)} {t('menu.items') || 'items'}
                               </span>
                             </div>
                             <div className="space-y-2">
@@ -543,10 +620,10 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
                                     item.status === "IN_PROGRESS" ? "text-blue-500" :
                                     "text-green-500"
                                   }`}>
-                                    {item.status === "PENDING" ? "Pendiente" :
-                                     item.status === "IN_PROGRESS" ? "En preparación" :
-                                     item.status === "CANCELLED" ? "Cancelada" :
-                                     "Listo"}
+                                    {item.status === "PENDING" ? t('menu.pending') || 'Pendiente' :
+                                     item.status === "IN_PROGRESS" ? t('menu.inProgress') || 'En preparación' :
+                                     item.status === "CANCELLED" ? t('menu.cancelled') || 'Cancelada' :
+                                     t('menu.ready') || 'Listo'}
                                   </span>
                                 </div>
                               ))}
@@ -562,7 +639,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
               <>
                 <div className="flex flex-col gap-4">
                   <Input
-                    placeholder="Buscar productos..."
+                    placeholder={t('menu.searchPlaceholder') || 'Buscar productos...'}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="max-w-sm"
@@ -574,7 +651,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
                       onClick={() => setSelectedCategory("all")}
                       className="whitespace-nowrap"
                     >
-                      Todos
+                      {t('menu.all') || 'Todos'}
                     </Button>
                     {categories.map((category) => (
                       <Button
@@ -637,7 +714,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
                                   </div>
                                 ) : (
                                   <div className="relative w-full h-40 flex items-center justify-center bg-muted rounded-lg border border-dashed border-gray-300">
-                                    <span className="text-xs text-gray-400">Producto sin imagen</span>
+                                    <span className="text-xs text-gray-400">{t('menu.noImage') || 'Producto sin imagen'}</span>
                                   </div>
                                 )}
                                 <div className="space-y-1.5">
@@ -693,6 +770,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
               })
               setCart(newCart)
             }}
+            t={t}
           />
         </div>
       </div>

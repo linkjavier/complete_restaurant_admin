@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import Image from "next/image"
 import { Moon, Sun } from "lucide-react";
+import { useMenuLanguage } from '@/components/table/menu'
+import { MenuLanguageSwitch } from '@/components/table/menu'
 function MenuThemeSwitch({ menuTheme, toggleMenuTheme }: { menuTheme: 'light' | 'dark', toggleMenuTheme: () => void }) {
   return (
     <button
@@ -40,6 +42,9 @@ export default function TablePage() {
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
   const toggleMenuTheme = () => setMenuTheme(menuTheme === 'light' ? 'dark' : 'light');
+
+  // Hook de idioma local
+  const { language, setLanguage, t } = useMenuLanguage();
 
   // Efecto para cambiar el fondo del body según el tema local SOLO en la pantalla de ingreso de nombre
   React.useEffect(() => {
@@ -109,7 +114,7 @@ export default function TablePage() {
             <div className="flex flex-col space-y-1">
               <h1 className="text-2xl font-bold">{businessName}</h1>
               <p className="text-muted-foreground text-sm">
-                Ubicación: {table.location?.name || "Sin ubicación"}
+                {t('welcome.locationLabel') || 'Ubicación'}: {table.location?.name || t('welcome.noLocation') || 'Sin ubicación'}
               </p>
             </div>
             
@@ -128,22 +133,23 @@ export default function TablePage() {
 
         {!isOrderStarted ? (
           <div className="max-w-md mx-auto space-y-4 mt-2 md:mt-4 relative">
-            <div className="absolute top-0 right-0 z-10">
+            <div className="absolute top-0 right-0 z-10 flex gap-2">
+              <MenuLanguageSwitch language={language} setLanguage={setLanguage} />
               <MenuThemeSwitch menuTheme={menuTheme} toggleMenuTheme={toggleMenuTheme} />
             </div>
             <div>
               <label htmlFor="customerName" className="block text-sm font-medium mb-2">
-                Tu Nombre
+                {t('welcome.nameLabel') || 'Tu Nombre'}
               </label>
               <Input
                 id="customerName"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Ingresa tu nombre"
+                placeholder={t('welcome.namePlaceholder') || 'Ingresa tu nombre'}
               />
             </div>
             <Button onClick={handleStartOrder} className="w-full">
-              Ver Menú
+              {t('welcome.seeMenu') || 'Ver Menú'}
             </Button>
           </div>
         ) : (
