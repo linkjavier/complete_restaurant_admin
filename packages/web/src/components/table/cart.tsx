@@ -15,9 +15,10 @@ interface CartProps {
   locationId: string
   items: OrderItem[]
   onItemsChange: (items: OrderItem[]) => void
+  t: (key: string) => string
 }
 
-export function Cart({ customerName, tableId, locationId, items, onItemsChange }: CartProps) {
+export function Cart({ customerName, tableId, locationId, items, onItemsChange, t }: CartProps) {
   const [splitBill, setSplitBill] = useState(false)
   const [splitNames, setSplitNames] = useState<string[]>([customerName])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -122,7 +123,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Tu Pedido</CardTitle>
+          <CardTitle>{t('cart.title') || 'Tu Pedido'}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -174,7 +175,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
 
       <Card>
         <CardHeader>
-          <CardTitle>Dividir Cuenta</CardTitle>
+          <CardTitle>{t('cart.splitTitle') || 'Dividir Cuenta'}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -185,7 +186,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
                 className="flex items-center gap-2"
               >
                 <Users className="h-4 w-4" />
-                {splitBill ? "No Dividir" : "Dividir Cuenta"}
+                {splitBill ? t('cart.noSplit') || 'No Dividir' : t('cart.split') || 'Dividir Cuenta'}
               </Button>
             </div>
 
@@ -194,7 +195,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
                 {splitNames.map((name, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <Input
-                      placeholder="Nombre del comensal"
+                      placeholder={t('cart.guestPlaceholder') || 'Nombre del comensal'}
                       value={name}
                       onChange={(e) => handleSplitNameChange(index, e.target.value)}
                     />
@@ -215,7 +216,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
                   className="w-full"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Añadir Comensal
+                  {t('cart.addGuest') || 'Añadir Comensal'}
                 </Button>
               </div>
             )}
@@ -226,7 +227,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
       <Card>
         <CardContent className="pt-6">
           <div className="flex justify-between items-center">
-            <span className="font-medium">Total:</span>
+            <span className="font-medium">{t('cart.total') || 'Total:'}</span>
             <div className="text-lg font-bold">
               ${total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
             </div>
@@ -236,7 +237,7 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange }
             onClick={handleConfirmOrder}
             disabled={items.length === 0 || isSubmitting}
           >
-            {isSubmitting ? "Enviando..." : "Confirmar Pedido"}
+            {isSubmitting ? t('cart.sending') || 'Enviando...' : t('cart.confirm') || 'Confirmar Pedido'}
           </Button>
         </CardContent>
       </Card>
