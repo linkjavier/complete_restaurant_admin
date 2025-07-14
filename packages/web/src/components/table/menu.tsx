@@ -25,6 +25,7 @@ const languages = [
   { code: 'zh', name: '中文', flag: '🇨🇳' },
   { code: 'it', name: 'Italiano', flag: '🇮🇹' },
   { code: 'hi', name: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'pt', name: 'Português (Brasil)', flag: '🇧🇷' },
 ]
 type MenuLanguage = typeof languages[number]['code']
 

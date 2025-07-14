@@ -2378,5 +2378,304 @@ export const translations = {
       locationLabel: "स्थान",
       noLocation: "कोई स्थान नहीं"
     }
+  },
+  pt: {
+    // Header
+    login: "Entrar",
+
+    // Hero Section
+    heroTitle: "A IA que revoluciona a gestão do seu restaurante",
+    heroSubtitle: "Se você é dono de restaurante, temos a melhor opção para otimizar seu negócio. KutchenAI é o assistente inteligente que automatiza, vende mais e te dá controle total. Confie na plataforma líder e leve seu restaurante para o próximo nível!",
+    requestDemo: "Solicitar uma demonstração",
+    viewFeatures: "Ver funcionalidades",
+
+    // Trust Section
+    trustText: "Cada vez mais",
+    restaurants: "restaurantes",
+    trustIn: "confiam na KutchenAI",
+
+    // Features Section
+    featuresTitle: "Tudo o que seu restaurante precisa",
+    features: [
+      {
+        title: "Dashboard em Tempo Real",
+        desc: "Controle total do seu restaurante com métricas e relatórios instantâneos."
+      },
+      {
+        title: "Assistente de Inteligência Artificial",
+        desc: "Atenda clientes, receba pedidos e responda automaticamente 24/7."
+      },
+      {
+        title: "POS e Vendas",
+        desc: "Ponto de venda rápido, controle de caixa e faturamento fácil."
+      },
+      {
+        title: "Gestão de Pedidos e Cozinha",
+        desc: "Pedidos claros, sem erros e painel especial para chefs e equipe."
+      },
+      {
+        title: "Estoque e Ingredientes",
+        desc: "Controle seu estoque, custos e evite perdas."
+      },
+      {
+        title: "Multi-Unidade e Usuários",
+        desc: "Gerencie todas as suas unidades e equipe em um só lugar."
+      },
+      {
+        title: "Menu QR Inteligente",
+        desc: "Seus clientes podem ver o menu e pedir pelo celular."
+      },
+    ],
+
+    // Benefits Section
+    whyTitle: "Por que KutchenAI?",
+    benefits: [
+      "Economize tempo e dinheiro automatizando tarefas repetitivas.",
+      "Melhore a experiência dos clientes com atendimento 24h/24 e 7j/7 e pedidos sem erros.",
+      "Tome decisões inteligentes com relatórios e métricas em tempo real.",
+      "Segurança e privacidade em nível bancário.",
+      "Plateforme flexível, escalável e fácil de usar."
+    ],
+
+    // CTA Section
+    readyTitle: "Pronto para transformar seu restaurante?",
+    startFree: "Comece grátis agora",
+    noCreditCard: "Sem cartão de crédito. Sem compromisso.",
+
+    // Footer
+    platformDescription: "Plataforma inteligente de gestão para restaurantes.",
+    termsAndConditions: "Termos e condições",
+
+    // Register Page
+    registerTitle: "Criar uma conta",
+    registerDescription: "Insira suas informações para criar sua conta",
+    registerBusinessPlaceholder: "Nome do negócio",
+    registerBusinessExample: "Exemplo: Restaurante Paola, Café Central...",
+    registerFirstName: "Nome",
+    registerLastName: "Sobrenome",
+    registerEmail: "E-mail",
+    registerPassword: "Senha",
+    registerButton: "Criar conta",
+    registerAlreadyHave: "Já tem uma conta?",
+    registerSignIn: "Entrar",
+
+    // Login Subdomain Modal
+    loginSubdomainTitle: "Qual é o seu subdomínio?",
+    loginSubdomainPlaceholder: "Ex: minhaempresa",
+    loginSubdomainButton: "Próximo",
+
+    // Login Page
+    loginTitle: "Entrar na sua conta",
+    loginDescription: "Digite seu e-mail para acessar sua conta",
+    loginEmail: "E-mail",
+    loginPassword: "Senha",
+    loginButton: "Entrar",
+    loginOrContinue: "Ou continue com",
+    loginGoogle: "Google",
+    loginFacebook: "Facebook",
+    loginNoAccount: "Não tem uma conta?",
+    loginSignUp: "Cadastre-se",
+
+    // Dashboard
+    dashboard: {
+      title: "Dashboard",
+      overview: "Visão geral",
+      analytics: "Análises",
+      reports: "Relatórios",
+      newLocation: "Nova Unidade",
+      totalSales: "Vendas Totais",
+      activeOrders: "Pedidos Ativos",
+      paidOrders: "Pedidos Pagos",
+      unpaidOrders: "Pedidos em Aberto",
+      cancelledOrders: "Pedidos Cancelados",
+      orderChannels: "Canais de Pedido",
+      salesByLocation: "Vendas por Unidade",
+      topProducts: "Top 5 Produtos Mais Vendidos",
+      unitsSold: "unidades vendidas",
+      sinceLastMonth: "desde o mês passado",
+      total: "Total",
+      orders: "pedidos",
+      order: "pedido",
+      // Analytics
+      salesAndPareto: "Vendas e Pareto de Produtos",
+      selectPeriod: "Selecionar período",
+      lastWeek: "Última Semana",
+      lastMonth: "Último Mês",
+      customRange: "Intervalo Personalizado",
+      revenueByProduct: "Receita por Produto",
+      cumulativePercentage: "Percentual Acumulado",
+      // Kitchen Analytics
+      kitchenTimes: "Tempos de Cozinha e Gargalos",
+      activityByHour: "Atividade por Hora e Categoria",
+      preparationTimes: "Tempos de Preparo por Item",
+      congestionByHour: "Congestionamento por Hora",
+      averageTime: "Tempo Médio",
+      maximum: "Máximo",
+      minimum: "Mínimo",
+      low: "Baixo",
+      medium: "Médio",
+      high: "Alto",
+      minutes: "Minutos",
+      // Inventory Analysis
+      ingredientsAndWaste: "Ingredientes e Desperdício",
+      inventoryDistribution: "Distribuição de Estoque",
+      consumptionVsStock: "Consumo vs Estoque vs Previsão",
+      category: "Categoria",
+      currentStock: "Estoque Atual",
+      consumption: "Consumo",
+      prediction: "Previsão",
+      highValue: "Alto Valor",
+      mediumValue: "Valor Médio",
+      lowValue: "Baixo Valor",
+      highValueDesc: "Alto valor, baixo volume",
+      mediumValueDesc: "Valor e volume médios",
+      lowValueDesc: "Baixo valor, alto volume",
+      items: "itens",
+      // Reports
+      predictionsAndRecommendations: "Previsões e Recomendações",
+      systemAlerts: "Alertas do Sistema",
+      orderAnalysis: "Análise de Pedidos e Comportamento",
+      conversionFunnel: "Funil de Conversão",
+      averageTimeBySection: "Tempo Médio por Seção",
+      cartAbandonmentRate: "Taxa de Abandono de Carrinho",
+      views: "Visualizações",
+      clicks: "Cliques",
+      payments: "Pagamentos",
+      conversionRate: "taxa de conversão",
+      seconds: "Segundos",
+      percentage: "Percentual",
+      abandonmentRate: "Taxa de Abandono",
+      trend: "Tendência",
+      confidence: "confiança",
+      daysLeft: "dias restantes",
+      alerts: "alertas",
+      // Order Channels
+      pos: "POS",
+      aiWhatsapp: "IA WhatsApp",
+      qrTables: "QR Mesas",
+      waiters: "Garçons",
+      diddi: "Diddi",
+      rappi: "Rappi"
+    },
+
+    // Sidebar
+    sidebar: {
+      dashboard: "Dashboard",
+      ai: "Inteligência Artificial",
+      pos: "POS",
+      orders: "Pedidos",
+      tables: "Mesas",
+      kitchen: "Cozinha",
+      categories: "Categorias",
+      products: "Produtos",
+      ingredients: "Ingredientes",
+      locations: "Unidades",
+      customers: "Clientes",
+      users: "Usuários",
+      settings: "Configurações"
+    },
+
+    // User Menu
+    userMenu: {
+      logout: "Sair"
+    },
+
+    // AI Manager
+    aiManager: {
+      title: "Inteligência Artificial v.3.0",
+      whatsappConnected: "WhatsApp Conectado",
+      connect: "Conectar",
+      connectWhatsApp: "Conectar WhatsApp",
+      activateAI: "Ativar Agente IA",
+      aiActivated: "IA ativada",
+      aiDeactivated: "IA desativada",
+      errorUpdatingSettings: "Erro ao atualizar configurações",
+      loading: "Carregando...",
+      redirectingToLogin: "Redirecionando para login...",
+      noLocationAssigned: "Você não tem uma unidade atribuída",
+      contactAdmin: "Por favor, contate o administrador para atribuir uma unidade.",
+      tabs: {
+        whatsapp: "WhatsApp",
+        chat: "Chat IA"
+      },
+      error: {
+        retryConnection: "Tentar novamente",
+        cannotVerifyWhatsApp: "Não é possível verificar o status do WhatsApp: tenantId ou locationId ausente.",
+        cannotConnectWhatsApp: "Não é possível conectar ao WhatsApp: tenantId ou locationId ausente."
+      },
+      chats: {
+        title: "Chats",
+        connectingAI: "Conectando IA ao WhatsApp...",
+        scanQR: "Escaneie o QR code com o WhatsApp",
+        loadingChats: "Carregando chats...",
+        noChatsAvailable: "Nenhum chat disponível",
+        noMessages: "Sem mensagens",
+        unreadCount: "mensagens não lidas"
+      },
+      chat: {
+        selectChatToStart: "Selecione um chat para começar",
+        loadingMessages: "Carregando mensagens...",
+        noMessagesInChat: "Nenhuma mensagem neste chat",
+        aiActive: "IA Ativa",
+        aiInactive: "IA Inativa",
+        activateAIForChat: "Ativar IA para este chat",
+        deactivateAIForChat: "Desativar IA para este chat",
+        typeMessage: "Digite uma mensagem...",
+        sendMessage: "Enviar mensagem",
+        aiEnabledForChat: "IA para {name} agora está ativa.",
+        aiDisabledForChat: "IA para {name} agora está inativa."
+      },
+      voice: {
+        listening: "Ouvindo...",
+        typeMessage: "Digite sua mensagem...",
+        errorAccessingMicrophone: "Erro ao acessar o microfone",
+        errorProcessingAudio: "Erro ao processar o áudio",
+        writing: "Escrevendo..."
+      }
+    },
+
+    // Menu
+    menu: {
+      loading: "Carregando menu e pedidos...",
+      errorLoading: "Erro ao carregar dados",
+      retry: "Tentar novamente",
+      noImage: "Sem imagem do produto",
+      welcome: "Olá!",
+      intro: "Aqui você pode ver nosso menu, pedir produtos, ver seus pedidos e pagar a conta.",
+      menuTab: "Menu",
+      ordersTab: "Seus Pedidos",
+      activeOrders: "Pedidos Ativos",
+      noOrders: "Você não tem pedidos",
+      order: "Pedido",
+      items: "itens",
+      pending: "Pendente",
+      inProgress: "Em preparo",
+      cancelled: "Cancelado",
+      ready: "Pronto",
+      searchPlaceholder: "Buscar produtos...",
+      all: "Todos"
+    },
+
+    // Cart
+    cart: {
+      title: "Seu Pedido",
+      splitTitle: "Dividir Conta",
+      split: "Dividir Conta",
+      noSplit: "Não Dividir",
+      guestPlaceholder: "Nome do convidado",
+      addGuest: "Adicionar Convidado",
+      total: "Total:",
+      sending: "Enviando...",
+      confirm: "Confirmar Pedido"
+    },
+
+    // Welcome
+    welcome: {
+      nameLabel: "Seu Nome",
+      namePlaceholder: "Digite seu nome",
+      seeMenu: "Ver Menu",
+      locationLabel: "Localização",
+      noLocation: "Sem localização"
+    }
   }
 } 
