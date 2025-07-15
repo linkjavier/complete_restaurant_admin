@@ -465,6 +465,21 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     // --- FIN NUEVO ---
 
+    // --- NUEVO: Interceptar confirmación de menú ---
+    const lastAssistantMessage = this.conversationService.getLastAssistantMessage(conversationId);
+    if (
+      lastAssistantMessage &&
+      (
+        lastAssistantMessage.toLowerCase().includes('te gustaría ver el menú') ||
+        lastAssistantMessage.toLowerCase().includes('quieres ver el menú') ||
+        lastAssistantMessage.toLowerCase().includes('ver el menú') ||
+        lastAssistantMessage.toLowerCase().includes('ver el menu')
+      ) &&
+      this.messageHandler.isConfirmation(text)
+    ) {
+      // Llama al menú general, usando un texto genérico
+      return await this.handleMenuRequest(client, 'menú', locationId, chatType);
+    }
     // Process with OpenAI
     return await this.processWithOpenAI(client, text, locationId, chatType, chatId);
   }
