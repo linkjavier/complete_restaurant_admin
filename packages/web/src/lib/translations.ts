@@ -8,11 +8,47 @@ export const translations = {
     heroSubtitle: "Si eres dueño de restaurante, tenemos la mejor opción para optimizar tu negocio. KutchenAI es el asistente inteligente que automatiza, vende más y te da el control total. ¡Confía en la plataforma líder y lleva tu restaurante al siguiente nivel!",
     requestDemo: "Solicita una demo",
     viewFeatures: "Ver funcionalidades",
+    platformNumberOne: "Plataforma #1 en Colombia",
+    activeRestaurants: "✓ 500+ restaurantes activos",
     
     // Trust Section
     trustText: "Cada vez son",
     restaurants: "más restaurantes",
     trustIn: "que confían en KutchenAI",
+    
+    // Market Segments Section
+    marketSegmentsTitle: "Para todos los tipos de restaurantes",
+    marketSegmentsSubtitle: "KutchenAI se adapta a tu modelo de negocio, sin importar cómo sirvas a tus clientes",
+    marketSegments: [
+      {
+        title: "Restaurantes Físicos",
+        subtitle: "Gestión completa de mesas y servicio",
+        description: "Optimiza tu restaurante tradicional con gestión de mesas, pedidos y cocina integrada.",
+        features: ["Gestión de mesas", "Pedidos por meseros", "Control de cocina", "Facturación POS"],
+        icon: "🍽️"
+      },
+      {
+        title: "E-Restaurants",
+        subtitle: "Restaurantes 100% digitales",
+        description: "Para restaurantes que operan exclusivamente online con delivery y takeaway.",
+        features: ["Pedidos online", "Integración delivery", "Gestión virtual", "Analytics digital"],
+        icon: "💻"
+      },
+      {
+        title: "Cocinas Ocultas",
+        subtitle: "Dark Kitchens & Ghost Kitchens",
+        description: "Maximiza la eficiencia de tu cocina oculta con gestión inteligente de pedidos y delivery.",
+        features: ["Gestión multi-app", "Optimización cocina", "Control delivery", "Analytics avanzado"],
+        icon: "👻"
+      },
+      {
+        title: "Delivery & Takeaway",
+        subtitle: "Especialistas en entrega a domicilio",
+        description: "Enfócate en la entrega rápida y eficiente con gestión optimizada de pedidos.",
+        features: ["Multi-plataforma", "Gestión delivery", "Optimización rutas", "Control calidad"],
+        icon: "🚚"
+      }
+    ],
     
     // Features Section
     featuresTitle: "Todo lo que tu restaurante necesita",
@@ -47,6 +83,59 @@ export const translations = {
       },
     ],
     
+    // Advanced Features Section
+    advancedFeaturesTitle: "Funcionalidades Avanzadas",
+    advancedFeaturesSubtitle: "Herramientas especializadas para cada tipo de negocio",
+    advancedFeatures: [
+      {
+        title: "Integración Multi-Plataforma",
+        description: "Conecta con Rappi, Uber Eats, Didi Food y más desde un solo lugar",
+        benefits: ["Gestión centralizada", "Sincronización automática", "Reportes unificados", "Menos errores"]
+      },
+      {
+        title: "IA para Atención al Cliente",
+        description: "Chatbot inteligente que atiende consultas y toma pedidos 24/7",
+        benefits: ["Respuestas instantáneas", "Reducción de errores", "Mejor experiencia", "Ahorro en personal"]
+      },
+      {
+        title: "Analytics Predictivos",
+        description: "Predice demanda, optimiza inventario y maximiza ganancias",
+        benefits: ["Reducción de desperdicios", "Mejor planificación", "Aumento de ventas", "Optimización de costos"]
+      },
+      {
+        title: "Gestión de Delivery",
+        description: "Optimiza rutas, tiempos de entrega y satisfacción del cliente",
+        benefits: ["Entregas más rápidas", "Menor costo operativo", "Clientes satisfechos", "Mejor reputación"]
+      }
+    ],
+    
+    // Success Stories Section
+    successStoriesTitle: "Historias de Éxito",
+    successStoriesSubtitle: "Restaurantes que transformaron su negocio con KutchenAI",
+    successStories: [
+      {
+        name: "Restaurante La Paola",
+        type: "Restaurante Físico",
+        location: "Cali, Colombia",
+        testimonial: "KutchenAI nos ayudó a reducir errores en pedidos en un 80% y aumentar nuestras ventas en un 35% en solo 3 meses.",
+        metrics: ["80% menos errores", "35% más ventas", "50% menos tiempo de espera"]
+      },
+      {
+        name: "Cocina Virtual Express",
+        type: "Dark Kitchen",
+        location: "Bogotá, Colombia",
+        testimonial: "Con KutchenAI gestionamos 5 plataformas de delivery desde una sola interfaz. Nuestra eficiencia aumentó un 60%.",
+        metrics: ["5 plataformas integradas", "60% más eficiencia", "40% más pedidos"]
+      },
+      {
+        name: "Delivery Rápido",
+        type: "Especialista en Delivery",
+        location: "Medellín, Colombia",
+        testimonial: "Los tiempos de entrega se redujeron de 45 a 25 minutos en promedio. Nuestros clientes están más satisfechos que nunca.",
+        metrics: ["45% menos tiempo de entrega", "95% satisfacción", "30% más repetición"]
+      }
+    ],
+    
     // Benefits Section
     whyTitle: "¿Por qué KutchenAI?",
     benefits: [
@@ -57,14 +146,94 @@ export const translations = {
       "Plataforma flexible, escalable y fácil de usar."
     ],
     
+    // ROI Section
+    roiTitle: "Retorno de Inversión Garantido",
+    roiSubtitle: "Ve los resultados en los primeros 30 días",
+    roiMetrics: [
+      {
+        metric: "30%",
+        description: "Aumento promedio en ventas"
+      },
+      {
+        metric: "50%",
+        description: "Reducción en tiempo de servicio"
+      },
+      {
+        metric: "80%",
+        description: "Menos errores en pedidos"
+      },
+      {
+        metric: "60%",
+        description: "Ahorro en costos operativos"
+      }
+    ],
+    
+    // Pricing Section
+    pricingTitle: "Planes Flexibles para tu Negocio",
+    pricingSubtitle: "Elige el plan que mejor se adapte a tus necesidades",
+    mostPopular: "Más Popular",
+    pricingPlans: [
+      {
+        name: "Starter",
+        price: "Gratis",
+        period: "por 30 días",
+        description: "Perfecto para empezar",
+        features: ["Hasta 100 pedidos/mes", "Funciones básicas", "Soporte por email", "1 ubicación"],
+        cta: "Empezar gratis",
+        popular: false
+      },
+      {
+        name: "Professional",
+        price: "$99",
+        period: "/mes",
+        description: "Para restaurantes en crecimiento",
+        features: ["Pedidos ilimitados", "Todas las funciones", "Soporte prioritario", "Hasta 3 ubicaciones", "Integración multi-plataforma"],
+        cta: "Comenzar ahora",
+        popular: true
+      },
+      {
+        name: "Enterprise",
+        price: "Personalizado",
+        period: "",
+        description: "Para cadenas y grandes operaciones",
+        features: ["Ubicaciones ilimitadas", "Soporte 24/7", "API personalizada", "Implementación dedicada", "Analytics avanzados"],
+        cta: "Contactar ventas",
+        popular: false
+      }
+    ],
+    
     // CTA Section
     readyTitle: "¿Listo para transformar tu restaurante?",
     startFree: "Empieza gratis ahora",
     noCreditCard: "Sin tarjeta de crédito. Sin compromiso.",
+    joinRestaurants: "Únete a más de 500 restaurantes que ya confían en KutchenAI para transformar su negocio",
+    talkToExpert: "Hablar con un experto",
     
     // Footer
     platformDescription: "Plataforma de gestión inteligente para restaurantes.",
     termsAndConditions: "Términos y condiciones",
+    product: "Producto",
+    featuresLink: "Funcionalidades",
+    segments: "Segmentos",
+    pricing: "Precios",
+    integrations: "Integraciones",
+    company: "Empresa",
+    aboutUs: "Sobre nosotros",
+    blog: "Blog",
+    careers: "Carreras",
+    press: "Prensa",
+    support: "Soporte",
+    helpCenter: "Centro de ayuda",
+    documentation: "Documentación",
+    community: "Comunidad",
+    serviceStatus: "Estado del servicio",
+    legal: "Legal",
+    privacy: "Privacidad",
+    terms: "Términos",
+    cookies: "Cookies",
+    security: "Seguridad",
+    location: "Cali - Colombia",
+    allRightsReserved: "Todos los derechos reservados.",
     
     // Register Page
     registerTitle: "Crea una cuenta",
@@ -310,12 +479,13 @@ export const translations = {
     heroSubtitle: "If you own a restaurant, we have the best option to optimize your business. KutchenAI is the intelligent assistant that automates, sells more, and gives you total control. Trust the leading platform and take your restaurant to the next level!",
     requestDemo: "Request a demo",
     viewFeatures: "View features",
+    platformNumberOne: "Platform #1 in Colombia",
+    activeRestaurants: "✓ 500+ active restaurants",
     
     // Trust Section
     trustText: "More and more",
     restaurants: "restaurants",
     trustIn: "trust KutchenAI",
-
     
     // Features Section
     featuresTitle: "Everything your restaurant needs",
@@ -364,10 +534,34 @@ export const translations = {
     readyTitle: "Ready to transform your restaurant?",
     startFree: "Start free now",
     noCreditCard: "No credit card. No commitment.",
+    joinRestaurants: "Join over 500 restaurants that already trust KutchenAI to transform their business",
+    talkToExpert: "Talk to an expert",
     
     // Footer
     platformDescription: "Intelligent management platform for restaurants.",
     termsAndConditions: "Terms and conditions",
+    product: "Product",
+    featuresLink: "Features",
+    segments: "Segments",
+    pricing: "Pricing",
+    integrations: "Integrations",
+    company: "Company",
+    aboutUs: "About us",
+    blog: "Blog",
+    careers: "Careers",
+    press: "Press",
+    support: "Support",
+    helpCenter: "Help center",
+    documentation: "Documentation",
+    community: "Community",
+    serviceStatus: "Service status",
+    legal: "Legal",
+    privacy: "Privacy",
+    terms: "Terms",
+    cookies: "Cookies",
+    security: "Security",
+    location: "Cali - Colombia",
+    allRightsReserved: "All rights reserved.",
     
     // Register Page
     registerTitle: "Create an account",
@@ -612,6 +806,8 @@ export const translations = {
     heroSubtitle: "レストランオーナーの皆様へ、ビジネス最適化の最良の選択肢をご提案します。KutchenAIは自動化、売上向上、完全なコントロールを実現するインテリジェントアシスタントです。リーディングプラットフォームを信頼し、レストランを次のレベルへ！",
     requestDemo: "デモをリクエスト",
     viewFeatures: "機能を見る",
+    platformNumberOne: "コロンビアNo.1プラットフォーム",
+    activeRestaurants: "✓ 500以上のアクティブレストラン",
 
     // Trust Section
     trustText: "ますます多くの",
@@ -665,11 +861,35 @@ export const translations = {
     readyTitle: "レストランを変革する準備はできていますか？",
     startFree: "今すぐ無料で始める",
     noCreditCard: "クレジットカード不要。契約不要。",
+    joinRestaurants: "すでに500以上のレストランがKutchenAIを信頼してビジネスを変革しています",
+    talkToExpert: "専門家に相談する",
 
     // Footer
     platformDescription: "レストラン向けインテリジェント管理プラットフォーム。",
     termsAndConditions: "利用規約",
-
+    product: "製品",
+    featuresLink: "機能",
+    segments: "セグメント",
+    pricing: "料金",
+    integrations: "統合",
+    company: "会社",
+    aboutUs: "私たちについて",
+    blog: "ブログ",
+    careers: "採用情報",
+    press: "プレス",
+    support: "サポート",
+    helpCenter: "ヘルプセンター",
+    documentation: "ドキュメント",
+    community: "コミュニティ",
+    serviceStatus: "サービス状況",
+    legal: "法的情報",
+    privacy: "プライバシー",
+    terms: "利用規約",
+    cookies: "クッキー",
+    security: "セキュリティ",
+    location: "カリ - コロンビア",
+    allRightsReserved: "全著作権所有。",
+    
     // Register Page
     registerTitle: "アカウント作成",
     registerDescription: "アカウント作成のため情報を入力してください",
@@ -908,6 +1128,8 @@ export const translations = {
     heroSubtitle: "Wenn Sie ein Restaurant besitzen, haben wir die beste Option, um Ihr Geschäft zu optimieren. KutchenAI ist der intelligente Assistent, der automatisiert, mehr verkauft und Ihnen die volle Kontrolle gibt. Vertrauen Sie der führenden Plattform und bringen Sie Ihr Restaurant auf das nächste Level!",
     requestDemo: "Demo anfordern",
     viewFeatures: "Funktionen anzeigen",
+    platformNumberOne: "Plattform #1 in Kolumbien",
+    activeRestaurants: "✓ 500+ aktive Restaurants",
 
     // Trust Section
     trustText: "Immer mehr",
@@ -961,11 +1183,35 @@ export const translations = {
     readyTitle: "Bereit, Ihr Restaurant zu transformieren?",
     startFree: "Jetzt kostenlos starten",
     noCreditCard: "Keine Kreditkarte. Keine Verpflichtung.",
+    joinRestaurants: "Schließen Sie sich über 500 Restaurants an, die bereits KutchenAI vertrauen, um ihr Geschäft zu transformieren",
+    talkToExpert: "Mit einem Experten sprechen",
 
     // Footer
     platformDescription: "Intelligente Managementplattform für Restaurants.",
     termsAndConditions: "Allgemeine Geschäftsbedingungen",
-
+    product: "Produkt",
+    featuresLink: "Funktionen",
+    segments: "Segmente",
+    pricing: "Preise",
+    integrations: "Integrationen",
+    company: "Unternehmen",
+    aboutUs: "Über uns",
+    blog: "Blog",
+    careers: "Karriere",
+    press: "Presse",
+    support: "Support",
+    helpCenter: "Hilfecenter",
+    documentation: "Dokumentation",
+    community: "Community",
+    serviceStatus: "Service-Status",
+    legal: "Rechtliches",
+    privacy: "Datenschutz",
+    terms: "AGB",
+    cookies: "Cookies",
+    security: "Sicherheit",
+    location: "Cali - Kolumbien",
+    allRightsReserved: "Alle Rechte vorbehalten.",
+    
     // Register Page
     registerTitle: "Konto erstellen",
     registerDescription: "Geben Sie Ihre Informationen ein, um Ihr Konto zu erstellen",
@@ -1204,6 +1450,8 @@ export const translations = {
     heroSubtitle: "Si vous possédez un restaurant, nous avons la meilleure option pour optimiser votre entreprise. KutchenAI est l'assistant intelligent qui automatise, vend plus et vous donne un contrôle total. Faites confiance à la plateforme leader et faites passer votre restaurant au niveau supérieur !",
     requestDemo: "Demander une démo",
     viewFeatures: "Voir les fonctionnalités",
+    platformNumberOne: "Plateforme #1 en Colombie",
+    activeRestaurants: "✓ 500+ restaurants actifs",
 
     // Trust Section
     trustText: "De plus en plus de",
@@ -1256,12 +1504,36 @@ export const translations = {
     // CTA Section
     readyTitle: "Prêt à transformer votre restaurant ?",
     startFree: "Commencez gratuitement maintenant",
-    noCreditCard: "Pas de carte de crédit. Pas d'engagement.",
+    noCreditCard: "Pas de carte de crédito. Pas d'engagement.",
+    joinRestaurants: "Rejoignez plus de 500 restaurants qui font déjà confiance à KutchenAI pour transformer leur entreprise",
+    talkToExpert: "Parler à un expert",
 
     // Footer
     platformDescription: "Plateforme de gestion intelligente pour restaurants.",
     termsAndConditions: "Conditions générales",
-
+    product: "Produit",
+    featuresLink: "Fonctionnalités",
+    segments: "Segments",
+    pricing: "Tarifs",
+    integrations: "Intégrations",
+    company: "Entreprise",
+    aboutUs: "À propos de nous",
+    blog: "Blog",
+    careers: "Carrières",
+    press: "Presse",
+    support: "Support",
+    helpCenter: "Centre d'aide",
+    documentation: "Documentation",
+    community: "Communauté",
+    serviceStatus: "État du service",
+    legal: "Mentions légales",
+    privacy: "Confidentialité",
+    terms: "Conditions",
+    cookies: "Cookies",
+    security: "Sécurité",
+    location: "Cali - Colombie",
+    allRightsReserved: "Tous droits réservés.",
+    
     // Register Page
     registerTitle: "Créer un compte",
     registerDescription: "Saisissez vos informations pour créer votre compte",
@@ -1500,6 +1772,8 @@ export const translations = {
     heroSubtitle: "如果您是餐厅老板，我们为您提供优化业务的最佳选择。KutchenAI 是智能助手，实现自动化、提升销售并让您全面掌控。信赖领先平台，让您的餐厅迈向新高度！",
     requestDemo: "申请演示",
     viewFeatures: "查看功能",
+    platformNumberOne: "哥伦比亚第一平台",
+    activeRestaurants: "✓ 500+ 活跃餐厅",
 
     // Trust Section
     trustText: "越来越多的",
@@ -1553,11 +1827,35 @@ export const translations = {
     readyTitle: "准备好改变您的餐厅了吗？",
     startFree: "立即免费开始",
     noCreditCard: "无需信用卡，无需承诺。",
+    joinRestaurants: "加入超过500家已信赖KutchenAI改造业务的餐厅",
+    talkToExpert: "与专家对话",
 
     // Footer
     platformDescription: "餐厅智能管理平台。",
     termsAndConditions: "条款与条件",
-
+    product: "产品",
+    featuresLink: "功能",
+    segments: "细分市场",
+    pricing: "定价",
+    integrations: "集成",
+    company: "公司",
+    aboutUs: "关于我们",
+    blog: "博客",
+    careers: "职业",
+    press: "新闻",
+    support: "支持",
+    helpCenter: "帮助中心",
+    documentation: "文档",
+    community: "社区",
+    serviceStatus: "服务状态",
+    legal: "法律",
+    privacy: "隐私",
+    terms: "条款",
+    cookies: "Cookie",
+    security: "安全",
+    location: "卡利 - 哥伦比亚",
+    allRightsReserved: "版权所有。",
+    
     // Register Page
     registerTitle: "创建账户",
     registerDescription: "请输入信息以创建账户",
@@ -2083,6 +2381,627 @@ export const translations = {
       noLocation: "Nessuna posizione"
     }
   },
+  de: {
+    // Header
+    login: "Anmelden",
+
+    // Hero Section
+    heroTitle: "Die KI, die Ihr Restaurantmanagement revolutioniert",
+    heroSubtitle: "Wenn Sie ein Restaurant besitzen, haben wir die beste Option, um Ihr Geschäft zu optimieren. KutchenAI ist der intelligente Assistent, der automatisiert, mehr verkauft und Ihnen die volle Kontrolle gibt. Vertrauen Sie der führenden Plattform und bringen Sie Ihr Restaurant auf das nächste Level!",
+    requestDemo: "Demo anfordern",
+    viewFeatures: "Funktionen anzeigen",
+    platformNumberOne: "Plattform #1 in Kolumbien",
+    activeRestaurants: "✓ 500+ aktive Restaurants",
+
+    // Trust Section
+    trustText: "Immer mehr",
+    restaurants: "Restaurants",
+    trustIn: "vertrauen auf KutchenAI",
+
+    // Features Section
+    featuresTitle: "Alles, was Ihr Restaurant braucht",
+    features: [
+      {
+        title: "Echtzeit-Dashboard",
+        desc: "Volle Kontrolle über Ihr Restaurant mit sofortigen Kennzahlen und Berichten."
+      },
+      {
+        title: "Künstliche Intelligenz Assistent",
+        desc: "Kunden betreuen, Bestellungen aufnehmen und automatisch 24/7 antworten."
+      },
+      {
+        title: "POS und Verkauf",
+        desc: "Schneller Point of Sale, Kassenkontrolle und einfache Abrechnung."
+      },
+      {
+        title: "Bestell- und Küchenmanagement",
+        desc: "Klare Bestellungen, keine Fehler und spezielles Panel für Köche und Personal."
+      },
+      {
+        title: "Inventar und Zutaten",
+        desc: "Bestände, Kosten kontrollieren und Verluste vermeiden."
+      },
+      {
+        title: "Multi-Standort und Benutzer",
+        desc: "Verwalten Sie alle Standorte und Ihr Team an einem Ort."
+      },
+      {
+        title: "Intelligente QR-Speisekarte",
+        desc: "Ihre Kunden können die Speisekarte ansehen und direkt vom Handy bestellen."
+      },
+    ],
+
+    // Benefits Section
+    whyTitle: "Warum KutchenAI?",
+    benefits: [
+      "Sparen Sie Zeit und Geld durch Automatisierung wiederkehrender Aufgaben.",
+      "Verbessern Sie das Kundenerlebnis mit 24/7-Service und fehlerfreien Bestellungen.",
+      "Treffen Sie intelligente Entscheidungen mit Berichten und Kennzahlen in Echtzeit.",
+      "Sicherheits- und Datenschutz auf Bankniveau.",
+      "Flexible, skalierbare und benutzerfreundliche Plattform."
+    ],
+
+    // CTA Section
+    readyTitle: "Bereit, Ihr Restaurant zu transformieren?",
+    startFree: "Jetzt kostenlos starten",
+    noCreditCard: "Keine Kreditkarte. Keine Verpflichtung.",
+    joinRestaurants: "Schließen Sie sich über 500 Restaurants an, die bereits KutchenAI vertrauen, um ihr Geschäft zu transformieren",
+    talkToExpert: "Mit einem Experten sprechen",
+
+    // Footer
+    platformDescription: "Intelligente Managementplattform für Restaurants.",
+    termsAndConditions: "Allgemeine Geschäftsbedingungen",
+    product: "Produkt",
+    featuresLink: "Funktionen",
+    segments: "Segmente",
+    pricing: "Preise",
+    integrations: "Integrationen",
+    company: "Unternehmen",
+    aboutUs: "Über uns",
+    blog: "Blog",
+    careers: "Karriere",
+    press: "Presse",
+    support: "Support",
+    helpCenter: "Hilfecenter",
+    documentation: "Dokumentation",
+    community: "Community",
+    serviceStatus: "Service-Status",
+    legal: "Rechtliches",
+    privacy: "Datenschutz",
+    terms: "AGB",
+    cookies: "Cookies",
+    security: "Sicherheit",
+    location: "Cali - Kolumbien",
+    allRightsReserved: "Alle Rechte vorbehalten.",
+    
+    // Register Page
+    registerTitle: "Konto erstellen",
+    registerDescription: "Geben Sie Ihre Informationen ein, um Ihr Konto zu erstellen",
+    registerBusinessPlaceholder: "Name des Unternehmens",
+    registerBusinessExample: "Beispiel: Restaurant Paola, Central Café...",
+    registerFirstName: "Vorname",
+    registerLastName: "Nachname",
+    registerEmail: "E-Mail",
+    registerPassword: "Passwort",
+    registerButton: "Konto erstellen",
+    registerAlreadyHave: "Sie haben bereits ein Konto?",
+    registerSignIn: "Anmelden",
+
+    // Login Subdomain Modal
+    loginSubdomainTitle: "Was ist Ihre Subdomain?",
+    loginSubdomainPlaceholder: "Z.B. meinunternehmen",
+    loginSubdomainButton: "Weiter",
+
+    // Login Page
+    loginTitle: "Melden Sie sich bei Ihrem Konto an",
+    loginDescription: "Geben Sie Ihre E-Mail-Adresse ein, um sich anzumelden",
+    loginEmail: "E-Mail",
+    loginPassword: "Passwort",
+    loginButton: "Anmelden",
+    loginOrContinue: "Oder weiter mit",
+    loginGoogle: "Google",
+    loginFacebook: "Facebook",
+    loginNoAccount: "Sie haben noch kein Konto?",
+    loginSignUp: "Registrieren",
+
+    // Dashboard
+    dashboard: {
+      title: "Dashboard",
+      overview: "Übersicht",
+      analytics: "Analytik",
+      reports: "Berichte",
+      newLocation: "Neuer Standort",
+      totalSales: "Gesamtumsatz",
+      activeOrders: "Aktive Bestellungen",
+      paidOrders: "Bezahlte Bestellungen",
+      unpaidOrders: "Unbezahlte Bestellungen",
+      cancelledOrders: "Stornierte Bestellungen",
+      orderChannels: "Bestellkanäle",
+      salesByLocation: "Umsatz nach Standort",
+      topProducts: "Top 5 meistverkaufte Produkte",
+      unitsSold: "verkaufte Einheiten",
+      sinceLastMonth: "seit letztem Monat",
+      total: "Gesamt",
+      orders: "Bestellungen",
+      order: "Bestellung",
+      // Analytics
+      salesAndPareto: "Umsatz und Produkt-Pareto",
+      selectPeriod: "Zeitraum auswählen",
+      lastWeek: "Letzte Woche",
+      lastMonth: "Letzter Monat",
+      customRange: "Benutzerdefinierter Zeitraum",
+      revenueByProduct: "Umsatz nach Produkt",
+      cumulativePercentage: "Kumulierter Prozentsatz",
+      // Kitchen Analytics
+      kitchenTimes: "Küchenzeiten und Engpässe",
+      activityByHour: "Aktivität nach Stunde und Kategorie",
+      preparationTimes: "Vorbereitungszeiten pro Artikel",
+      congestionByHour: "Stau nach Stunde",
+      averageTime: "Durchschnittszeit",
+      maximum: "Maximum",
+      minimum: "Minimum",
+      low: "Niedrig",
+      medium: "Mittel",
+      high: "Hoch",
+      minutes: "Minuten",
+      // Inventory Analysis
+      ingredientsAndWaste: "Zutaten und Abfall",
+      inventoryDistribution: "Inventarverteilung",
+      consumptionVsStock: "Verbrauch vs. Bestand vs. Prognose",
+      category: "Kategorie",
+      currentStock: "Aktueller Bestand",
+      consumption: "Verbrauch",
+      prediction: "Prognose",
+      highValue: "Hoher Wert",
+      mediumValue: "Mittlerer Wert",
+      lowValue: "Niedriger Wert",
+      highValueDesc: "Hoher Wert, geringes Volumen",
+      mediumValueDesc: "Mittlerer Wert und Volumen",
+      lowValueDesc: "Niedriger Wert, hohes Volumen",
+      items: "Artikel",
+      // Reports
+      predictionsAndRecommendations: "Prognosen und Empfehlungen",
+      systemAlerts: "Systemwarnungen",
+      orderAnalysis: "Bestellanalyse und Verhalten",
+      conversionFunnel: "Conversion-Funnel",
+      averageTimeBySection: "Durchschnittszeit pro Abschnitt",
+      cartAbandonmentRate: "Warenkorbabbruchrate",
+      views: "Ansichten",
+      clicks: "Klicks",
+      payments: "Zahlungen",
+      conversionRate: "Konversionsrate",
+      seconds: "Sekunden",
+      percentage: "Prozentsatz",
+      abandonmentRate: "Abbruchrate",
+      trend: "Trend",
+      confidence: "Vertrauen",
+      daysLeft: "verbleibende Tage",
+      alerts: "Warnungen",
+      // Order Channels
+      pos: "POS",
+      aiWhatsapp: "AI WhatsApp",
+      qrTables: "QR-Tische",
+      waiters: "Kellner",
+      diddi: "Diddi",
+      rappi: "Rappi"
+    },
+
+    // Sidebar
+    sidebar: {
+      dashboard: "Dashboard",
+      ai: "Künstliche Intelligenz",
+      pos: "POS",
+      orders: "Bestellungen",
+      tables: "Tische",
+      kitchen: "Küche",
+      categories: "Kategorien",
+      products: "Produkte",
+      ingredients: "Zutaten",
+      locations: "Standorte",
+      customers: "Kunden",
+      users: "Benutzer",
+      settings: "Einstellungen"
+    },
+
+    // User Menu
+    userMenu: {
+      logout: "Abmelden"
+    },
+
+    // AI Manager
+    aiManager: {
+      title: "Künstliche Intelligenz v.3.0",
+      whatsappConnected: "WhatsApp verbunden",
+      connect: "Verbinden",
+      connectWhatsApp: "WhatsApp verbinden",
+      activateAI: "KI-Agent aktivieren",
+      aiActivated: "KI aktiviert",
+      aiDeactivated: "KI deaktiviert",
+      errorUpdatingSettings: "Fehler beim Aktualisieren der Einstellungen",
+      loading: "Lädt...",
+      redirectingToLogin: "Weiterleitung zum Login...",
+      noLocationAssigned: "Ihnen ist kein Standort zugewiesen",
+      contactAdmin: "Bitte wenden Sie sich an den Administrator, um Ihnen einen Standort zuzuweisen.",
+      tabs: {
+        whatsapp: "WhatsApp",
+        chat: "KI-Chat"
+      },
+      error: {
+        retryConnection: "Verbindung erneut versuchen",
+        cannotVerifyWhatsApp: "WhatsApp-Status kann nicht überprüft werden: tenantId oder locationId fehlt.",
+        cannotConnectWhatsApp: "Verbindung zu WhatsApp nicht möglich: tenantId oder locationId fehlt."
+      },
+      chats: {
+        title: "Chats",
+        connectingAI: "KI wird mit WhatsApp verbunden...",
+        scanQR: "Scannen Sie den QR-Code mit WhatsApp",
+        loadingChats: "Chats werden geladen...",
+        noChatsAvailable: "Keine Chats verfügbar",
+        noMessages: "Keine Nachrichten",
+        unreadCount: "ungelesene Nachrichten"
+      },
+      chat: {
+        selectChatToStart: "Wählen Sie einen Chat zum Starten aus",
+        loadingMessages: "Nachrichten werden geladen...",
+        noMessagesInChat: "Keine Nachrichten in diesem Chat",
+        aiActive: "KI aktiv",
+        aiInactive: "KI inaktiv",
+        activateAIForChat: "KI für diesen Chat aktivieren",
+        deactivateAIForChat: "KI für diesen Chat deaktivieren",
+        typeMessage: "Nachricht eingeben...",
+        sendMessage: "Nachricht senden",
+        aiEnabledForChat: "KI für {name} ist jetzt aktiv.",
+        aiDisabledForChat: "KI für {name} ist jetzt inaktiv."
+      },
+      voice: {
+        listening: "Hört zu...",
+        typeMessage: "Nachricht eingeben...",
+        errorAccessingMicrophone: "Fehler beim Zugriff auf das Mikrofon",
+        errorProcessingAudio: "Fehler bei der Audioverarbeitung",
+        writing: "Schreibt..."
+      }
+    },
+
+    menu: {
+      loading: "Menü und Bestellungen werden geladen...",
+      errorLoading: "Fehler beim Laden der Daten",
+      retry: "Erneut versuchen",
+      noImage: "Kein Produktbild",
+      welcome: "Hallo!",
+      intro: "Hier können Sie unser Menü einsehen, Produkte bestellen, Ihre Bestellungen ansehen und bezahlen.",
+      menuTab: "Menü",
+      ordersTab: "Ihre Bestellungen",
+      activeOrders: "Aktive Bestellungen",
+      noOrders: "Sie haben keine Bestellungen",
+      order: "Bestellung",
+      items: "Artikel",
+      pending: "Ausstehend",
+      inProgress: "In Vorbereitung",
+      cancelled: "Storniert",
+      ready: "Fertig",
+      searchPlaceholder: "Produkte suchen...",
+      all: "Alle"
+    },
+
+    cart: {
+      title: "Ihre Bestellung",
+      splitTitle: "Rechnung teilen",
+      split: "Rechnung teilen",
+      noSplit: "Nicht teilen",
+      guestPlaceholder: "Gastname",
+      addGuest: "Gast hinzufügen",
+      total: "Gesamt:",
+      sending: "Wird gesendet...",
+      confirm: "Bestellung bestätigen"
+    },
+
+    welcome: {
+      nameLabel: "Ihr Name",
+      namePlaceholder: "Geben Sie Ihren Namen ein",
+      seeMenu: "Menü anzeigen",
+      locationLabel: "Standort",
+      noLocation: "Kein Standort"
+    }
+  },
+  pt: {
+    // Header
+    login: "Entrar",
+
+    // Hero Section
+    heroTitle: "A IA que revoluciona a gestão do seu restaurante",
+    heroSubtitle: "Se você é dono de restaurante, temos a melhor opção para otimizar seu negócio. KutchenAI é o assistente inteligente que automatiza, vende mais e te dá controle total. Confie na plataforma líder e leve seu restaurante para o próximo nível!",
+    requestDemo: "Solicitar uma demonstração",
+    viewFeatures: "Ver funcionalidades",
+
+    // Trust Section
+    trustText: "Cada vez mais",
+    restaurants: "restaurantes",
+    trustIn: "confiam na KutchenAI",
+
+    // Features Section
+    featuresTitle: "Tudo o que seu restaurante precisa",
+    features: [
+      {
+        title: "Dashboard em Tempo Real",
+        desc: "Controle total do seu restaurante com métricas e relatórios instantâneos."
+      },
+      {
+        title: "Assistente de Inteligência Artificial",
+        desc: "Atenda clientes, receba pedidos e responda automaticamente 24/7."
+      },
+      {
+        title: "POS e Vendas",
+        desc: "Ponto de venda rápido, controle de caixa e faturamento fácil."
+      },
+      {
+        title: "Gestão de Pedidos e Cozinha",
+        desc: "Pedidos claros, sem erros e painel especial para chefs e equipe."
+      },
+      {
+        title: "Estoque e Ingredientes",
+        desc: "Controle seu estoque, custos e evite perdas."
+      },
+      {
+        title: "Multi-Unidade e Usuários",
+        desc: "Gerencie todas as suas unidades e equipe em um só lugar."
+      },
+      {
+        title: "Menu QR Inteligente",
+        desc: "Seus clientes podem ver o menu e pedir pelo celular."
+      },
+    ],
+
+    // Benefits Section
+    whyTitle: "Por que KutchenAI?",
+    benefits: [
+      "Economize tempo e dinheiro automatizando tarefas repetitivas.",
+      "Melhore a experiência dos clientes com atendimento 24h/24 e 7j/7 e pedidos sem erros.",
+      "Tome decisões inteligentes com relatórios e métricas em tempo real.",
+      "Segurança e privacidade em nível bancário.",
+      "Plateforme flexível, évolutive et facile à utilizar."
+    ],
+
+    // CTA Section
+    readyTitle: "Pronto para transformar seu restaurante?",
+    startFree: "Comece grátis agora",
+    noCreditCard: "Sem cartão de crédito. Sem compromisso.",
+
+    // Footer
+    platformDescription: "Plataforma inteligente de gestão para restaurantes.",
+    termsAndConditions: "Termos e condições",
+
+    // Register Page
+    registerTitle: "Criar uma conta",
+    registerDescription: "Insira suas informações para criar sua conta",
+    registerBusinessPlaceholder: "Nome do negócio",
+    registerBusinessExample: "Exemplo: Restaurante Paola, Café Central...",
+    registerFirstName: "Nome",
+    registerLastName: "Sobrenome",
+    registerEmail: "E-mail",
+    registerPassword: "Senha",
+    registerButton: "Criar conta",
+    registerAlreadyHave: "Já tem uma conta?",
+    registerSignIn: "Entrar",
+
+    // Login Subdomain Modal
+    loginSubdomainTitle: "Qual é o seu subdomínio?",
+    loginSubdomainPlaceholder: "Ex: minhaempresa",
+    loginSubdomainButton: "Próximo",
+
+    // Login Page
+    loginTitle: "Entrar na sua conta",
+    loginDescription: "Digite seu e-mail para acessar sua conta",
+    loginEmail: "E-mail",
+    loginPassword: "Senha",
+    loginButton: "Entrar",
+    loginOrContinue: "Ou continue com",
+    loginGoogle: "Google",
+    loginFacebook: "Facebook",
+    loginNoAccount: "Não tem uma conta?",
+    loginSignUp: "Cadastre-se",
+
+    // Dashboard
+    dashboard: {
+      title: "Dashboard",
+      overview: "Visão geral",
+      analytics: "Análises",
+      reports: "Relatórios",
+      newLocation: "Nova Unidade",
+      totalSales: "Vendas Totais",
+      activeOrders: "Pedidos Ativos",
+      paidOrders: "Pedidos Pagos",
+      unpaidOrders: "Pedidos em Aberto",
+      cancelledOrders: "Pedidos Cancelados",
+      orderChannels: "Canais de Pedido",
+      salesByLocation: "Vendas por Unidade",
+      topProducts: "Top 5 Produtos Mais Vendidos",
+      unitsSold: "unidades vendidas",
+      sinceLastMonth: "desde o mês passado",
+      total: "Total",
+      orders: "pedidos",
+      order: "pedido",
+      // Analytics
+      salesAndPareto: "Vendas e Pareto de Produtos",
+      selectPeriod: "Selecionar período",
+      lastWeek: "Última Semana",
+      lastMonth: "Último Mês",
+      customRange: "Intervalo Personalizado",
+      revenueByProduct: "Receita por Produto",
+      cumulativePercentage: "Percentual Acumulado",
+      // Kitchen Analytics
+      kitchenTimes: "Tempos de Cozinha e Gargalos",
+      activityByHour: "Atividade por Hora e Categoria",
+      preparationTimes: "Tempos de Preparo por Item",
+      congestionByHour: "Congestionamento por Hora",
+      averageTime: "Tempo Médio",
+      maximum: "Máximo",
+      minimum: "Mínimo",
+      low: "Baixo",
+      medium: "Médio",
+      high: "Alto",
+      minutes: "Minutos",
+      // Inventory Analysis
+      ingredientsAndWaste: "Ingredientes e Desperdício",
+      inventoryDistribution: "Distribuição de Estoque",
+      consumptionVsStock: "Consumo vs Estoque vs Previsão",
+      category: "Categoria",
+      currentStock: "Estoque Atual",
+      consumption: "Consumo",
+      prediction: "Previsão",
+      highValue: "Alto Valor",
+      mediumValue: "Valor Médio",
+      lowValue: "Baixo Valor",
+      highValueDesc: "Alto valor, baixo volume",
+      mediumValueDesc: "Valor e volume médios",
+      lowValueDesc: "Baixo valor, alto volume",
+      items: "itens",
+      // Reports
+      predictionsAndRecommendations: "Previsões e Recomendações",
+      systemAlerts: "Alertas do Sistema",
+      orderAnalysis: "Análise de Pedidos e Comportamento",
+      conversionFunnel: "Funil de Conversão",
+      averageTimeBySection: "Tempo Médio por Seção",
+      cartAbandonmentRate: "Taxa de Abandono de Carrinho",
+      views: "Visualizações",
+      clicks: "Cliques",
+      payments: "Pagamentos",
+      conversionRate: "taxa de conversão",
+      seconds: "Segundos",
+      percentage: "Percentual",
+      abandonmentRate: "Taxa de Abandono",
+      trend: "Tendência",
+      confidence: "confiança",
+      daysLeft: "dias restantes",
+      alerts: "alertas",
+      // Order Channels
+      pos: "POS",
+      aiWhatsapp: "IA WhatsApp",
+      qrTables: "QR Mesas",
+      waiters: "Garçons",
+      diddi: "Diddi",
+      rappi: "Rappi"
+    },
+
+    // Sidebar
+    sidebar: {
+      dashboard: "Dashboard",
+      ai: "Inteligência Artificial",
+      pos: "POS",
+      orders: "Pedidos",
+      tables: "Mesas",
+      kitchen: "Cozinha",
+      categories: "Categorias",
+      products: "Produtos",
+      ingredients: "Ingredientes",
+      locations: "Unidades",
+      customers: "Clientes",
+      users: "Usuários",
+      settings: "Configurações"
+    },
+
+    // User Menu
+    userMenu: {
+      logout: "Sair"
+    },
+
+    // AI Manager
+    aiManager: {
+      title: "Inteligência Artificial v.3.0",
+      whatsappConnected: "WhatsApp Conectado",
+      connect: "Conectar",
+      connectWhatsApp: "Conectar WhatsApp",
+      activateAI: "Ativar Agente IA",
+      aiActivated: "IA ativada",
+      aiDeactivated: "IA desativada",
+      errorUpdatingSettings: "Erro ao atualizar configurações",
+      loading: "Carregando...",
+      redirectingToLogin: "Redirecionando para login...",
+      noLocationAssigned: "Você não tem uma unidade atribuída",
+      contactAdmin: "Por favor, contate o administrador para atribuir uma unidade.",
+      tabs: {
+        whatsapp: "WhatsApp",
+        chat: "Chat IA"
+      },
+      error: {
+        retryConnection: "Tentar novamente",
+        cannotVerifyWhatsApp: "Não é possível verificar o status do WhatsApp: tenantId ou locationId ausente.",
+        cannotConnectWhatsApp: "Não é possível conectar ao WhatsApp: tenantId ou locationId ausente."
+      },
+      chats: {
+        title: "Chats",
+        connectingAI: "Conectando IA ao WhatsApp...",
+        scanQR: "Escaneie o QR code com o WhatsApp",
+        loadingChats: "Carregando chats...",
+        noChatsAvailable: "Nenhum chat disponível",
+        noMessages: "Sem mensagens",
+        unreadCount: "mensagens não lidas"
+      },
+      chat: {
+        selectChatToStart: "Selecione um chat para começar",
+        loadingMessages: "Carregando mensagens...",
+        noMessagesInChat: "Nenhuma mensagem neste chat",
+        aiActive: "IA Ativa",
+        aiInactive: "IA Inativa",
+        activateAIForChat: "Ativar IA para este chat",
+        deactivateAIForChat: "Desativar IA para este chat",
+        typeMessage: "Digite uma mensagem...",
+        sendMessage: "Enviar mensagem",
+        aiEnabledForChat: "IA para {name} agora está ativa.",
+        aiDisabledForChat: "IA para {name} agora está inativa."
+      },
+      voice: {
+        listening: "Ouvindo...",
+        typeMessage: "Digite sua mensagem...",
+        errorAccessingMicrophone: "Erro ao acessar o microfone",
+        errorProcessingAudio: "Erro ao processar o áudio",
+        writing: "Escrevendo..."
+      }
+    },
+
+    // Menu
+    menu: {
+      loading: "Carregando menu e pedidos...",
+      errorLoading: "Erro ao carregar dados",
+      retry: "Tentar novamente",
+      noImage: "Sem imagem do produto",
+      welcome: "Olá!",
+      intro: "Aqui você pode ver nosso menu, pedir produtos, ver seus pedidos e pagar a conta.",
+      menuTab: "Menu",
+      ordersTab: "Seus Pedidos",
+      activeOrders: "Pedidos Ativos",
+      noOrders: "Você não tem pedidos",
+      order: "Pedido",
+      items: "itens",
+      pending: "Pendente",
+      inProgress: "Em preparo",
+      cancelled: "Cancelado",
+      ready: "Pronto",
+      searchPlaceholder: "Buscar produtos...",
+      all: "Todos"
+    },
+
+    // Cart
+    cart: {
+      title: "Seu Pedido",
+      splitTitle: "Dividir Conta",
+      split: "Dividir Conta",
+      noSplit: "Não Dividir",
+      guestPlaceholder: "Nome do convidado",
+      addGuest: "Adicionar Convidado",
+      total: "Total:",
+      sending: "Enviando...",
+      confirm: "Confirmar Pedido"
+    },
+
+    // Welcome
+    welcome: {
+      nameLabel: "Seu Nome",
+      namePlaceholder: "Digite seu nome",
+      seeMenu: "Ver Menu",
+      locationLabel: "Localização",
+      noLocation: "Sem localização"
+    }
+  },
   hi: {
     // Header
     login: "लॉग इन करें",
@@ -2377,305 +3296,6 @@ export const translations = {
       seeMenu: "मेनू देखें",
       locationLabel: "स्थान",
       noLocation: "कोई स्थान नहीं"
-    }
-  },
-  pt: {
-    // Header
-    login: "Entrar",
-
-    // Hero Section
-    heroTitle: "A IA que revoluciona a gestão do seu restaurante",
-    heroSubtitle: "Se você é dono de restaurante, temos a melhor opção para otimizar seu negócio. KutchenAI é o assistente inteligente que automatiza, vende mais e te dá controle total. Confie na plataforma líder e leve seu restaurante para o próximo nível!",
-    requestDemo: "Solicitar uma demonstração",
-    viewFeatures: "Ver funcionalidades",
-
-    // Trust Section
-    trustText: "Cada vez mais",
-    restaurants: "restaurantes",
-    trustIn: "confiam na KutchenAI",
-
-    // Features Section
-    featuresTitle: "Tudo o que seu restaurante precisa",
-    features: [
-      {
-        title: "Dashboard em Tempo Real",
-        desc: "Controle total do seu restaurante com métricas e relatórios instantâneos."
-      },
-      {
-        title: "Assistente de Inteligência Artificial",
-        desc: "Atenda clientes, receba pedidos e responda automaticamente 24/7."
-      },
-      {
-        title: "POS e Vendas",
-        desc: "Ponto de venda rápido, controle de caixa e faturamento fácil."
-      },
-      {
-        title: "Gestão de Pedidos e Cozinha",
-        desc: "Pedidos claros, sem erros e painel especial para chefs e equipe."
-      },
-      {
-        title: "Estoque e Ingredientes",
-        desc: "Controle seu estoque, custos e evite perdas."
-      },
-      {
-        title: "Multi-Unidade e Usuários",
-        desc: "Gerencie todas as suas unidades e equipe em um só lugar."
-      },
-      {
-        title: "Menu QR Inteligente",
-        desc: "Seus clientes podem ver o menu e pedir pelo celular."
-      },
-    ],
-
-    // Benefits Section
-    whyTitle: "Por que KutchenAI?",
-    benefits: [
-      "Economize tempo e dinheiro automatizando tarefas repetitivas.",
-      "Melhore a experiência dos clientes com atendimento 24h/24 e 7j/7 e pedidos sem erros.",
-      "Tome decisões inteligentes com relatórios e métricas em tempo real.",
-      "Segurança e privacidade em nível bancário.",
-      "Plateforme flexível, escalável e fácil de usar."
-    ],
-
-    // CTA Section
-    readyTitle: "Pronto para transformar seu restaurante?",
-    startFree: "Comece grátis agora",
-    noCreditCard: "Sem cartão de crédito. Sem compromisso.",
-
-    // Footer
-    platformDescription: "Plataforma inteligente de gestão para restaurantes.",
-    termsAndConditions: "Termos e condições",
-
-    // Register Page
-    registerTitle: "Criar uma conta",
-    registerDescription: "Insira suas informações para criar sua conta",
-    registerBusinessPlaceholder: "Nome do negócio",
-    registerBusinessExample: "Exemplo: Restaurante Paola, Café Central...",
-    registerFirstName: "Nome",
-    registerLastName: "Sobrenome",
-    registerEmail: "E-mail",
-    registerPassword: "Senha",
-    registerButton: "Criar conta",
-    registerAlreadyHave: "Já tem uma conta?",
-    registerSignIn: "Entrar",
-
-    // Login Subdomain Modal
-    loginSubdomainTitle: "Qual é o seu subdomínio?",
-    loginSubdomainPlaceholder: "Ex: minhaempresa",
-    loginSubdomainButton: "Próximo",
-
-    // Login Page
-    loginTitle: "Entrar na sua conta",
-    loginDescription: "Digite seu e-mail para acessar sua conta",
-    loginEmail: "E-mail",
-    loginPassword: "Senha",
-    loginButton: "Entrar",
-    loginOrContinue: "Ou continue com",
-    loginGoogle: "Google",
-    loginFacebook: "Facebook",
-    loginNoAccount: "Não tem uma conta?",
-    loginSignUp: "Cadastre-se",
-
-    // Dashboard
-    dashboard: {
-      title: "Dashboard",
-      overview: "Visão geral",
-      analytics: "Análises",
-      reports: "Relatórios",
-      newLocation: "Nova Unidade",
-      totalSales: "Vendas Totais",
-      activeOrders: "Pedidos Ativos",
-      paidOrders: "Pedidos Pagos",
-      unpaidOrders: "Pedidos em Aberto",
-      cancelledOrders: "Pedidos Cancelados",
-      orderChannels: "Canais de Pedido",
-      salesByLocation: "Vendas por Unidade",
-      topProducts: "Top 5 Produtos Mais Vendidos",
-      unitsSold: "unidades vendidas",
-      sinceLastMonth: "desde o mês passado",
-      total: "Total",
-      orders: "pedidos",
-      order: "pedido",
-      // Analytics
-      salesAndPareto: "Vendas e Pareto de Produtos",
-      selectPeriod: "Selecionar período",
-      lastWeek: "Última Semana",
-      lastMonth: "Último Mês",
-      customRange: "Intervalo Personalizado",
-      revenueByProduct: "Receita por Produto",
-      cumulativePercentage: "Percentual Acumulado",
-      // Kitchen Analytics
-      kitchenTimes: "Tempos de Cozinha e Gargalos",
-      activityByHour: "Atividade por Hora e Categoria",
-      preparationTimes: "Tempos de Preparo por Item",
-      congestionByHour: "Congestionamento por Hora",
-      averageTime: "Tempo Médio",
-      maximum: "Máximo",
-      minimum: "Mínimo",
-      low: "Baixo",
-      medium: "Médio",
-      high: "Alto",
-      minutes: "Minutos",
-      // Inventory Analysis
-      ingredientsAndWaste: "Ingredientes e Desperdício",
-      inventoryDistribution: "Distribuição de Estoque",
-      consumptionVsStock: "Consumo vs Estoque vs Previsão",
-      category: "Categoria",
-      currentStock: "Estoque Atual",
-      consumption: "Consumo",
-      prediction: "Previsão",
-      highValue: "Alto Valor",
-      mediumValue: "Valor Médio",
-      lowValue: "Baixo Valor",
-      highValueDesc: "Alto valor, baixo volume",
-      mediumValueDesc: "Valor e volume médios",
-      lowValueDesc: "Baixo valor, alto volume",
-      items: "itens",
-      // Reports
-      predictionsAndRecommendations: "Previsões e Recomendações",
-      systemAlerts: "Alertas do Sistema",
-      orderAnalysis: "Análise de Pedidos e Comportamento",
-      conversionFunnel: "Funil de Conversão",
-      averageTimeBySection: "Tempo Médio por Seção",
-      cartAbandonmentRate: "Taxa de Abandono de Carrinho",
-      views: "Visualizações",
-      clicks: "Cliques",
-      payments: "Pagamentos",
-      conversionRate: "taxa de conversão",
-      seconds: "Segundos",
-      percentage: "Percentual",
-      abandonmentRate: "Taxa de Abandono",
-      trend: "Tendência",
-      confidence: "confiança",
-      daysLeft: "dias restantes",
-      alerts: "alertas",
-      // Order Channels
-      pos: "POS",
-      aiWhatsapp: "IA WhatsApp",
-      qrTables: "QR Mesas",
-      waiters: "Garçons",
-      diddi: "Diddi",
-      rappi: "Rappi"
-    },
-
-    // Sidebar
-    sidebar: {
-      dashboard: "Dashboard",
-      ai: "Inteligência Artificial",
-      pos: "POS",
-      orders: "Pedidos",
-      tables: "Mesas",
-      kitchen: "Cozinha",
-      categories: "Categorias",
-      products: "Produtos",
-      ingredients: "Ingredientes",
-      locations: "Unidades",
-      customers: "Clientes",
-      users: "Usuários",
-      settings: "Configurações"
-    },
-
-    // User Menu
-    userMenu: {
-      logout: "Sair"
-    },
-
-    // AI Manager
-    aiManager: {
-      title: "Inteligência Artificial v.3.0",
-      whatsappConnected: "WhatsApp Conectado",
-      connect: "Conectar",
-      connectWhatsApp: "Conectar WhatsApp",
-      activateAI: "Ativar Agente IA",
-      aiActivated: "IA ativada",
-      aiDeactivated: "IA desativada",
-      errorUpdatingSettings: "Erro ao atualizar configurações",
-      loading: "Carregando...",
-      redirectingToLogin: "Redirecionando para login...",
-      noLocationAssigned: "Você não tem uma unidade atribuída",
-      contactAdmin: "Por favor, contate o administrador para atribuir uma unidade.",
-      tabs: {
-        whatsapp: "WhatsApp",
-        chat: "Chat IA"
-      },
-      error: {
-        retryConnection: "Tentar novamente",
-        cannotVerifyWhatsApp: "Não é possível verificar o status do WhatsApp: tenantId ou locationId ausente.",
-        cannotConnectWhatsApp: "Não é possível conectar ao WhatsApp: tenantId ou locationId ausente."
-      },
-      chats: {
-        title: "Chats",
-        connectingAI: "Conectando IA ao WhatsApp...",
-        scanQR: "Escaneie o QR code com o WhatsApp",
-        loadingChats: "Carregando chats...",
-        noChatsAvailable: "Nenhum chat disponível",
-        noMessages: "Sem mensagens",
-        unreadCount: "mensagens não lidas"
-      },
-      chat: {
-        selectChatToStart: "Selecione um chat para começar",
-        loadingMessages: "Carregando mensagens...",
-        noMessagesInChat: "Nenhuma mensagem neste chat",
-        aiActive: "IA Ativa",
-        aiInactive: "IA Inativa",
-        activateAIForChat: "Ativar IA para este chat",
-        deactivateAIForChat: "Desativar IA para este chat",
-        typeMessage: "Digite uma mensagem...",
-        sendMessage: "Enviar mensagem",
-        aiEnabledForChat: "IA para {name} agora está ativa.",
-        aiDisabledForChat: "IA para {name} agora está inativa."
-      },
-      voice: {
-        listening: "Ouvindo...",
-        typeMessage: "Digite sua mensagem...",
-        errorAccessingMicrophone: "Erro ao acessar o microfone",
-        errorProcessingAudio: "Erro ao processar o áudio",
-        writing: "Escrevendo..."
-      }
-    },
-
-    // Menu
-    menu: {
-      loading: "Carregando menu e pedidos...",
-      errorLoading: "Erro ao carregar dados",
-      retry: "Tentar novamente",
-      noImage: "Sem imagem do produto",
-      welcome: "Olá!",
-      intro: "Aqui você pode ver nosso menu, pedir produtos, ver seus pedidos e pagar a conta.",
-      menuTab: "Menu",
-      ordersTab: "Seus Pedidos",
-      activeOrders: "Pedidos Ativos",
-      noOrders: "Você não tem pedidos",
-      order: "Pedido",
-      items: "itens",
-      pending: "Pendente",
-      inProgress: "Em preparo",
-      cancelled: "Cancelado",
-      ready: "Pronto",
-      searchPlaceholder: "Buscar produtos...",
-      all: "Todos"
-    },
-
-    // Cart
-    cart: {
-      title: "Seu Pedido",
-      splitTitle: "Dividir Conta",
-      split: "Dividir Conta",
-      noSplit: "Não Dividir",
-      guestPlaceholder: "Nome do convidado",
-      addGuest: "Adicionar Convidado",
-      total: "Total:",
-      sending: "Enviando...",
-      confirm: "Confirmar Pedido"
-    },
-
-    // Welcome
-    welcome: {
-      nameLabel: "Seu Nome",
-      namePlaceholder: "Digite seu nome",
-      seeMenu: "Ver Menu",
-      locationLabel: "Localização",
-      noLocation: "Sem localização"
     }
   }
 } 
