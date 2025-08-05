@@ -154,18 +154,35 @@ export const landingTranslations = {
       {
         name: "Starter",
         price: "Gratis",
-        period: "por 30 días",
-        description: "Perfecto para empezar",
-        features: ["Hasta 100 pedidos/mes", "Funciones básicas", "Soporte por email", "1 ubicación"],
-        cta: "Empezar gratis",
+        period: "5 días",
+        description: "Prueba el asistente AI",
+        features: [
+          "Acceso completo al asistente AI por 5 días",
+          "Todas las funcionalidades de IA incluidas",
+          "Sin compromiso, sin tarjeta de crédito",
+          "Experiencia completa de la plataforma",
+          "Soporte técnico incluido"
+        ],
+        cta: "Probar gratis",
         popular: false
       },
       {
         name: "Professional",
-        price: "$99",
+        price: "$49.00",
         period: "/mes",
-        description: "Para restaurantes en crecimiento",
-        features: ["Pedidos ilimitados", "Todas las funciones", "Soporte prioritario", "Hasta 3 ubicaciones", "Integración multi-plataforma"],
+        description: "Asistente AI completo para tu restaurante",
+        features: [
+          "Asistente AI 24/7 con inteligencia avanzada",
+          "Análisis predictivo de demanda en tiempo real",
+          "Optimización automática de inventario y compras",
+          "Gestión inteligente de pedidos y cocina",
+          "Proyecciones financieras y de rentabilidad",
+          "Recomendaciones personalizadas de menú",
+          "Análisis de tendencias y estacionalidad",
+          "Reportes automáticos y dashboards inteligentes",
+          "Integración multi-plataforma automática",
+          "Soporte prioritario con especialistas"
+        ],
         cta: "Comenzar ahora",
         popular: true
       },
@@ -173,12 +190,24 @@ export const landingTranslations = {
         name: "Enterprise",
         price: "Personalizado",
         period: "",
-        description: "Para cadenas y grandes operaciones",
-        features: ["Ubicaciones ilimitadas", "Soporte 24/7", "API personalizada", "Implementación dedicada", "Analytics avanzados"],
+        description: "Solución completa para grandes operaciones",
+        features: [
+          "Asistente AI personalizado para tu negocio",
+          "Implementación dedicada y capacitación",
+          "API personalizada y integraciones avanzadas",
+          "Analytics predictivos de nivel empresarial",
+          "Soporte 24/7 con gerente de cuenta",
+          "Múltiples ubicaciones y usuarios ilimitados",
+          "Consultoría estratégica incluida",
+          "Desarrollo de funcionalidades a medida"
+        ],
         cta: "Contactar ventas",
         popular: false
       }
-    ]
+    ],
+    
+    // PTD Information
+    ptdInfo: "Después de tu prueba gratuita, puedes contratar el asistente por días a solo $1.99/día"
   },
   
   en: {
@@ -336,18 +365,42 @@ export const landingTranslations = {
       {
         name: "Starter",
         price: "Free",
-        period: "for 30 days",
-        description: "Perfect to get started",
-        features: ["Up to 100 orders/month", "Basic features", "Email support", "1 location"],
-        cta: "Start free",
+        period: "5 days",
+        description: "Try the AI assistant",
+        features: [
+          "The assistant tells you what to buy",
+          "The assistant helps you manage your inventory",
+          "The assistant helps you make orders",
+          "The assistant gives you sales projections",
+          "The assistant gives you loss projections",
+          "The assistant gives you profitability projections",
+          "The assistant gives you key action ideas and strategies"
+        ],
+        cta: "Try for free",
         popular: false
       },
       {
         name: "Professional",
-        price: "$99",
-        period: "/month",
-        description: "For growing restaurants",
-        features: ["Unlimited orders", "All features", "Priority support", "Up to 3 locations", "Multi-platform integration"],
+        price: "$49.00",
+        period: "/day",
+        description: "PTD Mode - Hire the assistant by days",
+        features: [
+          "The assistant tells you what to buy",
+          "The assistant helps you manage your inventory",
+          "The assistant helps you make orders",
+          "The assistant gives you sales projections",
+          "The assistant gives you loss projections",
+          "The assistant gives you profitability projections",
+          "The assistant gives you demand projections",
+          "The assistant gives you operational cost projections",
+          "The assistant gives you staff efficiency projections",
+          "The assistant gives you menu optimization projections",
+          "The assistant gives you inventory turnover projections",
+          "The assistant gives you product margin projections",
+          "The assistant gives you seasonality projections",
+          "The assistant gives you market trend projections",
+          "The assistant gives you key action ideas and strategies"
+        ],
         cta: "Start now",
         popular: true
       },
@@ -355,12 +408,24 @@ export const landingTranslations = {
         name: "Enterprise",
         price: "Custom",
         period: "",
-        description: "For chains and large operations",
-        features: ["Unlimited locations", "24/7 support", "Custom API", "Dedicated implementation", "Advanced analytics"],
+        description: "Complete solution for large operations",
+        features: [
+          "Customized AI assistant for your business",
+          "Dedicated implementation and training",
+          "Custom API and advanced integrations",
+          "Enterprise-level predictive analytics",
+          "24/7 support with account manager",
+          "Multiple locations and unlimited users",
+          "Strategic consulting included",
+          "Custom feature development"
+        ],
         cta: "Contact sales",
         popular: false
       }
-    ]
+    ],
+    
+    // PTD Information
+    ptdInfo: "After your free trial, you can hire the assistant by days at $1.99/day"
   },
   
   fr: {
@@ -497,31 +562,67 @@ export const landingTranslations = {
       {
         name: "Starter",
         price: "Gratuit",
-        period: "pendant 30 jours",
-        description: "Parfait pour commencer",
-        features: ["Jusqu'à 100 commandes/mois", "Fonctionnalités de base", "Support par email", "1 emplacement"],
-        cta: "Commencer gratuitement",
+        period: "5 jours",
+        description: "Essayez l'assistant IA",
+        features: [
+          "L'assistant vous dit quoi acheter",
+          "L'assistant vous aide à gérer votre inventaire",
+          "L'assistant vous aide à faire les commandes",
+          "L'assistant vous donne des projections de vente",
+          "L'assistant vous donne des projections de pertes",
+          "L'assistant vous donne des projections de rentabilité",
+          "L'assistant vous donne des idées clés d'actions et stratégies"
+        ],
+        cta: "Essayer gratuitement",
         popular: false
       },
       {
         name: "Professional",
-        price: "99€",
-        period: "/mois",
-        description: "Pour les restaurants en croissance",
-        features: ["Commandes illimitées", "Toutes les fonctionnalités", "Support prioritaire", "Jusqu'à 3 emplacements", "Intégration multi-plateforme"],
+        price: "$49.00",
+        period: "/jour",
+        description: "Mode PTD - Engagez l'assistant par jours",
+        features: [
+          "L'assistant vous dit quoi acheter",
+          "L'assistant vous aide à gérer votre inventaire",
+          "L'assistant vous aide à faire les commandes",
+          "L'assistant vous donne des projections de vente",
+          "L'assistant vous donne des projections de pertes",
+          "L'assistant vous donne des projections de rentabilité",
+          "L'assistant vous donne des projections de demande",
+          "L'assistant vous donne des projections de coûts opérationnels",
+          "L'assistant vous donne des projections d'efficacité du personnel",
+          "L'assistant vous donne des projections d'optimisation de menu",
+          "L'assistant vous donne des projections de rotation d'inventaire",
+          "L'assistant vous donne des projections de marges par produit",
+          "L'assistant vous donne des projections de saisonnalité",
+          "L'assistant vous donne des projections de tendances du marché",
+          "L'assistant vous donne des idées clés d'actions et stratégies"
+        ],
         cta: "Commencer maintenant",
         popular: true
       },
       {
-        name: "Enterprise",
+        name: "Entreprise",
         price: "Personnalisé",
         period: "",
-        description: "Pour les chaînes et grandes opérations",
-        features: ["Emplacements illimités", "Support 24/7", "API personnalisée", "Implémentation dédiée", "Analytics avancés"],
-        cta: "Contacter les ventes",
+        description: "Solution complète pour les grands opérations",
+        features: [
+          "Assistant IA personnalisé pour votre entreprise",
+          "Implémentation dédiée et formation",
+          "API personnalisée et intégrations avancées",
+          "Analyses prédictives de niveau d'entreprise",
+          "Support 24/7 avec un manager de compte",
+          "Multiples emplacements et utilisateurs illimités",
+          "Consultation stratégique incluse",
+          "Développement de fonctionnalités sur mesure"
+        ],
+        cta: "Contactez ventes",
         popular: false
       }
-    ]
+    ],
+    
+    // PTD Information
+    ptdInfo: "Après votre essai gratuit, vous pouvez engager l'assistant par jours à 1,99 $/jour"
   },
   
   pt: {
@@ -658,18 +759,42 @@ export const landingTranslations = {
       {
         name: "Starter",
         price: "Grátis",
-        period: "por 30 dias",
-        description: "Perfeito para começar",
-        features: ["Até 100 pedidos/mês", "Funcionalidades básicas", "Suporte por email", "1 localização"],
-        cta: "Começar grátis",
+        period: "5 dias",
+        description: "Experimente o assistente IA",
+        features: [
+          "O assistente te diz o que comprar",
+          "O assistente te ajuda a gerenciar seu inventário",
+          "O assistente te ajuda a fazer pedidos",
+          "O assistente te dá projeções de vendas",
+          "O assistente te dá projeções de perdas",
+          "O assistente te dá projeções de rentabilidade",
+          "O assistente te dá ideias chave de ações e estratégias"
+        ],
+        cta: "Experimentar grátis",
         popular: false
       },
       {
         name: "Professional",
-        price: "R$99",
-        period: "/mês",
-        description: "Para restaurantes em crescimento",
-        features: ["Pedidos ilimitados", "Todas as funcionalidades", "Suporte prioritário", "Até 3 localizações", "Integração multi-plataforma"],
+        price: "$49.00",
+        period: "/dia",
+        description: "Modalidade PTD - Contrate o assistente por dias",
+        features: [
+          "O assistente te diz o que comprar",
+          "O assistente te ajuda a gerenciar seu inventário",
+          "O assistente te ajuda a fazer pedidos",
+          "O assistente te dá projeções de vendas",
+          "O assistente te dá projeções de perdas",
+          "O assistente te dá projeções de rentabilidade",
+          "O assistente te dá projeções de demanda",
+          "O assistente te dá projeções de custos operacionais",
+          "O assistente te dá projeções de eficiência de pessoal",
+          "O assistente te dá projeções de otimização de menu",
+          "O assistente te dá projeções de rotatividade de inventário",
+          "O assistente te dá projeções de margens por produto",
+          "O assistente te dá projeções de sazonalidade",
+          "O assistente te dá projeções de tendências do mercado",
+          "O assistente te dá ideias chave de ações e estratégias"
+        ],
         cta: "Começar agora",
         popular: true
       },
@@ -677,194 +802,24 @@ export const landingTranslations = {
         name: "Enterprise",
         price: "Personalizado",
         period: "",
-        description: "Para cadeias e grandes operações",
-        features: ["Localizações ilimitadas", "Suporte 24/7", "API personalizada", "Implementação dedicada", "Analytics avançados"],
+        description: "Solução completa para grandes operações",
+        features: [
+          "Assistente IA personalizado para seu negócio",
+          "Implantação dedicada e capacitação",
+          "API personalizada e integrações avançadas",
+          "Análises preditivas de nível empresarial",
+          "Suporte 24/7 com gerente de conta",
+          "Múltiplas localizações e usuários ilimitados",
+          "Consultoria estratégica incluída",
+          "Desenvolvimento de funcionalidades sob medida"
+        ],
         cta: "Contatar vendas",
         popular: false
       }
-    ]
-  },
-  
-  ja: {
-    // Hero Section Badges
-    platformNumberOne: "コロンビア第1位のプラットフォーム",
-    activeRestaurants: "✓ 500以上のアクティブなレストラン",
-    
-    // CTA Section
-    readyTitle: "レストランを変革する準備はできていますか？",
-    startFree: "今すぐ無料で始める",
-    noCreditCard: "クレジットカード不要。契約なし。",
-    joinRestaurants: "すでに500以上のレストランがKutchenAIを信頼してビジネスを変革しています",
-    talkToExpert: "専門家に相談する",
-    
-    // Footer
-    platformDescription: "レストラン向けのインテリジェント管理プラットフォーム。",
-    termsAndConditions: "利用規約",
-    product: "製品",
-    featuresLink: "機能",
-    segments: "セグメント",
-    pricing: "料金",
-    integrations: "統合",
-    company: "会社",
-    aboutUs: "私たちについて",
-    blog: "ブログ",
-    careers: "採用",
-    press: "プレス",
-    support: "サポート",
-    helpCenter: "ヘルプセンター",
-    documentation: "ドキュメント",
-    community: "コミュニティ",
-    serviceStatus: "サービス状況",
-    legal: "法的",
-    privacy: "プライバシー",
-    terms: "利用規約",
-    cookies: "クッキー",
-    security: "セキュリティ",
-    location: "カリ - コロンビア",
-    allRightsReserved: "全著作権所有。",
-    mostPopular: "最も人気",
-    
-    // Market Segments Section
-    marketSegmentsTitle: "すべてのタイプのレストラン向け",
-    marketSegmentsSubtitle: "KutchenAIは、お客様のサービス方法に関係なく、ビジネスモデルに適応します",
-    marketSegments: [
-      {
-        title: "実店舗レストラン",
-        subtitle: "テーブルとサービスの完全管理",
-        description: "テーブル、注文、キッチンの統合管理で従来のレストランを最適化します。",
-        features: ["テーブル管理", "ウェイター注文", "キッチン制御", "POS請求"],
-        icon: "🍽️"
-      },
-      {
-        title: "E-レストラン",
-        subtitle: "100%デジタルレストラン",
-        description: "デリバリーとテイクアウトでオンライン専用に運営するレストラン向け。",
-        features: ["オンライン注文", "デリバリー統合", "仮想管理", "デジタル分析"],
-        icon: "💻"
-      },
-      {
-        title: "ダークキッチン",
-        subtitle: "ダークキッチン＆ゴーストキッチン",
-        description: "インテリジェントな注文とデリバリー管理でダークキッチンの効率を最大化します。",
-        features: ["マルチアプリ管理", "キッチン最適化", "デリバリー制御", "高度な分析"],
-        icon: "👻"
-      },
-      {
-        title: "デリバリー＆テイクアウト",
-        subtitle: "宅配専門",
-        description: "最適化された注文管理で迅速で効率的なデリバリーに集中します。",
-        features: ["マルチプラットフォーム", "デリバリー管理", "ルート最適化", "品質管理"],
-        icon: "🚚"
-      }
     ],
     
-    // Advanced Features Section
-    advancedFeaturesTitle: "高度な機能",
-    advancedFeaturesSubtitle: "各ビジネスタイプに特化したツール",
-    advancedFeatures: [
-      {
-        title: "マルチプラットフォーム統合",
-        description: "Rappi、Uber Eats、Didi Foodなどに一箇所から接続",
-        benefits: ["一元管理", "自動同期", "統一レポート", "エラー削減"]
-      },
-      {
-        title: "カスタマーサービスのAI",
-        description: "問い合わせに対応し、24/7注文を受けるインテリジェントチャットボット",
-        benefits: ["即座の応答", "エラー削減", "より良い体験", "スタッフ削減"]
-      },
-      {
-        title: "予測分析",
-        description: "需要を予測し、在庫を最適化し、利益を最大化",
-        benefits: ["廃棄物削減", "より良い計画", "売上増加", "コスト最適化"]
-      },
-      {
-        title: "デリバリー管理",
-        description: "ルート、配送時間、顧客満足度を最適化",
-        benefits: ["より速い配送", "低い運営コスト", "満足した顧客", "より良い評判"]
-      }
-    ],
-    
-    // Success Stories Section
-    successStoriesTitle: "成功事例",
-    successStoriesSubtitle: "KutchenAIでビジネスを変革したレストラン",
-    successStories: [
-      {
-        name: "レストラン・ラ・パオラ",
-        type: "実店舗レストラン",
-        location: "カリ、コロンビア",
-        testimonial: "KutchenAIは注文エラーを80%削減し、売上を35%増加させるのに3ヶ月で役立ちました。",
-        metrics: ["80%エラー削減", "35%売上増加", "50%待ち時間削減"]
-      },
-      {
-        name: "バーチャルキッチンエクスプレス",
-        type: "ダークキッチン",
-        location: "ボゴタ、コロンビア",
-        testimonial: "KutchenAIで5つのデリバリープラットフォームを単一インターフェースから管理します。効率が60%向上しました。",
-        metrics: ["5つの統合プラットフォーム", "60%効率向上", "40%注文増加"]
-      },
-      {
-        name: "ファストデリバリー",
-        type: "デリバリー専門",
-        location: "メデジン、コロンビア",
-        testimonial: "配送時間が平均45分から25分に短縮されました。お客様はこれまで以上に満足しています。",
-        metrics: ["45%配送時間削減", "95%満足度", "30%リピート増加"]
-      }
-    ],
-    
-    // ROI Section
-    roiTitle: "保証された投資収益率",
-    roiSubtitle: "最初の30日で結果を確認",
-    roiMetrics: [
-      {
-        metric: "30%",
-        description: "平均売上増加"
-      },
-      {
-        metric: "50%",
-        description: "サービス時間削減"
-      },
-      {
-        metric: "80%",
-        description: "注文エラー削減"
-      },
-      {
-        metric: "60%",
-        description: "運営コスト削減"
-      }
-    ],
-    
-    // Pricing Section
-    pricingTitle: "ビジネスに柔軟なプラン",
-    pricingSubtitle: "ニーズに最適なプランを選択",
-    pricingPlans: [
-      {
-        name: "スターター",
-        price: "無料",
-        period: "30日間",
-        description: "始めるのに最適",
-        features: ["月100注文まで", "基本機能", "メールサポート", "1店舗"],
-        cta: "無料で始める",
-        popular: false
-      },
-      {
-        name: "プロフェッショナル",
-        price: "¥99",
-        period: "/月",
-        description: "成長するレストラン向け",
-        features: ["無制限注文", "全機能", "優先サポート", "最大3店舗", "マルチプラットフォーム統合"],
-        cta: "今すぐ始める",
-        popular: true
-      },
-      {
-        name: "エンタープライズ",
-        price: "カスタム",
-        period: "",
-        description: "チェーンと大規模運営向け",
-        features: ["無制限店舗", "24/7サポート", "カスタムAPI", "専用実装", "高度な分析"],
-        cta: "営業に連絡",
-        popular: false
-      }
-    ]
+    // PTD Information
+    ptdInfo: "Após sua avaliação gratuita, você pode contratar o assistente por dias a $1.99/dia"
   },
   
   de: {
@@ -1022,18 +977,35 @@ export const landingTranslations = {
       {
         name: "Starter",
         price: "Kostenlos",
-        period: "für 30 Tage",
-        description: "Perfekt zum Einstieg",
-        features: ["Bis zu 100 Bestellungen/Monat", "Grundfunktionen", "E-Mail-Support", "1 Standort"],
-        cta: "Kostenlos starten",
+        period: "5 Tage",
+        description: "Testen Sie den KI-Assistenten",
+        features: [
+          "Vollständiger Zugang zum KI-Assistenten für 5 Tage",
+          "Alle KI-Funktionen inbegriffen",
+          "Keine Verpflichtung, keine Kreditkarte",
+          "Vollständige Plattform-Erfahrung",
+          "Technischer Support inbegriffen"
+        ],
+        cta: "Kostenlos testen",
         popular: false
       },
       {
         name: "Professional",
-        price: "99€",
+        price: "$49.00",
         period: "/Monat",
-        description: "Für wachsende Restaurants",
-        features: ["Unbegrenzte Bestellungen", "Alle Funktionen", "Prioritäts-Support", "Bis zu 3 Standorte", "Multi-Plattform-Integration"],
+        description: "Vollständiger KI-Assistent für Ihr Restaurant",
+        features: [
+          "24/7 KI-Assistent mit fortschrittlicher Intelligenz",
+          "Echtzeit-Nachfragevorhersage-Analyse",
+          "Automatische Inventar- und Einkaufsoptimierung",
+          "Intelligente Bestell- und Küchenverwaltung",
+          "Finanzielle und Rentabilitätsprognosen",
+          "Personalisierte Menüempfehlungen",
+          "Trend- und Saisonalitätsanalyse",
+          "Automatische Berichte und intelligente Dashboards",
+          "Automatische Multi-Plattform-Integration",
+          "Prioritäts-Support mit Spezialisten"
+        ],
         cta: "Jetzt starten",
         popular: true
       },
@@ -1041,12 +1013,24 @@ export const landingTranslations = {
         name: "Enterprise",
         price: "Individuell",
         period: "",
-        description: "Für Ketten und große Betriebe",
-        features: ["Unbegrenzte Standorte", "24/7 Support", "Individuelle API", "Dedizierte Implementierung", "Erweiterte Analysen"],
+        description: "Vollständige Lösung für große Betriebe",
+        features: [
+          "Maßgeschneiderter KI-Assistent für Ihr Unternehmen",
+          "Dedizierte Implementierung und Schulung",
+          "Maßgeschneiderte API und erweiterte Integrationen",
+          "Unternehmensgrade Vorhersageanalysen",
+          "24/7 Support mit Account Manager",
+          "Mehrere Standorte und unbegrenzte Benutzer",
+          "Strategische Beratung inbegriffen",
+          "Maßgeschneiderte Funktionsentwicklung"
+        ],
         cta: "Vertrieb kontaktieren",
         popular: false
       }
-    ]
+    ],
+    
+    // PTD Information
+    ptdInfo: "Nach Ihrer kostenlosen Testphase können Sie den Assistenten für $1.99/Tag tageweise mieten"
   },
   
   zh: {
@@ -1204,18 +1188,35 @@ export const landingTranslations = {
       {
         name: "入门版",
         price: "免费",
-        period: "30天",
-        description: "完美开始",
-        features: ["每月最多100个订单", "基本功能", "邮件支持", "1个位置"],
-        cta: "免费开始",
+        period: "5天",
+        description: "试用AI助手",
+        features: [
+          "5天完整AI助手访问",
+          "包含所有AI功能",
+          "无承诺，无需信用卡",
+          "完整平台体验",
+          "包含技术支持"
+        ],
+        cta: "免费试用",
         popular: false
       },
       {
         name: "专业版",
-        price: "¥99",
+        price: "$49.00",
         period: "/月",
-        description: "适合成长中的餐厅",
-        features: ["无限订单", "所有功能", "优先支持", "最多3个位置", "多平台集成"],
+        description: "餐厅完整AI助手",
+        features: [
+          "24/7高级AI助手",
+          "实时需求预测分析",
+          "自动库存和采购优化",
+          "智能订单和厨房管理",
+          "财务和盈利能力预测",
+          "个性化菜单推荐",
+          "趋势和季节性分析",
+          "自动报告和智能仪表板",
+          "自动多平台集成",
+          "专家优先支持"
+        ],
         cta: "立即开始",
         popular: true
       },
@@ -1223,12 +1224,24 @@ export const landingTranslations = {
         name: "企业版",
         price: "定制",
         period: "",
-        description: "适合连锁店和大型运营",
-        features: ["无限位置", "24/7支持", "定制API", "专用实施", "高级分析"],
+        description: "大型运营完整解决方案",
+        features: [
+          "为您的业务定制AI助手",
+          "专用实施和培训",
+          "定制API和高级集成",
+          "企业级预测分析",
+          "24/7账户经理支持",
+          "多地点和无限用户",
+          "包含战略咨询",
+          "定制功能开发"
+        ],
         cta: "联系销售",
         popular: false
       }
-    ]
+    ],
+    
+    // PTD Information
+    ptdInfo: "免费试用后，您可以按天租用助手，每天仅需$1.99"
   },
   
   it: {
@@ -1386,18 +1399,35 @@ export const landingTranslations = {
       {
         name: "Starter",
         price: "Gratis",
-        period: "per 30 giorni",
-        description: "Perfetto per iniziare",
-        features: ["Fino a 100 ordini/mese", "Funzionalità base", "Supporto email", "1 sede"],
-        cta: "Inizia gratis",
+        period: "5 giorni",
+        description: "Prova l'assistente AI",
+        features: [
+          "Accesso completo all'assistente AI per 5 giorni",
+          "Tutte le funzionalità AI incluse",
+          "Nessun impegno, nessuna carta di credito",
+          "Esperienza completa della piattaforma",
+          "Supporto tecnico incluso"
+        ],
+        cta: "Prova gratis",
         popular: false
       },
       {
         name: "Professional",
-        price: "€99",
+        price: "$49.00",
         period: "/mese",
-        description: "Per ristoranti in crescita",
-        features: ["Ordini illimitati", "Tutte le funzionalità", "Supporto prioritario", "Fino a 3 sedi", "Integrazione multi-piattaforma"],
+        description: "Assistente AI completo per il tuo ristorante",
+        features: [
+          "Assistente AI 24/7 con intelligenza avanzata",
+          "Analisi predittiva della domanda in tempo reale",
+          "Ottimizzazione automatica di inventario e acquisti",
+          "Gestione intelligente di ordini e cucina",
+          "Proiezioni finanziarie e di redditività",
+          "Raccomandazioni personalizzate del menu",
+          "Analisi di tendenze e stagionalità",
+          "Report automatici e dashboard intelligenti",
+          "Integrazione multi-piattaforma automatica",
+          "Supporto prioritario con specialisti"
+        ],
         cta: "Inizia ora",
         popular: true
       },
@@ -1405,12 +1435,24 @@ export const landingTranslations = {
         name: "Enterprise",
         price: "Personalizzato",
         period: "",
-        description: "Per catene e grandi operazioni",
-        features: ["Sedi illimitate", "Supporto 24/7", "API personalizzata", "Implementazione dedicata", "Analytics avanzati"],
+        description: "Soluzione completa per grandi operazioni",
+        features: [
+          "Assistente AI personalizzato per il tuo business",
+          "Implementazione dedicata e formazione",
+          "API personalizzata e integrazioni avanzate",
+          "Analytics predittivi di livello aziendale",
+          "Supporto 24/7 con account manager",
+          "Multiple sedi e utenti illimitati",
+          "Consulenza strategica inclusa",
+          "Sviluppo di funzionalità su misura"
+        ],
         cta: "Contatta vendite",
         popular: false
       }
-    ]
+    ],
+    
+    // PTD Information
+    ptdInfo: "Dopo la tua prova gratuita, puoi assumere l'assistente per giorni a $1.99/giorno"
   },
   
   hi: {
@@ -1568,18 +1610,35 @@ export const landingTranslations = {
       {
         name: "स्टार्टर",
         price: "मुफ्त",
-        period: "30 दिनों के लिए",
-        description: "शुरू करने के लिए बिल्कुल सही",
-        features: ["प्रति माह 100 ऑर्डर तक", "बुनियादी सुविधाएं", "ईमेल सहायता", "1 स्थान"],
-        cta: "मुफ्त शुरू करें",
+        period: "5 दिन",
+        description: "AI सहायक को आज़माएं",
+        features: [
+          "5 दिनों के लिए AI सहायक का पूर्ण पहुंच",
+          "सभी AI सुविधाएं शामिल",
+          "कोई प्रतिबद्धता नहीं, कोई क्रेडिट कार्ड नहीं",
+          "प्लेटफॉर्म का पूर्ण अनुभव",
+          "तकनीकी सहायता शामिल"
+        ],
+        cta: "मुफ्त आज़माएं",
         popular: false
       },
       {
         name: "प्रोफेशनल",
-        price: "₹99",
+        price: "$49.00",
         period: "/महीना",
-        description: "बढ़ते रेस्तरां के लिए",
-        features: ["असीमित ऑर्डर", "सभी सुविधाएं", "प्राथमिकता सहायता", "3 स्थान तक", "मल्टी-प्लेटफॉर्म एकीकरण"],
+        description: "आपके रेस्तरां के लिए पूर्ण AI सहायक",
+        features: [
+          "24/7 उन्नत AI सहायक",
+          "वास्तविक समय मांग पूर्वानुमान विश्लेषण",
+          "स्वचालित इन्वेंटरी और खरीदारी अनुकूलन",
+          "स्मार्ट ऑर्डर और रसोई प्रबंधन",
+          "वित्तीय और लाभप्रदता पूर्वानुमान",
+          "व्यक्तिगत मेनू सिफारिशें",
+          "रुझान और मौसमी विश्लेषण",
+          "स्वचालित रिपोर्ट और स्मार्ट डैशबोर्ड",
+          "स्वचालित मल्टी-प्लेटफॉर्म एकीकरण",
+          "विशेषज्ञों के साथ प्राथमिकता सहायता"
+        ],
         cta: "अभी शुरू करें",
         popular: true
       },
@@ -1587,11 +1646,234 @@ export const landingTranslations = {
         name: "एंटरप्राइज",
         price: "कस्टम",
         period: "",
-        description: "श्रृंखलाओं और बड़े संचालन के लिए",
-        features: ["असीमित स्थान", "24/7 सहायता", "कस्टम API", "समर्पित कार्यान्वयन", "उन्नत विश्लेषण"],
+        description: "बड़े संचालन के लिए पूर्ण समाधान",
+        features: [
+          "आपके व्यवसाय के लिए अनुकूलित AI सहायक",
+          "समर्पित कार्यान्वयन और प्रशिक्षण",
+          "कस्टम API और उन्नत एकीकरण",
+          "एंटरप्राइज-स्तरीय पूर्वानुमान विश्लेषण",
+          "खाता प्रबंधक के साथ 24/7 सहायता",
+          "कई स्थान और असीमित उपयोगकर्ता",
+          "रणनीतिक परामर्श शामिल",
+          "कस्टम सुविधा विकास"
+        ],
         cta: "बिक्री से संपर्क करें",
         popular: false
       }
-    ]
+    ],
+    
+    // PTD Information
+    ptdInfo: "आपके निःशुल्क परीक्षण के बाद, आप सहायक को $1.99/दिन में दिन-दर-दिन किराए पर ले सकते हैं"
+  },
+  
+  ja: {
+    // Hero Section Badges
+    platformNumberOne: "コロンビア第1位のプラットフォーム",
+    activeRestaurants: "✓ 500以上のアクティブなレストラン",
+    
+    // CTA Section
+    readyTitle: "レストランを変革する準備はできていますか？",
+    startFree: "今すぐ無料で始める",
+    noCreditCard: "クレジットカード不要。契約なし。",
+    joinRestaurants: "すでに500以上のレストランがKutchenAIを信頼してビジネスを変革しています",
+    talkToExpert: "専門家に相談する",
+    
+    // Footer
+    platformDescription: "レストラン向けのインテリジェント管理プラットフォーム。",
+    termsAndConditions: "利用規約",
+    product: "製品",
+    featuresLink: "機能",
+    segments: "セグメント",
+    pricing: "料金",
+    integrations: "統合",
+    company: "会社",
+    aboutUs: "私たちについて",
+    blog: "ブログ",
+    careers: "採用",
+    press: "プレス",
+    support: "サポート",
+    helpCenter: "ヘルプセンター",
+    documentation: "ドキュメント",
+    community: "コミュニティ",
+    serviceStatus: "サービス状況",
+    legal: "法的",
+    privacy: "プライバシー",
+    terms: "利用規約",
+    cookies: "クッキー",
+    security: "セキュリティ",
+    location: "カリ - コロンビア",
+    allRightsReserved: "全著作権所有。",
+    mostPopular: "最も人気",
+    
+    // Market Segments Section
+    marketSegmentsTitle: "すべてのタイプのレストラン向け",
+    marketSegmentsSubtitle: "KutchenAIは、お客様のサービス方法に関係なく、ビジネスモデルに適応します",
+    marketSegments: [
+      {
+        title: "実店舗レストラン",
+        subtitle: "テーブルとサービスの完全管理",
+        description: "テーブル、注文、キッチンの統合管理で従来のレストランを最適化します。",
+        features: ["テーブル管理", "ウェイター注文", "キッチン制御", "POS 請求"],
+        icon: "🍽️"
+      },
+      {
+        title: "E-レストラン",
+        subtitle: "100%デジタルレストラン",
+        description: "デリバリーとテイクアウトでオンライン専用に運営するレストラン向け。",
+        features: ["オンライン注文", "デリバリー統合", "仮想管理", "デジタル分析"],
+        icon: "💻"
+      },
+      {
+        title: "ダークキッチン",
+        subtitle: "ダークキッチン＆ゴーストキッチン",
+        description: "インテリジェントな注文とデリバリー管理でダークキッチンの効率を最大化します。",
+        features: ["マルチアプリ管理", "キッチン最適化", "デリバリー制御", "高度な分析"],
+        icon: "👻"
+      },
+      {
+        title: "デリバリー＆テイクアウト",
+        subtitle: "宅配専門",
+        description: "最適化された注文管理で迅速で効率的なデリバリーに集中します。",
+        features: ["マルチプラットフォーム", "デリバリー管理", "ルート最適化", "品質管理"],
+        icon: "🚚"
+      }
+    ],
+    
+    // Advanced Features Section
+    advancedFeaturesTitle: "高度な機能",
+    advancedFeaturesSubtitle: "各ビジネスタイプに特化したツール",
+    advancedFeatures: [
+      {
+        title: "マルチプラットフォーム統合",
+        description: "Rappi、Uber Eats、Didi Foodなどに一箇所から接続",
+        benefits: ["一元管理", "自動同期", "統一レポート", "エラー削減"]
+      },
+      {
+        title: "カスタマーサービスのAI",
+        description: "問い合わせに対応し、24/7注文を受けるインテリジェントチャットボット",
+        benefits: ["即座の応答", "エラー削減", "より良い体験", "スタッフ削減"]
+      },
+      {
+        title: "予測分析",
+        description: "需要を予測し、在庫を最適化し、利益を最大化",
+        benefits: ["廃棄物削減", "より良い計画", "売上増加", "コスト最適化"]
+      },
+      {
+        title: "デリバリー管理",
+        description: "ルート、配送時間、顧客満足度を最適化",
+        benefits: ["より速い配送", "低い運営コスト", "満足した顧客", "より良い評判"]
+      }
+    ],
+    
+    // Success Stories Section
+    successStoriesTitle: "成功事例",
+    successStoriesSubtitle: "KutchenAIでビジネスを変革したレストラン",
+    successStories: [
+      {
+        name: "レストラン・ラ・パオラ",
+        type: "実店舗レストラン",
+        location: "カリ、コロンビア",
+        testimonial: "KutchenAIは注文エラーを80%削減し、売上を35%増加させるのに3ヶ月で役立ちました。",
+        metrics: ["80%エラー削減", "35%売上増加", "50%待ち時間削減"]
+      },
+      {
+        name: "バーチャルキッチンエクスプレス",
+        type: "ダークキッチン",
+        location: "ボゴタ、コロンビア",
+        testimonial: "KutchenAIで5つのデリバリープラットフォームを単一インターフェースから管理します。効率が60%向上しました。",
+        metrics: ["5つの統合プラットフォーム", "60%効率向上", "40%注文増加"]
+      },
+      {
+        name: "ファストデリバリー",
+        type: "デリバリー専門",
+        location: "メデジン、コロンビア",
+        testimonial: "配送時間が平均45分から25分に短縮されました。お客様はこれまで以上に満足しています。",
+        metrics: ["45%配送時間削減", "95%満足度", "30%リピート増加"]
+      }
+    ],
+    
+    // ROI Section
+    roiTitle: "保証された投資収益率",
+    roiSubtitle: "最初の30日で結果を確認",
+    roiMetrics: [
+      {
+        metric: "30%",
+        description: "平均売上増加"
+      },
+      {
+        metric: "50%",
+        description: "サービス時間削減"
+      },
+      {
+        metric: "80%",
+        description: "注文エラー削減"
+      },
+      {
+        metric: "60%",
+        description: "運営コスト削減"
+      }
+    ],
+    
+    // Pricing Section
+    pricingTitle: "ビジネスに柔軟なプラン",
+    pricingSubtitle: "ニーズに最適なプランを選択",
+    pricingPlans: [
+      {
+        name: "スターター",
+        price: "無料",
+        period: "5日間",
+        description: "AIアシスタントを試す",
+        features: [
+          "5日間のAIアシスタント完全アクセス",
+          "すべてのAI機能が含まれています",
+          "契約なし、クレジットカード不要",
+          "プラットフォームの完全体験",
+          "技術サポート付き"
+        ],
+        cta: "無料で試す",
+        popular: false
+      },
+      {
+        name: "プロフェッショナル",
+        price: "$49.00",
+        period: "/月",
+        description: "レストラン向け完全AIアシスタント",
+        features: [
+          "24/7高度なAIアシスタント",
+          "リアルタイム需要予測分析",
+          "自動在庫・購入最適化",
+          "インテリジェント注文・キッチン管理",
+          "財務・収益性予測",
+          "パーソナライズされたメニュー推奨",
+          "トレンド・季節性分析",
+          "自動レポート・インテリジェントダッシュボード",
+          "自動マルチプラットフォーム統合",
+          "専門家による優先サポート"
+        ],
+        cta: "今すぐ始める",
+        popular: true
+      },
+      {
+        name: "エンタープライズ",
+        price: "カスタム",
+        period: "",
+        description: "大規模運営向け完全ソリューション",
+        features: [
+          "ビジネス向けカスタマイズAIアシスタント",
+          "専用実装とトレーニング",
+          "カスタムAPIと高度な統合",
+          "エンタープライズレベルの予測分析",
+          "アカウントマネージャーによる24/7サポート",
+          "複数拠点と無制限ユーザー",
+          "戦略的コンサルティング付き",
+          "カスタム機能開発"
+        ],
+        cta: "営業に連絡",
+        popular: false
+      }
+    ],
+    
+    // PTD Information
+    ptdInfo: "無料トライアル後、アシスタントを1日$1.99で日単位で契約できます"
   }
 }; 

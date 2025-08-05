@@ -358,11 +358,11 @@ export default function HomePage() {
                       <p className="text-muted-foreground">{plan.description}</p>
                     </div>
                     
-                    <ul className="space-y-4 mb-8">
+                    <ul className="space-y-4 mb-8 max-h-96 overflow-y-auto">
                       {plan.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-center">
-                          <Check className="w-5 h-5 mr-3 text-green-500 flex-shrink-0" />
-                          <span className="text-muted-foreground">{feature}</span>
+                        <li key={idx} className="flex items-start">
+                          <Check className="w-5 h-5 mr-3 text-green-500 flex-shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground text-sm leading-relaxed">{feature}</span>
                         </li>
                       ))}
                     </ul>
@@ -373,11 +373,46 @@ export default function HomePage() {
                           ? 'bg-primary hover:bg-primary/90' 
                           : 'bg-secondary hover:bg-secondary/80'
                       }`}
+                      onClick={async () => {
+                        // Guardar el plan seleccionado
+                        localStorage.setItem('selectedPlan', plan.name);
+                        // Llamar al backend para crear la sesión de Stripe Checkout
+                        try {
+                          // En desarrollo, usar el endpoint de prueba
+                          const endpoint = process.env.NODE_ENV === 'development' 
+                            ? `${API_URL}/payments/test/checkout`
+                            : `${API_URL}/payments/stripe/checkout`;
+                          
+                          const res = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ plan: plan.name }),
+                          });
+                          const data = await res.json();
+                          if (data.url) {
+                            window.location.href = data.url;
+                          } else {
+                            alert('Error iniciando el pago.');
+                          }
+                        } catch (err) {
+                          alert('Error de conexión.');
+                        }
+                      }}
                     >
-                      {plan.cta}
+                      {plan.cta} <span className="ml-2">💳</span>
                     </Button>
                   </div>
                 ))}
+              </div>
+              
+              {/* PTD Information */}
+              <div className="mt-12 text-center">
+                <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-6 max-w-2xl mx-auto">
+                  <p className="text-lg font-semibold text-primary mb-2">💡 ¿Necesitas más flexibilidad?</p>
+                  <p className="text-muted-foreground">{lt.ptdInfo}</p>
+                </div>
               </div>
             </div>
           </section>

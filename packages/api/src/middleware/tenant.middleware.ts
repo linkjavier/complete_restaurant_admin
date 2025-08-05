@@ -13,9 +13,24 @@ export class TenantMiddleware implements NestMiddleware {
       // DEBUG: imprime la URL real para ver cómo llega
       console.log('[TenantMiddleware] originalUrl:', req.originalUrl, 'path:', req.path);
 
-      // Permitir acceso libre a cualquier petición que contenga /tenants, /auth/register, /auth/login, /locations, /categories, /products o /pos/tables
-      // (Ya no asignar tenantId por defecto aquí, solo dejar pasar para que se resuelva por subdominio)
-      // Elimina el bloque que asigna el primer tenant y el return next();
+      // Rutas públicas que no requieren tenant
+      const publicPaths = [
+        '/auth/register',
+        '/auth/login',
+        '/settings/business',
+        '/payments/stripe/checkout',
+        '/health'
+      ];
+
+      // Verificar si la ruta actual es pública
+      const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
+      
+      if (isPublicPath) {
+        console.log('[TenantMiddleware] Ruta pública permitida sin tenant:', req.path);
+        // Para rutas públicas, asignar un tenant por defecto
+        (req as any).tenantId = 'default-tenant';
+        return next();
+      }
 
       // Permitir acceso libre a /auth/register en cualquier entorno
       const allowedLocalhostPaths = ['/auth/register'];
