@@ -13,11 +13,144 @@ import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PaymentMethod } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { AuthService } from '../auth/auth.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('payments')
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(
+    private readonly paymentsService: PaymentsService,
+    private readonly authService: AuthService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @Post('register-with-payment')
+  @ApiOperation({ summary: 'Register user with payment' })
+  @ApiResponse({ status: 201, description: 'User registered and payment initiated' })
+  async registerWithPayment(@Body() body: {
+    tenantName: string;
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    plan: string;
+  }) {
+    try {
+      // Verificar que la clave de Stripe esté configurada
+      if (!process.env.STRIPE_SECRET_KEY) {
+        throw new HttpException('Stripe configuration missing', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      // Stripe Price IDs - Actualizar con los IDs reales de tu cuenta de Stripe
+      const prices: Record<string, string> = {
+        'Starter': 'price_1RssTb4hcZSxv6KjMd7Jjyf1',
+        'Professional': 'price_1RssTb4hcZSxv6KjMd7Jjyf2',
+        'Enterprise': 'price_1RssTb4hcZSxv6KjMd7Jjyf3',
+        '入门版': 'price_1RssTb4hcZSxv6KjMd7Jjyf1',
+        '专业版': 'price_1RssTb4hcZSxv6KjMd7Jjyf2',
+        'Enterprise Personalizado': 'price_1RssTb4hcZSxv6KjMd7Jjyf3',
+        'Plan Básico': 'price_1RssTb4hcZSxv6KjMd7Jjyf1',
+        'Plan Pro': 'price_1RssTb4hcZSxv6KjMd7Jjyf2',
+        'PTD Pay The Day': 'price_1RssTb4hcZSxv6KjMd7Jjyf1',
+      };
+
+      const priceId = prices[body.plan];
+      if (!priceId) {
+        throw new HttpException('Plan no válido', HttpStatus.BAD_REQUEST);
+      }
+
+      // Crear el usuario y tenant
+      const registerData = {
+        tenantName: body.tenantName,
+        email: body.email,
+        password: body.password,
+        firstName: body.firstName,
+        lastName: body.lastName,
+        role: 'SUPER_ADMIN' as any,
+      };
+
+      const user = await this.authService.register(registerData, undefined);
+
+      // Obtener el tenant del usuario registrado
+      const userWithTenant = await this.prisma.user.findUnique({
+        where: { id: user.user.id },
+        include: { tenant: true }
+      });
+
+      if (!userWithTenant || !userWithTenant.tenant) {
+        throw new HttpException('Error al obtener datos del tenant', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      // Crear la suscripción en la base de datos
+      const subscription = await this.prisma.subscription.create({
+        data: {
+          tenantId: userWithTenant.tenant.id,
+          userId: user.user.id,
+          planName: body.plan,
+          planPrice: this.getPlanPrice(body.plan),
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
+          status: 'TRIAL',
+        },
+      });
+
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { 
+        apiVersion: '2022-11-15' 
+      });
+
+      // Crear sesión de checkout con metadata
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        mode: body.plan === 'Starter' ? 'payment' : 'subscription',
+        success_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/success?session_id={CHECKOUT_SESSION_ID}&subscription_id=${subscription.id}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/cancel`,
+        metadata: {
+          plan: body.plan,
+          subscriptionId: subscription.id,
+          tenantId: userWithTenant.tenant.id,
+          userId: user.user.id,
+        },
+        customer_email: body.email,
+      });
+
+      return { 
+        url: session.url,
+        subscriptionId: subscription.id,
+        message: 'Usuario registrado y pago iniciado'
+      };
+    } catch (error) {
+      console.error('Error in register with payment:', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Error en el registro con pago: ' + (error.message || 'Error desconocido'),
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  private getPlanPrice(plan: string): number {
+    const prices: Record<string, number> = {
+      'Starter': 0,
+      'Professional': 50,
+      'Enterprise': 100,
+      '入门版': 0,
+      '专业版': 50,
+      'Enterprise Personalizado': 100,
+      'Plan Básico': 0,
+      'Plan Pro': 50,
+      'PTD Pay The Day': 0,
+    };
+    return prices[plan] || 0;
+  }
 
   @Post('stripe/checkout')
   async createStripeCheckout(@Body() body: { plan: string }) {

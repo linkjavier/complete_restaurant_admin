@@ -4,9 +4,10 @@ import { CustomersService } from '../../customers/customers.service';
 export interface CustomerContext {
   name: string;
   phone: string;
+  email?: string;
+  greeting: string;
   address: string;
   neighborhood: string;
-  greeting: string;
 }
 
 @Injectable()
@@ -24,18 +25,19 @@ export class CustomerContextService {
       return {
         name: customer.name,
         phone: customer.phone,
-        address: customer.address || '',
-        neighborhood: customer.neighborhood || '',
-        greeting: `¡Hola, ${customer.name}! \n`
+        email: customer.email,
+        greeting: `¡Hola, ${customer.name}! \n`,
+        address: customer.address,
+        neighborhood: customer.neighborhood
       };
     }
 
     return {
       name: '',
       phone: '',
+      greeting: '',
       address: '',
-      neighborhood: '',
-      greeting: ''
+      neighborhood: ''
     };
   }
 
@@ -48,9 +50,7 @@ export class CustomerContextService {
       await this.customersService.upsert({
         name: orderData.customerName,
         phone: orderData.phone,
-        address: orderData.deliveryAddress,
-        neighborhood: orderData.neighborhood,
-        whatsappId: orderData.chatId || '',
+        email: orderData.email,
         locationId: orderData.locationId,
       }, tenantId);
     } catch (err) {

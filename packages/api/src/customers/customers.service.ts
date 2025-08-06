@@ -14,16 +14,16 @@ export class CustomersService {
 
   async create(data: CreateCustomerDto, tenantId: string) {
     try {
-      return await this.prisma.customer.create({ data: { ...data, tenantId } });
+      return await this.prisma.customer.create({
+        data: {
+          ...data,
+          tenantId,
+        },
+      });
     } catch (error) {
-      // Si es un error de restricción única, intentar encontrar el cliente existente
       if (error.message.includes('Unique constraint failed')) {
         const existingCustomer = await this.findByPhone(data.phone, data.locationId, tenantId);
         if (existingCustomer) {
-          // Si el cliente existe pero no tiene whatsappId, actualizarlo
-          if (!existingCustomer.whatsappId && data.whatsappId) {
-            return await this.update(existingCustomer.id, { whatsappId: data.whatsappId }, tenantId);
-          }
           return existingCustomer;
         }
       }
@@ -140,40 +140,35 @@ export class CustomersService {
       {
         name: 'María González',
         phone: '3001234567',
-        address: 'Calle 123 #45-67',
-        neighborhood: 'Centro',
+        email: 'maria@example.com',
         locationId,
         tenantId,
       },
       {
         name: 'Carlos Rodríguez',
         phone: '3109876543',
-        address: 'Carrera 78 #12-34',
-        neighborhood: 'La Soledad',
+        email: 'carlos@example.com',
         locationId,
         tenantId,
       },
       {
         name: 'Ana Martínez',
         phone: '3155551234',
-        address: 'Avenida 5 #23-45',
-        neighborhood: 'San Fernando',
+        email: 'ana@example.com',
         locationId,
         tenantId,
       },
       {
         name: 'Luis Pérez',
         phone: '3207778888',
-        address: 'Calle 90 #67-89',
-        neighborhood: 'El Prado',
+        email: 'luis@example.com',
         locationId,
         tenantId,
       },
       {
         name: 'Sofia Herrera',
         phone: '3009990000',
-        address: 'Carrera 45 #12-78',
-        neighborhood: 'Buenos Aires',
+        email: 'sofia@example.com',
         locationId,
         tenantId,
       },
@@ -195,11 +190,7 @@ export class CustomersService {
     const normalizedPhone = data.phone.replace(/[^0-9]/g, '');
     return this.prisma.customer.upsert({
       where: {
-        phone_locationId_tenantId: {
-          phone: normalizedPhone,
-          locationId: data.locationId,
-          tenantId,
-        },
+        id: (await this.findByPhone(normalizedPhone, data.locationId, tenantId))?.id || 'temp-id',
       },
       update: data,
       create: { ...data, phone: normalizedPhone, tenantId },

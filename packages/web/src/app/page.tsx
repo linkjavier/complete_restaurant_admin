@@ -195,6 +195,7 @@ export default function HomePage() {
                       height={imgHeight}
                         className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                       priority={i === 2 || i === 4}
+                      style={{ width: 'auto', height: 'auto' }}
                     />
                     <div
                         className="absolute bottom-0 left-0 w-full p-6"
@@ -376,28 +377,14 @@ export default function HomePage() {
                       onClick={async () => {
                         // Guardar el plan seleccionado
                         localStorage.setItem('selectedPlan', plan.name);
-                        // Llamar al backend para crear la sesión de Stripe Checkout
-                        try {
-                          // En desarrollo, usar el endpoint de prueba
-                          const endpoint = process.env.NODE_ENV === 'development' 
-                            ? `${API_URL}/payments/test/checkout`
-                            : `${API_URL}/payments/stripe/checkout`;
-                          
-                          const res = await fetch(endpoint, {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ plan: plan.name }),
-                          });
-                          const data = await res.json();
-                          if (data.url) {
-                            window.location.href = data.url;
-                          } else {
-                            alert('Error iniciando el pago.');
-                          }
-                        } catch (err) {
-                          alert('Error de conexión.');
+                        
+                        // Redirigir al registro con pago
+                        if (plan.name === 'Starter') {
+                          // Para el plan gratuito, ir directamente al registro
+                          window.location.href = '/auth/register';
+                        } else {
+                          // Para planes de pago, ir al registro con pago
+                          window.location.href = '/auth/register-with-payment';
                         }
                       }}
                     >

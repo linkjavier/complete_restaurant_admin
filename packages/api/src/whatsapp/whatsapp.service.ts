@@ -436,21 +436,13 @@ export class WhatsappService {
                 await this.customersService.create({
                   name: customerInfo.name || '',
                   phone: normalizedPhone,
-                  address: customerInfo.address || '',
-                  neighborhood: customerInfo.neighborhood || '',
-                  whatsappId: chat.id,
+                  email: customerInfo.email || null,
                   locationId: locationId
                 }, tenantId);
               } catch (createError) {
-                if (createError.message.includes('Unique constraint failed')) {
-                  const existingCustomer = await this.customersService.findByPhone(normalizedPhone, locationId, tenantId);
-                  if (existingCustomer && !existingCustomer.whatsappId) {
-                    await this.customersService.update(existingCustomer.id, { whatsappId: chat.id }, tenantId);
-                  }
-                }
+                // Si ya existe, no hacer nada
+                console.log('Customer already exists:', createError.message);
               }
-            } else if (!existingCustomer.whatsappId) {
-              await this.customersService.update(existingCustomer.id, { whatsappId: chat.id }, tenantId);
             }
           }
         } catch (error) {}

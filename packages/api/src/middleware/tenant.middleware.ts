@@ -19,6 +19,8 @@ export class TenantMiddleware implements NestMiddleware {
         '/auth/login',
         '/settings/business',
         '/payments/stripe/checkout',
+        '/payments/test/checkout',
+        '/payments/register-with-payment',
         '/health'
       ];
 
@@ -32,17 +34,18 @@ export class TenantMiddleware implements NestMiddleware {
         return next();
       }
 
-      // Permitir acceso libre a /auth/register en cualquier entorno
-      const allowedLocalhostPaths = ['/auth/register'];
+      // Log para depuración del header Host
+      console.log('[TenantMiddleware] Host header:', req.headers.host);
       const hostHeader = req.headers.host;
       const host = hostHeader ? hostHeader.split(':')[0] : '';
-      if (allowedLocalhostPaths.includes(req.path)) {
-        console.log('[TenantMiddleware] Ruta permitida sin tenant:', req.path);
+      
+      // Si estamos en localhost, permitir acceso a todas las rutas de desarrollo
+      if (host === 'localhost' || host === '127.0.0.1') {
+        console.log('[TenantMiddleware] Acceso permitido en localhost:', req.path);
+        (req as any).tenantId = 'default-tenant';
         return next();
       }
 
-      // Log para depuración del header Host
-      console.log('[TenantMiddleware] Host header:', req.headers.host);
       // Extraer subdominio (empresa1.tuapp.com)
       const parts = host.split('.');
       const subdomain = parts.length >= 2 ? parts[0].toLowerCase() : null;

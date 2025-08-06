@@ -30,6 +30,7 @@ model Tenant {
   productVariantGroups ProductVariantGroup[]
   productVariants      ProductVariant[]
   settings             Settings[]
+  subscriptions        Subscription[]
 }
 
 model User {
@@ -47,6 +48,7 @@ model User {
   orders        Order[]        @relation("orderUser")
   deletedOrders Order[]        @relation("orderDeletedBy")
   notifications Notification[]
+  subscriptions Subscription[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -418,18 +420,58 @@ model ProductVariant {
 }
 
 model Customer {
-  id           String   @id @default(cuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  name         String
-  phone        String
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  email     String?
+  phone     String?
+  location  Location @relation(fields: [locationId], references: [id])
+  locationId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   address      String?
-  neighborhood String?
-  whatsappId   String?
-  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  locationId   String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  neighborhood String?  
+}
 
-  @@unique([phone, locationId, tenantId], name: "phone_locationId_tenantId")
+// Nuevos modelos para suscripciones y pagos
+model Subscription {
+  id                String              @id @default(uuid())
+  tenantId          String
+  tenant            Tenant              @relation(fields: [tenantId], references: [id])
+  userId            String
+  user              User                @relation(fields: [userId], references: [id])
+  stripeCustomerId  String?             // ID del cliente en Stripe
+  stripeSubscriptionId String?          // ID de la suscripción en Stripe
+  planName          String              // Nombre del plan (Starter, Professional, Enterprise)
+  planPrice         Decimal             @db.Decimal(10, 2)
+  status            SubscriptionStatus  @default(ACTIVE)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd Boolean             @default(false)
+  payments          SubscriptionPayment[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+model SubscriptionPayment {
+  id              String              @id @default(uuid())
+  subscriptionId  String
+  subscription    Subscription        @relation(fields: [subscriptionId], references: [id])
+  stripePaymentId String              // ID del pago en Stripe
+  amount          Decimal             @db.Decimal(10, 2)
+  currency        String              @default("USD")
+  status          PaymentStatus       @default(PENDING)
+  paymentMethod   String?             // Método de pago usado
+  metadata        Json?               // Datos adicionales del pago
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
+  TRIAL
 }

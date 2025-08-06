@@ -126,7 +126,7 @@ export const landingTranslations = {
     ],
     
     // ROI Section
-    roiTitle: "Retorno de Inversión Garantido",
+    roiTitle: "Retorno de Inversión Garantizado",
     roiSubtitle: "Ve los resultados en los primeros 30 días",
     roiMetrics: [
       {
