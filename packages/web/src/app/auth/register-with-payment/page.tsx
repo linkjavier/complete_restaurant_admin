@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -14,7 +15,7 @@ import { ThemeSwitch } from '@/components/theme-switch';
 import { LanguageSwitch } from '@/components/language-switch';
 import { useLanguage } from '@/hooks/use-language';
 import { API_URL } from '@/lib/api';
-import { Check, CreditCard, Shield, Zap } from 'lucide-react';
+import { Check, Shield, Zap } from 'lucide-react';
 
 export default function RegisterWithPaymentPage() {
   const router = useRouter();
@@ -171,7 +172,8 @@ export default function RegisterWithPaymentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+    <Suspense fallback={<div>Cargando...</div>}>
+          <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
         {/* Header */}
         <div className="text-center mb-8">
@@ -304,7 +306,6 @@ export default function RegisterWithPaymentPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="w-5 h-5" />
                   Selecciona tu plan
                 </CardTitle>
                 <CardDescription>
@@ -371,7 +372,6 @@ export default function RegisterWithPaymentPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <CreditCard className="w-4 h-4" />
                   Procesado por Stripe
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
@@ -387,7 +387,7 @@ export default function RegisterWithPaymentPage() {
         <div className="mt-8 text-center">
           <Button 
             size="lg" 
-            className="w-full max-w-md"
+            className="w-full max-w-md bg-primary text-white hover:bg-primary-700 focus:bg-primary-800 focus:ring-2 focus:ring-primary-400 focus:outline-none"
             onClick={handleSubmit}
             disabled={isLoading || !selectedPlan}
           >
@@ -406,5 +406,7 @@ export default function RegisterWithPaymentPage() {
         </div>
       </div>
     </div>
+    </Suspense>
+
   );
 } 

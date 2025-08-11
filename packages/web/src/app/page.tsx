@@ -195,7 +195,6 @@ export default function HomePage() {
                       height={imgHeight}
                         className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                       priority={i === 2 || i === 4}
-                      style={{ width: 'auto', height: 'auto' }}
                     />
                     <div
                         className="absolute bottom-0 left-0 w-full p-6"
@@ -371,24 +370,38 @@ export default function HomePage() {
                     <Button 
                       className={`w-full py-3 ${
                         plan.popular 
-                          ? 'bg-primary hover:bg-primary/90' 
-                          : 'bg-secondary hover:bg-secondary/80'
+                          ? 'bg-background text-foreground border-2 border-primary transition-colors hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground' 
+                          : 'bg-secondary hover:bg-secondary/80 text-foreground'
                       }`}
                       onClick={async () => {
                         // Guardar el plan seleccionado
                         localStorage.setItem('selectedPlan', plan.name);
-                        
-                        // Redirigir al registro con pago
-                        if (plan.name === 'Starter') {
-                          // Para el plan gratuito, ir directamente al registro
-                          window.location.href = '/auth/register';
-                        } else {
-                          // Para planes de pago, ir al registro con pago
-                          window.location.href = '/auth/register-with-payment';
+                        // Llamar al backend para crear la sesión de Stripe Checkout
+                        try {
+                          // En desarrollo, usar el endpoint de prueba
+                          const endpoint = process.env.NODE_ENV === 'development' 
+                            ? `${API_URL}/payments/test/checkout`
+                            : `${API_URL}/payments/stripe/checkout`;
+                          
+                          const res = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ plan: plan.name }),
+                          });
+                          const data = await res.json();
+                          if (data.url) {
+                            window.location.href = data.url;
+                          } else {
+                            alert('Error iniciando el pago.');
+                          }
+                        } catch (err) {
+                          alert('Error de conexión.');
                         }
                       }}
                     >
-                      {plan.cta} <span className="ml-2">💳</span>
+                      {plan.cta}
                     </Button>
                   </div>
                 ))}
