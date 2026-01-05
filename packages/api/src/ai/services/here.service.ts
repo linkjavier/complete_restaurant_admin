@@ -32,8 +32,21 @@ export class HereService {
             const items = response.data.items;
             if (items && items.length > 0) {
                 const bestMatch = items[0];
-                // Enforce a more specific match for location setup if needed
-                const isValid = bestMatch.resultType === 'houseNumber' || bestMatch.resultType === 'street' || bestMatch.resultType === 'locality';
+                const score = bestMatch.scoring?.queryScore || 0;
+                const houseNumberScore = bestMatch.scoring?.fieldScore?.houseNumber || 0;
+                const houseNumberFallback = bestMatch.houseNumberFallback === true;
+
+                // Thresholds:
+                // 1. queryScore > 0.65 (indicates overall good match)
+                // 2. If it's a houseNumber type, houseNumberScore should be reasonable (> 0.5)
+                // 3. Avoid houseNumberFallback if we want precision for delivery
+                let isValid = (bestMatch.resultType === 'houseNumber' || bestMatch.resultType === 'street' || bestMatch.resultType === 'locality') && score > 0.65;
+
+                // Extra strictness for delivery addresses:
+                if (bestMatch.resultType === 'houseNumber' && (houseNumberFallback || houseNumberScore < 0.5)) {
+                    console.log(`[HERE] Rehusando houseNumber con score bajo o fallback: score=${score}, hnScore=${houseNumberScore}, fallback=${houseNumberFallback}`);
+                    isValid = false;
+                }
 
                 const result = {
                     isValid,
@@ -43,7 +56,7 @@ export class HereService {
                     details: bestMatch,
                 };
 
-                console.log('[HERE VALIDATION]', JSON.stringify(result, null, 2));
+                console.log(`[HERE VALIDATION] Result (Score: ${score}):`, JSON.stringify(result, null, 2));
                 return result;
             }
 
