@@ -60,7 +60,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       console.error('OPENAI_API_KEY is not set in environment variables');
       throw new Error('OPENAI_API_KEY is required');
     }
-    
+
     this.openai = new OpenAI({ apiKey });
   }
 
@@ -88,7 +88,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       customerData: {},
       step: 'awaiting_menu_confirmation',
     });
-    
+
     try {
       const tenantId = await this.getTenantId(locationId);
       const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId, tenantId);
@@ -106,7 +106,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       };
 
       await this.conversationService.getOrCreateConversation(conversationContext);
-      
+
       const aiSettings = await this.settingsService.getAISettings(tenantId, locationId);
       const businessSettings = await this.settingsService.getBusinessSettings(tenantId, locationId);
       const businessName = businessSettings.name;
@@ -145,13 +145,13 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const locationId = this.locationIds.get(client.id);
     const chatType = this.chatTypes.get(client.id);
     const chatId = client.handshake.query.chatId as string;
-    
+
     if (locationId && chatType && chatId) {
       const conversationId = this.conversationService.getConversationId(locationId, chatType, chatId);
       this.conversationService.deleteConversation(conversationId);
       this.orderStateService.deleteState(conversationId);
     }
-    
+
     this.locationIds.delete(client.id);
     this.chatTypes.delete(client.id);
   }
@@ -525,7 +525,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const tenantId = await this.getTenantId(locationId);
       const { bestProduct, candidateProducts, matchingProducts } = await this.menuHandler.searchProducts(text, locationId, tenantId);
-      
+
       const usedGeneric = this.messageHandler.hasUsedGenericWords(text);
       if (candidateProducts.length > 1 && usedGeneric) {
         const response = this.menuHandler.formatCandidateProducts(candidateProducts);
@@ -543,10 +543,10 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       if (matchingProducts.length > 0 && !this.messageHandler.isGeneralMenuRequest(text)) {
-        const response = matchingProducts.length === 1 
+        const response = matchingProducts.length === 1
           ? this.menuHandler.formatProductResponse(matchingProducts[0])
           : this.menuHandler.formatProductList(matchingProducts);
-        
+
         if ('emit' in client) {
           client.emit('ai_response', { type: 'text', content: response });
         }
@@ -623,19 +623,19 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       console.log(`[AI Gateway] Calling OpenAI API with ${conversation.length} messages`);
       const tenantId = await this.getTenantId(locationId);
       const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini-2024-07-18',
+        model: 'gpt-4o-mini',
         messages: conversation,
         functions: chatType === 'admin' ? adminAssistantFunctions : restaurantAssistantFunctions,
         function_call: 'auto',
       });
 
       const response = completion.choices[0].message;
-      console.log(`[AI Gateway] OpenAI response:`, { 
-        hasContent: !!response.content, 
+      console.log(`[AI Gateway] OpenAI response:`, {
+        hasContent: !!response.content,
         hasFunctionCall: !!response.function_call,
-        functionName: response.function_call?.name 
+        functionName: response.function_call?.name
       });
-      
+
       this.conversationService.addMessage(conversationId, {
         role: 'assistant',
         content: response.content || '',
@@ -651,13 +651,13 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           chatType,
           tenantId
         );
-        
+
         this.conversationService.addMessage(conversationId, {
           role: 'function',
           name: response.function_call.name,
           content: JSON.stringify(functionResult),
         });
-        
+
         if (functionResult && (functionResult.validatedItems || functionResult.validated)) {
           console.log('[DEBUG] Guardando orderData en OrderStateService:', functionResult.orderData);
           // Si es calculate_order_subtotal, guardar validatedItems como items
@@ -696,7 +696,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (error) {
       console.error('Error in processWithOpenAI:', error);
       const errorMessage = 'Error processing your message. Please try again.';
-      
+
       if ('emit' in client) {
         client.emit('error', { message: errorMessage, details: error.message });
       }

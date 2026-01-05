@@ -8,6 +8,7 @@ import { OrderStateService } from './order-state.service';
 import { NLPService } from './nlp.service';
 import { CustomersService } from '../../customers/customers.service';
 import { OrderHandlerService } from './order-handler.service';
+import { HereService } from './here.service';
 import Fuse from 'fuse.js';
 
 @Injectable()
@@ -22,7 +23,8 @@ export class FunctionExecutorService {
     private orderStateService: OrderStateService,
     private customersService: CustomersService,
     private orderHandler: OrderHandlerService,
-  ) {}
+    private hereService: HereService,
+  ) { }
 
   private async getNLPService(locationId: string, tenantId: string): Promise<NLPService> {
     const menu = await this.productsService.findAll({ locationId, tenantId });
@@ -35,18 +37,18 @@ export class FunctionExecutorService {
   }
 
   async executeFunction(
-    functionName: string, 
-    functionArgs: any, 
-    locationId: string, 
+    functionName: string,
+    functionArgs: any,
+    locationId: string,
     chatType: string,
     tenantId: string
   ): Promise<{ message: string; validatedItems?: any[]; totalAmount?: number; validated?: boolean; orderData?: any }> {
     console.log(`[Function Executor] Processing ${functionName} for ${chatType}`);
-    
+
     if (chatType === 'admin') {
       return this.handleAdminFunction(functionName, functionArgs);
     }
-    
+
     return this.handleRestaurantFunction(functionName, functionArgs, locationId, tenantId);
   }
 
@@ -84,8 +86,8 @@ export class FunctionExecutorService {
     try {
       const { productName, locationId: searchLocationId } = functionArgs;
       const menu = await this.productsService.findAll({ locationId: searchLocationId, tenantId });
-      
-      const matchingProducts = menu.filter(product => 
+
+      const matchingProducts = menu.filter(product =>
         product.name.toLowerCase().includes(productName.toLowerCase())
       );
 
@@ -126,13 +128,13 @@ export class FunctionExecutorService {
 
       let menuText = '🍽️ *Menú del Restaurante*\n';
       let prodCount = 1;
-      
+
       for (const product of menu) {
         const price = formatPrice(product.price);
         menuText += `\n${prodCount}. *${product.name}* - $${price}`;
         prodCount++;
       }
-      
+
       return { message: menuText };
     } catch (error) {
       console.error('Error in get_menu:', error);
@@ -151,7 +153,7 @@ export class FunctionExecutorService {
 
       const menu = await this.productsService.findAll({ locationId, tenantId });
       const deliveryFee = await this.settingsService.getDeliveryFee(tenantId, locationId);
-      
+
       // --- HIDRATAR variantes con IDs reales ANTES de cualquier cálculo ---
       const itemsWithSyncedVariants = this.syncVariantsWithIds(items, menu);
       // Validar variantes mapeadas
@@ -179,10 +181,10 @@ export class FunctionExecutorService {
 
       for (let i = 0; i < itemsWithSyncedVariants.length; i++) {
         const item = itemsWithSyncedVariants[i];
-        let matchingProducts = menu.filter(product => 
+        let matchingProducts = menu.filter(product =>
           product.name.toLowerCase().includes(item.productName.toLowerCase())
         );
-        
+
         if (matchingProducts.length === 0) {
           return { message: `❌ Producto no encontrado: "${item.productName}"` };
         }
@@ -324,7 +326,7 @@ export class FunctionExecutorService {
             return { message: msg };
           }
         }
-        
+
         let variantTotal = 0;
         let variantDetails = [];
         if (item.variants && item.variants.length > 0 && product.variantGroups) {
@@ -345,7 +347,7 @@ export class FunctionExecutorService {
         }
         const subtotal = (product.price + variantTotal) * item.quantity;
         totalAmount += subtotal;
-        
+
         validatedItems.push({
           productId: product.id,
           productName: product.name,
@@ -374,8 +376,8 @@ export class FunctionExecutorService {
       }).join('\n');
 
       const formattedTotal = formatPrice(totalAmount + deliveryFee);
-      const deliveryFeeText = deliveryFee > 0 
-        ? `\n🚚 *Domicilio:* $${formatPrice(deliveryFee)}` 
+      const deliveryFeeText = deliveryFee > 0
+        ? `\n🚚 *Domicilio:* $${formatPrice(deliveryFee)}`
         : '';
 
       const response = `📋 *Resumen de tu Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ Todos los productos fueron validados correctamente.\n\n¿Deseas agregar algo más a tu orden o procedemos con tus datos de entrega?`;
@@ -394,7 +396,7 @@ export class FunctionExecutorService {
   private async validateOrderBeforeCreation(functionArgs: any, locationId: string, tenantId: string) {
     try {
       const { items, totalAmount, customerName, deliveryAddress, phone, neighborhood, paymentMethod, chatId } = functionArgs;
-      
+
       // --- NUEVO: Verificar si el cliente existe en la base de datos ---
       let existingCustomer = null;
       if (chatId) {
@@ -461,7 +463,7 @@ export class FunctionExecutorService {
       // --- NUEVO: Si faltan datos, mostrar mensaje con datos existentes confirmados ---
       if (missingFields.length > 0) {
         let message = '';
-        
+
         if (existingCustomer && Object.keys(customerDataToConfirm).length > 0) {
           message += `👋 ¡Hola ${existingCustomer.name}! Veo que ya tienes datos registrados:\n\n`;
           message += `✅ *Datos confirmados:*\n`;
@@ -473,16 +475,31 @@ export class FunctionExecutorService {
         } else {
           message += `Para completar tu pedido, necesito algunos datos de entrega:\n\n`;
         }
-        
+
         message += missingFields.map((field, index) => `${index + 1}. *${field}*`).join('\n');
-        
+
         if (missingFields.includes('Método de pago')) {
           message += `\n\n💳 *Método de pago:* Efectivo, Tarjeta de Crédito, Tarjeta Débito, o Transferencia`;
         }
-        
+
         message += `\n\nPor favor, proporcióname esta información. 📝`;
-        
+
         return { message };
+      }
+
+      // --- NUEVO: Validar dirección con HERE ---
+      if (deliveryAddress) {
+        const validation = await this.hereService.validateAddress(deliveryAddress);
+        if (!validation.isValid) {
+          return {
+            message: `📍 *Dirección de Entrega*\n\nNo pudimos validar la dirección: *"${deliveryAddress}"*.\n\nPor favor, ingresa una dirección más precisa para que podamos entregarte tu pedido sin problemas. 😊`
+          };
+        }
+        // Si es válida, podemos usar la dirección formateada de HERE si queremos ser más precisos
+        if (validation.formattedAddress) {
+          console.log(`[HERE] Dirección normalizada: ${deliveryAddress} -> ${validation.formattedAddress}`);
+          // Opcionalmente podrías actualizar deliveryAddress con validation.formattedAddress
+        }
       }
 
       if (!items || items.length === 0) {
@@ -575,8 +592,8 @@ export class FunctionExecutorService {
       }).join('\n');
 
       const formattedTotal = formatPrice(itemsWithPrices.reduce((sum, item) => sum + item.subtotal, 0) + deliveryFee);
-      const deliveryFeeText = deliveryFee > 0 
-        ? `\n🚚 *Domicilio:* $${formatPrice(deliveryFee)}` 
+      const deliveryFeeText = deliveryFee > 0
+        ? `\n🚚 *Domicilio:* $${formatPrice(deliveryFee)}`
         : '';
 
       // --- NUEVO: Mensaje personalizado según si es cliente existente o nuevo ---

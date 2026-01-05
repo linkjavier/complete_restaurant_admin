@@ -7,6 +7,7 @@ import { MessageHandlerService } from './services/message-handler.service';
 import { MenuHandlerService } from './services/menu-handler.service';
 import { OrderHandlerService } from './services/order-handler.service';
 import { FunctionExecutorService } from './services/function-executor.service';
+import { HereService } from './services/here.service';
 import { ProductsModule } from '../products/products.module';
 import { OrdersModule } from '../orders/orders.module';
 import { ConfigModule } from '@nestjs/config';
@@ -36,7 +37,8 @@ import { LocationsModule } from '../locations/locations.module';
     MenuHandlerService,
     OrderHandlerService,
     FunctionExecutorService,
+    HereService,
   ],
-  exports: [AIGateway, CustomerContextService],
+  exports: [AIGateway, CustomerContextService, HereService],
 })
-export class AIModule {} 
+export class AIModule { } 
