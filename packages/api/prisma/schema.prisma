@@ -72,6 +72,10 @@ model Location {
   tenant           Tenant            @relation(fields: [tenantId], references: [id])
   name             String
   address          String
+  city             String?
+  country          String?
+  latitude         Float?
+  longitude        Float?
   phone            String
   orders           Order[]
   users            User[]

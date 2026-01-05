@@ -14,7 +14,7 @@ export class HereService {
         }
     }
 
-    async validateAddress(address: string): Promise<{ isValid: boolean; formattedAddress?: string; details?: any }> {
+    async validateAddress(address: string): Promise<{ isValid: boolean; formattedAddress?: string; lat?: number; lng?: number; details?: any }> {
         if (!this.apiKey) {
             this.logger.error('HERE_API_KEY is missing, cannot validate address');
             return { isValid: false };
@@ -32,13 +32,14 @@ export class HereService {
             const items = response.data.items;
             if (items && items.length > 0) {
                 const bestMatch = items[0];
-                // Consider it valid if it has at least a house number or is a specific enough address
-                // You can adjust this logic based on how strict you want to be
-                const isValid = bestMatch.resultType === 'houseNumber' || bestMatch.resultType === 'street';
+                // Enforce a more specific match for location setup if needed
+                const isValid = bestMatch.resultType === 'houseNumber' || bestMatch.resultType === 'street' || bestMatch.resultType === 'locality';
 
                 const result = {
                     isValid,
                     formattedAddress: bestMatch.address.label,
+                    lat: bestMatch.position.lat,
+                    lng: bestMatch.position.lng,
                     details: bestMatch,
                 };
 

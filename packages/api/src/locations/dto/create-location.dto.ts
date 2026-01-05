@@ -10,6 +10,20 @@ export class CreateLocationDto {
   address: string;
 
   @IsString()
+  @IsOptional()
+  city?: string;
+
+  @IsString()
+  @IsOptional()
+  country?: string;
+
+  @IsOptional()
+  latitude?: number;
+
+  @IsOptional()
+  longitude?: number;
+
+  @IsString()
   @IsNotEmpty()
   phone: string;
 

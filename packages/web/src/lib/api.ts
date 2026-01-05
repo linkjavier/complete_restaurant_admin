@@ -76,6 +76,10 @@ export interface Location {
   id: string;
   name: string;
   address: string;
+  city?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
   phone: string;
   createdAt: string;
   updatedAt: string;
@@ -289,26 +293,34 @@ export async function getLocations(): Promise<Location[]> {
   return response.json();
 }
 
-export async function createLocation(data: { name: string; address: string; phone: string }): Promise<Location> {
+export async function createLocation(data: {
+  name: string;
+  address: string;
+  phone: string;
+  city?: string;
+  country?: string;
+}): Promise<Location> {
   const response = await fetch(`${API_URL}/locations`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error('Error al crear la ubicación');
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al crear la ubicación');
   }
   return response.json();
 }
 
-export async function updateLocation(id: string, data: { name: string }): Promise<Location> {
+export async function updateLocation(id: string, data: Partial<Omit<Location, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Location> {
   const response = await fetch(`${API_URL}/locations/${id}`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error('Error al actualizar la ubicación');
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al actualizar la ubicación');
   }
   return response.json();
 }
@@ -620,7 +632,7 @@ export async function getKitchenOrders(): Promise<any[]> {
   if (!token) {
     throw new Error("No authentication token found");
   }
-  
+
   const response = await fetch(`${API_URL}/orders?kitchen=true`, {
     headers: getAuthHeaders(),
   });
@@ -646,13 +658,13 @@ export async function updateKitchenOrderItemStatus(
   if (!token) {
     throw new Error("No authentication token found");
   }
-  
+
   const response = await fetch(`${API_URL}/kitchen/orders/items/${itemId}/status`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ status }),
   });
-  
+
   if (!response.ok) {
     if (response.status === 401) {
       localStorage.removeItem('token');
@@ -668,12 +680,12 @@ export async function printKitchenTicket(orderId: string): Promise<any> {
   if (!token) {
     throw new Error("No authentication token found");
   }
-  
+
   const response = await fetch(`${API_URL}/kitchen/orders/${orderId}/print`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  
+
   if (!response.ok) {
     if (response.status === 401) {
       localStorage.removeItem('token');
@@ -831,11 +843,11 @@ export async function updateCustomer(id: string, data: {
     },
     body: JSON.stringify(data),
   });
-  
+
   if (!response.ok) {
     throw new Error('Error al actualizar el cliente');
   }
-  
+
   return response.json();
 }
 

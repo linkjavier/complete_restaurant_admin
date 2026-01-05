@@ -22,7 +22,7 @@ import { CurrentTenant } from '../auth/decorators/tenant.decorator';
 @Controller('locations')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class LocationsController {
-  constructor(private readonly locationsService: LocationsService) {}
+  constructor(private readonly locationsService: LocationsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Obtener todas las ubicaciones' })
@@ -51,11 +51,11 @@ export class LocationsController {
     return this.locationsService.create(data, tenantId);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @ApiOperation({ summary: 'Actualizar una ubicación' })
   @ApiResponse({ status: 200, description: 'Ubicación actualizada exitosamente' })
   @ApiResponse({ status: 404, description: 'Ubicación no encontrada' })
-  async update(@Param('id') id: string, @Body() data: CreateLocationDto, @CurrentTenant() tenantId: string) {
+  async update(@Param('id') id: string, @Body() data: Partial<CreateLocationDto>, @CurrentTenant() tenantId: string) {
     const location = await this.locationsService.findOne(id, tenantId);
     if (!location) {
       throw new NotFoundException(`Ubicación con ID ${id} no encontrada`);

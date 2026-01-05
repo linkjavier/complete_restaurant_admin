@@ -26,7 +26,7 @@ import { LocationsModule } from '../locations/locations.module';
     STTModule,
     CategoriesModule,
     forwardRef(() => CustomersModule),
-    LocationsModule,
+    forwardRef(() => LocationsModule),
   ],
   providers: [
     AIGateway,

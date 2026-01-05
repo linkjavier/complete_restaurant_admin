@@ -8,6 +8,37 @@ import { Label } from "@/components/ui/label"
 import { Plus, Trash2, Pencil } from "lucide-react"
 import { getLocations, createLocation, deleteLocation, updateLocation, Location } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+const COUNTRIES = [
+  { id: "CO", name: "Colombia" },
+  { id: "US", name: "Estados Unidos" },
+  { id: "MX", name: "México" },
+]
+
+const CITIES: Record<string, { id: string; name: string }[]> = {
+  CO: [
+    { id: "Bogota", name: "Bogotá" },
+    { id: "Medellin", name: "Medellín" },
+    { id: "Cali", name: "Cali" },
+  ],
+  US: [
+    { id: "NY", name: "New York" },
+    { id: "LA", name: "Los Angeles" },
+    { id: "Miami", name: "Miami" },
+  ],
+  MX: [
+    { id: "CDMX", name: "Ciudad de México" },
+    { id: "Guadajara", name: "Guadalajara" },
+    { id: "Monterrey", name: "Monterrey" },
+  ],
+}
 
 export function LocationsManager() {
   const [locations, setLocations] = useState<Location[]>([])
@@ -17,6 +48,8 @@ export function LocationsManager() {
     name: "",
     address: "",
     phone: "",
+    country: "",
+    city: "",
   })
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
   const { toast } = useToast()
@@ -41,20 +74,16 @@ export function LocationsManager() {
 
   const handleCreateLocation = async () => {
     try {
-      if (!newLocation.name || !newLocation.address || !newLocation.phone) {
+      if (!newLocation.name || !newLocation.address || !newLocation.phone || !newLocation.country || !newLocation.city) {
         toast({
           title: "Error",
-          description: "Por favor ingresa nombre, dirección y teléfono",
+          description: "Por favor ingresa nombre, dirección, teléfono, país y ciudad",
           variant: "destructive",
         })
         return
       }
 
-      await createLocation({
-        name: newLocation.name,
-        address: newLocation.address,
-        phone: newLocation.phone,
-      })
+      await createLocation(newLocation)
 
       toast({
         title: "Éxito",
@@ -65,6 +94,8 @@ export function LocationsManager() {
         name: "",
         address: "",
         phone: "",
+        country: "",
+        city: "",
       })
 
       fetchLocations()
@@ -72,7 +103,7 @@ export function LocationsManager() {
       console.error('Error creating location:', err)
       toast({
         title: "Error",
-        description: "Error al crear la ubicación. Por favor, asegúrate de estar autenticado.",
+        description: err instanceof Error ? err.message : "Error al crear la ubicación. Por favor, asegúrate de estar autenticado.",
         variant: "destructive",
       })
     }
@@ -93,6 +124,10 @@ export function LocationsManager() {
 
       await updateLocation(editingLocation.id, {
         name: editingLocation.name,
+        address: editingLocation.address,
+        phone: editingLocation.phone,
+        country: editingLocation.country,
+        city: editingLocation.city,
       })
 
       toast({
@@ -106,7 +141,7 @@ export function LocationsManager() {
       console.error('Error updating location:', err)
       toast({
         title: "Error",
-        description: "Error al actualizar la ubicación. Por favor, asegúrate de estar autenticado.",
+        description: err instanceof Error ? err.message : "Error al actualizar la ubicación. Por favor, asegúrate de estar autenticado.",
         variant: "destructive",
       })
     }
@@ -174,6 +209,58 @@ export function LocationsManager() {
                     : setNewLocation({ ...newLocation, phone: e.target.value })
                 }
               />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>País</Label>
+                  <Select
+                    value={editingLocation ? editingLocation.country : newLocation.country}
+                    onValueChange={(val) =>
+                      editingLocation
+                        ? setEditingLocation({ ...editingLocation, country: val, city: "" })
+                        : setNewLocation({ ...newLocation, country: val, city: "" })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar País" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRIES.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Ciudad</Label>
+                  <Select
+                    value={editingLocation ? editingLocation.city : newLocation.city}
+                    disabled={editingLocation ? !editingLocation.country : !newLocation.country}
+                    onValueChange={(val) =>
+                      editingLocation
+                        ? setEditingLocation({ ...editingLocation, city: val })
+                        : setNewLocation({ ...newLocation, city: val })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar Ciudad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {((editingLocation ? editingLocation.country : newLocation.country) &&
+                        CITIES[editingLocation ? editingLocation.country! : newLocation.country!]?.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))) || (
+                          <SelectItem value="none" disabled>
+                            Selecciona un país primero
+                          </SelectItem>
+                        )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
             <div className="flex gap-2">
               {editingLocation ? (
@@ -228,6 +315,9 @@ export function LocationsManager() {
                   >
                     <div>
                       <p className="font-medium">{location.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {location.address}, {location.city}, {location.country}
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       <Button
