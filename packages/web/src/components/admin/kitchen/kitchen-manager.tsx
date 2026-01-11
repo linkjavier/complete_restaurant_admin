@@ -12,9 +12,20 @@ import { useOrderSocket } from "@/hooks/use-order-socket"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { getLocations, Location } from "@/lib/api"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { MapPin } from "lucide-react"
 
 export function KitchenManager() {
   const [orders, setOrders] = useState<any[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("all")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [itemToCancel, setItemToCancel] = useState<{ id: string, name: string } | null>(null)
@@ -79,36 +90,54 @@ export function KitchenManager() {
   // Initial fetch of orders
   useEffect(() => {
     fetchOrders()
-    
+
     // Set up polling as a fallback (every 2 minutes)
     const interval = setInterval(fetchOrders, 120000)
     return () => clearInterval(interval)
-  }, [])
+  }, [selectedLocationId]) // Recarga cuando cambia la sede
+
+  // Fetch locations for labels and selector
+  useEffect(() => {
+    const fetchLocationsData = async () => {
+      try {
+        const data = await getLocations();
+        setLocations(data);
+      } catch (err) {
+        console.error('Error fetching locations:', err);
+      }
+    };
+    fetchLocationsData();
+  }, []);
 
   const fetchOrders = async () => {
     try {
       setLoading(true)
       setError(null)
       console.log("Fetching orders...")
-      const data = await getKitchenOrders()
+
+      const locationId = (user?.role === 'SUPER_ADMIN')
+        ? selectedLocationId
+        : (user?.locationId || undefined);
+
+      const data = await getKitchenOrders(locationId)
 
       console.log("Received orders:", data)
       // Filter orders that have items with status PENDING or IN_PROGRESS
-      const activeOrders = data.filter(order => 
-        order.items.some(item => 
+      const activeOrders = data.filter(order =>
+        order.items.some(item =>
           item.status === "PENDING" || item.status === "IN_PROGRESS"
         )
       )
       setOrders(activeOrders)
     } catch (err: any) {
       console.error('Error fetching orders:', err)
-      
+
       // Check if the error is authentication related
-      if (err.message?.includes('No authentication token found') || 
-          err.message?.includes('Authentication expired') ||
-          err.message?.includes('Unauthorized')) {
+      if (err.message?.includes('No authentication token found') ||
+        err.message?.includes('Authentication expired') ||
+        err.message?.includes('Unauthorized')) {
         setError("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.")
-        
+
         // Redirect to login after a short delay
         setTimeout(() => {
           router.push('/auth/login')
@@ -124,24 +153,24 @@ export function KitchenManager() {
   const handleUpdateItemStatus = async (itemId: string, status: "PENDING" | "IN_PROGRESS" | "READY" | "CANCELLED") => {
     try {
       await updateKitchenOrderItemStatus(itemId, status)
-      
+
       // Update local state immediately
       setOrders(prevOrders => {
         return prevOrders.map(order => {
-          const updatedItems = order.items.map(item => 
+          const updatedItems = order.items.map(item =>
             item.id === itemId ? { ...item, status } : item
           )
-          
+
           // If status is READY and all items are ready, keep the order for 5 seconds
           if (status === "READY" && updatedItems.every(i => i.status === "READY" || i.status === "CANCELLED")) {
             setOrderJustCompleted(order.id)
           }
-          
+
           return {
             ...order,
             items: updatedItems
           }
-        }).filter(order => 
+        }).filter(order =>
           order.items.some(i => i.status === "PENDING" || i.status === "IN_PROGRESS")
         )
       })
@@ -153,10 +182,10 @@ export function KitchenManager() {
             Estado del item actualizado a{' '}
             <span className="font-bold uppercase">
               {status === "PENDING" ? "Pendiente" :
-               status === "IN_PROGRESS" ? "En preparación" :
-               status === "READY" ? "Completado" :
-               status === "CANCELLED" ? "Cancelado" :
-               status}
+                status === "IN_PROGRESS" ? "En preparación" :
+                  status === "READY" ? "Completado" :
+                    status === "CANCELLED" ? "Cancelado" :
+                      status}
             </span>
           </span>
         ),
@@ -164,18 +193,18 @@ export function KitchenManager() {
       })
     } catch (err: any) {
       console.error('Error updating item status:', err)
-      
+
       // Check if the error is authentication related
-      if (err.message?.includes('No authentication token found') || 
-          err.message?.includes('Authentication expired') ||
-          err.message?.includes('Unauthorized')) {
+      if (err.message?.includes('No authentication token found') ||
+        err.message?.includes('Authentication expired') ||
+        err.message?.includes('Unauthorized')) {
         toast({
           title: "Error de autenticación",
           description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
           variant: "destructive",
           duration: 3000
         })
-        
+
         // Redirect to login after a short delay
         setTimeout(() => {
           router.push('/auth/login')
@@ -201,18 +230,18 @@ export function KitchenManager() {
       })
     } catch (err: any) {
       console.error('Error printing ticket:', err)
-      
+
       // Check if the error is authentication related
-      if (err.message?.includes('No authentication token found') || 
-          err.message?.includes('Authentication expired') ||
-          err.message?.includes('Unauthorized')) {
+      if (err.message?.includes('No authentication token found') ||
+        err.message?.includes('Authentication expired') ||
+        err.message?.includes('Unauthorized')) {
         toast({
           title: "Error de autenticación",
           description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
           variant: "destructive",
           duration: 3000
         })
-        
+
         // Redirect to login after a short delay
         setTimeout(() => {
           router.push('/auth/login')
@@ -231,7 +260,7 @@ export function KitchenManager() {
   const handleStartOrder = async (orderId: string, items: any[]) => {
     try {
       const pendingItems = items.filter(item => item.status === "PENDING");
-      
+
       // Update all pending items to IN_PROGRESS
       for (const item of pendingItems) {
         await updateKitchenOrderItemStatus(item.id, "IN_PROGRESS");
@@ -243,7 +272,7 @@ export function KitchenManager() {
           if (order.id === orderId) {
             return {
               ...order,
-              items: order.items.map(item => 
+              items: order.items.map(item =>
                 item.status === "PENDING" ? { ...item, status: "IN_PROGRESS" } : item
               )
             }
@@ -270,21 +299,29 @@ export function KitchenManager() {
 
   // Join the kitchen-specific channel when socket is connected and user has a locationId
   useEffect(() => {
-    if (connected && user?.locationId) {
-      try {
-        console.log(`Trying to join kitchen-${user.locationId} channel...`);
-        
-        // Add a delay to ensure connection is fully established
-        setTimeout(() => {
-          // Emit event to join the kitchen channel for this location
-          const joined = emit('join-kitchen', user.locationId);
-          console.log(`Emit join-kitchen for location: ${user.locationId}. Success: ${joined}`);
-        }, 500);
-      } catch (error) {
-        console.error("Error joining kitchen channel:", error);
+    if (connected) {
+      // Si es SUPER_ADMIN y tiene una ubicación seleccionada que no sea "todas"
+      // o si es un usuario normal con ubicación asignada.
+      const locationToJoin = (user?.role === 'SUPER_ADMIN' && selectedLocationId !== 'all')
+        ? selectedLocationId
+        : user?.locationId;
+
+      if (locationToJoin) {
+        try {
+          console.log(`Trying to join kitchen-${locationToJoin} channel...`);
+
+          // Add a delay to ensure connection is fully established
+          setTimeout(() => {
+            // Emit event to join the kitchen channel for this location
+            const joined = emit('join-kitchen', locationToJoin);
+            console.log(`Emit join-kitchen for location: ${locationToJoin}. Success: ${joined}`);
+          }, 500);
+        } catch (error) {
+          console.error("Error joining kitchen channel:", error);
+        }
       }
     }
-  }, [connected, user, emit])
+  }, [connected, user, selectedLocationId, emit])
 
   // Set up WebSocket event listeners
   useEffect(() => {
@@ -322,26 +359,26 @@ export function KitchenManager() {
     // Listen for order item updates
     const unsubscribeOrderItemUpdated = subscribe('order_item_updated', (dataRaw) => {
       const data = Array.isArray(dataRaw) ? dataRaw[0] : dataRaw;
-      
+
       console.log("order_item_updated event received:", data)
-      
+
       if (!data || !data.item || !data.order) {
         console.warn("Received invalid order item update", data)
         return;
       }
-      
+
       const { item, order } = data
-      
+
       setOrders(prevOrders => {
         const orderIndex = prevOrders.findIndex(o => o.id === order.id)
-        
+
         if (orderIndex === -1) {
           if (order.items.some(i => i.status === "PENDING" || i.status === "IN_PROGRESS")) {
             return [...prevOrders, order]
           }
           return prevOrders
         }
-        
+
         const updatedOrders = [...prevOrders]
         const updatedOrder = { ...order }
         updatedOrders[orderIndex] = updatedOrder
@@ -350,8 +387,8 @@ export function KitchenManager() {
         if (updatedOrder.items.every(i => i.status === "READY" || i.status === "CANCELLED")) {
           setOrderJustCompleted(order.id)
         }
-        
-        return updatedOrders.filter(order => 
+
+        return updatedOrders.filter(order =>
           order.items.some(i => i.status === "PENDING" || i.status === "IN_PROGRESS")
         )
       })
@@ -360,18 +397,18 @@ export function KitchenManager() {
     // Listen for order updates
     const unsubscribeOrderUpdated = subscribe('order_updated', (updatedOrderData) => {
       const updatedOrder = Array.isArray(updatedOrderData) ? updatedOrderData[0] : updatedOrderData;
-      
+
       console.log("order_updated event received:", updatedOrder)
-      
+
       if (!updatedOrder) {
         console.warn("Received invalid order update")
         return;
       }
-      
+
       setOrders(prevOrders => {
-        return prevOrders.map(order => 
+        return prevOrders.map(order =>
           order.id === updatedOrder.id ? updatedOrder : order
-        ).filter(order => 
+        ).filter(order =>
           order.items.some(item => item.status === "PENDING" || item.status === "IN_PROGRESS")
         )
       })
@@ -408,7 +445,7 @@ export function KitchenManager() {
         duration: 3000
       })
       const timeout = setTimeout(() => {
-        setOrders(currentOrders => 
+        setOrders(currentOrders =>
           currentOrders.filter(o => o.id !== orderJustCompleted)
         )
         setOrderJustCompleted(null)
@@ -425,7 +462,31 @@ export function KitchenManager() {
             <div>
               <CardTitle>Órdenes Activas</CardTitle>
               <div className="text-sm text-muted-foreground mt-1">
-                {user?.locationId ? `Ubicación: ${user.locationId}` : 'Sin ubicación asignada'}
+                {user?.role === 'SUPER_ADMIN' ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="font-medium whitespace-nowrap text-primary">Sede:</span>
+                    <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                      <SelectTrigger className="w-[180px] h-8 text-xs">
+                        <SelectValue placeholder="Seleccionar sede" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas las sedes</SelectItem>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.id}>
+                            {loc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 mt-1">
+                    <MapPin className="h-3 w-3 text-emerald-600" />
+                    <span className="font-semibold text-emerald-700 uppercase">
+                      {locations.find(l => l.id === user?.locationId)?.name || user?.locationId || 'Sin sede asignada'}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -491,8 +552,8 @@ export function KitchenManager() {
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-1">
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => handlePrintTicket(order.id)}
                               className="h-7 text-xs px-2"
@@ -500,8 +561,8 @@ export function KitchenManager() {
                               Imprimir Ticket
                             </Button>
                             {order.items.some(item => item.status === "PENDING") && (
-                              <Button 
-                                variant="default" 
+                              <Button
+                                variant="default"
                                 size="sm"
                                 onClick={() => handleStartOrder(order.id, order.items)}
                                 className="h-7 text-xs px-2"
@@ -512,7 +573,7 @@ export function KitchenManager() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="p-2">
                         <h4 className="font-medium text-sm mb-1">Items:</h4>
                         <ul className="space-y-1">
@@ -539,11 +600,11 @@ export function KitchenManager() {
                                         <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">x{item.quantity}</span>
                                       </div>
                                       <p className="text-xs text-gray-500">
-                                        {item.status === "PENDING" ? "Pendiente" : 
-                                         item.status === "IN_PROGRESS" ? "En preparación" : 
-                                         item.status === "READY" ? "Completado" : 
-                                         item.status === "CANCELLED" ? "Cancelado" : 
-                                         item.status}
+                                        {item.status === "PENDING" ? "Pendiente" :
+                                          item.status === "IN_PROGRESS" ? "En preparación" :
+                                            item.status === "READY" ? "Completado" :
+                                              item.status === "CANCELLED" ? "Cancelado" :
+                                                item.status}
                                       </p>
                                       {item.notes && (
                                         <p className="text-xs text-muted-foreground">
@@ -554,7 +615,7 @@ export function KitchenManager() {
                                   </div>
                                   <div className="flex flex-wrap gap-1">
                                     {item.status === "PENDING" && (
-                                      <Button 
+                                      <Button
                                         size="sm"
                                         variant="outline"
                                         onClick={() => handleUpdateItemStatus(item.id, "IN_PROGRESS")}
@@ -565,7 +626,7 @@ export function KitchenManager() {
                                     )}
                                     {item.status === "IN_PROGRESS" && (
                                       <>
-                                        <Button 
+                                        <Button
                                           size="sm"
                                           variant="outline"
                                           onClick={() => handleUpdateItemStatus(item.id, "PENDING")}
@@ -573,7 +634,7 @@ export function KitchenManager() {
                                         >
                                           Volver a Pendiente
                                         </Button>
-                                        <Button 
+                                        <Button
                                           size="sm"
                                           variant="default"
                                           onClick={() => handleUpdateItemStatus(item.id, "READY")}
@@ -583,7 +644,7 @@ export function KitchenManager() {
                                         </Button>
                                       </>
                                     )}
-                                    <Button 
+                                    <Button
                                       size="sm"
                                       variant="destructive"
                                       onClick={() => setItemToCancel({ id: item.id, name: item.product.name })}

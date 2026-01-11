@@ -23,7 +23,7 @@ export class PosService {
   @WebSocketServer()
   server: Server;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getActiveOrders(tableId?: string) {
     return this.prisma.order.findMany({
@@ -31,6 +31,7 @@ export class PosService {
         status: {
           in: ['PENDING', 'IN_PROGRESS', 'READY', 'DELIVERED'],
         },
+        isDeleted: { not: true },
         ...(tableId && { tableId }),
       },
       include: {
@@ -88,7 +89,7 @@ export class PosService {
     );
 
     const paidAmount = order.payments.reduce(
-      (sum, payment) => 
+      (sum, payment) =>
         payment.status === 'COMPLETED' ? sum + payment.amount : sum,
       0,
     );

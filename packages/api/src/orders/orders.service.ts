@@ -62,7 +62,11 @@ export class OrdersService {
       skip,
       take,
       cursor,
-      where: { ...where, tenantId },
+      where: {
+        ...where,
+        tenantId,
+        isDeleted: { not: true }
+      },
       orderBy,
       include: {
         table: true,
@@ -234,8 +238,8 @@ export class OrdersService {
     }
   }
 
-  async findAll(locationId?: string, tableId?: string, kitchen?: boolean, showDeleted = false) {
-    const where: Prisma.OrderWhereInput = {};
+  async findAll(tenantId: string, locationId?: string, tableId?: string, kitchen?: boolean, showDeleted = false) {
+    const where: Prisma.OrderWhereInput = { tenantId };
 
     if (locationId) {
       where.locationId = locationId;
@@ -459,6 +463,12 @@ export class OrdersService {
         },
       });
       this.logger.log(`Order ${id} marked as deleted successfully`);
+
+      // Notify clients via WebSocket
+      if (order.locationId) {
+        this.ordersGateway.emitOrderUpdated(deletedOrder as any, order.locationId);
+      }
+
       return deletedOrder;
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -469,7 +479,7 @@ export class OrdersService {
     }
   }
 
-  async findDeleted(locationId?: string) {
-    return this.findAll(locationId, undefined, false, true);
+  async findDeleted(tenantId: string, locationId?: string) {
+    return this.findAll(tenantId, locationId, undefined, false, true);
   }
 }

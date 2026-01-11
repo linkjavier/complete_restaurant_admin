@@ -626,14 +626,19 @@ export async function getUser(): Promise<User> {
   return userData;
 }
 
-export async function getKitchenOrders(): Promise<any[]> {
+export async function getKitchenOrders(locationId?: string): Promise<any[]> {
   console.log("Fetching kitchen orders DEEPER...")
   const token = getAuthToken();
   if (!token) {
     throw new Error("No authentication token found");
   }
 
-  const response = await fetch(`${API_URL}/orders?kitchen=true`, {
+  let url = `${API_URL}/orders?kitchen=true`;
+  if (locationId && locationId !== 'all') {
+    url += `&locationId=${locationId}`;
+  }
+
+  const response = await fetch(url, {
     headers: getAuthHeaders(),
   });
 

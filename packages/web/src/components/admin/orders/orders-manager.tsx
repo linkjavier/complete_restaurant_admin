@@ -26,6 +26,14 @@ import {
 import { useOrderSocket } from "@/hooks/use-order-socket"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { getLocations, Location } from "@/lib/api"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { API_URL } from '@/lib/api'
 
 // Tipos para las órdenes
@@ -89,6 +97,8 @@ interface Order {
 
 export function OrdersManager() {
   const [orders, setOrders] = useState<Order[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("all")
   const [deletedOrders, setDeletedOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -114,30 +124,51 @@ export function OrdersManager() {
     initialFetch();
     const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
+  }, [selectedLocationId]); // Recargar cuando cambie la ubicación seleccionada
+
+  // Fetch locations
+  useEffect(() => {
+    const fetchLocationsData = async () => {
+      try {
+        const data = await getLocations();
+        setLocations(data);
+      } catch (err) {
+        console.error('Error fetching locations:', err);
+      }
+    };
+    fetchLocationsData();
   }, []);
 
   // Join orders room when socket is connected and user has a locationId
   useEffect(() => {
-    if (connected && user?.locationId) {
-      try {
-        console.log(`Trying to join orders-${user.locationId} channel...`);
+    if (connected) {
+      // Si es SUPER_ADMIN y tiene una ubicación seleccionada que no sea "todas"
+      // o si es un usuario normal con ubicación asignada.
+      const locationToJoin = (user?.role === 'SUPER_ADMIN' && selectedLocationId !== 'all')
+        ? selectedLocationId
+        : user?.locationId;
 
-        setTimeout(() => {
-          const joined = emit('join-kitchen', user.locationId);
-          console.log(`Emit join-kitchen for location: ${user.locationId}. Success: ${joined}`);
+      if (locationToJoin) {
+        try {
+          console.log(`Trying to join orders-${locationToJoin} channel...`);
 
-          if (joined) {
-            setTimeout(() => {
-              console.log("Testing WebSocket by emitting a test message");
-              emit('ping', { test: 'message' });
-            }, 1000);
-          }
-        }, 500);
-      } catch (error) {
-        console.error("Error joining orders channel:", error);
+          setTimeout(() => {
+            const joined = emit('join-kitchen', locationToJoin);
+            console.log(`Emit join-kitchen for location: ${locationToJoin}. Success: ${joined}`);
+
+            if (joined) {
+              setTimeout(() => {
+                console.log("Testing WebSocket by emitting a test message");
+                emit('ping', { test: 'message' });
+              }, 1000);
+            }
+          }, 500);
+        } catch (error) {
+          console.error("Error joining orders channel:", error);
+        }
       }
     }
-  }, [connected, user, emit])
+  }, [connected, user, selectedLocationId, emit])
 
   // Set up WebSocket event listeners
   useEffect(() => {
@@ -246,7 +277,18 @@ export function OrdersManager() {
   // Updated fetchOrders function to include the required kitchen=true query parameter
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`${API_URL}/orders?kitchen=false`, {
+      let url = `${API_URL}/orders?kitchen=false`;
+
+      // Aplicar filtro de ubicación
+      if (user?.role === 'SUPER_ADMIN') {
+        if (selectedLocationId !== 'all') {
+          url += `&locationId=${selectedLocationId}`;
+        }
+      } else if (user?.locationId) {
+        url += `&locationId=${user.locationId}`;
+      }
+
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -451,6 +493,9 @@ export function OrdersManager() {
   }
 
   const filteredOrders = orders.filter(order => {
+    // Siempre ignorar órdenes eliminadas en las pestañas normales
+    if (order.isDeleted) return false
+
     switch (activeTab) {
       case "active":
         return order.status === "PENDING" || order.status === "IN_PROGRESS"
@@ -468,7 +513,16 @@ export function OrdersManager() {
   // Fetch deleted orders
   const fetchDeletedOrders = async () => {
     try {
-      const response = await fetch(`${API_URL}/orders/deleted/list?locationId=${user?.locationId || ''}`, {
+      let locationParam = '';
+      if (user?.role === 'SUPER_ADMIN') {
+        if (selectedLocationId !== 'all') {
+          locationParam = `locationId=${selectedLocationId}`;
+        }
+      } else if (user?.locationId) {
+        locationParam = `locationId=${user.locationId}`;
+      }
+
+      const response = await fetch(`${API_URL}/orders/deleted/list${locationParam ? `?${locationParam}` : ''}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -483,7 +537,7 @@ export function OrdersManager() {
 
   useEffect(() => {
     if (activeTab === 'deleted') fetchDeletedOrders();
-  }, [activeTab, user]);
+  }, [activeTab, user, selectedLocationId]);
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
@@ -507,12 +561,38 @@ export function OrdersManager() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Gestión de Órdenes</CardTitle>
+          <div className="flex justify-between items-center sm:flex-row flex-col gap-4">
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
+              <CardTitle>Gestión de Órdenes</CardTitle>
+              <div className="text-sm text-muted-foreground">
+                {user?.role === 'SUPER_ADMIN' ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="font-medium whitespace-nowrap text-primary">Ubicación:</span>
+                    <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                      <SelectTrigger className="w-[200px] h-8 text-xs">
+                        <SelectValue placeholder="Seleccionar ubicación" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas las sedes</SelectItem>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.id}>
+                            {loc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 mt-1">
+                    <MapPin className="h-3 w-3 text-emerald-600" />
+                    <span className="font-semibold text-emerald-700">
+                      Sede: {locations.find(l => l.id === user?.locationId)?.name || user?.locationId || 'Sin asignar'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
             {connectionStatus}
-          </div>
-          <div className="text-sm text-muted-foreground mt-1">
-            {user?.locationId ? `Ubicación: ${user.locationId}` : 'Sin ubicación asignada'}
           </div>
         </CardHeader>
         <CardContent>
