@@ -6,6 +6,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrdersGateway } from './orders.gateway';
 import { OrdersQueueService } from './orders-workers/orders-queue.service';
 import { ProductsService } from '../products/products.service';
+import { GeocodingService } from '../geocoding/geocoding.service';
 
 @Injectable()
 export class OrdersService {
@@ -17,6 +18,7 @@ export class OrdersService {
     private ordersGateway: OrdersGateway,
     private ordersQueueService: OrdersQueueService,
     private productsService: ProductsService,
+    private geocodingService: GeocodingService,
   ) {
     // Log to verify gateway is injected
     this.logger.log(`OrdersService initialized with OrdersGateway: ${!!this.ordersGateway}`);
@@ -84,8 +86,28 @@ export class OrdersService {
   async create(createOrderDto: CreateOrderDto, tenantId: string) {
     try {
       this.logger.log(`Creating order from DTO: ${JSON.stringify(createOrderDto)}`);
-      
+
       const { userId, items, ...orderData } = createOrderDto;
+
+      // Handle Delivery Address Validation and Location Assignment
+      if (orderData.type === 'DELIVERY' && orderData.deliveryAddress) {
+        this.logger.log(`Performing backend address validation for delivery order...`);
+        try {
+          const validation = await this.geocodingService.validateAndAssignLocation(
+            orderData.deliveryAddress,
+            tenantId
+          );
+
+          if (validation.assignedLocation) {
+            this.logger.log(`Address validated. Overriding locationId to closest branch: ${validation.assignedLocation.name} (${validation.assignedLocation.id})`);
+            orderData.locationId = validation.assignedLocation.id;
+          }
+        } catch (error) {
+          this.logger.warn(`Delivery address validation failed: ${error.message}`);
+          // We still create the order but log the warning, or we could throw if strict
+          // For now, let's keep the user's manual assignment if validation fails
+        }
+      }
 
       // START: Price calculation logic
       let orderSubtotal = 0;
@@ -191,20 +213,20 @@ export class OrdersService {
           this.logger.log(`Successfully emitted new order event`);
         } catch (wsError) {
           this.logger.error(
-            `WebSocket event emission failed for order ${order.id}: ${wsError.message}`, 
+            `WebSocket event emission failed for order ${order.id}: ${wsError.message}`,
             wsError.stack
           );
         }
       } else {
         this.logger.warn(`No locationId for order ${order.id}, skipping WebSocket notification`);
       }
-      
+
       // Queue background processing jobs only if status is PENDING
       if (order.status === 'PENDING') {
         await this.ordersQueueService.addOrderProcessingJob(order);
         this.logger.log(`Background processing jobs queued for order ${order.id}`);
       }
-      
+
       return order;
     } catch (error) {
       this.logger.error(`Error creating order: ${error.message}`, error.stack);
@@ -340,7 +362,7 @@ export class OrdersService {
         this.ordersGateway.emitOrderUpdated(updatedOrder, updatedOrder.locationId);
         this.logger.log(`WebSocket event emitted for updated order ${id}`);
       }
-      
+
       return updatedOrder;
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -399,11 +421,11 @@ export class OrdersService {
           order.locationId
         );
         this.logger.log(`WebSocket event emitted for updated item ${itemId} in order ${orderId}`);
-        
+
         // Queue notifications for status changes if needed
         await this.ordersQueueService.addOrderItemStatusChangeJob(updatedItem, order);
       }
-      
+
       return this.findOne(orderId);
     } catch (error) {
       if (error instanceof NotFoundException) {

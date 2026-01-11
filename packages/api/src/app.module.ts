@@ -25,6 +25,7 @@ import { UploadModule } from './upload/upload.module';
 import { STTModule } from './stt/stt.module';
 import { CustomersModule } from './customers/customers.module';
 import { TenantsModule } from './tenants/tenants.module';
+import { GeocodingModule } from './geocoding/geocoding.module';
 
 @Module({
   imports: [
@@ -56,8 +57,9 @@ import { TenantsModule } from './tenants/tenants.module';
     STTModule,
     CustomersModule,
     TenantsModule,
+    GeocodingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

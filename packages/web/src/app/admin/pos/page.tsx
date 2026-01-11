@@ -5,17 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, CheckCircle2 } from "lucide-react"
-import { 
-  getProducts, 
-  Product, 
-  ProductVariant, 
-  Category, 
-  getTables, 
-  Table, 
-  createOrder, 
+import {
+  getProducts,
+  Product,
+  ProductVariant,
+  Category,
+  getTables,
+  Table,
+  createOrder,
   getActiveOrders,
   processPayment,
-  getCategories
+  getCategories,
+  getLocations,
+  Location
 } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -34,6 +36,7 @@ export default function PosPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [tables, setTables] = useState<Table[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [cart, setCart] = useState<Record<string, { product: Product, variant?: ProductVariant, quantity: number }>>({})
@@ -82,14 +85,16 @@ export default function PosPage() {
     try {
       setLoading(true)
       setError(null)
-      const [productsData, tablesData, categoriesData] = await Promise.all([
+      const [productsData, tablesData, categoriesData, locationsData] = await Promise.all([
         getProducts(),
         getTables(),
         getCategories(),
+        getLocations(),
       ])
       setProducts([...productsData].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })))
       setTables(tablesData)
       setCategories(categoriesData)
+      setLocations(locationsData)
     } catch (err) {
       console.error('Error fetching data:', err)
       setError('Error al cargar los datos. Por favor, intente de nuevo.')
@@ -165,7 +170,7 @@ export default function PosPage() {
     })
   }
 
-  const handleCreateOrder = async () => {
+  const handleCreateOrder = async (assignedLocationId?: string) => {
     try {
       if (orderType === "table" && !selectedTable) {
         toast({
@@ -234,7 +239,10 @@ export default function PosPage() {
       })
 
       // Usar locationId del usuario autenticado, o fallback a la primera mesa
-      const locationId = user?.locationId || tables[0]?.locationId
+      // Si es domicilio y tenemos una sede asignada por validación de dirección, usar esa.
+      const locationId = (orderType === "delivery" && assignedLocationId)
+        ? assignedLocationId
+        : (user?.locationId || tables[0]?.locationId)
       if (!locationId) {
         toast({
           title: "Error",
@@ -247,8 +255,8 @@ export default function PosPage() {
 
       const orderData = {
         tableId: orderType === "table" ? selectedTable : undefined,
-        type: orderType === "table" ? "TABLE" as const : 
-              orderType === "delivery" ? "DELIVERY" as const : "TAKEOUT" as const,
+        type: orderType === "table" ? "TABLE" as const :
+          orderType === "delivery" ? "DELIVERY" as const : "TAKEOUT" as const,
         locationId,
         customerName: (orderType === "takeout" || orderType === "delivery") ? customerName : undefined,
         deliveryAddress: orderType === "delivery" ? deliveryAddress : undefined,
@@ -272,7 +280,7 @@ export default function PosPage() {
 
         await processPayment(createdOrder.id, total, "CASH")
       }
-      
+
       // Clear cart and form fields
       setCart({})
       setCustomerName("")
@@ -317,28 +325,28 @@ export default function PosPage() {
   const filteredProducts = products.filter(product => {
     const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesCategory && matchesSearch
   })
 
   const groupedProducts =
     selectedCategory === "all"
       ? categories
-          .map(category => ({
-            categoryName: category.name,
-            categoryId: category.id,
-            products: filteredProducts.filter(p => p.categoryId === category.id),
-          }))
-          .filter(group => group.products.length > 0)
+        .map(category => ({
+          categoryName: category.name,
+          categoryId: category.id,
+          products: filteredProducts.filter(p => p.categoryId === category.id),
+        }))
+        .filter(group => group.products.length > 0)
       : filteredProducts.length > 0
-      ? [
+        ? [
           {
             categoryName: categories.find((c) => c.id === selectedCategory)?.name || "",
             categoryId: selectedCategory,
             products: filteredProducts,
           },
         ]
-      : []
+        : []
 
   // Get all active orders for selected table
   const currentOrders = activeOrders
@@ -455,6 +463,7 @@ export default function PosPage() {
             onPhoneChange={setPhone}
             paymentMethod={paymentMethod}
             onPaymentMethodChange={setPaymentMethod}
+            locations={locations}
           />
         </div>
       </div>

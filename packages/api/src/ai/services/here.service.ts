@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { normalizeAddress } from '../../geocoding/address-utils';
 
 @Injectable()
 export class HereService {
@@ -22,9 +23,14 @@ export class HereService {
 
         try {
             this.logger.log(`Validating address: ${address}`);
+            const normalizedAddress = normalizeAddress(address);
+            if (normalizedAddress.toLowerCase() !== address.toLowerCase()) {
+                this.logger.log(`Address normalized for AI search: "${address}" -> "${normalizedAddress}"`);
+            }
+
             const response = await axios.get('https://geocode.search.hereapi.com/v1/geocode', {
                 params: {
-                    q: address,
+                    q: normalizedAddress,
                     apiKey: this.apiKey,
                 },
             });

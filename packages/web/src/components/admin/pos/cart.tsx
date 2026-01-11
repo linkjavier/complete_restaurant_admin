@@ -5,7 +5,7 @@ import { Product, ProductVariant } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Minus, Plus, Trash2 } from "lucide-react"
+import { Minus, Plus, Trash2, MapPin, Loader2, CheckCircle2, XCircle, ExternalLink } from "lucide-react"
 import { Table } from "@/lib/api"
 import { PaymentDialog } from "@/components/admin/pos/payment-dialog"
 import { Badge } from "@/components/ui/badge"
@@ -32,7 +32,7 @@ interface CartProps {
   tables: Table[]
   onOrderTypeChange: (type: "table" | "takeout" | "delivery") => void
   onTableSelect: (tableId: string) => void
-  onSubmit: () => void
+  onSubmit: (assignedLocationId?: string) => void
   loading?: boolean
   customerName: string
   onCustomerNameChange: (name: string) => void
@@ -58,6 +58,7 @@ interface CartProps {
       status: string
     }[]
   }[]
+  locations?: Location[]
 }
 
 export function Cart({
@@ -82,14 +83,79 @@ export function Cart({
   paymentMethod,
   onPaymentMethodChange,
   currentOrders = [],
+  locations = [],
 }: CartProps) {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [tempOrderId, setTempOrderId] = useState<string | null>(null)
-  
+
+  // Address validation state
+  const [isValidating, setIsValidating] = useState(false)
+  const [addressValidation, setAddressValidation] = useState<{
+    isValid: boolean | null
+    distance?: number
+    coords?: { lat: number; lng: number }
+    assignedLocation?: Location
+    error?: string
+  }>({ isValid: null })
+
+  const handleValidateAddress = async (address: string) => {
+    if (!address.trim()) {
+      setAddressValidation({ isValid: null })
+      return
+    }
+
+    setIsValidating(true)
+    try {
+      const { getAuthHeaders, API_URL } = await import("@/lib/api")
+      const response = await fetch(`${API_URL}/address/validate`, {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ address }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Error al validar la dirección")
+      }
+
+      const data = await response.json()
+      setAddressValidation({
+        isValid: true,
+        coords: data.coords,
+        distance: data.distance,
+        assignedLocation: data.assignedLocation,
+      })
+    } catch (error: any) {
+      console.error("Error validating address:", error)
+      setAddressValidation({
+        isValid: false,
+        error: error.message || "Error al validar la dirección"
+      })
+    } finally {
+      setIsValidating(false)
+    }
+  }
+
   const cartTotal = items.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
+    (sum, item) => {
+      // Calcular precio base del producto
+      let itemPrice = item.product.price;
+
+      // Sumar precios de variantes si existen
+      if (item.variants && item.variants.length > 0) {
+        const variantsPrice = item.variants.reduce((vSum, v) => vSum + (v.price || 0), 0);
+        itemPrice += variantsPrice;
+      } else if (item.variant) {
+        itemPrice += (item.variant.price || 0);
+      }
+
+      return sum + itemPrice * item.quantity;
+    },
     0
   )
 
@@ -104,16 +170,16 @@ export function Cart({
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[status] || 'bg-gray-100 text-gray-800'}`}>
         {status === 'PENDING' ? 'Pendiente' :
-         status === 'IN_PROGRESS' ? 'En Preparación' :
-         status === 'READY' ? 'Listo' :
-         status === 'DELIVERED' ? 'Entregado' :
-         status === 'CANCELLED' ? 'Cancelado' : status}
+          status === 'IN_PROGRESS' ? 'En Preparación' :
+            status === 'READY' ? 'Listo' :
+              status === 'DELIVERED' ? 'Entregado' :
+                status === 'CANCELLED' ? 'Cancelado' : status}
       </span>
     )
   }
 
   const ordersTotal = currentOrders.reduce(
-    (sum, order) => sum + (order.total || order.items?.reduce((itemSum, item) => 
+    (sum, order) => sum + (order.total || order.items?.reduce((itemSum, item) =>
       itemSum + (item.product.price * item.quantity), 0) || 0),
     0
   )
@@ -128,8 +194,10 @@ export function Cart({
         setTempOrderId("temp")  // ID temporal para el diálogo de pago
         setIsPaymentDialogOpen(true)
       } else {
-        // Mesa: crear orden primero
-        await onSubmit()
+        // Mesa o Domicilio: crear orden primero
+        // Si es domicilio, pasar el ID de la sede asignada
+        const assignedLocationId = orderType === "delivery" ? addressValidation.assignedLocation?.id : undefined;
+        await onSubmit(assignedLocationId)
       }
     } catch (error) {
       console.error('Error submitting order:', error)
@@ -207,13 +275,70 @@ export function Cart({
                     disabled={isProcessing}
                     className="h-8"
                   />
-                  <Input
-                    placeholder="Dirección de entrega"
-                    value={deliveryAddress}
-                    onChange={(e) => onDeliveryAddressChange(e.target.value)}
-                    disabled={isProcessing}
-                    className="h-8"
-                  />
+                  <div className="relative">
+                    <Input
+                      placeholder="Dirección de entrega"
+                      value={deliveryAddress}
+                      onChange={(e) => {
+                        onDeliveryAddressChange(e.target.value)
+                        setAddressValidation({ isValid: null })
+                      }}
+                      onBlur={(e) => handleValidateAddress(e.target.value)}
+                      disabled={isProcessing}
+                      className={`h-8 pr-8 ${addressValidation.isValid === true
+                        ? "border-green-500 focus-visible:ring-green-500"
+                        : addressValidation.isValid === false
+                          ? "border-red-500 focus-visible:ring-red-500"
+                          : ""
+                        }`}
+                    />
+                    <div className="absolute right-2 top-1.5 flex items-center gap-1">
+                      {isValidating ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : addressValidation.isValid === true ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : addressValidation.isValid === false ? (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      ) : (
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+
+                  {addressValidation.isValid === true && (
+                    <div className="px-2 py-1 bg-green-50 border border-green-100 rounded-md space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-green-700 font-medium flex items-center gap-2">
+                          <span>Coord: {addressValidation.coords?.lat.toFixed(4)}, {addressValidation.coords?.lng.toFixed(4)}</span>
+                          {addressValidation.distance !== undefined && (
+                            <span className="font-bold">Distancia: {addressValidation.distance.toFixed(1)} km</span>
+                          )}
+                        </p>
+                        {addressValidation.coords && (
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${addressValidation.coords.lat},${addressValidation.coords.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-green-100 px-1.5 py-0.5 rounded text-[9px] font-bold text-green-700 hover:bg-green-200 hover:text-green-900 transition-colors flex items-center gap-1"
+                          >
+                            <ExternalLink size={10} />
+                            Ver en Mapa
+                          </a>
+                        )}
+                      </div>
+                      {addressValidation.assignedLocation && (
+                        <p className="text-[10px] text-green-800 font-bold border-t border-green-200 pt-1">
+                          Sede asignada: {addressValidation.assignedLocation.name}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {addressValidation.isValid === false && (
+                    <p className="text-[10px] text-red-600 font-medium px-1">
+                      {addressValidation.error || "Dirección no válida o no encontrada"}
+                    </p>
+                  )}
                   <Input
                     placeholder="Barrio (opcional)"
                     value={neighborhood}
@@ -295,7 +420,7 @@ export function Cart({
                         <div className="flex justify-between items-center pt-1 border-t">
                           <span className="text-xs font-medium">Subtotal:</span>
                           <span className="text-xs font-medium">
-                            ${(order.total || order.items?.reduce((sum, item) => 
+                            ${(order.total || order.items?.reduce((sum, item) =>
                               sum + (item.product.price * item.quantity), 0) || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                           </span>
                         </div>
@@ -467,7 +592,7 @@ export function Cart({
           </div>
         )}
       </CardContent>
-      
+
       {(selectedOrderId || tempOrderId) && (
         <PaymentDialog
           isOpen={isPaymentDialogOpen}
