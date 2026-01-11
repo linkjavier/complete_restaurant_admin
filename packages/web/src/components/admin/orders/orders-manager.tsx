@@ -10,17 +10,18 @@ import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import { 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  CreditCard, 
-  Printer, 
-  Receipt, 
+import {
+  Clock,
+  CheckCircle2,
+  XCircle,
+  CreditCard,
+  Printer,
+  Receipt,
   AlertCircle,
   Timer,
   Nfc,
-  HandCoins
+  HandCoins,
+  MapPin
 } from "lucide-react"
 import { useOrderSocket } from "@/hooks/use-order-socket"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -60,6 +61,9 @@ interface Order {
   id: string
   table?: {
     number: number
+  }
+  location?: {
+    name: string
   }
   items: OrderItem[]
   status: OrderStatus
@@ -106,7 +110,7 @@ export function OrdersManager() {
         setLoading(false);
       }
     };
-    
+
     initialFetch();
     const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
@@ -117,11 +121,11 @@ export function OrdersManager() {
     if (connected && user?.locationId) {
       try {
         console.log(`Trying to join orders-${user.locationId} channel...`);
-        
+
         setTimeout(() => {
           const joined = emit('join-kitchen', user.locationId);
           console.log(`Emit join-kitchen for location: ${user.locationId}. Success: ${joined}`);
-          
+
           if (joined) {
             setTimeout(() => {
               console.log("Testing WebSocket by emitting a test message");
@@ -147,14 +151,14 @@ export function OrdersManager() {
     // Listen for new orders
     const unsubscribeNewOrder = subscribe('new_order_created', (newOrderData) => {
       const newOrder = Array.isArray(newOrderData) ? newOrderData[0] : newOrderData;
-      
+
       console.log("new_order_created event received:", newOrder)
-      
+
       setOrders(prevOrders => {
         if (prevOrders.some(order => order.id === newOrder.id)) {
           return prevOrders
         }
-        
+
         return [newOrder, ...prevOrders]
       })
 
@@ -170,16 +174,16 @@ export function OrdersManager() {
     // Listen for order updates
     const unsubscribeOrderUpdated = subscribe('order_updated', (updatedOrderData) => {
       const updatedOrder = Array.isArray(updatedOrderData) ? updatedOrderData[0] : updatedOrderData;
-      
+
       console.log("order_updated event received:", updatedOrder)
-      
+
       if (!updatedOrder) {
         console.warn("Received invalid order update")
         return;
       }
-      
+
       setOrders(prevOrders => {
-        return prevOrders.map(order => 
+        return prevOrders.map(order =>
           order.id === updatedOrder.id ? updatedOrder : order
         )
       })
@@ -188,30 +192,30 @@ export function OrdersManager() {
     // Listen for order item updates
     const unsubscribeOrderItemUpdated = subscribe('order_item_updated', (dataRaw) => {
       const data = Array.isArray(dataRaw) ? dataRaw[0] : dataRaw;
-      
+
       console.log("order_item_updated event received:", data)
-      
+
       if (!data || !data.item || !data.order) {
         console.warn("Received invalid order item update", data)
         return;
       }
-      
+
       const { item, order } = data
-      
+
       setOrders(prevOrders => {
         const orderIndex = prevOrders.findIndex(o => o.id === order.id)
-        
+
         if (orderIndex === -1) {
           return [...prevOrders, order]
         }
-        
+
         const updatedOrders = [...prevOrders]
         const updatedOrder = { ...updatedOrders[orderIndex] }
-        
-        updatedOrder.items = updatedOrder.items.map(i => 
+
+        updatedOrder.items = updatedOrder.items.map(i =>
           i.id === item.id ? { ...i, ...item } : i
         )
-        
+
         updatedOrders[orderIndex] = updatedOrder
         return updatedOrders
       })
@@ -253,7 +257,7 @@ export function OrdersManager() {
       }
 
       const data = await response.json();
-      
+
       // Silently update orders without affecting UI state
       setOrders(prevOrders => {
         // Only update if there are actual changes
@@ -299,7 +303,7 @@ export function OrdersManager() {
         title: "Éxito",
         description: `Estado de la orden actualizado a ${status}`,
       })
-      
+
       fetchOrders()
     } catch (err: any) {
       console.error('Error updating order status:', err)
@@ -319,7 +323,7 @@ export function OrdersManager() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           orderId,
           method: paymentMethod,
           amount: calculateOrderTotal(orders.find(o => o.id === orderId)!)
@@ -334,7 +338,7 @@ export function OrdersManager() {
         title: "Éxito",
         description: "Pago procesado correctamente",
       })
-      
+
       fetchOrders()
     } catch (err: any) {
       console.error('Error processing payment:', err)
@@ -402,7 +406,7 @@ export function OrdersManager() {
 
     const config = statusConfig[status]
     return (
-      <Badge 
+      <Badge
         variant={config.variant as any}
         className={status === "CANCELLED" ? "bg-red-100 text-red-700 hover:bg-red-200" : ""}
       >
@@ -422,7 +426,7 @@ export function OrdersManager() {
 
     const config = statusConfig[status]
     return (
-      <Badge 
+      <Badge
         variant={config.variant as any}
         className="flex items-center"
       >
@@ -434,7 +438,7 @@ export function OrdersManager() {
 
   const getPaymentMethodIcon = (method?: PaymentMethod) => {
     if (!method) return null
-    
+
     const icons = {
       CASH: <Receipt className="h-4 w-4" />,
       CARD: <CreditCard className="h-4 w-4" />,
@@ -599,23 +603,28 @@ export function OrdersManager() {
                                     <p className="text-sm text-muted-foreground">
                                       Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                                     </p>
+                                    {order.location?.name && (
+                                      <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        Ubicación: {order.location.name}
+                                      </p>
+                                    )}
                                     {order.paymentMethod && (
                                       <p className="text-sm font-medium text-primary mt-1">
                                         Método de pago: {
                                           order.paymentMethod === "CASH" ? "Efectivo" :
-                                          order.paymentMethod === "CARD" ? "Tarjeta" :
-                                          order.paymentMethod === "TRANSFER" ? "Transferencia" :
-                                          "Otro"
+                                            order.paymentMethod === "CARD" ? "Tarjeta" :
+                                              order.paymentMethod === "TRANSFER" ? "Transferencia" :
+                                                "Otro"
                                         }
                                       </p>
                                     )}
                                     {order.source && (
                                       <p className="text-xs mt-1">
-                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${
-                                          order.source === 'WHATSAPP' 
-                                            ? 'bg-green-200 text-green-700' 
-                                            : 'bg-gray-200 text-gray-700'
-                                        }`}>{order.source}</span>
+                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${order.source === 'WHATSAPP'
+                                          ? 'bg-green-200 text-green-700'
+                                          : 'bg-gray-200 text-gray-700'
+                                          }`}>{order.source}</span>
                                       </p>
                                     )}
                                   </div>
@@ -625,7 +634,7 @@ export function OrdersManager() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="p-4">
                                 <div className="space-y-4">
                                   {order.items.map((item) => (
@@ -743,15 +752,15 @@ export function OrdersManager() {
                                 <div className="mt-4 flex justify-end gap-2">
                                   {order.status === "PENDING" && (
                                     <>
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleUpdateOrderStatus(order.id, "IN_PROGRESS")}
                                       >
                                         Iniciar Preparación
                                       </Button>
-                                      <Button 
-                                        variant="destructive" 
+                                      <Button
+                                        variant="destructive"
                                         size="sm"
                                         onClick={() => handleUpdateOrderStatus(order.id, "CANCELLED")}
                                       >
@@ -759,10 +768,10 @@ export function OrdersManager() {
                                       </Button>
                                     </>
                                   )}
-                                  
+
                                   {order.status === "IN_PROGRESS" && (
-                                    <Button 
-                                      variant="default" 
+                                    <Button
+                                      variant="default"
                                       size="sm"
                                       onClick={() => handleUpdateOrderStatus(order.id, "READY")}
                                     >
@@ -772,15 +781,15 @@ export function OrdersManager() {
 
                                   {order.status === "READY" && !order.paymentMethod && (
                                     <div className="flex gap-2">
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CASH")}
                                       >
                                         Pago en Efectivo
                                       </Button>
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CARD")}
                                       >
@@ -790,8 +799,8 @@ export function OrdersManager() {
                                   )}
 
                                   {order.status === "PAID" && (
-                                    <Button 
-                                      variant="outline" 
+                                    <Button
+                                      variant="outline"
                                       size="sm"
                                       onClick={() => handlePrintReceipt(order.id)}
                                     >
@@ -799,8 +808,8 @@ export function OrdersManager() {
                                     </Button>
                                   )}
 
-                                  <Button 
-                                    variant="destructive" 
+                                  <Button
+                                    variant="destructive"
                                     size="sm"
                                     onClick={() => setOrderToDelete(order)}
                                   >
@@ -865,23 +874,28 @@ export function OrdersManager() {
                                     <p className="text-sm text-muted-foreground">
                                       Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                                     </p>
+                                    {order.location?.name && (
+                                      <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        Ubicación: {order.location.name}
+                                      </p>
+                                    )}
                                     {order.paymentMethod && (
                                       <p className="text-sm font-medium text-primary mt-1">
                                         Método de pago: {
                                           order.paymentMethod === "CASH" ? "Efectivo" :
-                                          order.paymentMethod === "CARD" ? "Tarjeta" :
-                                          order.paymentMethod === "TRANSFER" ? "Transferencia" :
-                                          "Otro"
+                                            order.paymentMethod === "CARD" ? "Tarjeta" :
+                                              order.paymentMethod === "TRANSFER" ? "Transferencia" :
+                                                "Otro"
                                         }
                                       </p>
                                     )}
                                     {order.source && (
                                       <p className="text-xs mt-1">
-                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${
-                                          order.source === 'WHATSAPP' 
-                                            ? 'bg-green-200 text-green-700' 
-                                            : 'bg-gray-200 text-gray-700'
-                                        }`}>{order.source}</span>
+                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${order.source === 'WHATSAPP'
+                                          ? 'bg-green-200 text-green-700'
+                                          : 'bg-gray-200 text-gray-700'
+                                          }`}>{order.source}</span>
                                       </p>
                                     )}
                                   </div>
@@ -891,7 +905,7 @@ export function OrdersManager() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="p-4">
                                 <div className="space-y-4">
                                   {order.items.map((item) => (
@@ -1009,15 +1023,15 @@ export function OrdersManager() {
                                 <div className="mt-4 flex justify-end gap-2">
                                   {order.status === "READY" && !order.paymentMethod && (
                                     <div className="flex gap-2">
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CASH")}
                                       >
                                         Pago en Efectivo
                                       </Button>
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CARD")}
                                       >
@@ -1027,8 +1041,8 @@ export function OrdersManager() {
                                   )}
 
                                   {order.status === "PAID" && (
-                                    <Button 
-                                      variant="outline" 
+                                    <Button
+                                      variant="outline"
                                       size="sm"
                                       onClick={() => handlePrintReceipt(order.id)}
                                     >
@@ -1036,8 +1050,8 @@ export function OrdersManager() {
                                     </Button>
                                   )}
 
-                                  <Button 
-                                    variant="destructive" 
+                                  <Button
+                                    variant="destructive"
                                     size="sm"
                                     onClick={() => setOrderToDelete(order)}
                                   >
@@ -1102,23 +1116,28 @@ export function OrdersManager() {
                                     <p className="text-sm text-muted-foreground">
                                       Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                                     </p>
+                                    {order.location?.name && (
+                                      <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        Ubicación: {order.location.name}
+                                      </p>
+                                    )}
                                     {order.paymentMethod && (
                                       <p className="text-sm font-medium text-primary mt-1">
                                         Método de pago: {
                                           order.paymentMethod === "CASH" ? "Efectivo" :
-                                          order.paymentMethod === "CARD" ? "Tarjeta" :
-                                          order.paymentMethod === "TRANSFER" ? "Transferencia" :
-                                          "Otro"
+                                            order.paymentMethod === "CARD" ? "Tarjeta" :
+                                              order.paymentMethod === "TRANSFER" ? "Transferencia" :
+                                                "Otro"
                                         }
                                       </p>
                                     )}
                                     {order.source && (
                                       <p className="text-xs mt-1">
-                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${
-                                          order.source === 'WHATSAPP' 
-                                            ? 'bg-green-200 text-green-700' 
-                                            : 'bg-gray-200 text-gray-700'
-                                        }`}>{order.source}</span>
+                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${order.source === 'WHATSAPP'
+                                          ? 'bg-green-200 text-green-700'
+                                          : 'bg-gray-200 text-gray-700'
+                                          }`}>{order.source}</span>
                                       </p>
                                     )}
                                   </div>
@@ -1128,7 +1147,7 @@ export function OrdersManager() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="p-4">
                                 <div className="space-y-4">
                                   {order.items.map((item) => (
@@ -1246,15 +1265,15 @@ export function OrdersManager() {
                                 <div className="mt-4 flex justify-end gap-2">
                                   {order.status === "READY" && !order.paymentMethod && (
                                     <div className="flex gap-2">
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CASH")}
                                       >
                                         Pago en Efectivo
                                       </Button>
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CARD")}
                                       >
@@ -1264,8 +1283,8 @@ export function OrdersManager() {
                                   )}
 
                                   {order.status === "PAID" && (
-                                    <Button 
-                                      variant="outline" 
+                                    <Button
+                                      variant="outline"
                                       size="sm"
                                       onClick={() => handlePrintReceipt(order.id)}
                                     >
@@ -1273,8 +1292,8 @@ export function OrdersManager() {
                                     </Button>
                                   )}
 
-                                  <Button 
-                                    variant="destructive" 
+                                  <Button
+                                    variant="destructive"
                                     size="sm"
                                     onClick={() => setOrderToDelete(order)}
                                   >
@@ -1339,23 +1358,28 @@ export function OrdersManager() {
                                     <p className="text-sm text-muted-foreground">
                                       Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                                     </p>
+                                    {order.location?.name && (
+                                      <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        Ubicación: {order.location.name}
+                                      </p>
+                                    )}
                                     {order.paymentMethod && (
                                       <p className="text-sm font-medium text-primary mt-1">
                                         Método de pago: {
                                           order.paymentMethod === "CASH" ? "Efectivo" :
-                                          order.paymentMethod === "CARD" ? "Tarjeta" :
-                                          order.paymentMethod === "TRANSFER" ? "Transferencia" :
-                                          "Otro"
+                                            order.paymentMethod === "CARD" ? "Tarjeta" :
+                                              order.paymentMethod === "TRANSFER" ? "Transferencia" :
+                                                "Otro"
                                         }
                                       </p>
                                     )}
                                     {order.source && (
                                       <p className="text-xs mt-1">
-                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${
-                                          order.source === 'WHATSAPP' 
-                                            ? 'bg-green-200 text-green-700' 
-                                            : 'bg-gray-200 text-gray-700'
-                                        }`}>{order.source}</span>
+                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${order.source === 'WHATSAPP'
+                                          ? 'bg-green-200 text-green-700'
+                                          : 'bg-gray-200 text-gray-700'
+                                          }`}>{order.source}</span>
                                       </p>
                                     )}
                                   </div>
@@ -1365,7 +1389,7 @@ export function OrdersManager() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="p-4">
                                 <div className="space-y-4">
                                   {order.items.map((item) => (
@@ -1482,8 +1506,8 @@ export function OrdersManager() {
 
                                 <div className="mt-4 flex justify-end gap-2">
                                   {order.status === "CANCELLED" && (
-                                    <Button 
-                                      variant="outline" 
+                                    <Button
+                                      variant="outline"
                                       size="sm"
                                       onClick={() => handleDeleteOrder(order.id)}
                                     >
@@ -1549,7 +1573,7 @@ export function OrdersManager() {
           <DialogHeader>
             <DialogTitle>Confirmar Eliminación</DialogTitle>
           </DialogHeader>
-          <p>¿Estás seguro de que deseas eliminar la orden <span className="font-bold">#{orderToDelete?.id.substring(0,8)}</span>? Esta acción no se puede deshacer.</p>
+          <p>¿Estás seguro de que deseas eliminar la orden <span className="font-bold">#{orderToDelete?.id.substring(0, 8)}</span>? Esta acción no se puede deshacer.</p>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setOrderToDelete(null)}>
               Cancelar
@@ -1563,7 +1587,7 @@ export function OrdersManager() {
 
       {/* Dialog para ver detalles de la orden eliminada */}
       <Dialog open={!!selectedDeletedOrder} onOpenChange={(open) => !open && setSelectedDeletedOrder(null)}>
-        <DialogContent 
+        <DialogContent
           className={cn(
             "max-w-2xl flex flex-col",
             "h-[600px] md:h-[600px]",
@@ -1575,7 +1599,7 @@ export function OrdersManager() {
             "rounded-lg md:rounded-lg",
             "p-0 md:p-6"
           )}
-          style={{ 
+          style={{
             maxHeight: 'calc(var(--vh, 1vh) * 90)',
             height: 'calc(var(--vh, 1vh) * 90)'
           }}

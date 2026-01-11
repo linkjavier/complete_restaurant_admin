@@ -640,6 +640,7 @@ export class FunctionExecutorService {
         orderData: {
           items: itemsWithSyncedVariants.map(item => ({
             productId: item.productId,
+            productName: item.productName,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             subtotal: item.subtotal,
@@ -665,11 +666,12 @@ export class FunctionExecutorService {
     console.log(`[SYNC VARIANTS] Iniciando sincronización de ${items.length} items con un menú de ${menu.length} productos.`);
     return items.map(item => {
       let product = item.productId ? menu.find(p => p.id === item.productId) : undefined;
-      if (!product) {
+      if (!product && item.productName) {
         product = menu.find(p => normalizeName(p.name) === normalizeName(item.productName));
         if (product) console.log(`[SYNC VARIANTS] Producto "${item.productName}" encontrado por nombre exacto.`);
       }
-      if (!product) {
+
+      if (!product && item.productName) {
         console.log(`[SYNC VARIANTS] Producto "${item.productName}" no encontrado por ID/nombre exacto. Probando Fuse...`);
         const fuse = new Fuse(menu, { keys: ['name'], threshold: 0.4 });
         const results = fuse.search(item.productName);
@@ -678,17 +680,29 @@ export class FunctionExecutorService {
           console.log(`[SYNC VARIANTS] Producto "${item.productName}" encontrado por Fuse -> "${product.name}" (score: ${results[0].score})`);
         }
       }
+
+      // Si se proporcionó un productId pero no se encontró en este menú (ej: cambio de sede), 
+      // y no tenemos productName, intentamos buscar el producto por el nombre que tenía originalmente si es posible,
+      // o lanzamos un error más descriptivo.
+      if (!product && item.productId) {
+        console.warn(`[SYNC VARIANTS] El productId ${item.productId} no corresponde a esta sede. Intentando recuperar por nombre de referencia si existe.`);
+        // Aquí no tenemos el nombre si no vino en el item, por eso es vital que venga.
+      }
+
       if (!product || !product.variantGroups) {
-        console.error(`[SYNC VARIANTS] ERROR: No se encontró el producto "${item.productName}" en el menú actual.`);
+        const itemIdentifier = item.productName || item.productId || 'desconocido';
+        console.error(`[SYNC VARIANTS] ERROR: No se encontró el producto "${itemIdentifier}" en el menú actual.`);
+        console.log(`[SYNC VARIANTS] Menu disponible para esta sede (${menu.length} productos):`, menu.map(p => `${p.name} (${p.id})`).join(', ').substring(0, 500));
+
         const options = menu.map(p => p.name).join(', ');
-        throw new Error(`No se pudo identificar el producto "${item.productName}". Opciones disponibles en esta sede: ${options.substring(0, 200)}${options.length > 200 ? '...' : ''}`);
+        throw new Error(`No se pudo identificar el producto "${itemIdentifier}". Por favor, asegúrate de que el producto esté disponible en la sede seleccionada. Opciones disponibles: ${options.substring(0, 200)}${options.length > 200 ? '...' : ''}`);
       }
 
       const syncedVariants = (item.variants || []).map(variant => {
         const group = product.variantGroups.find(g => normalizeName(g.name) === normalizeName(variant.groupName));
         if (!group) return null;
         let variantRecord = group.variants.find(v => normalizeName(v.name) === normalizeName(variant.variantName));
-        if (!variantRecord) {
+        if (!variantRecord && variant.variantName) {
           const fuse = new Fuse(group.variants, { keys: ['name'], threshold: 0.4 });
           const results = fuse.search(variant.variantName);
           if (results.length > 0) variantRecord = results[0].item;

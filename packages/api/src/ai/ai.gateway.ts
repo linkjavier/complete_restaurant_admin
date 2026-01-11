@@ -379,7 +379,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ...validatedOrderData,
         ...state.customerData,
         chatId,
-        locationId
+        locationId: validatedOrderData.locationId || locationId
       }, tenantId);
       const response = this.orderHandler.formatOrderSuccessMessage(createdOrder.id);
       this.orderStateService.deleteState(conversationId);
