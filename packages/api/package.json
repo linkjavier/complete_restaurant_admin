@@ -53,12 +53,14 @@
     "fuse.js": "^7.1.0",
     "heic-convert": "^2.1.0",
     "ioredis": "^5.6.1",
+    "mammoth": "^1.11.0",
     "openai": "^5.1.0",
     "passport": "^0.6.0",
     "passport-facebook": "^3.0.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.0",
     "passport-local": "^1.0.0",
+    "pdf-parse": "^2.4.5",
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
@@ -66,7 +68,8 @@
     "socket.io": "^4.8.1",
     "stripe": "^12.0.0",
     "uuid": "^11.1.0",
-    "whatsapp-web.js": "^1.30.0"
+    "whatsapp-web.js": "^1.30.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

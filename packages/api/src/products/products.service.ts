@@ -5,17 +5,17 @@ import { Prisma } from '@prisma/client';
 @Injectable()
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(data: any, tenantId: string): Promise<any> {
     try {
       this.logger.debug(`Creating product with data: ${JSON.stringify(data)}`);
-      const { ingredients, variantGroups, ...productData } = data;
+      const { ingredients, variantGroups, categoryName, ...productData } = data;
       return await this.prisma.$transaction(async (tx) => {
         // 1. Crear el producto base
         const product = await tx.product.create({
-          data: { 
-            ...productData, 
+          data: {
+            ...productData,
             tenantId: tenantId
           },
         });
@@ -95,9 +95,9 @@ export class ProductsService {
           categoryId: categoryId,
           OR: search
             ? [
-                { name: { contains: search, mode: 'insensitive' } },
-                { description: { contains: search, mode: 'insensitive' } },
-              ]
+              { name: { contains: search, mode: 'insensitive' } },
+              { description: { contains: search, mode: 'insensitive' } },
+            ]
             : undefined,
         },
         include: {
@@ -219,11 +219,11 @@ export class ProductsService {
     try {
       // Obtener el producto antes de eliminarlo
       const product = await this.findOne(id);
-      
+
       if (!product) {
         throw new Error(`Product with id ${id} not found`);
       }
-      
+
       // Transacción para eliminar el producto y sus relaciones
       await this.prisma.$transaction(async (tx) => {
         // 1. Eliminar las relaciones de ingredientes
@@ -232,20 +232,20 @@ export class ProductsService {
             productId: id
           }
         });
-        
+
         // 2. Eliminar las relaciones de variantes
         await tx.productVariant.deleteMany({
           where: {
             productId: id
           }
         });
-        
+
         // 3. Eliminar el producto
         await tx.product.delete({
           where: { id },
         });
       });
-      
+
       return product;
     } catch (error) {
       this.logger.error(`Error removing product ${id}: ${error.message}`);

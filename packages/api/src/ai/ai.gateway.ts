@@ -21,6 +21,7 @@ import { MenuHandlerService } from './services/menu-handler.service';
 import { OrderHandlerService } from './services/order-handler.service';
 import { FunctionExecutorService } from './services/function-executor.service';
 import { NLPService } from './services/nlp.service';
+import { CoordinatorService } from './services/coordinator.service';
 import { LocationsService } from '../locations/locations.service';
 
 function asChatType(value: any): 'whatsapp' | 'ai' | 'admin' {
@@ -53,7 +54,8 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private menuHandler: MenuHandlerService,
     private orderHandler: OrderHandlerService,
     private functionExecutor: FunctionExecutorService,
-    private locationsService: LocationsService
+    private locationsService: LocationsService,
+    private coordinatorService: CoordinatorService
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
@@ -480,7 +482,36 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Llama al menú general, usando un texto genérico
       return await this.handleMenuRequest(client, 'menú', locationId, chatType);
     }
-    // Process with OpenAI
+    // --- NUEVO: Usar Coordinador Multi-agente ---
+    const tenantId = await this.getTenantId(locationId);
+    const context = { locationId, tenantId, chatType, chatId };
+
+    // Solo delegamos a especialistas si NO estamos en un flujo de recolección de datos activo
+    if (state.step !== 'awaiting_customer_data' && state.step !== 'awaiting_customer_data_confirmation' && !pendingSelection) {
+      const specializedResponse = await this.coordinatorService.delegate(text, context);
+
+      // Si el agente respondió algo que no es un fallback genérico (o si decidimos que siempre responde si tiene match)
+      // Por ahora, si el coordinador decidió delegar a un especialista (no CustomAgent por defecto), devolvemos su respuesta.
+      if (specializedResponse && specializedResponse.content) {
+        // Si queremos que el especialista siempre responda si el coordinador lo eligió:
+        // Pero necesitamos saber si fue una respuesta de un especialista real o el fallback.
+        // Implementemos una forma de saber si fue un match.
+        // Por ahora, asumiremos que si hay respuesta la usamos si parece relevante.
+        // MEJORA: Solo usar si no es el CustomAgent el que respondió (o si queremos que CustomAgent sea el que use OpenAI)
+
+        // Vamos a ser más selectivos: si el texto tiene palabras clave, confiamos en el especialista.
+        const normalized = text.toLowerCase();
+        if (normalized.includes('desayuno') || normalized.includes('almuerzo') || normalized.includes('ventas') || normalized.includes('reporte')) {
+          if ('emit' in client) {
+            client.emit('ai_response', { type: 'text', content: specializedResponse.content });
+          }
+          this.conversationService.addMessage(conversationId, { role: 'assistant', content: specializedResponse.content });
+          return specializedResponse.content;
+        }
+      }
+    }
+
+    // Process with OpenAI (Fallback)
     return await this.processWithOpenAI(client, text, locationId, chatType, chatId);
   }
 

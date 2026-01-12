@@ -147,13 +147,14 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     // Obtener logo y nombre del negocio desde la API
     const fetchBusiness = async () => {
       try {
-        const res = await fetch(`${API_URL}/settings/business`)
+        const locationId = user?.locationId
+        const res = await fetch(`${API_URL}/settings/business${locationId ? `?locationId=${locationId}` : ''}`)
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")
           setBusinessName(data.name || "Admin Panel")
         }
-      } catch {}
+      } catch { }
     }
     fetchBusiness()
   }, [])
@@ -201,7 +202,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                       priority
                     />
                   </div>
-                  <div 
+                  <div
                     className="cursor-pointer"
                     onClick={() => handleNavigation('/admin/dashboard')}
                   >
@@ -232,7 +233,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
           </div>
           <div className="space-y-1 pb-4">
             {routes.filter(route => !route.roles || route.roles.includes(user.role)).map((route) => {
-              const isActive = pathname === route.href || 
+              const isActive = pathname === route.href ||
                 (route.href === '/admin/pos' && pathname.startsWith('/admin/pos/')) ||
                 (route.href === '/admin/orders' && pathname.startsWith('/admin/orders/')) ||
                 (route.href === '/admin/tables' && pathname.startsWith('/admin/tables/')) ||

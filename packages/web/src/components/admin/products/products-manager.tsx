@@ -26,6 +26,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 
+import { ImportProductsDialog } from "./import-products-dialog"
+import { FileText } from "lucide-react"
+
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
   const [vh, setVh] = useState('100vh');
@@ -98,6 +101,7 @@ export function ProductsManager() {
   const [error, setError] = useState<string | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
@@ -110,19 +114,8 @@ export function ProductsManager() {
     locationId: "",
     isActive: true,
     quantity: 0,
-    ingredients: [],
-    variantGroups: [] as {
-      id: string;
-      name: string;
-      order?: number;
-      variants: {
-        id: string;
-        name: string;
-        price?: number;
-        image?: string;
-        isActive?: boolean;
-      }[];
-    }[],
+    ingredients: [] as any[],
+    variantGroups: [] as any[],
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const { toast } = useToast()
@@ -190,6 +183,21 @@ export function ProductsManager() {
     }
   }
 
+  const resetNewProductForm = () => {
+    setNewProduct({
+      name: "",
+      description: "",
+      price: 0,
+      image: "",
+      categoryId: "",
+      locationId: "",
+      isActive: true,
+      quantity: 0,
+      ingredients: [],
+      variantGroups: [],
+    })
+  }
+
   const handleCreateProduct = async () => {
     try {
       if (!newProduct.name || !newProduct.price || !newProduct.categoryId || !newProduct.locationId) {
@@ -201,25 +209,17 @@ export function ProductsManager() {
         return
       }
 
-      // Antes de enviar a la API, asegúrate de que todos los ids existen
       const variantGroupsWithIds = (newProduct.variantGroups || []).map(group => ({
         ...group,
         id: group.id || crypto.randomUUID(),
-        variants: (group.variants || []).map(variant => ({
+        variants: (group.variants || []).map((variant: any) => ({
           ...variant,
           id: variant.id || crypto.randomUUID(),
         }))
       }))
+
       await createProduct({
-        name: newProduct.name,
-        description: newProduct.description || undefined,
-        price: newProduct.price,
-        image: newProduct.image || undefined,
-        categoryId: newProduct.categoryId,
-        locationId: newProduct.locationId,
-        isActive: newProduct.isActive,
-        quantity: newProduct.quantity,
-        ingredients: newProduct.ingredients,
+        ...newProduct,
         variantGroups: variantGroupsWithIds,
       })
       toast({
@@ -238,6 +238,34 @@ export function ProductsManager() {
       })
     }
   }
+
+  const handleBulkImport = async (importedProducts: any[]) => {
+    try {
+      setLoading(true)
+      for (const product of importedProducts) {
+        await createProduct({
+          ...product,
+          isActive: true,
+          quantity: 0
+        })
+      }
+      toast({
+        title: "Éxito",
+        description: `${importedProducts.length} productos importados correctamente`,
+      })
+      fetchProducts()
+    } catch (err) {
+      console.error('Error in bulk import:', err)
+      toast({
+        title: "Error parcial",
+        description: "Hubo un problema al importar algunos productos.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleUpdateProduct = async () => {
     if (!editingProduct) return
     try {
@@ -250,37 +278,29 @@ export function ProductsManager() {
         return
       }
       await updateProduct(editingProduct.id, {
-        name: editingProduct.name,
-        description: editingProduct.description || undefined,
-        price: editingProduct.price,
-        image: editingProduct.image || undefined,
-        categoryId: editingProduct.categoryId,
-        locationId: editingProduct.locationId,
-        isActive: editingProduct.isActive,
-        quantity: editingProduct.quantity,
+        ...editingProduct,
         ingredients: editingProduct.ingredients?.map(pi => ({
           ingredientId: pi.ingredientId,
           quantity: pi.quantity,
         })) || [],
-        variantGroups: editingProduct.variantGroups,
       })
       toast({
         title: "Éxito",
         description: "Producto actualizado correctamente",
       })
       setIsEditDialogOpen(false)
-      setScrollToProductId(editingProduct.id)
       setEditingProduct(null)
       fetchProducts()
     } catch (err) {
       console.error('Error updating product:', err)
       toast({
         title: "Error",
-        description: "Error al actualizar el producto. Por favor, asegúrate de estar autenticado.",
+        description: "Error al actualizar el producto.",
         variant: "destructive",
       })
     }
   }
+
   const handleDeleteProduct = async (id: string) => {
     try {
       await deleteProduct(id)
@@ -293,33 +313,9 @@ export function ProductsManager() {
       console.error('Error deleting product:', err)
       toast({
         title: "Error",
-        description: "Error al eliminar el producto. Por favor, asegúrate de estar autenticado.",
+        description: "No se pudo eliminar el producto.",
         variant: "destructive",
       })
-    }
-  }
-
-  const addIngredient = (product: typeof newProduct | Product) => {
-    const newIngredient = {
-      ingredientId: "",
-      quantity: 0,
-    }
-    if ('ingredients' in product) {
-      const fullIngredient = {
-        id: `temp-${Date.now()}`,
-        productId: ('id' in product) ? product.id : "",
-        ingredientId: "",
-        quantity: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-      product.ingredients.push(fullIngredient)
-    }
-  }
-
-  const removeIngredient = (product: typeof newProduct | Product, index: number) => {
-    if ('ingredients' in product) {
-      product.ingredients.splice(index, 1)
     }
   }
 
@@ -329,48 +325,6 @@ export function ProductsManager() {
       variantGroups: product.variantGroups || [],
     })
     setIsEditDialogOpen(true)
-  }
-
-  // Filter products based on search term and selected category
-  const filteredProducts = products.filter(product => {
-    const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
-
-  const groupedProducts =
-    selectedCategory === "all"
-      ? categories
-          .map(category => ({
-            categoryName: category.name,
-            categoryId: category.id,
-            products: filteredProducts.filter(p => p.categoryId === category.id),
-          }))
-          .filter(group => group.products.length > 0)
-      : filteredProducts.length > 0
-      ? [
-          {
-            categoryName: categories.find((c) => c.id === selectedCategory)?.name || "",
-            categoryId: selectedCategory,
-            products: filteredProducts,
-          },
-        ]
-      : []
-
-  const resetNewProductForm = () => {
-    setNewProduct({
-      name: "",
-      description: "",
-      price: 0,
-      image: "",
-      categoryId: "",
-      locationId: "",
-      isActive: true,
-      quantity: 0,
-      ingredients: [],
-      variantGroups: [],
-    })
   }
 
   const handleCreateDialogClose = () => {
@@ -383,16 +337,50 @@ export function ProductsManager() {
     setEditingProduct(null)
   }
 
-  // Al agregar una nueva variante a un grupo
+  const addIngredient = (product: any) => {
+    if (product.ingredients) {
+      product.ingredients.push({
+        ingredientId: "",
+        quantity: 0,
+      })
+    }
+  }
+
+  const removeIngredient = (product: any, index: number) => {
+    if (product.ingredients) {
+      product.ingredients.splice(index, 1)
+    }
+  }
+
+  const filteredProducts = products.filter(product => {
+    const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    return matchesCategory && matchesSearch
+  })
+
+  const groupedProducts = selectedCategory === "all"
+    ? categories.map(category => ({
+      categoryName: category.name,
+      categoryId: category.id,
+      products: filteredProducts.filter(p => p.categoryId === category.id),
+    })).filter(group => group.products.length > 0)
+    : filteredProducts.length > 0
+      ? [{
+        categoryName: categories.find(c => c.id === selectedCategory)?.name || "",
+        categoryId: selectedCategory,
+        products: filteredProducts,
+      }]
+      : []
+
   const addVariantToGroup = (groupIdx: number) => {
     setNewProduct(prev => {
       const groups = [...prev.variantGroups]
-      groups[groupIdx].variants.push({ id: crypto.randomUUID(), name: '', price: undefined, image: '', isActive: true })
+      groups[groupIdx].variants.push({ id: crypto.randomUUID(), name: '', price: undefined, isActive: true })
       return { ...prev, variantGroups: groups }
     })
   }
 
-  // Al agregar un nuevo grupo de variantes
   const addVariantGroup = () => {
     setNewProduct(prev => ({
       ...prev,
@@ -404,16 +392,25 @@ export function ProductsManager() {
   }
 
   return (
-    <div className="space-y-4 w-full max-w-full overflow-x-hidden">
+    <div className="space-y-4 w-full max-w-full overflow-x-hidden" >
       <Card className="w-full">
         <CardHeader className="border-b">
           <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <CardTitle className="text-lg sm:text-xl">Productos Existentes</CardTitle>
               <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsImportDialogOpen(true)}
+                  className="flex items-center gap-2 border-primary text-primary hover:bg-primary/10"
+                >
+                  <FileText className="h-4 w-4" />
+                  Importar
+                </Button>
+                <Button
                   variant="default"
-              size="sm"
+                  size="sm"
                   onClick={() => setIsCreateDialogOpen(true)}
                   className="flex items-center gap-2"
                 >
@@ -437,7 +434,7 @@ export function ProductsManager() {
                 >
                   <Grid className="h-4 w-4" />
                   <span className="hidden md:inline ml-2">Grid</span>
-            </Button>
+                </Button>
               </div>
             </div>
             <div className="flex flex-col md:flex-row gap-4">
@@ -500,7 +497,7 @@ export function ProductsManager() {
                     <div key={categoryId}>
                       <CategoryTitle title={categoryName} />
                       {viewMode === 'list' ? (
-            <div className="grid gap-4 w-full">
+                        <div className="grid gap-4 w-full">
                           {groupProducts.map((product) => (
                             <div
                               key={product.id}
@@ -668,7 +665,7 @@ export function ProductsManager() {
                                           {product.isActive ? "Activo" : "Inactivo"}
                                         </Badge>
                                       </div>
-                                      
+
                                       <div className="space-y-1 text-sm mt-2">
                                         <div className="flex justify-between items-center">
                                           <span className="text-muted-foreground">Precio:</span>
@@ -690,7 +687,7 @@ export function ProductsManager() {
                                         </div>
                                       </div>
                                     </div>
-        
+
                                     {product.ingredients && product.ingredients.length > 0 && (
                                       <div className="pt-2 border-t mt-2">
                                         <p className="text-sm font-medium mb-1">Ingredientes:</p>
@@ -746,8 +743,8 @@ export function ProductsManager() {
       </Card>
 
       {/* Create Product Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateDialogClose}>
-        <DialogContent 
+      <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateDialogClose} >
+        <DialogContent
           className={cn(
             "max-w-4xl lg:max-w-6xl xl:max-w-7xl flex flex-col",
             "h-[calc(var(--vh,1vh)*90)] md:h-[600px]",
@@ -758,7 +755,7 @@ export function ProductsManager() {
             "rounded-lg md:rounded-lg",
             "p-0 md:p-6"
           )}
-          style={{ 
+          style={{
             maxHeight: 'calc(var(--vh, 1vh) * 90)',
             height: 'calc(var(--vh, 1vh) * 90)'
           }}
@@ -779,7 +776,7 @@ export function ProductsManager() {
                     placeholder="Ingresa el nombre del producto"
                     value={newProduct.name}
                     onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                    style={{ 
+                    style={{
                       fontSize: '16px',
                       WebkitTextSizeAdjust: '100%'
                     }}
@@ -795,14 +792,14 @@ export function ProductsManager() {
                     value={newProduct.price}
                     onChange={(e) => {
                       const value = e.target.value === '' ? 0 : Number(e.target.value);
-                        setNewProduct({ ...newProduct, price: value });
+                      setNewProduct({ ...newProduct, price: value });
                     }}
                     onFocus={(e) => {
                       if (e.target.value === '0') {
                         e.target.value = '';
                       }
                     }}
-                    style={{ 
+                    style={{
                       fontSize: '16px',
                       WebkitTextSizeAdjust: '100%'
                     }}
@@ -853,7 +850,7 @@ export function ProductsManager() {
                     placeholder="Ingresa el stock actual"
                     value={newProduct.quantity}
                     onChange={(e) => setNewProduct({ ...newProduct, quantity: parseFloat(e.target.value) })}
-                    style={{ 
+                    style={{
                       fontSize: '16px',
                       WebkitTextSizeAdjust: '100%'
                     }}
@@ -876,7 +873,7 @@ export function ProductsManager() {
                   placeholder="Ingresa una descripción (opcional)"
                   value={newProduct.description}
                   onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                  style={{ 
+                  style={{
                     fontSize: '16px',
                     WebkitTextSizeAdjust: '100%'
                   }}
@@ -901,9 +898,9 @@ export function ProductsManager() {
                         <Select
                           value={ingredient.ingredientId}
                           onValueChange={(value) => {
-                              const newIngredients = [...newProduct.ingredients]
-                              newIngredients[index].ingredientId = value
-                              setNewProduct({ ...newProduct, ingredients: newIngredients })
+                            const newIngredients = [...newProduct.ingredients]
+                            newIngredients[index].ingredientId = value
+                            setNewProduct({ ...newProduct, ingredients: newIngredients })
                           }}
                         >
                           <SelectTrigger className="w-full">
@@ -924,11 +921,11 @@ export function ProductsManager() {
                           type="number"
                           value={ingredient.quantity}
                           onChange={(e) => {
-                              const newIngredients = [...newProduct.ingredients]
-                              newIngredients[index].quantity = parseFloat(e.target.value)
-                              setNewProduct({ ...newProduct, ingredients: newIngredients })
+                            const newIngredients = [...newProduct.ingredients]
+                            newIngredients[index].quantity = parseFloat(e.target.value)
+                            setNewProduct({ ...newProduct, ingredients: newIngredients })
                           }}
-                          style={{ 
+                          style={{
                             fontSize: '16px',
                             WebkitTextSizeAdjust: '100%'
                           }}
@@ -939,9 +936,9 @@ export function ProductsManager() {
                         size="icon"
                         className="w-full lg:w-10"
                         onClick={() => {
-                            const newIngredients = [...newProduct.ingredients]
-                            newIngredients.splice(index, 1)
-                            setNewProduct({ ...newProduct, ingredients: newIngredients })
+                          const newIngredients = [...newProduct.ingredients]
+                          newIngredients.splice(index, 1)
+                          setNewProduct({ ...newProduct, ingredients: newIngredients })
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -951,16 +948,16 @@ export function ProductsManager() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                        const newIngredients = [...newProduct.ingredients]
-                        newIngredients.push({
-                          id: `temp-${Date.now()}`,
-                          productId: "",
-                          ingredientId: "",
-                          quantity: 0,
-                          createdAt: new Date().toISOString(),
-                          updatedAt: new Date().toISOString(),
-                        })
-                        setNewProduct({ ...newProduct, ingredients: newIngredients })
+                      const newIngredients = [...newProduct.ingredients]
+                      newIngredients.push({
+                        id: `temp-${Date.now()}`,
+                        productId: "",
+                        ingredientId: "",
+                        quantity: 0,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                      })
+                      setNewProduct({ ...newProduct, ingredients: newIngredients })
                     }}
                     className="w-full sm:w-auto"
                   >
@@ -1074,19 +1071,19 @@ export function ProductsManager() {
           </ScrollArea>
           <div className="flex-none p-4 flex gap-2 border-t">
             <Button variant="outline" onClick={handleCreateDialogClose} className="flex-1">
-                      Cancelar
-                    </Button>
+              Cancelar
+            </Button>
             <Button onClick={handleCreateProduct} className="flex-1">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Crear Producto
-                  </Button>
-              </div>
+              <Plus className="mr-2 h-4 w-4" />
+              Crear Producto
+            </Button>
+          </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Edit Product Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>
-        <DialogContent 
+      < Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose} >
+        <DialogContent
           className={cn(
             "max-w-4xl lg:max-w-6xl xl:max-w-7xl flex flex-col",
             "h-[calc(var(--vh,1vh)*90)] md:h-[600px]",
@@ -1097,7 +1094,7 @@ export function ProductsManager() {
             "rounded-lg md:rounded-lg",
             "p-0 md:p-6"
           )}
-          style={{ 
+          style={{
             maxHeight: 'calc(var(--vh, 1vh) * 90)',
             height: 'calc(var(--vh, 1vh) * 90)'
           }}
@@ -1119,12 +1116,12 @@ export function ProductsManager() {
                       placeholder="Ingresa el nombre del producto"
                       value={editingProduct.name}
                       onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                      style={{ 
+                      style={{
                         fontSize: '16px',
                         WebkitTextSizeAdjust: '100%'
                       }}
                     />
-            </div>
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-price">Precio</Label>
                     <Input
@@ -1142,12 +1139,12 @@ export function ProductsManager() {
                           e.target.value = '';
                         }
                       }}
-                      style={{ 
+                      style={{
                         fontSize: '16px',
                         WebkitTextSizeAdjust: '100%'
                       }}
                     />
-          </div>
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-categoryId">Categoría</Label>
                     <Select
@@ -1165,7 +1162,7 @@ export function ProductsManager() {
                         ))}
                       </SelectContent>
                     </Select>
-              </div>
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-locationId">Ubicación</Label>
                     <Select
@@ -1183,7 +1180,7 @@ export function ProductsManager() {
                         ))}
                       </SelectContent>
                     </Select>
-            </div>
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-quantity">Stock Actual</Label>
                     <Input
@@ -1193,12 +1190,12 @@ export function ProductsManager() {
                       placeholder="Ingresa el stock actual"
                       value={editingProduct.quantity || 0}
                       onChange={(e) => setEditingProduct({ ...editingProduct, quantity: parseFloat(e.target.value) })}
-                      style={{ 
+                      style={{
                         fontSize: '16px',
                         WebkitTextSizeAdjust: '100%'
                       }}
                     />
-                </div>
+                  </div>
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="edit-isActive"
@@ -1206,8 +1203,8 @@ export function ProductsManager() {
                       onCheckedChange={(checked) => setEditingProduct({ ...editingProduct, isActive: checked })}
                     />
                     <Label htmlFor="edit-isActive">Producto Activo</Label>
-                          </div>
-                          </div>
+                  </div>
+                </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="edit-description">Descripción</Label>
@@ -1216,12 +1213,12 @@ export function ProductsManager() {
                     placeholder="Ingresa una descripción (opcional)"
                     value={editingProduct.description || ""}
                     onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
-                    style={{ 
+                    style={{
                       fontSize: '16px',
                       WebkitTextSizeAdjust: '100%'
                     }}
                   />
-                              </div>
+                </div>
 
                 <div className="grid gap-2">
                   <Label>Imagen del Producto</Label>
@@ -1229,7 +1226,7 @@ export function ProductsManager() {
                     onImageUploaded={(url) => setEditingProduct({ ...editingProduct, image: url })}
                     currentImage={editingProduct.image}
                   />
-                            </div>
+                </div>
 
                 <div className="grid gap-2">
                   <Label>Ingredientes</Label>
@@ -1268,7 +1265,7 @@ export function ProductsManager() {
                               newIngredients[index].quantity = parseFloat(e.target.value)
                               setEditingProduct({ ...editingProduct, ingredients: newIngredients })
                             }}
-                            style={{ 
+                            style={{
                               fontSize: '16px',
                               WebkitTextSizeAdjust: '100%'
                             }}
@@ -1288,7 +1285,7 @@ export function ProductsManager() {
                         </Button>
                       </div>
                     ))}
-                        <Button
+                    <Button
                       variant="outline"
                       onClick={() => {
                         const newIngredients = [...editingProduct.ingredients || []]
@@ -1306,9 +1303,9 @@ export function ProductsManager() {
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Agregar Ingrediente
-                        </Button>
-                      </div>
-                    </div>
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="grid gap-2">
                   <Label>Variantes</Label>
@@ -1412,7 +1409,7 @@ export function ProductsManager() {
                     </Button>
                   </div>
                 </div>
-                                  </div>
+              </div>
             </ScrollArea>
           )}
           <div className="flex-none p-4 flex gap-2 border-t">
@@ -1423,9 +1420,9 @@ export function ProductsManager() {
               <Pencil className="mr-2 h-4 w-4" />
               Actualizar Producto
             </Button>
-                        </div>
+          </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       <Dialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
         <DialogContent className="sm:max-w-md w-[calc(100%-2rem)] mx-auto">
@@ -1458,6 +1455,14 @@ export function ProductsManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      <ImportProductsDialog
+        isOpen={isImportDialogOpen}
+        onClose={() => setIsImportDialogOpen(false)}
+        onProductsImported={handleBulkImport}
+        categories={categories}
+        locations={locations}
+        onCategoryCreated={fetchCategories}
+      />
+    </div >
   )
 }

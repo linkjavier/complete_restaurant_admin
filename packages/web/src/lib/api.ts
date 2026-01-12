@@ -189,14 +189,18 @@ export const getTenantIdFromSubdomain = () => {
   return null;
 };
 
-export const getAuthHeaders = () => {
+export const getAuthHeaders = (isMultipart = false) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const tenantId = getTenantIdFromSubdomain();
-  const headers = {
-    'Content-Type': 'application/json',
+  const headers: Record<string, string> = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}),
   };
+
+  if (!isMultipart) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   if (!tenantId) {
     console.warn('[getAuthHeaders] WARNING: No tenantId detected from subdomain! Host:', window.location.hostname);
   } else {
