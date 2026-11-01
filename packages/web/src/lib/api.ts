@@ -54,7 +54,8 @@ export interface Product {
   categoryId: string;
   category?: Category;
   isActive: boolean;
-  locationId?: string;
+  locationId: string;
+  location?: Location;
   ingredients?: ProductIngredient[];
   createdAt?: string;
   updatedAt?: string;

@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils"
 
 import { ImportProductsDialog } from "./import-products-dialog"
 import { FileText } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
@@ -105,6 +106,7 @@ export function ProductsManager() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [selectedLocationId, setSelectedLocationId] = useState("all")
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
@@ -119,17 +121,12 @@ export function ProductsManager() {
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const { toast } = useToast()
+  const { user, isLoading: isAuthLoading } = useAuth()
+  const isSuperAdmin = user?.role === "SUPER_ADMIN"
   const [productToDelete, setProductToDelete] = useState<{ id: string, name: string } | null>(null)
   const [scrollToProductId, setScrollToProductId] = useState<string | null>(null)
   const productRefs = useRef<Map<string, HTMLElement>>(new Map())
   const vh = useMobileViewportHeight()
-
-  useEffect(() => {
-    fetchProducts()
-    fetchCategories()
-    fetchLocations()
-    fetchIngredients()
-  }, [])
 
   useEffect(() => {
     if (scrollToProductId && productRefs.current.has(scrollToProductId)) {
@@ -141,11 +138,17 @@ export function ProductsManager() {
     }
   }, [products, scrollToProductId])
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (locationId?: string) => {
     try {
       setLoading(true)
       setError(null)
-      const data = await getProducts()
+      if (!isSuperAdmin && !locationId) {
+        setProducts([])
+        setError("Tu usuario no tiene una sucursal asignada.")
+        return
+      }
+
+      const data = await getProducts(locationId)
       const sortedData = [...data].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }))
       setProducts(sortedData)
     } catch (err) {
@@ -155,6 +158,18 @@ export function ProductsManager() {
       setLoading(false)
     }
   }
+
+  const reloadProducts = () =>
+    fetchProducts(isSuperAdmin ? undefined : user?.locationId ?? undefined)
+
+  useEffect(() => {
+    if (isAuthLoading || !user) return
+
+    void reloadProducts()
+    void fetchCategories()
+    void fetchLocations()
+    void fetchIngredients()
+  }, [isAuthLoading, isSuperAdmin, user])
 
   const fetchCategories = async () => {
     try {
@@ -220,6 +235,7 @@ export function ProductsManager() {
 
       await createProduct({
         ...newProduct,
+        locationId: isSuperAdmin ? newProduct.locationId : user?.locationId ?? "",
         variantGroups: variantGroupsWithIds,
       })
       toast({
@@ -228,7 +244,7 @@ export function ProductsManager() {
       })
       resetNewProductForm()
       setIsCreateDialogOpen(false)
-      fetchProducts()
+      void reloadProducts()
     } catch (err) {
       console.error('Error creating product:', err)
       toast({
@@ -245,6 +261,7 @@ export function ProductsManager() {
       for (const product of importedProducts) {
         await createProduct({
           ...product,
+          locationId: isSuperAdmin ? product.locationId : user?.locationId ?? "",
           isActive: true,
           quantity: 0
         })
@@ -253,7 +270,7 @@ export function ProductsManager() {
         title: "Éxito",
         description: `${importedProducts.length} productos importados correctamente`,
       })
-      fetchProducts()
+      void reloadProducts()
     } catch (err) {
       console.error('Error in bulk import:', err)
       toast({
@@ -279,6 +296,7 @@ export function ProductsManager() {
       }
       await updateProduct(editingProduct.id, {
         ...editingProduct,
+        locationId: isSuperAdmin ? editingProduct.locationId : user?.locationId ?? "",
         ingredients: editingProduct.ingredients?.map(pi => ({
           ingredientId: pi.ingredientId,
           quantity: pi.quantity,
@@ -290,7 +308,7 @@ export function ProductsManager() {
       })
       setIsEditDialogOpen(false)
       setEditingProduct(null)
-      fetchProducts()
+      void reloadProducts()
     } catch (err) {
       console.error('Error updating product:', err)
       toast({
@@ -308,7 +326,7 @@ export function ProductsManager() {
         title: "Éxito",
         description: "Producto eliminado correctamente",
       })
-      fetchProducts()
+      void reloadProducts()
     } catch (err) {
       console.error('Error deleting product:', err)
       toast({
@@ -353,10 +371,14 @@ export function ProductsManager() {
   }
 
   const filteredProducts = products.filter(product => {
+    const matchesLocation =
+      !isSuperAdmin ||
+      selectedLocationId === "all" ||
+      product.locationId === selectedLocationId
     const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesCategory && matchesSearch
+    return matchesLocation && matchesCategory && matchesSearch
   })
 
   const groupedProducts = selectedCategory === "all"
@@ -402,7 +424,17 @@ export function ProductsManager() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsImportDialogOpen(true)}
+                  onClick={() => {
+                    if (!isSuperAdmin && !user?.locationId) {
+                      toast({
+                        title: "Sucursal requerida",
+                        description: "Tu usuario no tiene una sucursal asignada.",
+                        variant: "destructive",
+                      })
+                      return
+                    }
+                    setIsImportDialogOpen(true)
+                  }}
                   className="flex items-center gap-2 border-primary text-primary hover:bg-primary/10"
                 >
                   <FileText className="h-4 w-4" />
@@ -411,7 +443,23 @@ export function ProductsManager() {
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={() => setIsCreateDialogOpen(true)}
+                  onClick={() => {
+                    if (!isSuperAdmin && !user?.locationId) {
+                      toast({
+                        title: "Sucursal requerida",
+                        description: "Tu usuario no tiene una sucursal asignada.",
+                        variant: "destructive",
+                      })
+                      return
+                    }
+                    setNewProduct((current) => ({
+                      ...current,
+                      locationId: isSuperAdmin
+                        ? selectedLocationId === "all" ? "" : selectedLocationId
+                        : user?.locationId ?? "",
+                    }))
+                    setIsCreateDialogOpen(true)
+                  }}
                   className="flex items-center gap-2"
                 >
                   <Plus className="h-4 w-4" />
@@ -449,6 +497,24 @@ export function ProductsManager() {
                   />
                 </div>
               </div>
+              {isSuperAdmin && (
+                <Select
+                  value={selectedLocationId}
+                  onValueChange={setSelectedLocationId}
+                >
+                  <SelectTrigger className="w-full md:w-[220px]">
+                    <SelectValue placeholder="Sucursal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las sucursales</SelectItem>
+                    {locations.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Select
                 value={selectedCategory}
                 onValueChange={setSelectedCategory}
@@ -466,7 +532,7 @@ export function ProductsManager() {
                 </SelectContent>
               </Select>
             </div>
-            {(searchTerm || selectedCategory !== "all") && (
+            {(searchTerm || selectedCategory !== "all" || selectedLocationId !== "all") && (
               <div className="text-sm text-muted-foreground">
                 Mostrando {filteredProducts.length} de {products.length} productos
               </div>
@@ -474,13 +540,15 @@ export function ProductsManager() {
           </div>
         </CardHeader>
         <CardContent className="w-full">
-          {loading ? (
+          {loading || isAuthLoading ? (
             <div className="text-center">Cargando productos...</div>
           ) : error ? (
             <div className="text-center text-red-500">
               {error}
               <div className="mt-4">
-                <Button onClick={fetchProducts}>Reintentar</Button>
+                <Button onClick={() => void reloadProducts()}>
+                  Reintentar
+                </Button>
               </div>
             </div>
           ) : (
@@ -531,9 +599,11 @@ export function ProductsManager() {
                                     <p className="text-sm text-muted-foreground">
                                       Categoría: {product.category?.name}
                                     </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      Ubicación: {locations.find(loc => loc.id === product.locationId)?.name}
-                                    </p>
+                                    {isSuperAdmin && (
+                                      <p className="text-sm text-muted-foreground">
+                                        Ubicación: {product.location?.name || locations.find(loc => loc.id === product.locationId)?.name}
+                                      </p>
+                                    )}
                                     <p className="text-sm text-muted-foreground">
                                       Estado: {product.isActive ? "Activo" : "Inactivo"}
                                     </p>
@@ -677,10 +747,12 @@ export function ProductsManager() {
                                           <span className="text-muted-foreground">Categoría:</span>
                                           <span className="truncate">{product.category?.name}</span>
                                         </div>
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground">Ubicación:</span>
-                                          <span className="truncate">{locations.find(loc => loc.id === product.locationId)?.name}</span>
-                                        </div>
+                                        {isSuperAdmin && (
+                                          <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                            <span>Sucursal:</span>
+                                            <span className="truncate">{product.location?.name || locations.find(loc => loc.id === product.locationId)?.name}</span>
+                                          </div>
+                                        )}
                                         <div className="flex justify-between items-center">
                                           <span className="text-muted-foreground">Stock:</span>
                                           <span>{product.quantity || 0}</span>
@@ -823,24 +895,26 @@ export function ProductsManager() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="create-locationId">Ubicación</Label>
-                  <Select
-                    value={newProduct.locationId}
-                    onValueChange={(value) => setNewProduct({ ...newProduct, locationId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona una ubicación" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations.map((location) => (
-                        <SelectItem key={location.id} value={location.id}>
-                          {location.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {isSuperAdmin && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="create-locationId">Ubicación</Label>
+                    <Select
+                      value={newProduct.locationId}
+                      onValueChange={(value) => setNewProduct({ ...newProduct, locationId: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una ubicación" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {locations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label htmlFor="create-quantity">Stock Actual</Label>
                   <Input
@@ -1163,24 +1237,26 @@ export function ProductsManager() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-locationId">Ubicación</Label>
-                    <Select
-                      value={editingProduct.locationId}
-                      onValueChange={(value) => setEditingProduct({ ...editingProduct, locationId: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una ubicación" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            {location.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {isSuperAdmin && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-locationId">Ubicación</Label>
+                      <Select
+                        value={editingProduct.locationId}
+                        onValueChange={(value) => setEditingProduct({ ...editingProduct, locationId: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona una ubicación" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locations.map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="grid gap-2">
                     <Label htmlFor="edit-quantity">Stock Actual</Label>
                     <Input
@@ -1460,7 +1536,9 @@ export function ProductsManager() {
         onClose={() => setIsImportDialogOpen(false)}
         onProductsImported={handleBulkImport}
         categories={categories}
-        locations={locations}
+        locations={isSuperAdmin ? locations : locations.filter((location) => location.id === user?.locationId)}
+        showLocationSelector={isSuperAdmin}
+        defaultLocationId={!isSuperAdmin ? user?.locationId ?? "" : undefined}
         onCategoryCreated={fetchCategories}
       />
     </div >

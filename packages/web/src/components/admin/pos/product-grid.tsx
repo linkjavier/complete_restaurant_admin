@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Product, ProductVariant } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { MapPin, Plus } from "lucide-react"
 import Image from "next/image"
 import { ImageIcon } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -23,7 +23,8 @@ interface ProductVariantWithGroup extends ProductVariant {
 interface ProductGridProps {
   groupedProducts: GroupedProduct[];
   onAddToCart: (product: Product, variants?: ProductVariantWithGroup[] | ProductVariant) => void;
-  cart: Record<string, number>
+  cart: Record<string, number>;
+  showLocationName?: boolean;
 }
 
 export const CategoryTitle = ({ title }: { title: string }) => {
@@ -63,7 +64,7 @@ export const CategoryTitle = ({ title }: { title: string }) => {
   )
 }
 
-export function ProductGrid({ groupedProducts, onAddToCart, cart }: ProductGridProps) {
+export function ProductGrid({ groupedProducts, onAddToCart, cart, showLocationName = false }: ProductGridProps) {
   const [variantModal, setVariantModal] = useState<{ product: Product | null, open: boolean }>({ product: null, open: false })
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({}) // groupId -> variantId or 'single' for simple
 
@@ -121,6 +122,12 @@ export function ProductGrid({ groupedProducts, onAddToCart, cart }: ProductGridP
                     <div className="space-y-1 flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
                       <p className="text-sm font-medium">${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
+                      {showLocationName && product.location && (
+                        <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <MapPin className="h-3 w-3" />
+                          {product.location.name}
+                        </p>
+                      )}
                     </div>
                     <div className="flex-none">
                       <Button

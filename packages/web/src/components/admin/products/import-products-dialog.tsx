@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,16 +26,27 @@ interface ImportProductsDialogProps {
     onProductsImported: (products: any[]) => void
     categories: Category[]
     locations: Location[]
+    showLocationSelector?: boolean
+    defaultLocationId?: string
     onCategoryCreated?: () => void
 }
 
-export function ImportProductsDialog({ isOpen, onClose, onProductsImported, categories, locations, onCategoryCreated }: ImportProductsDialogProps) {
+export function ImportProductsDialog({
+    isOpen,
+    onClose,
+    onProductsImported,
+    categories,
+    locations,
+    showLocationSelector = true,
+    defaultLocationId = "",
+    onCategoryCreated,
+}: ImportProductsDialogProps) {
     const [file, setFile] = useState<File | null>(null)
     const [loading, setLoading] = useState(false)
     const [extractedProducts, setExtractedProducts] = useState<ExtractedProduct[]>([])
     const [detectedCategories, setDetectedCategories] = useState<string[]>([])
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>("")
-    const [selectedLocationId, setSelectedLocationId] = useState<string>("")
+    const [selectedLocationId, setSelectedLocationId] = useState<string>(defaultLocationId)
     const [creatingCategories, setCreatingCategories] = useState(false)
     const [createdCategoriesMap, setCreatedCategoriesMap] = useState<Record<string, string>>({})
     const [processingStep, setProcessingStep] = useState<number>(0)
@@ -48,6 +59,12 @@ export function ImportProductsDialog({ isOpen, onClose, onProductsImported, cate
     ]
 
     const { toast } = useToast()
+
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedLocationId(defaultLocationId)
+        }
+    }, [defaultLocationId, isOpen])
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -271,17 +288,19 @@ export function ImportProductsDialog({ isOpen, onClose, onProductsImported, cate
                                         Se usará si un producto no tiene categoría detectada.
                                     </p>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Ubicación destino</Label>
-                                    <select
-                                        className="w-full p-2 border rounded-md text-sm"
-                                        value={selectedLocationId}
-                                        onChange={(e) => setSelectedLocationId(e.target.value)}
-                                    >
-                                        <option value="">Selecciona una ubicación</option>
-                                        {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                                    </select>
-                                </div>
+                                {showLocationSelector && (
+                                    <div className="space-y-2">
+                                        <Label>Ubicación destino</Label>
+                                        <select
+                                            className="w-full p-2 border rounded-md text-sm"
+                                            value={selectedLocationId}
+                                            onChange={(e) => setSelectedLocationId(e.target.value)}
+                                        >
+                                            <option value="">Selecciona una ubicación</option>
+                                            {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
 
                             {detectedCategories.length > 0 && (

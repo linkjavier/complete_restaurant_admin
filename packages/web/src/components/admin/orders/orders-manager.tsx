@@ -88,6 +88,7 @@ interface Order {
   source?: string
   deliveryFee?: number
   subtotal?: number
+  isDeleted?: boolean | null
   deletedBy?: {
     firstName: string
     lastName: string

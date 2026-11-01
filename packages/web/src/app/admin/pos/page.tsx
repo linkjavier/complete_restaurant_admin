@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -32,11 +32,14 @@ import { ProductGrid, CategoryTitle } from "@/components/admin/pos/product-grid"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { useAuth } from "@/hooks/use-auth"
 
+const ALL_LOCATIONS = "all"
+
 export default function PosPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [tables, setTables] = useState<Table[]>([])
   const [locations, setLocations] = useState<Location[]>([])
+  const [selectedLocationId, setSelectedLocationId] = useState(ALL_LOCATIONS)
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [cart, setCart] = useState<Record<string, { product: Product, variant?: ProductVariant, quantity: number }>>({})
@@ -52,11 +55,8 @@ export default function PosPage() {
   const [activeOrders, setActiveOrders] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
-  const { user } = useAuth();
-
-  useEffect(() => {
-    fetchData()
-  }, [])
+  const { user, isLoading: isAuthLoading } = useAuth()
+  const isSuperAdmin = user?.role === "SUPER_ADMIN"
 
   // Fetch active orders when table is selected
   useEffect(() => {
@@ -81,12 +81,18 @@ export default function PosPage() {
     }
   }
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!user) return
+
     try {
       setLoading(true)
       setError(null)
+      if (!isSuperAdmin && !user.locationId) {
+        throw new Error("Tu usuario no tiene una sucursal asignada.")
+      }
+
       const [productsData, tablesData, categoriesData, locationsData] = await Promise.all([
-        getProducts(),
+        getProducts(isSuperAdmin ? undefined : user.locationId ?? undefined),
         getTables(),
         getCategories(),
         getLocations(),
@@ -106,7 +112,13 @@ export default function PosPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [isSuperAdmin, toast, user])
+
+  useEffect(() => {
+    if (!isAuthLoading && user) {
+      void fetchData()
+    }
+  }, [fetchData, isAuthLoading, user])
 
   // Nueva función para generar la clave del carrito
   function getCartKey(product: Product, variants?: ProductVariant[] | ProductVariant) {
@@ -121,6 +133,23 @@ export default function PosPage() {
 
   // Actualizar handleAddToCart para soportar múltiples variantes
   const handleAddToCart = (product: Product, variantsOrVariant?: ProductVariant[] | ProductVariant) => {
+    const cartLocationIds = new Set(
+      Object.values(cart)
+        .map((item) => item.product.locationId)
+        .filter(Boolean),
+    )
+    if (
+      product.locationId &&
+      [...cartLocationIds].some((locationId) => locationId !== product.locationId)
+    ) {
+      toast({
+        title: "Productos de distintas sucursales",
+        description: "El carrito solo puede incluir productos de una sucursal. Filtra por sucursal para continuar.",
+        variant: "destructive",
+      })
+      return
+    }
+
     // Validar ids
     if (Array.isArray(variantsOrVariant)) {
       if (variantsOrVariant.some(v => !v.id)) {
@@ -220,6 +249,38 @@ export default function PosPage() {
         return
       }
 
+      const cartLocationIds = new Set(
+        Object.values(cart)
+          .map((item) => item.product.locationId)
+          .filter(Boolean),
+      )
+      if (cartLocationIds.size > 1) {
+        toast({
+          title: "Productos de distintas sucursales",
+          description: "El pedido debe contener productos de una sola sucursal.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const [productLocationId] = [...cartLocationIds]
+      const orderLocationId =
+        (orderType === "delivery" && assignedLocationId) ||
+        (orderType === "table" ? selectedTableData?.locationId : undefined) ||
+        (isSuperAdmin && selectedLocationId !== ALL_LOCATIONS ? selectedLocationId : undefined) ||
+        productLocationId ||
+        user?.locationId ||
+        tables[0]?.locationId
+
+      if (productLocationId && orderLocationId !== productLocationId) {
+        toast({
+          title: "La sucursal no coincide",
+          description: "Selecciona la sucursal de los productos del carrito antes de crear el pedido.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const orderItems = Object.values(cart).map(item => {
         let variantsArr: { productVariantId: string, groupName?: string }[] = [];
         // Soporte para múltiples variantes por item
@@ -238,11 +299,7 @@ export default function PosPage() {
         }
       })
 
-      // Usar locationId del usuario autenticado, o fallback a la primera mesa
-      // Si es domicilio y tenemos una sede asignada por validación de dirección, usar esa.
-      const locationId = (orderType === "delivery" && assignedLocationId)
-        ? assignedLocationId
-        : (user?.locationId || tables[0]?.locationId)
+      const locationId = orderLocationId
       if (!locationId) {
         toast({
           title: "Error",
@@ -323,10 +380,14 @@ export default function PosPage() {
   }
 
   const filteredProducts = products.filter(product => {
+    const matchesLocation =
+      !isSuperAdmin ||
+      selectedLocationId === ALL_LOCATIONS ||
+      product.locationId === selectedLocationId
     const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesCategory && matchesSearch
+    return matchesLocation && matchesCategory && matchesSearch
   })
 
   const groupedProducts =
@@ -351,7 +412,7 @@ export default function PosPage() {
   // Get all active orders for selected table
   const currentOrders = activeOrders
 
-  if (loading) {
+  if (loading || isAuthLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -367,7 +428,7 @@ export default function PosPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-500 mb-4">{error}</p>
-          <Button onClick={fetchData}>Reintentar</Button>
+          <Button onClick={() => void fetchData()}>Reintentar</Button>
         </div>
       </div>
     )
@@ -392,6 +453,28 @@ export default function PosPage() {
                     />
                   </div>
                 </div>
+                {isSuperAdmin && (
+                  <Select
+                    value={selectedLocationId}
+                    onValueChange={(locationId) => {
+                      setSelectedLocationId(locationId)
+                      setCart({})
+                      setSelectedTable("")
+                    }}
+                  >
+                    <SelectTrigger className="w-full md:w-[200px]">
+                      <SelectValue placeholder="Sucursal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_LOCATIONS}>Todas las sucursales</SelectItem>
+                      {locations.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Select
                   value={selectedCategory}
                   onValueChange={setSelectedCategory}
@@ -416,6 +499,7 @@ export default function PosPage() {
               groupedProducts={groupedProducts}
               onAddToCart={handleAddToCart}
               cart={Object.fromEntries(Object.entries(cart).map(([key, item]) => [key, item.quantity]))}
+              showLocationName={isSuperAdmin}
             />
           </CardContent>
         </Card>

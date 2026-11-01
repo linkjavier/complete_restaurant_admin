@@ -444,6 +444,30 @@ export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
 chmod +x ./scripts/seed-database-with-images.sh && ./scripts/seed-database-with-images.sh
 ```
 
+#### Blondie development demo
+
+With the local `blondie` database running and configured in `packages/api/.env`, run:
+
+```bash
+npm --workspace packages/api run seed:dev
+```
+
+This repeatable seed creates the `blondie` tenant, three Medellín demo locations,
+business settings, four menu categories, six products with photos at each location,
+and a development administrator. It only runs against a local PostgreSQL database
+named `blondie` and refuses to run when `NODE_ENV=production`. It does not erase
+other tenants or their data.
+
+Development login:
+
+- URL: `http://blondie.localhost:3001/auth/login`
+- Email: `demo@blondie.local`
+- Password: `BlondieDemo2026!`
+
+Set `BLONDIE_DEMO_EMAIL` or `BLONDIE_DEMO_PASSWORD` in the API environment to
+override the demo credentials before running the seed. Each run resets the
+development administrator's password to the configured value.
+
 ## 🚀 Deployment
 
 ### Production Requirements

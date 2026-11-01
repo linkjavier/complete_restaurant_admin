@@ -102,6 +102,9 @@ export class ProductsService {
         },
         include: {
           category: true,
+          location: {
+            select: { id: true, name: true },
+          },
           variantGroups: {
             where: { isActive: true },
             include: {
