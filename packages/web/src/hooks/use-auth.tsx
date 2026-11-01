@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 import { getAuthToken } from "@/lib/auth";
 import { getAuthHeaders } from "@/lib/api";
 import { getUser, User, API_URL } from "@/lib/api";
@@ -11,8 +11,14 @@ interface AuthState {
   error: string | null;
 }
 
+interface LoginResponse {
+  access_token: string;
+  user: User;
+}
+
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<any>;
+  login: (email: string, password: string) => Promise<LoginResponse>;
+  completeLogin: (accessToken: string) => Promise<User>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -45,6 +51,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchUser();
   }, []);
 
+  const completeLogin = useCallback(async (accessToken: string) => {
+    localStorage.setItem('token', accessToken);
+    const secureCookie = window.location.protocol === 'https:' ? ' secure;' : '';
+    document.cookie = `token=${accessToken}; path=/; max-age=604800; samesite=lax;${secureCookie}`;
+    const userData = await getUser();
+    setState({ user: userData, isLoading: false, error: null });
+    return userData;
+  }, []);
+
   const login = async (email: string, password: string) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
@@ -58,10 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(error.message || 'Login failed');
       }
       const data = await response.json();
-      localStorage.setItem('token', data.access_token);
-      document.cookie = `token=${data.access_token}; path=/; max-age=604800; samesite=lax;`;
-      const userData = await getUser();
-      setState({ user: userData, isLoading: false, error: null });
+      const userData = await completeLogin(data.access_token);
       return { ...data, user: userData };
     } catch (error) {
       setState(prev => ({
@@ -78,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       localStorage.removeItem('token');
+      document.cookie = 'token=; path=/; max-age=0; samesite=lax;';
       setState({ user: null, isLoading: false, error: null });
       router.push('/auth/login');
     } catch (error) {
@@ -100,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ ...state, login, completeLogin, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

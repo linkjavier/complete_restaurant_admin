@@ -1,15 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy, VerifyCallback } from 'passport-google-oauth20';
+import { Strategy } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
-import { AuthService } from '../auth.service';
+import { SocialProfile } from './social-profile.interface';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly authService: AuthService,
-  ) {
+  constructor(configService: ConfigService) {
     super({
       clientID: configService.get<string>('GOOGLE_CLIENT_ID'),
       clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET'),
@@ -18,20 +15,17 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     });
   }
 
-  async validate(
-    accessToken: string,
-    refreshToken: string,
-    profile: any,
-    done: VerifyCallback,
-  ): Promise<any> {
-    const { name, emails, photos } = profile;
-    const user = {
-      email: emails[0].value,
-      firstName: name.givenName,
-      lastName: name.familyName,
-      picture: photos[0].value,
-      accessToken,
+  async validate(accessToken: string, refreshToken: string, profile: SocialProfile) {
+    const email = profile.emails?.[0];
+    if (!email?.value || !(email.verified || profile._json?.email_verified)) {
+      throw new UnauthorizedException('Google did not provide a verified email address');
+    }
+
+    return {
+      email: email.value,
+      firstName: profile.name?.givenName || profile.displayName?.split(' ')[0] || email.value,
+      lastName: profile.name?.familyName || '',
+      avatar: profile.photos?.[0]?.value,
     };
-    done(null, user);
   }
-} 
+}

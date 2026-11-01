@@ -23,6 +23,7 @@ export function middleware(request: NextRequest) {
   const publicPaths = [ '/',
                         '/auth/login',
                         '/auth/register', 
+                        '/auth/oauth',
                         '/api/auth', 
                         '/assets',
                         '/table',

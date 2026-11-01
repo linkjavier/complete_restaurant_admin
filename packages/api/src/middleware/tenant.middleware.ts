@@ -17,6 +17,9 @@ export class TenantMiddleware implements NestMiddleware {
       const publicPaths = [
         '/auth/register',
         '/auth/login',
+        '/auth/google',
+        '/auth/facebook',
+        '/auth/oauth',
         '/settings/business',
         '/payments/stripe/checkout',
         '/payments/test/checkout',

@@ -32,6 +32,7 @@ import { PurchasesModule } from './purchases/purchases.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['../../.env', '.env'],
     }),
     BullModule.forRoot({
       url: `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || '6379'}`,

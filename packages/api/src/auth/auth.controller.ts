@@ -7,8 +7,10 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  BadRequestException,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -17,12 +19,19 @@ import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { FacebookAuthGuard } from './guards/facebook-auth.guard';
 import { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { LoginResponse, UserResponse } from './types/auth.types';
+import { LoginResponse } from './types/auth.types';
+import { SocialProvider } from './auth.service';
+
+interface SocialLoginProfile {
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatar?: string;
+}
 
 interface RequestWithUser extends Request {
-  user: any;
+  user?: SocialLoginProfile;
 }
 
 @ApiTags('Authentication')
@@ -102,7 +111,7 @@ export class AuthController {
     }
   })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
-  async register(@Body() registerDto: RegisterDto, @Req() req: Request): Promise<LoginResponse> {
+  async register(@Body() registerDto: RegisterDto): Promise<LoginResponse> {
     if (!registerDto['tenantName']) {
       throw new UnauthorizedException('tenantName is required');
     }
@@ -118,67 +127,72 @@ export class AuthController {
     return req.user;
   }
 
-  @UseGuards(GoogleAuthGuard)
-  @Post('google')
-  @ApiOperation({ summary: 'Login with Google' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Google login successful',
-    schema: {
-      type: 'object',
-      properties: {
-        access_token: { type: 'string' },
-        user: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            email: { type: 'string' },
-            firstName: { type: 'string' },
-            lastName: { type: 'string' },
-            role: { type: 'string' },
-            locationId: { type: 'string', nullable: true },
-            location: {
-              type: 'object',
-              properties: {
-                id: { type: 'string' },
-                name: { type: 'string' }
-              }
-            },
-            createdAt: { type: 'string', format: 'date-time' },
-            updatedAt: { type: 'string', format: 'date-time' }
-          }
-        }
-      }
-    }
-  })
-  @ApiResponse({ status: 401, description: 'Google authentication failed' })
-  async googleLogin(@Req() req: any): Promise<LoginResponse> {
-    return this.authService.socialLogin(req.user);
+  @Get('google')
+  @ApiOperation({ summary: 'Start Google OAuth login' })
+  async googleLogin(
+    @Req() req: Request & { tenantId?: string },
+    @Query('returnTo') returnTo: string,
+    @Query('nonce') nonce: string,
+    @Res() res: Response,
+  ) {
+    const url = await this.authService.createSocialAuthorizationUrl(
+      'google',
+      req.tenantId,
+      returnTo,
+      nonce,
+    );
+    return res.redirect(url);
   }
 
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: 'Google OAuth callback' })
-  @ApiResponse({ status: 200, description: 'Google OAuth callback successful' })
-  async googleAuthCallback(@Req() req: any): Promise<LoginResponse> {
-    return this.authService.socialLogin(req.user);
+  async googleAuthCallback(
+    @Req() req: RequestWithUser,
+    @Query('state') state: string,
+    @Res() res: Response,
+  ) {
+    if (!req.user) return;
+    return this.finishSocialLogin('google', req.user, state, res);
   }
 
   @Get('facebook')
-  @UseGuards(FacebookAuthGuard)
-  @ApiOperation({ summary: 'Facebook OAuth login' })
-  @ApiResponse({ status: 200, description: 'Facebook login successful' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async facebookAuth() {
-    // This route will redirect to Facebook
+  @ApiOperation({ summary: 'Start Facebook OAuth login' })
+  async facebookAuth(
+    @Req() req: Request & { tenantId?: string },
+    @Query('returnTo') returnTo: string,
+    @Query('nonce') nonce: string,
+    @Res() res: Response,
+  ) {
+    const url = await this.authService.createSocialAuthorizationUrl(
+      'facebook',
+      req.tenantId,
+      returnTo,
+      nonce,
+    );
+    return res.redirect(url);
   }
 
   @Get('facebook/callback')
   @UseGuards(FacebookAuthGuard)
   @ApiOperation({ summary: 'Facebook OAuth callback' })
-  @ApiResponse({ status: 200, description: 'Facebook OAuth callback successful' })
-  async facebookAuthCallback(@Req() req: any): Promise<LoginResponse> {
-    return this.authService.socialLogin(req.user);
+  async facebookAuthCallback(
+    @Req() req: RequestWithUser,
+    @Query('state') state: string,
+    @Res() res: Response,
+  ) {
+    if (!req.user) return;
+    return this.finishSocialLogin('facebook', req.user, state, res);
+  }
+
+  @Post('oauth/exchange')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Exchange one-time social login code for a session' })
+  async exchangeSocialLoginCode(@Body('code') code: string): Promise<LoginResponse> {
+    if (typeof code !== 'string') {
+      throw new BadRequestException('A social login code is required');
+    }
+    return this.authService.exchangeSocialLoginTicket(code);
   }
 
   @Get('me')
@@ -190,4 +204,22 @@ export class AuthController {
   async getCurrentUser(@Req() req: any) {
     return req.user;
   }
-} 
+
+  private async finishSocialLogin(
+    provider: SocialProvider,
+    profile: SocialLoginProfile,
+    state: string,
+    res: Response,
+  ) {
+    const oauthState = await this.authService.verifySocialOAuthState(state, provider);
+    const user = await this.authService.socialLogin({
+      ...profile,
+      tenantId: oauthState.tenantId,
+    });
+    const code = await this.authService.createSocialLoginTicket(user.id);
+    const callbackUrl = new URL('/auth/oauth/callback', oauthState.returnTo);
+    callbackUrl.searchParams.set('code', code);
+    callbackUrl.searchParams.set('nonce', oauthState.nonce);
+    return res.redirect(callbackUrl.toString());
+  }
+}

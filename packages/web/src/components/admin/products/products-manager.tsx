@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect, useRef, useMemo } from "react"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Pencil, ChevronUp, List, Grid, Search, Expand, Shrink } from "lucide-react"
+import { Plus, Trash2, Pencil, ChevronUp, List, Grid, Search, Eye, Package, AlertTriangle, Clock3 } from "lucide-react"
 import { getProducts, createProduct, deleteProduct, updateProduct, Product } from "@/lib/api"
 import { getCategories, Category } from "@/lib/api"
 import { getLocations, Location } from "@/lib/api"
@@ -57,38 +57,12 @@ function useMobileViewportHeight() {
 }
 
 const CategoryTitle = ({ title }: { title: string }) => {
-  const words = title.split(' ')
-  const lastWord = words.pop() || ''
-  const firstPart = words.join(' ')
-
   return (
-    <div className="text-center my-6">
-      {firstPart && (
-        <h2
-          className="text-3xl"
-          style={{
-            fontFamily: "'Anton', sans-serif",
-            color: '#c83b3b',
-            textTransform: 'uppercase',
-            fontWeight: 400,
-            letterSpacing: '0.05em',
-            lineHeight: 1,
-          }}
-        >
-          {firstPart}
-        </h2>
-      )}
-      <h3
-        className="text-5xl"
-        style={{
-          fontFamily: "'Pacifico', cursive",
-          color: '#e58c3d',
-          lineHeight: 1.2,
-          textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
-        }}
-      >
-        {lastWord}
-      </h3>
+    <div className="mb-4 mt-2 flex items-center gap-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </h2>
+      <div className="h-px flex-1 bg-border" />
     </div>
   )
 }
@@ -96,6 +70,7 @@ const CategoryTitle = ({ title }: { title: string }) => {
 export function ProductsManager() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [hasInitializedCategory, setHasInitializedCategory] = useState(false)
   const [locations, setLocations] = useState<Location[]>([])
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [loading, setLoading] = useState(true)
@@ -107,6 +82,10 @@ export function ProductsManager() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [selectedProductType, setSelectedProductType] = useState<"all" | "sale" | "intermediate">("all")
+  const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "in-stock" | "out-of-stock" | "inactive">("all")
+  const [modifiedFilter, setModifiedFilter] = useState<"all" | "recent">("all")
+  const [priceRange, setPriceRange] = useState<"all" | "under-25000" | "25000-50000" | "over-50000">("all")
+  const [sortOrder, setSortOrder] = useState<"name" | "recent" | "price">("name")
   const [selectedLocationId, setSelectedLocationId] = useState("all")
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -128,6 +107,7 @@ export function ProductsManager() {
   const { user, isLoading: isAuthLoading } = useAuth()
   const isSuperAdmin = user?.role === "SUPER_ADMIN"
   const [productToDelete, setProductToDelete] = useState<{ id: string, name: string } | null>(null)
+  const [detailsProduct, setDetailsProduct] = useState<Product | null>(null)
   const [scrollToProductId, setScrollToProductId] = useState<string | null>(null)
   const productRefs = useRef<Map<string, HTMLElement>>(new Map())
   const vh = useMobileViewportHeight()
@@ -179,6 +159,10 @@ export function ProductsManager() {
     try {
       const data = await getCategories()
       setCategories(data)
+      if (!hasInitializedCategory && data.length > 0) {
+        setSelectedCategory(data[0].id)
+        setHasInitializedCategory(true)
+      }
     } catch (err) {
       console.error('Error fetching categories:', err)
     }
@@ -441,7 +425,7 @@ export function ProductsManager() {
     }
   }
 
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = useMemo(() => products.filter(product => {
     const matchesLocation =
       !isSuperAdmin ||
       selectedLocationId === "all" ||
@@ -453,8 +437,50 @@ export function ProductsManager() {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesLocation && matchesCategory && matchesProductType && matchesSearch
-  })
+    const matchesAvailability =
+      availabilityFilter === "all" ||
+      (availabilityFilter === "in-stock" && product.quantity > 0) ||
+      (availabilityFilter === "out-of-stock" && product.quantity <= 0) ||
+      (availabilityFilter === "inactive" && !product.isActive)
+    const matchesPrice =
+      priceRange === "all" ||
+      (!product.isIntermediate &&
+        ((priceRange === "under-25000" && product.price < 25000) ||
+          (priceRange === "25000-50000" && product.price >= 25000 && product.price <= 50000) ||
+          (priceRange === "over-50000" && product.price > 50000)))
+    const updatedAt = new Date(product.updatedAt ?? product.createdAt ?? 0).getTime()
+    const matchesModified =
+      modifiedFilter === "all" ||
+      (Number.isFinite(updatedAt) && Date.now() - updatedAt <= 7 * 24 * 60 * 60 * 1000)
+    return matchesLocation && matchesCategory && matchesProductType && matchesSearch && matchesAvailability && matchesPrice && matchesModified
+  }).sort((a, b) => {
+    if (sortOrder === "recent") {
+      return new Date(b.updatedAt ?? b.createdAt ?? 0).getTime() - new Date(a.updatedAt ?? a.createdAt ?? 0).getTime()
+    }
+    if (sortOrder === "price") return b.price - a.price
+    return a.name.localeCompare(b.name, "es", { sensitivity: "base" })
+  }), [
+    availabilityFilter,
+    isSuperAdmin,
+    modifiedFilter,
+    priceRange,
+    products,
+    searchTerm,
+    selectedCategory,
+    selectedLocationId,
+    selectedProductType,
+    sortOrder,
+  ])
+
+  const locationScopedProducts = products.filter((product) =>
+    !isSuperAdmin || selectedLocationId === "all" || product.locationId === selectedLocationId,
+  )
+  const productsWithNoStock = locationScopedProducts.filter((product) => product.quantity <= 0).length
+  const recentlyUpdatedCount = locationScopedProducts.filter((product) => {
+    if (!product.updatedAt) return false
+    const updatedAt = new Date(product.updatedAt).getTime()
+    return Number.isFinite(updatedAt) && Date.now() - updatedAt <= 7 * 24 * 60 * 60 * 1000
+  }).length
 
   const groupedProducts = selectedCategory === "all"
     ? categories.map(category => ({
@@ -490,148 +516,233 @@ export function ProductsManager() {
 
   return (
     <div className="space-y-4 w-full max-w-full overflow-x-hidden" >
-      <Card className="w-full">
-        <CardHeader className="border-b">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <CardTitle className="text-lg sm:text-xl">Catálogo de productos y preparaciones</CardTitle>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (!isSuperAdmin && !user?.locationId) {
-                      toast({
-                        title: "Sucursal requerida",
-                        description: "Tu usuario no tiene una sucursal asignada.",
-                        variant: "destructive",
-                      })
-                      return
-                    }
-                    setIsImportDialogOpen(true)
-                  }}
-                  className="flex items-center gap-2 border-primary text-primary hover:bg-primary/10"
-                >
-                  <FileText className="h-4 w-4" />
-                  Importar
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => {
-                    if (!isSuperAdmin && !user?.locationId) {
-                      toast({
-                        title: "Sucursal requerida",
-                        description: "Tu usuario no tiene una sucursal asignada.",
-                        variant: "destructive",
-                      })
-                      return
-                    }
-                    setNewProduct((current) => ({
-                      ...current,
-                      locationId: isSuperAdmin
-                        ? selectedLocationId === "all" ? "" : selectedLocationId
-                        : user?.locationId ?? "",
-                      isIntermediate: selectedProductType === "intermediate",
-                      price: selectedProductType === "intermediate" ? 0 : current.price,
-                    }))
-                    setIsCreateDialogOpen(true)
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Crear producto / preparación
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="flex-1 sm:flex-none"
-                >
-                  <List className="h-4 w-4" />
-                  <span className="hidden md:inline ml-2">Lista</span>
-                </Button>
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className="flex-1 sm:flex-none"
-                >
-                  <Grid className="h-4 w-4" />
-                  <span className="hidden md:inline ml-2">Grid</span>
-                </Button>
-              </div>
+      <Card className="w-full border-border/70 shadow-md shadow-black/[0.06]">
+        <CardHeader className="space-y-5 border-b bg-muted/20 p-4 sm:p-6">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                aria-label="Buscar productos"
+                placeholder="Buscar global..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                className="h-10 bg-background pl-9 shadow-sm"
+              />
             </div>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar productos..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-              {isSuperAdmin && (
-                <Select
-                  value={selectedLocationId}
-                  onValueChange={setSelectedLocationId}
-                >
-                  <SelectTrigger className="w-full md:w-[220px]">
-                    <SelectValue placeholder="Sucursal" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las sucursales</SelectItem>
-                    {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {location.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <Select
-                value={selectedProductType}
-                onValueChange={(value) => {
-                  if (value === "all" || value === "sale" || value === "intermediate") {
-                    setSelectedProductType(value)
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (!isSuperAdmin && !user?.locationId) {
+                    toast({
+                      title: "Sucursal requerida",
+                      description: "Tu usuario no tiene una sucursal asignada.",
+                      variant: "destructive",
+                    })
+                    return
                   }
+                  setIsImportDialogOpen(true)
                 }}
               >
-                <SelectTrigger className="w-full md:w-[220px]" aria-label="Tipo de catálogo">
-                  <SelectValue placeholder="Tipo de catálogo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Productos y preparaciones</SelectItem>
-                  <SelectItem value="sale">Productos de venta</SelectItem>
-                  <SelectItem value="intermediate">Preparaciones intermedias</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={selectedCategory}
-                onValueChange={setSelectedCategory}
+                <FileText className="mr-2 h-4 w-4" />
+                Importar
+              </Button>
+              <Button
+                size="sm"
+                className="w-full shadow-sm transition-shadow hover:shadow-md sm:w-auto"
+                onClick={() => {
+                  if (!isSuperAdmin && !user?.locationId) {
+                    toast({
+                      title: "Sucursal requerida",
+                      description: "Tu usuario no tiene una sucursal asignada.",
+                      variant: "destructive",
+                    })
+                    return
+                  }
+                  setNewProduct((current) => ({
+                    ...current,
+                    locationId: isSuperAdmin
+                      ? selectedLocationId === "all" ? "" : selectedLocationId
+                      : user?.locationId ?? "",
+                    isIntermediate: selectedProductType === "intermediate",
+                    price: selectedProductType === "intermediate" ? 0 : current.price,
+                  }))
+                  setIsCreateDialogOpen(true)
+                }}
               >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Categoría" />
+                <Plus className="mr-2 h-4 w-4" />
+                Añadir producto
+              </Button>
+            </div>
+            <div className="grid shrink-0 gap-x-4 gap-y-1 rounded-lg border bg-background px-3 py-2 text-xs shadow-sm sm:grid-cols-3 xl:block xl:min-w-[180px]">
+              <p className="flex items-center justify-between gap-3">
+                <span>Total productos</span>
+                <strong>{locationScopedProducts.length}</strong>
+              </p>
+              <button
+                type="button"
+                onClick={() => setAvailabilityFilter("out-of-stock")}
+                className="flex items-center justify-between gap-3 text-left hover:text-amber-700"
+              >
+                <span>Sin existencias</span>
+                <strong className="text-amber-700">{productsWithNoStock}</strong>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setModifiedFilter("recent")
+                  setSortOrder("recent")
+                }}
+                className="flex items-center justify-between gap-3 text-left hover:text-primary"
+              >
+                <span>Editados recientemente</span>
+                <strong className="inline-flex items-center gap-1">{recentlyUpdatedCount}<ChevronUp className="h-3 w-3 rotate-90" /></strong>
+              </button>
+            </div>
+          </div>
+
+          <div className={cn("grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap", isSuperAdmin ? "xl:flex-nowrap" : "")}>
+            {isSuperAdmin && (
+              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                <SelectTrigger aria-label="Filtrar por sucursal" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                  <SelectValue placeholder="Sucursal" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las categorías</SelectItem>
-                  {categories.map(category => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
+                  <SelectItem value="all">Todas las sucursales</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            {(searchTerm || selectedCategory !== "all" || selectedProductType !== "all" || selectedLocationId !== "all") && (
-              <div className="text-sm text-muted-foreground">
-                Mostrando {filteredProducts.length} de {products.length} elementos del catálogo
-              </div>
             )}
+            <Select
+              value={selectedCategory}
+              onValueChange={(value) => {
+                setSelectedCategory(value)
+              }}
+            >
+              <SelectTrigger aria-label="Filtrar por categoría" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                <SelectValue placeholder="Categorías" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las categorías</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={availabilityFilter}
+              onValueChange={(value) => {
+                if (value === "all" || value === "in-stock" || value === "out-of-stock" || value === "inactive") setAvailabilityFilter(value)
+              }}
+            >
+              <SelectTrigger aria-label="Filtrar por disponibilidad" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                <SelectValue placeholder="Disponibilidad" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="in-stock">Con existencias</SelectItem>
+                <SelectItem value="out-of-stock">Sin existencias</SelectItem>
+                <SelectItem value="inactive">Inactivos</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={priceRange}
+              onValueChange={(value) => {
+                if (value === "all" || value === "under-25000" || value === "25000-50000" || value === "over-50000") setPriceRange(value)
+              }}
+            >
+              <SelectTrigger aria-label="Filtrar por rango de precio" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                <SelectValue placeholder="Precio" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los precios</SelectItem>
+                <SelectItem value="under-25000">Menos de $25.000</SelectItem>
+                <SelectItem value="25000-50000">$25.000 a $50.000</SelectItem>
+                <SelectItem value="over-50000">Más de $50.000</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={modifiedFilter}
+              onValueChange={(value) => {
+                if (value === "all" || value === "recent") {
+                  setModifiedFilter(value)
+                  setSortOrder(value === "recent" ? "recent" : "name")
+                }
+              }}
+            >
+              <SelectTrigger aria-label="Filtrar por fecha de modificación" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                <Clock3 className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                <SelectValue placeholder="Fecha modificada" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Cualquier fecha</SelectItem>
+                <SelectItem value="recent">Últimos 7 días</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={selectedProductType}
+              onValueChange={(value) => {
+                if (value === "all" || value === "sale" || value === "intermediate") setSelectedProductType(value)
+              }}
+            >
+              <SelectTrigger aria-label="Filtrar tipo de producto" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los tipos</SelectItem>
+                <SelectItem value="sale">Productos de venta</SelectItem>
+                <SelectItem value="intermediate">Preparaciones</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+
+          <div className="-mb-6 flex items-center gap-2 overflow-x-auto border-b sm:-mb-6" role="tablist" aria-label="Categorías de productos">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedCategory === "all"}
+              onClick={() => setSelectedCategory("all")}
+              className={cn("shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors", selectedCategory === "all" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+            >
+              Todos
+            </button>
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                role="tab"
+                aria-selected={selectedCategory === category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={cn("shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors", selectedCategory === category.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+              >
+                {category.name}
+              </button>
+            ))}
+            <div className="ml-auto flex shrink-0 items-center gap-1 border-l pl-3">
+              <Button
+                variant={viewMode === "grid" ? "secondary" : "ghost"}
+                size="icon"
+                aria-label="Vista en cuadrícula"
+                onClick={() => setViewMode("grid")}
+              >
+                <Grid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                size="icon"
+                aria-label="Vista de lista"
+                onClick={() => setViewMode("list")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Mostrando {filteredProducts.length} de {products.length} elementos del catálogo
+          </p>
         </CardHeader>
         <CardContent className="w-full">
           {loading || isAuthLoading ? (
@@ -671,7 +782,7 @@ export function ProductsManager() {
                                 if (el) productRefs.current.set(product.id, el);
                                 else productRefs.current.delete(product.id);
                               }}
-                              className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4 w-full"
+                              className="flex w-full flex-col items-start justify-between gap-4 rounded-lg border border-border/70 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:flex-row sm:items-center"
                             >
                               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
                                 {product.image && (
@@ -796,7 +907,7 @@ export function ProductsManager() {
                           ))}
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 w-full">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 w-full">
                           {groupProducts.map((product) => {
                             return (
                               <Card
@@ -805,141 +916,93 @@ export function ProductsManager() {
                                   if (el) productRefs.current.set(product.id, el as HTMLElement);
                                   else productRefs.current.delete(product.id);
                                 }}
-                                className="overflow-hidden w-full flex flex-col"
+                                className="group w-full flex flex-col overflow-hidden border-border/70 shadow-md shadow-black/[0.08] transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/[0.14]"
                               >
                                 <CardContent className="p-0 flex-1 flex flex-col">
-                                  <div className="relative">
+                                  <div className="relative aspect-[4/3] overflow-hidden bg-muted">
                                     {product.image ? (
-                                      <div className="aspect-square sm:aspect-video w-full overflow-hidden">
-                                        <img
-                                          src={product.image}
-                                          alt={product.name}
-                                          className="w-full h-full object-cover"
-                                        />
-                                      </div>
+                                      <img
+                                        src={product.image}
+                                        alt={product.name}
+                                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                      />
                                     ) : (
-                                      <div className="aspect-square sm:aspect-video w-full bg-muted flex items-center justify-center">
-                                        <span className="text-muted-foreground">Sin imagen</span>
+                                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                                        <Package className="h-8 w-8 opacity-40" />
+                                        <span className="text-sm">Sin imagen</span>
                                       </div>
                                     )}
-                                    <div className="absolute top-2 right-2 flex flex-col gap-2">
+                                    <Badge
+                                      variant={product.isActive ? "default" : "secondary"}
+                                      className="absolute left-3 top-3 shadow-md"
+                                    >
+                                      {product.isActive ? "Activo" : "Inactivo"}
+                                    </Badge>
+                                    {product.quantity <= 0 && (
+                                      <Badge variant="destructive" className="absolute bottom-3 left-3 shadow-md">
+                                        Sin existencias
+                                      </Badge>
+                                    )}
+                                    <div className="absolute right-3 top-3 flex gap-2">
                                       <Button
                                         variant="outline"
                                         size="icon"
-                                        className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
+                                        aria-label={`Editar ${product.name}`}
+                                        title="Editar producto"
+                                        className="h-8 w-8 bg-background/90 shadow-md backdrop-blur-sm hover:bg-background"
                                         onClick={() => handleEditClick(product)}
                                       >
                                         <Pencil className="h-4 w-4" />
                                       </Button>
                                       <Button
-                                        variant="destructive"
+                                        variant="outline"
                                         size="icon"
-                                        className="h-8 w-8 hover:bg-destructive/90"
+                                        aria-label={`Eliminar ${product.name}`}
+                                        title="Eliminar producto"
+                                        className="h-8 w-8 bg-background/90 text-destructive shadow-md backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground"
                                         onClick={() => setProductToDelete({ id: product.id, name: product.name })}
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
                                   </div>
-                                  <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
-                                    <div>
-                                      <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                          <h3 className="font-semibold truncate">{product.name}</h3>
-                                          <p className="mt-1 font-mono text-xs text-muted-foreground">
-                                            Código: {product.code}
-                                          </p>
-                                          {product.description && (
-                                            <p className="text-sm text-muted-foreground line-clamp-2">
-                                              {product.description}
-                                            </p>
-                                          )}
-                                        </div>
-                                        <Badge variant={product.isActive ? "default" : "secondary"}>
-                                          {product.isActive ? "Activo" : "Inactivo"}
-                                        </Badge>
-                                      </div>
-
-                                      <div className="space-y-1 text-sm mt-2">
-                                        {!product.isIntermediate && (
-                                          <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground">Precio:</span>
-                                            <span className="font-medium">
-                                              ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                                            </span>
-                                          </div>
-                                        )}
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground">Categoría:</span>
-                                          <span className="truncate">{product.category?.name}</span>
-                                        </div>
-                                        {isSuperAdmin && (
-                                          <div className="flex justify-between items-center text-xs text-muted-foreground">
-                                            <span>Sucursal:</span>
-                                            <span className="truncate">{product.location?.name || locations.find(loc => loc.id === product.locationId)?.name}</span>
-                                          </div>
-                                        )}
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground">Stock:</span>
-                                          <span>{product.quantity || 0} {product.unit}</span>
-                                        </div>
-                                        {product.isIntermediate && (
-                                          <Badge variant="secondary">Preparación intermedia</Badge>
-                                        )}
-                                      </div>
+                                  <div className="flex flex-1 flex-col gap-3 p-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="min-w-0 truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        {product.isIntermediate ? "Preparación intermedia" : product.category?.name ?? "Producto"}
+                                      </p>
+                                      {isSuperAdmin && (
+                                        <span className="max-w-[45%] truncate text-xs text-muted-foreground">
+                                          {product.location?.name || locations.find((location) => location.id === product.locationId)?.name}
+                                        </span>
+                                      )}
                                     </div>
-
-                                    {product.ingredients && product.ingredients.length > 0 && (
-                                      <div className="pt-2 border-t mt-2">
-                                        <p className="text-sm font-medium mb-1">Ingredientes:</p>
-                                        <div className="flex flex-wrap gap-1">
-                                          {product.ingredients.map((pi, index) => (
-                                            <Badge key={index} variant="outline" className="text-xs">
-                                              {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
-                                            </Badge>
-                                          ))}
-                                        </div>
-                                      </div>
+                                    <div className="min-w-0">
+                                      <h3 className="line-clamp-2 min-h-12 font-semibold leading-6">{product.name}</h3>
+                                      <p className="mt-1 font-mono text-xs text-muted-foreground">{product.code}</p>
+                                      {product.description && (
+                                        <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{product.description}</p>
+                                      )}
+                                    </div>
+                                    {!product.isIntermediate && (
+                                      <p className="text-lg font-semibold">
+                                        ${product.price.toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+                                      </p>
                                     )}
-                                    {product.components && product.components.length > 0 && (
-                                      <div className="pt-2 border-t mt-2">
-                                        <p className="text-sm font-medium mb-1">Productos preelaborados:</p>
-                                        <div className="flex flex-wrap gap-1">
-                                          {product.components.map((component) => (
-                                            <Badge key={component.id} variant="outline" className="text-xs">
-                                              {component.component?.name}: {component.quantity}{" "}
-                                              {component.component?.unit}
-                                            </Badge>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {product.variantGroups && product.variantGroups.length > 0 && (
-                                      <div className="pt-2 border-t mt-2">
-                                        <p className="text-sm font-medium mb-1">Variantes:</p>
-                                        <div className="flex flex-wrap gap-2">
-                                          {product.variantGroups.map((group, gIdx) => (
-                                            <div key={gIdx} className="border rounded p-2 bg-muted/50 w-full">
-                                              <div className="font-medium text-sm mb-1">{group.name}</div>
-                                              <div className="flex flex-wrap gap-2">
-                                                {group.variants.map((variant, vIdx) => (
-                                                  <div key={vIdx} className="flex items-center gap-2 border rounded px-2 py-1 bg-muted/70">
-                                                    {variant.image && (
-                                                      <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
-                                                    )}
-                                                    <span className="font-medium text-xs">{variant.name}</span>
-                                                    {typeof variant.price === 'number' && !isNaN(variant.price) && (
-                                                      <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-                                                    )}
-                                                    <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
+                                    <div className="mt-auto flex items-center justify-between border-t pt-3 text-sm">
+                                      <span className="text-muted-foreground">Existencias</span>
+                                      <span className={cn("font-medium", product.quantity <= 0 && "text-destructive")}>
+                                        {product.quantity || 0} {product.unit}
+                                      </span>
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full"
+                                      onClick={() => setDetailsProduct(product)}
+                                    >
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Ver detalles
+                                    </Button>
                                   </div>
                                 </CardContent>
                               </Card>
@@ -955,6 +1018,124 @@ export function ProductsManager() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!detailsProduct} onOpenChange={(open) => !open && setDetailsProduct(null)}>
+        <DialogContent className="max-h-[90dvh] w-[calc(100%-1rem)] overflow-hidden p-0 sm:max-w-2xl">
+          {detailsProduct && (
+            <>
+              <DialogHeader className="border-b p-4 pr-12 sm:p-6">
+                <DialogTitle className="text-left">{detailsProduct.name}</DialogTitle>
+                <DialogDescription className="text-left">
+                  Ficha completa del producto y su configuración.
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="max-h-[calc(90dvh-150px)]">
+                <div className="space-y-5 p-4 sm:p-6">
+                  {detailsProduct.image && (
+                    <div className="h-48 overflow-hidden rounded-xl bg-muted sm:h-64">
+                      <img src={detailsProduct.image} alt={detailsProduct.name} className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                      <p className="text-xs text-muted-foreground">Código</p>
+                      <p className="mt-1 font-mono font-medium">{detailsProduct.code}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                      <p className="text-xs text-muted-foreground">Estado</p>
+                      <Badge variant={detailsProduct.isActive ? "default" : "secondary"} className="mt-1">
+                        {detailsProduct.isActive ? "Activo" : "Inactivo"}
+                      </Badge>
+                    </div>
+                    {!detailsProduct.isIntermediate && (
+                      <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                        <p className="text-xs text-muted-foreground">Precio</p>
+                        <p className="mt-1 font-semibold">
+                          ${detailsProduct.price.toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                    )}
+                    <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                      <p className="text-xs text-muted-foreground">Existencias</p>
+                      <p className="mt-1 font-semibold">{detailsProduct.quantity} {detailsProduct.unit}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                      <p className="text-xs text-muted-foreground">Categoría</p>
+                      <p className="mt-1 font-medium">{detailsProduct.category?.name ?? "Sin categoría"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                      <p className="text-xs text-muted-foreground">Sucursal</p>
+                      <p className="mt-1 font-medium">
+                        {detailsProduct.location?.name || locations.find((location) => location.id === detailsProduct.locationId)?.name || "—"}
+                      </p>
+                    </div>
+                  </div>
+                  {detailsProduct.description && (
+                    <div>
+                      <h3 className="mb-1 font-medium">Descripción</h3>
+                      <p className="text-sm leading-relaxed text-muted-foreground">{detailsProduct.description}</p>
+                    </div>
+                  )}
+                  {(detailsProduct.ingredients?.length || detailsProduct.components?.length) ? (
+                    <div className="space-y-3">
+                      <h3 className="font-medium">Receta e insumos</h3>
+                      {detailsProduct.ingredients?.map((line) => (
+                        <div key={line.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+                          <span>{line.ingredient?.name ?? "Ingrediente"}</span>
+                          <span className="shrink-0 text-muted-foreground">{line.quantity} {line.ingredient?.unit}</span>
+                        </div>
+                      ))}
+                      {detailsProduct.components?.map((line) => (
+                        <div key={line.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+                          <span>{line.component?.name ?? "Preparación"}</span>
+                          <span className="shrink-0 text-muted-foreground">{line.quantity} {line.component?.unit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                      Este producto no tiene una receta configurada.
+                    </p>
+                  )}
+                  {detailsProduct.variantGroups?.length ? (
+                    <div className="space-y-3">
+                      <h3 className="font-medium">Variantes</h3>
+                      {detailsProduct.variantGroups.map((group) => (
+                        <div key={group.id} className="space-y-2 rounded-lg border border-border/70 p-3 shadow-sm">
+                          <p className="text-sm font-medium">{group.name}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {group.variants.map((variant) => (
+                              <Badge key={variant.id} variant={variant.isActive ? "secondary" : "outline"}>
+                                {variant.name}
+                                {typeof variant.price === "number" && ` · $${variant.price.toLocaleString("es-CO")}`}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </ScrollArea>
+              <div className="flex gap-2 border-t p-4 sm:justify-end">
+                <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setDetailsProduct(null)}>
+                  Cerrar
+                </Button>
+                <Button
+                  className="flex-1 sm:flex-none"
+                  onClick={() => {
+                    handleEditClick(detailsProduct)
+                    setDetailsProduct(null)
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar producto
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Create Product Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateDialogClose} >

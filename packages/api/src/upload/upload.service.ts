@@ -11,13 +11,6 @@ export class UploadService {
   private readonly logger = new Logger(UploadService.name);
 
   constructor(private configService: ConfigService) {
-    // Log the configuration for debugging
-    this.logger.log('Cloudinary Config:');
-    this.logger.log(`Cloud Name: ${this.configService.get('CLOUDINARY_CLOUD_NAME')}`);
-    this.logger.log(`API Key: ${this.configService.get('CLOUDINARY_API_KEY')}`);
-    this.logger.log(`API Secret: ${this.configService.get('CLOUDINARY_API_SECRET')}`);
-
-    // Verify all required environment variables are present
     const cloudName = this.configService.get('CLOUDINARY_CLOUD_NAME');
     const apiKey = this.configService.get('CLOUDINARY_API_KEY');
     const apiSecret = this.configService.get('CLOUDINARY_API_SECRET');

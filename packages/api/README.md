@@ -50,9 +50,26 @@ http://localhost:3000/api
 - `GOOGLE_CLIENT_ID`: Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET`: Google OAuth client secret
 - `GOOGLE_CALLBACK_URL`: Google OAuth callback URL
-- `FACEBOOK_APP_ID`: Facebook OAuth app ID
-- `FACEBOOK_APP_SECRET`: Facebook OAuth app secret
+- `FACEBOOK_CLIENT_ID`: Facebook App ID
+- `FACEBOOK_CLIENT_SECRET`: Facebook App Secret
 - `FACEBOOK_CALLBACK_URL`: Facebook OAuth callback URL
+- `FRONTEND_URL`: trusted frontend base origin (for local development, `http://localhost:3001`)
+
+### Social login setup
+
+Configure the Google and Meta/Facebook OAuth applications with these exact
+redirect URIs (or the matching production API URLs):
+
+- `http://localhost:3000/auth/google/callback`
+- `http://localhost:3000/auth/facebook/callback`
+
+Set the matching client ID, secret, and callback URL in the API environment.
+Google must return a verified email; Facebook must grant the `email` permission.
+The OAuth state carries a signed tenant and validated frontend origin, and the
+API exchanges a short-lived, single-use code for the normal application session.
+An email already registered in that tenant keeps its existing role. A new
+social account is created as a `CUSTOMER`, matching the existing social account
+registration behavior.
 
 ## Scripts
 
