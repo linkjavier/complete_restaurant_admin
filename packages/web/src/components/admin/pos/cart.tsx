@@ -11,6 +11,7 @@ import { PaymentDialog } from "@/components/admin/pos/payment-dialog"
 import { Badge } from "@/components/ui/badge"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { toFiniteInteger } from "@/lib/utils"
 
 interface ProductVariantWithGroup extends ProductVariant {
   groupName?: string;
@@ -24,6 +25,7 @@ interface CartItem {
 }
 
 interface CartProps {
+  className?: string
   items: CartItem[]
   onUpdateQuantity: (key: string, quantity: number) => void
   onRemoveItem: (key: string) => void
@@ -62,6 +64,7 @@ interface CartProps {
 }
 
 export function Cart({
+  className,
   items,
   onUpdateQuantity,
   onRemoveItem,
@@ -216,7 +219,7 @@ export function Cart({
   }
 
   return (
-    <Card className="h-[calc(100vh-4rem)] flex flex-col sticky top-16">
+    <Card className={className ?? "h-[calc(100vh-4rem)] flex flex-col sticky top-16"}>
       <CardHeader className="flex-none p-2">
         <CardTitle className="text-lg">Carrito</CardTitle>
       </CardHeader>
@@ -513,7 +516,7 @@ export function Cart({
                               min="1"
                               value={item.quantity}
                               onChange={(e) =>
-                                onUpdateQuantity(item.product.id + (item.variant ? `__${item.variant.name}` : ''), parseInt(e.target.value))
+                                onUpdateQuantity(item.product.id + (item.variant ? `__${item.variant.name}` : ''), toFiniteInteger(e.target.value, item.quantity))
                               }
                               className="w-12 h-6 text-center text-xs"
                               disabled={isProcessing}

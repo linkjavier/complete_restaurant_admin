@@ -1,4 +1,11 @@
-import { Injectable, NotFoundException, Inject, forwardRef, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  Inject,
+  forwardRef,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Order, Prisma } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -111,6 +118,27 @@ export class OrdersService {
           // We still create the order but log the warning, or we could throw if strict
           // For now, let's keep the user's manual assignment if validation fails
         }
+      }
+
+      const requestedProductIds = [...new Set(items.map((item) => item.productId))];
+      const orderProducts = await this.prisma.product.findMany({
+        where: {
+          id: { in: requestedProductIds },
+          tenantId,
+          isActive: true,
+          ...(orderData.locationId ? { locationId: orderData.locationId } : {}),
+        },
+        select: { id: true, isIntermediate: true },
+      });
+      if (orderProducts.length !== requestedProductIds.length) {
+        throw new NotFoundException(
+          'One or more products are unavailable for this business or location',
+        );
+      }
+      if (orderProducts.some((product) => product.isIntermediate)) {
+        throw new BadRequestException(
+          'Intermediate products must be used in a recipe and cannot be sold directly',
+        );
       }
 
       // START: Price calculation logic

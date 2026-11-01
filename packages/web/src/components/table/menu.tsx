@@ -238,7 +238,11 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
         getActiveOrders(tableId),
         getCategories()
       ])
-      setProducts([...productsData].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })))
+      setProducts(
+        productsData
+          .filter((product) => !product.isIntermediate)
+          .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })),
+      )
       setCategories(categoriesData)
       setActiveOrders(ordersData)
       setError(null)

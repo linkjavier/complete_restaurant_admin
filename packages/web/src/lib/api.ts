@@ -54,9 +54,12 @@ export interface Product {
   categoryId: string;
   category?: Category;
   isActive: boolean;
+  isIntermediate: boolean;
+  unit: string;
   locationId: string;
   location?: Location;
   ingredients?: ProductIngredient[];
+  components?: ProductComponent[];
   createdAt?: string;
   updatedAt?: string;
   quantity: number;
@@ -148,6 +151,16 @@ export interface ProductIngredient {
   quantity: number
   product?: Product
   ingredient?: Ingredient
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProductComponent {
+  id: string
+  productId: string
+  componentId: string
+  quantity: number
+  component?: Product
   createdAt: string
   updatedAt: string
 }
@@ -451,7 +464,11 @@ export async function createIngredient(data: {
     body: JSON.stringify(data),
   })
   if (!response.ok) {
-    throw new Error("Error al crear el ingrediente")
+    const body = await response.json().catch(() => null) as { message?: string | string[] } | null
+    const message = Array.isArray(body?.message)
+      ? body.message.join(", ")
+      : body?.message
+    throw new Error(message || "Error al crear el ingrediente")
   }
   return response.json()
 }
@@ -544,9 +561,15 @@ export async function createProduct(data: {
   categoryId: string
   locationId: string
   isActive: boolean
+  isIntermediate?: boolean
+  unit?: string
   quantity: number
   ingredients?: {
     ingredientId: string
+    quantity: number
+  }[]
+  components?: {
+    componentId: string
     quantity: number
   }[]
   variantGroups?: Omit<ProductVariantGroup, 'id'>[]
@@ -560,7 +583,12 @@ export async function createProduct(data: {
     body: JSON.stringify(data),
   })
   if (!response.ok) {
-    throw new Error("Error al crear el producto")
+    const error = await response.json().catch(() => ({}))
+    throw new Error(
+      typeof error.message === "string"
+        ? error.message
+        : "Error al crear el producto",
+    )
   }
   return response.json()
 }
@@ -573,9 +601,15 @@ export async function updateProduct(id: string, data: {
   categoryId?: string
   locationId?: string
   isActive?: boolean
+  isIntermediate?: boolean
+  unit?: string
   quantity?: number
   ingredients?: {
     ingredientId: string
+    quantity: number
+  }[]
+  components?: {
+    componentId: string
     quantity: number
   }[]
   variantGroups?: Omit<ProductVariantGroup, 'id'>[]
@@ -589,7 +623,12 @@ export async function updateProduct(id: string, data: {
     body: JSON.stringify(data),
   })
   if (!response.ok) {
-    throw new Error("Error al actualizar el producto")
+    const error = await response.json().catch(() => ({}))
+    throw new Error(
+      typeof error.message === "string"
+        ? error.message
+        : "Error al actualizar el producto",
+    )
   }
   return response.json()
 }
@@ -940,6 +979,30 @@ export interface ProduceProductPayload {
   wasteNotes?: string;
 }
 
+export interface ProductionLog {
+  id: string;
+  productId: string;
+  quantity: number;
+  wasteQuantity: number;
+  wasteNotes?: string | null;
+  createdAt: string;
+  product: Pick<Product, "id" | "name" | "unit" | "locationId" | "location">;
+}
+
+export async function getProductionHistory(locationId?: string): Promise<ProductionLog[]> {
+  const searchParams = new URLSearchParams();
+  if (locationId) searchParams.set("locationId", locationId);
+
+  const response = await fetch(
+    `${API_URL}/production${searchParams.size ? `?${searchParams.toString()}` : ""}`,
+    { headers: getAuthHeaders() },
+  );
+  if (!response.ok) {
+    throw new Error("No se pudo cargar el historial de producción");
+  }
+  return response.json();
+}
+
 export async function produceProduct(data: ProduceProductPayload) {
   const response = await fetch(`${API_URL}/production/produce`, {
     method: 'POST',
@@ -949,10 +1012,23 @@ export async function produceProduct(data: ProduceProductPayload) {
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
+    const responseMessage = errorBody?.message;
+    const baseMessage =
+      typeof responseMessage === 'string'
+        ? responseMessage
+        : responseMessage?.message || 'Error al registrar la producción';
+    const missing = responseMessage?.missing as
+      | { name: string; required: number; available: number }[]
+      | undefined;
     const message =
-      errorBody?.message?.message ||
-      errorBody?.message ||
-      'Error al registrar la producción';
+      missing?.length
+        ? `${baseMessage}: ${missing
+            .map(
+              (item) =>
+                `${item.name}: requiere ${item.required}, disponibles ${item.available}`,
+            )
+            .join("; ")}`
+        : baseMessage;
     throw new Error(
       typeof message === 'string' ? message : JSON.stringify(message),
     );

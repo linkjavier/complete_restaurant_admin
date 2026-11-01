@@ -24,7 +24,7 @@ import { ImageUpload } from "./image-upload"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/lib/utils"
+import { cn, toFiniteNumber } from "@/lib/utils"
 
 import { ImportProductsDialog } from "./import-products-dialog"
 import { FileText } from "lucide-react"
@@ -106,6 +106,7 @@ export function ProductsManager() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [selectedProductType, setSelectedProductType] = useState<"all" | "sale" | "intermediate">("all")
   const [selectedLocationId, setSelectedLocationId] = useState("all")
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -115,8 +116,11 @@ export function ProductsManager() {
     categoryId: "",
     locationId: "",
     isActive: true,
+    isIntermediate: false,
+    unit: "unidad",
     quantity: 0,
     ingredients: [] as any[],
+    components: [] as { componentId: string; quantity: number }[],
     variantGroups: [] as any[],
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -207,18 +211,47 @@ export function ProductsManager() {
       categoryId: "",
       locationId: "",
       isActive: true,
+      isIntermediate: false,
+      unit: "unidad",
       quantity: 0,
       ingredients: [],
+      components: [],
       variantGroups: [],
     })
   }
 
   const handleCreateProduct = async () => {
     try {
-      if (!newProduct.name || !newProduct.price || !newProduct.categoryId || !newProduct.locationId) {
+      if (
+        !newProduct.name.trim() ||
+        !newProduct.categoryId ||
+        !newProduct.locationId ||
+        !newProduct.unit.trim() ||
+        !Number.isFinite(newProduct.price) ||
+        newProduct.price < 0 ||
+        (!newProduct.isIntermediate && newProduct.price === 0)
+      ) {
         toast({
-          title: "Error",
-          description: "Por favor completa todos los campos requeridos",
+          title: "Revisa los datos del producto",
+          description: newProduct.isIntermediate
+            ? "Completa el nombre, categoría, sucursal y unidad."
+            : "Completa el nombre, un precio mayor que cero, categoría, sucursal y unidad.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (
+        newProduct.ingredients.some(
+          (line) => !line.ingredientId || !Number.isFinite(line.quantity) || line.quantity <= 0,
+        ) ||
+        newProduct.components.some(
+          (line) => !line.componentId || !Number.isFinite(line.quantity) || line.quantity <= 0,
+        )
+      ) {
+        toast({
+          title: "Receta incompleta",
+          description: "Selecciona cada insumo y asigna una cantidad mayor que cero.",
           variant: "destructive",
         })
         return
@@ -235,6 +268,7 @@ export function ProductsManager() {
 
       await createProduct({
         ...newProduct,
+        unit: newProduct.unit.trim(),
         locationId: isSuperAdmin ? newProduct.locationId : user?.locationId ?? "",
         variantGroups: variantGroupsWithIds,
       })
@@ -249,7 +283,10 @@ export function ProductsManager() {
       console.error('Error creating product:', err)
       toast({
         title: "Error",
-        description: "Error al crear el producto. Por favor, asegúrate de estar autenticado.",
+        description:
+          err instanceof Error
+            ? err.message
+            : "Error al crear el producto. Por favor, asegúrate de estar autenticado.",
         variant: "destructive",
       })
     }
@@ -286,20 +323,50 @@ export function ProductsManager() {
   const handleUpdateProduct = async () => {
     if (!editingProduct) return
     try {
-      if (!editingProduct.name || !editingProduct.price || !editingProduct.categoryId || !editingProduct.locationId) {
+      if (
+        !editingProduct.name.trim() ||
+        !editingProduct.categoryId ||
+        !editingProduct.locationId ||
+        !editingProduct.unit.trim() ||
+        !Number.isFinite(editingProduct.price) ||
+        editingProduct.price < 0 ||
+        (!editingProduct.isIntermediate && editingProduct.price === 0)
+      ) {
         toast({
-          title: "Error",
-          description: "Por favor completa todos los campos requeridos",
+          title: "Revisa los datos del producto",
+          description: editingProduct.isIntermediate
+            ? "Completa el nombre, categoría, sucursal y unidad."
+            : "Completa el nombre, un precio mayor que cero, categoría, sucursal y unidad.",
+          variant: "destructive",
+        })
+        return
+      }
+      if (
+        (editingProduct.ingredients ?? []).some(
+          (line) => !line.ingredientId || !Number.isFinite(line.quantity) || line.quantity <= 0,
+        ) ||
+        (editingProduct.components ?? []).some(
+          (line) => !line.componentId || !Number.isFinite(line.quantity) || line.quantity <= 0,
+        )
+      ) {
+        toast({
+          title: "Receta incompleta",
+          description: "Selecciona cada insumo y asigna una cantidad mayor que cero.",
           variant: "destructive",
         })
         return
       }
       await updateProduct(editingProduct.id, {
         ...editingProduct,
+        unit: editingProduct.unit.trim(),
         locationId: isSuperAdmin ? editingProduct.locationId : user?.locationId ?? "",
         ingredients: editingProduct.ingredients?.map(pi => ({
           ingredientId: pi.ingredientId,
           quantity: pi.quantity,
+        })) || [],
+        components: editingProduct.components?.map(({ componentId, quantity }) => ({
+          componentId,
+          quantity,
         })) || [],
       })
       toast({
@@ -313,7 +380,10 @@ export function ProductsManager() {
       console.error('Error updating product:', err)
       toast({
         title: "Error",
-        description: "Error al actualizar el producto.",
+        description:
+          err instanceof Error
+            ? err.message
+            : "Error al actualizar el producto.",
         variant: "destructive",
       })
     }
@@ -376,9 +446,12 @@ export function ProductsManager() {
       selectedLocationId === "all" ||
       product.locationId === selectedLocationId
     const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
+    const matchesProductType =
+      selectedProductType === "all" ||
+      (selectedProductType === "intermediate" ? product.isIntermediate : !product.isIntermediate)
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesLocation && matchesCategory && matchesSearch
+    return matchesLocation && matchesCategory && matchesProductType && matchesSearch
   })
 
   const groupedProducts = selectedCategory === "all"
@@ -419,7 +492,7 @@ export function ProductsManager() {
         <CardHeader className="border-b">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <CardTitle className="text-lg sm:text-xl">Productos Existentes</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">Catálogo de productos y preparaciones</CardTitle>
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Button
                   variant="outline"
@@ -457,13 +530,15 @@ export function ProductsManager() {
                       locationId: isSuperAdmin
                         ? selectedLocationId === "all" ? "" : selectedLocationId
                         : user?.locationId ?? "",
+                      isIntermediate: selectedProductType === "intermediate",
+                      price: selectedProductType === "intermediate" ? 0 : current.price,
                     }))
                     setIsCreateDialogOpen(true)
                   }}
                   className="flex items-center gap-2"
                 >
                   <Plus className="h-4 w-4" />
-                  Crear Producto
+                  Crear producto / preparación
                 </Button>
                 <Button
                   variant={viewMode === 'list' ? 'default' : 'outline'}
@@ -516,6 +591,23 @@ export function ProductsManager() {
                 </Select>
               )}
               <Select
+                value={selectedProductType}
+                onValueChange={(value) => {
+                  if (value === "all" || value === "sale" || value === "intermediate") {
+                    setSelectedProductType(value)
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full md:w-[220px]" aria-label="Tipo de catálogo">
+                  <SelectValue placeholder="Tipo de catálogo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Productos y preparaciones</SelectItem>
+                  <SelectItem value="sale">Productos de venta</SelectItem>
+                  <SelectItem value="intermediate">Preparaciones intermedias</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
                 value={selectedCategory}
                 onValueChange={setSelectedCategory}
               >
@@ -532,9 +624,9 @@ export function ProductsManager() {
                 </SelectContent>
               </Select>
             </div>
-            {(searchTerm || selectedCategory !== "all" || selectedLocationId !== "all") && (
+            {(searchTerm || selectedCategory !== "all" || selectedProductType !== "all" || selectedLocationId !== "all") && (
               <div className="text-sm text-muted-foreground">
-                Mostrando {filteredProducts.length} de {products.length} productos
+                Mostrando {filteredProducts.length} de {products.length} elementos del catálogo
               </div>
             )}
           </div>
@@ -556,8 +648,12 @@ export function ProductsManager() {
               {groupedProducts.length === 0 ? (
                 <div className="text-center text-muted-foreground pt-8">
                   {products.length === 0
-                    ? "No hay productos creados"
-                    : "No se encontraron productos que coincidan con la búsqueda"}
+                    ? "Aún no hay productos ni preparaciones creados."
+                    : selectedProductType === "intermediate"
+                      ? "No hay preparaciones intermedias que coincidan con los filtros."
+                      : selectedProductType === "sale"
+                        ? "No hay productos de venta que coincidan con los filtros."
+                        : "No se encontraron elementos que coincidan con los filtros."}
                 </div>
               ) : (
                 <div className="space-y-8 pt-4">
@@ -587,15 +683,22 @@ export function ProductsManager() {
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium truncate">{product.name}</p>
+                                  {product.isIntermediate && (
+                                    <Badge variant="secondary" className="mt-1">
+                                      Preparación intermedia
+                                    </Badge>
+                                  )}
                                   {product.description && (
                                     <p className="text-sm text-muted-foreground line-clamp-2">
                                       {product.description}
                                     </p>
                                   )}
                                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
-                                    <p className="text-sm text-muted-foreground">
-                                      Precio: ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                                    </p>
+                                    {!product.isIntermediate && (
+                                      <p className="text-sm text-muted-foreground">
+                                        Precio: ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                      </p>
+                                    )}
                                     <p className="text-sm text-muted-foreground">
                                       Categoría: {product.category?.name}
                                     </p>
@@ -608,7 +711,7 @@ export function ProductsManager() {
                                       Estado: {product.isActive ? "Activo" : "Inactivo"}
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                      Stock: {product.quantity || 0}
+                                      Stock: {product.quantity || 0} {product.unit}
                                     </p>
                                   </div>
                                   {product.ingredients && product.ingredients.length > 0 && (
@@ -617,7 +720,20 @@ export function ProductsManager() {
                                       <div className="flex flex-wrap gap-1 mt-1">
                                         {product.ingredients.map((pi, index) => (
                                           <Badge key={index} variant="outline" className="text-xs">
-                                            {pi.ingredient?.name}: {pi.ingredient?.unit} {pi.quantity}
+                                            {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {product.components && product.components.length > 0 && (
+                                    <div className="mt-2">
+                                      <p className="text-sm font-medium">Productos preelaborados:</p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {product.components.map((component) => (
+                                          <Badge key={component.id} variant="outline" className="text-xs">
+                                            {component.component?.name}: {component.quantity}{" "}
+                                            {component.component?.unit}
                                           </Badge>
                                         ))}
                                       </div>
@@ -737,12 +853,14 @@ export function ProductsManager() {
                                       </div>
 
                                       <div className="space-y-1 text-sm mt-2">
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground">Precio:</span>
-                                          <span className="font-medium">
-                                            ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                                          </span>
-                                        </div>
+                                        {!product.isIntermediate && (
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground">Precio:</span>
+                                            <span className="font-medium">
+                                              ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                            </span>
+                                          </div>
+                                        )}
                                         <div className="flex justify-between items-center">
                                           <span className="text-muted-foreground">Categoría:</span>
                                           <span className="truncate">{product.category?.name}</span>
@@ -755,8 +873,11 @@ export function ProductsManager() {
                                         )}
                                         <div className="flex justify-between items-center">
                                           <span className="text-muted-foreground">Stock:</span>
-                                          <span>{product.quantity || 0}</span>
+                                          <span>{product.quantity || 0} {product.unit}</span>
                                         </div>
+                                        {product.isIntermediate && (
+                                          <Badge variant="secondary">Preparación intermedia</Badge>
+                                        )}
                                       </div>
                                     </div>
 
@@ -766,7 +887,20 @@ export function ProductsManager() {
                                         <div className="flex flex-wrap gap-1">
                                           {product.ingredients.map((pi, index) => (
                                             <Badge key={index} variant="outline" className="text-xs">
-                                              {pi.ingredient?.name}: {pi.ingredient?.unit} {pi.quantity}
+                                              {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {product.components && product.components.length > 0 && (
+                                      <div className="pt-2 border-t mt-2">
+                                        <p className="text-sm font-medium mb-1">Productos preelaborados:</p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {product.components.map((component) => (
+                                            <Badge key={component.id} variant="outline" className="text-xs">
+                                              {component.component?.name}: {component.quantity}{" "}
+                                              {component.component?.unit}
                                             </Badge>
                                           ))}
                                         </div>
@@ -833,16 +967,16 @@ export function ProductsManager() {
           }}
         >
           <DialogHeader className="p-4 md:p-0 border-b">
-            <DialogTitle>Crear Nuevo Producto</DialogTitle>
+            <DialogTitle>Crear producto o preparación</DialogTitle>
             <DialogDescription>
-              Completa la información del nuevo producto
+              Las preparaciones se producen por lote y se usan en las recetas; no se venden directamente.
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="flex-1 p-4 md:p-0">
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="create-name">Nombre del Producto</Label>
+                  <Label htmlFor="create-name">Nombre del producto o preparación</Label>
                   <Input
                     id="create-name"
                     placeholder="Ingresa el nombre del producto"
@@ -854,29 +988,31 @@ export function ProductsManager() {
                     }}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="create-price">Precio</Label>
-                  <Input
-                    id="create-price"
-                    type="number"
-                    min="0"
-                    placeholder="Ingresa el precio"
-                    value={newProduct.price}
-                    onChange={(e) => {
-                      const value = e.target.value === '' ? 0 : Number(e.target.value);
-                      setNewProduct({ ...newProduct, price: value });
-                    }}
-                    onFocus={(e) => {
-                      if (e.target.value === '0') {
-                        e.target.value = '';
-                      }
-                    }}
-                    style={{
-                      fontSize: '16px',
-                      WebkitTextSizeAdjust: '100%'
-                    }}
-                  />
-                </div>
+                {!newProduct.isIntermediate && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="create-price">Precio de venta</Label>
+                    <Input
+                      id="create-price"
+                      type="number"
+                      min="0"
+                      placeholder="Ingresa el precio"
+                      value={newProduct.price}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? 0 : Number(e.target.value);
+                        setNewProduct({ ...newProduct, price: value });
+                      }}
+                      onFocus={(e) => {
+                        if (e.target.value === '0') {
+                          e.target.value = '';
+                        }
+                      }}
+                      style={{
+                        fontSize: '16px',
+                        WebkitTextSizeAdjust: '100%'
+                      }}
+                    />
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label htmlFor="create-categoryId">Categoría</Label>
                   <Select
@@ -923,11 +1059,20 @@ export function ProductsManager() {
                     min="0"
                     placeholder="Ingresa el stock actual"
                     value={newProduct.quantity}
-                    onChange={(e) => setNewProduct({ ...newProduct, quantity: parseFloat(e.target.value) })}
+                    onChange={(e) => setNewProduct({ ...newProduct, quantity: toFiniteNumber(e.target.value) })}
                     style={{
                       fontSize: '16px',
                       WebkitTextSizeAdjust: '100%'
                     }}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="create-unit">Unidad de medida / producción</Label>
+                  <Input
+                    id="create-unit"
+                    placeholder="unidad, porción, kg..."
+                    value={newProduct.unit}
+                    onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}
                   />
                 </div>
                 <div className="flex items-center space-x-2">
@@ -938,7 +1083,24 @@ export function ProductsManager() {
                   />
                   <Label htmlFor="create-isActive">Producto Activo</Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="create-isIntermediate"
+                    checked={newProduct.isIntermediate}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({
+                        ...newProduct,
+                        isIntermediate: checked,
+                        price: checked ? 0 : newProduct.price,
+                      })
+                    }
+                  />
+                  <Label htmlFor="create-isIntermediate">Es una preparación intermedia</Label>
+                </div>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Una preparación (por ejemplo, carne de hamburguesa) se produce desde Producción y se agrega a la receta del producto final. No aparece en el POS.
+              </p>
 
               <div className="grid gap-2">
                 <Label htmlFor="create-description">Descripción</Label>
@@ -981,9 +1143,9 @@ export function ProductsManager() {
                             <SelectValue placeholder="Selecciona un ingrediente" />
                           </SelectTrigger>
                           <SelectContent>
-                            {ingredients.map((ing) => (
+                            {ingredients.filter((ing) => ing.locationId === newProduct.locationId).map((ing) => (
                               <SelectItem key={ing.id} value={ing.id}>
-                                {ing.name}
+                                {ing.name} ({ing.unit})
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -993,10 +1155,12 @@ export function ProductsManager() {
                         <Label>Cantidad</Label>
                         <Input
                           type="number"
+                          min="0.0001"
+                          step="any"
                           value={ingredient.quantity}
                           onChange={(e) => {
                             const newIngredients = [...newProduct.ingredients]
-                            newIngredients[index].quantity = parseFloat(e.target.value)
+                            newIngredients[index].quantity = toFiniteNumber(e.target.value)
                             setNewProduct({ ...newProduct, ingredients: newIngredients })
                           }}
                           style={{
@@ -1038,6 +1202,110 @@ export function ProductsManager() {
                     <Plus className="mr-2 h-4 w-4" />
                     Agregar Ingrediente
                   </Button>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Productos preelaborados de la receta</Label>
+                <p className="text-sm text-muted-foreground">
+                  Por ejemplo, agrega Carne de hamburguesa y define cuántas unidades lleva cada plato.
+                </p>
+                <div className="space-y-4 w-full">
+                  {newProduct.components.map((component, index) => {
+                    const selectedComponent = products.find(
+                      (product) => product.id === component.componentId,
+                    )
+                    const availableComponents = products.filter(
+                      (product) =>
+                        product.isIntermediate &&
+                        product.locationId === newProduct.locationId,
+                    )
+
+                    return (
+                      <div key={index} className="flex flex-col lg:flex-row gap-2 items-end w-full">
+                        <div className="w-full lg:flex-1">
+                          <Label>Preparación</Label>
+                          <Select
+                            value={component.componentId}
+                            onValueChange={(value) => {
+                              const next = [...newProduct.components]
+                              next[index] = { ...next[index], componentId: value }
+                              setNewProduct({ ...newProduct, components: next })
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona una preparación" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableComponents.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.name} ({product.unit})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-full lg:w-40">
+                          <Label>Cantidad por producto ({selectedComponent?.unit || "unidad"})</Label>
+                          <Input
+                            type="number"
+                            min="0.0001"
+                            step="any"
+                            value={component.quantity}
+                            onChange={(e) => {
+                              const next = [...newProduct.components]
+                              next[index] = { ...next[index], quantity: Number(e.target.value) }
+                              setNewProduct({ ...newProduct, components: next })
+                            }}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          onClick={() =>
+                            setNewProduct({
+                              ...newProduct,
+                              components: newProduct.components.filter((_, i) => i !== index),
+                            })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      setNewProduct({
+                        ...newProduct,
+                        components: [
+                          ...newProduct.components,
+                          { componentId: "", quantity: 1 },
+                        ],
+                      })
+                    }
+                    disabled={!products.some(
+                      (product) =>
+                        product.isIntermediate &&
+                        product.locationId === newProduct.locationId,
+                    )}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Agregar preparación
+                  </Button>
+                  {newProduct.locationId &&
+                    !products.some(
+                      (product) =>
+                        product.isIntermediate &&
+                        product.locationId === newProduct.locationId,
+                    ) && (
+                      <p className="text-sm text-muted-foreground">
+                        Primero crea un producto y márcalo como preparación intermedia.
+                      </p>
+                    )}
                 </div>
               </div>
 
@@ -1184,7 +1452,7 @@ export function ProductsManager() {
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="edit-name">Nombre del Producto</Label>
+                    <Label htmlFor="edit-name">Nombre del producto o preparación</Label>
                     <Input
                       id="edit-name"
                       placeholder="Ingresa el nombre del producto"
@@ -1196,29 +1464,31 @@ export function ProductsManager() {
                       }}
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-price">Precio</Label>
-                    <Input
-                      id="edit-price"
-                      type="number"
-                      min="0"
-                      placeholder="Ingresa el precio"
-                      value={editingProduct.price}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? 0 : Number(e.target.value);
-                        setEditingProduct({ ...editingProduct, price: value });
-                      }}
-                      onFocus={(e) => {
-                        if (e.target.value === '0') {
-                          e.target.value = '';
-                        }
-                      }}
-                      style={{
-                        fontSize: '16px',
-                        WebkitTextSizeAdjust: '100%'
-                      }}
-                    />
-                  </div>
+                  {!editingProduct.isIntermediate && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-price">Precio de venta</Label>
+                      <Input
+                        id="edit-price"
+                        type="number"
+                        min="0"
+                        placeholder="Ingresa el precio"
+                        value={editingProduct.price}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? 0 : Number(e.target.value);
+                          setEditingProduct({ ...editingProduct, price: value });
+                        }}
+                        onFocus={(e) => {
+                          if (e.target.value === '0') {
+                            e.target.value = '';
+                          }
+                        }}
+                        style={{
+                          fontSize: '16px',
+                          WebkitTextSizeAdjust: '100%'
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="grid gap-2">
                     <Label htmlFor="edit-categoryId">Categoría</Label>
                     <Select
@@ -1265,11 +1535,21 @@ export function ProductsManager() {
                       min="0"
                       placeholder="Ingresa el stock actual"
                       value={editingProduct.quantity || 0}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, quantity: parseFloat(e.target.value) })}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, quantity: toFiniteNumber(e.target.value) })}
                       style={{
                         fontSize: '16px',
                         WebkitTextSizeAdjust: '100%'
                       }}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-unit">Unidad de medida / producción</Label>
+                    <Input
+                      id="edit-unit"
+                      value={editingProduct.unit || "unidad"}
+                      onChange={(e) =>
+                        setEditingProduct({ ...editingProduct, unit: e.target.value })
+                      }
                     />
                   </div>
                   <div className="flex items-center space-x-2">
@@ -1280,7 +1560,24 @@ export function ProductsManager() {
                     />
                     <Label htmlFor="edit-isActive">Producto Activo</Label>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="edit-isIntermediate"
+                      checked={editingProduct.isIntermediate}
+                      onCheckedChange={(checked) =>
+                        setEditingProduct({
+                          ...editingProduct,
+                          isIntermediate: checked,
+                          price: checked ? 0 : editingProduct.price,
+                        })
+                      }
+                    />
+                      <Label htmlFor="edit-isIntermediate">Es una preparación intermedia</Label>
+                  </div>
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  Una preparación (por ejemplo, carne de hamburguesa) se produce desde Producción y se agrega a la receta del producto final. No aparece en el POS.
+                </p>
 
                 <div className="grid gap-2">
                   <Label htmlFor="edit-description">Descripción</Label>
@@ -1323,9 +1620,9 @@ export function ProductsManager() {
                               <SelectValue placeholder="Selecciona un ingrediente" />
                             </SelectTrigger>
                             <SelectContent>
-                              {ingredients.map((ing) => (
+                              {ingredients.filter((ing) => ing.locationId === editingProduct.locationId).map((ing) => (
                                 <SelectItem key={ing.id} value={ing.id}>
-                                  {ing.name}
+                                  {ing.name} ({ing.unit})
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1335,10 +1632,12 @@ export function ProductsManager() {
                           <Label>Cantidad</Label>
                           <Input
                             type="number"
+                            min="0.0001"
+                            step="any"
                             value={ingredient.quantity}
                             onChange={(e) => {
                               const newIngredients = [...editingProduct.ingredients || []]
-                              newIngredients[index].quantity = parseFloat(e.target.value)
+                              newIngredients[index].quantity = toFiniteNumber(e.target.value)
                               setEditingProduct({ ...editingProduct, ingredients: newIngredients })
                             }}
                             style={{
@@ -1379,6 +1678,111 @@ export function ProductsManager() {
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Agregar Ingrediente
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Productos preelaborados de la receta</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Define cuántas unidades de cada preparación consume este producto.
+                  </p>
+                  <div className="space-y-4 w-full">
+                    {(editingProduct.components || []).map((component, index) => {
+                      const selectedComponent = products.find(
+                        (product) => product.id === component.componentId,
+                      )
+                      const availableComponents = products.filter(
+                        (product) =>
+                          product.id !== editingProduct.id &&
+                          product.isIntermediate &&
+                          product.locationId === editingProduct.locationId,
+                      )
+
+                      return (
+                        <div key={component.id || index} className="flex flex-col lg:flex-row gap-2 items-end w-full">
+                          <div className="w-full lg:flex-1">
+                            <Label>Preparación</Label>
+                            <Select
+                              value={component.componentId}
+                              onValueChange={(value) => {
+                                const next = [...(editingProduct.components || [])]
+                                next[index] = { ...next[index], componentId: value }
+                                setEditingProduct({ ...editingProduct, components: next })
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona una preparación" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableComponents.map((product) => (
+                                  <SelectItem key={product.id} value={product.id}>
+                                    {product.name} ({product.unit})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="w-full lg:w-40">
+                            <Label>Cantidad por producto ({selectedComponent?.unit || "unidad"})</Label>
+                            <Input
+                              type="number"
+                              min="0.0001"
+                              step="any"
+                              value={component.quantity}
+                              onChange={(e) => {
+                                const next = [...(editingProduct.components || [])]
+                                next[index] = { ...next[index], quantity: Number(e.target.value) }
+                                setEditingProduct({ ...editingProduct, components: next })
+                              }}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            onClick={() =>
+                              setEditingProduct({
+                                ...editingProduct,
+                                components: (editingProduct.components || []).filter(
+                                  (_, i) => i !== index,
+                                ),
+                              })
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        setEditingProduct({
+                          ...editingProduct,
+                          components: [
+                            ...(editingProduct.components || []),
+                            {
+                              id: `temp-${Date.now()}`,
+                              productId: editingProduct.id,
+                              componentId: "",
+                              quantity: 1,
+                              createdAt: new Date().toISOString(),
+                              updatedAt: new Date().toISOString(),
+                            },
+                          ],
+                        })
+                      }
+                      disabled={!products.some(
+                        (product) =>
+                          product.id !== editingProduct.id &&
+                          product.isIntermediate &&
+                          product.locationId === editingProduct.locationId,
+                      )}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Agregar preparación
                     </Button>
                   </div>
                 </div>

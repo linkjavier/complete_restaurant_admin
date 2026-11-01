@@ -1,22 +1,10 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-  UseGuards,
-  Req,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { IngredientsService } from './ingredients.service';
-import { Ingredient as IngredientModel, Prisma } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Request } from 'express';
+import { CurrentTenant } from '../auth/decorators/tenant.decorator';
 
 @ApiTags('ingredients')
 @Controller('ingredients')
@@ -25,13 +13,12 @@ export class IngredientsController {
   constructor(private readonly ingredientsService: IngredientsService) {}
 
   @Post()
-  create(@Body() createIngredientDto: CreateIngredientDto & { tenantId: string }) {
-    return this.ingredientsService.create(createIngredientDto);
+  create(@Body() createIngredientDto: CreateIngredientDto, @CurrentTenant() tenantId: string) {
+    return this.ingredientsService.create({ ...createIngredientDto, tenantId });
   }
 
   @Get()
-  findAll(@Req() req: Request) {
-    const tenantId = (req as any).tenantId;
+  findAll(@CurrentTenant() tenantId: string) {
     return this.ingredientsService.findAll({ where: { tenantId } });
   }
 
@@ -49,4 +36,4 @@ export class IngredientsController {
   remove(@Param('id') id: string) {
     return this.ingredientsService.remove(id);
   }
-} 
+}

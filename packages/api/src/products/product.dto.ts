@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsArray, ValidateNested, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsArray, ValidateNested, Min, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ProductVariantDto {
@@ -34,9 +34,21 @@ export class ProductVariantGroupDto {
 
 export class ProductIngredientDto {
   @IsString()
+  @IsNotEmpty()
   ingredientId: string;
 
   @IsNumber()
+  @Min(0.0001)
+  quantity: number;
+}
+
+export class ProductComponentDto {
+  @IsString()
+  @IsNotEmpty()
+  componentId: string;
+
+  @IsNumber()
+  @Min(0.0001)
   quantity: number;
 }
 
@@ -66,6 +78,15 @@ export class CreateProductDto {
   isActive?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  isIntermediate?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  unit?: string;
+
+  @IsOptional()
   @IsNumber()
   quantity?: number;
 
@@ -74,6 +95,12 @@ export class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ProductIngredientDto)
   ingredients?: ProductIngredientDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductComponentDto)
+  components?: ProductComponentDto[];
 
   @IsOptional()
   @IsArray()
@@ -118,6 +145,15 @@ export class UpdateProductDto {
   isActive?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  isIntermediate?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  unit?: string;
+
+  @IsOptional()
   @IsNumber()
   quantity?: number;
 
@@ -126,6 +162,12 @@ export class UpdateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ProductIngredientDto)
   ingredients?: ProductIngredientDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductComponentDto)
+  components?: ProductComponentDto[];
 
   @IsOptional()
   @IsArray()

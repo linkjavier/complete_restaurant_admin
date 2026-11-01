@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Plus, Trash2, Pencil, ExternalLink, QrCode, Download, X, ChevronUp } from "lucide-react"
 import { getTables, createTable, deleteTable, updateTable, Table, getOrders, API_URL } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
+import { toFiniteInteger } from "@/lib/utils"
 import { getLocations, Location } from "@/lib/api"
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -378,7 +379,7 @@ export function TablesManager() {
                   value={editingTable ? editingTable.number : newTable.number}
                   onChange={(e) =>
                     editingTable
-                      ? setEditingTable({ ...editingTable, number: parseInt(e.target.value) })
+                      ? setEditingTable({ ...editingTable, number: toFiniteInteger(e.target.value, editingTable.number) })
                       : setNewTable({ ...newTable, number: e.target.value })
                   }
                 />
@@ -391,7 +392,7 @@ export function TablesManager() {
                   value={editingTable ? editingTable.seats : newTable.seats}
                   onChange={(e) =>
                     editingTable
-                      ? setEditingTable({ ...editingTable, seats: parseInt(e.target.value) })
+                      ? setEditingTable({ ...editingTable, seats: toFiniteInteger(e.target.value, editingTable.seats) })
                       : setNewTable({ ...newTable, seats: e.target.value })
                   }
                 />

@@ -131,10 +131,14 @@ model Product {
   categoryId    String
   isActive      Boolean               @default(true)
   isFinal       Boolean               @default(false)
+  isIntermediate Boolean              @default(false)
   quantity      Float                 @default(0)
+  unit          String                @default("unidad")
   location      Location              @relation(fields: [locationId], references: [id])
   locationId    String
   ingredients   ProductIngredient[]
+  components    ProductComponent[]    @relation("ProductRecipe")
+  usedInRecipes ProductComponent[]    @relation("RecipeComponent")
   orderItems    OrderItem[]
   productions   ProductionLog[]
   variants      ProductVariant[]
@@ -190,6 +194,20 @@ model ProductIngredient {
   updatedAt    DateTime   @updatedAt
 
   @@unique([productId, ingredientId])
+}
+
+model ProductComponent {
+  id          String  @id @default(cuid())
+  product     Product @relation("ProductRecipe", fields: [productId], references: [id], onDelete: Cascade)
+  productId   String
+  component   Product @relation("RecipeComponent", fields: [componentId], references: [id], onDelete: Restrict)
+  componentId String
+  quantity    Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([productId, componentId])
+  @@index([componentId])
 }
 
 model InventoryItem {

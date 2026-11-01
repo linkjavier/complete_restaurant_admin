@@ -1,4 +1,9 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   InsufficientStockError,
@@ -12,89 +17,139 @@ export class ProductionService {
     private stockSync: StockSyncService,
   ) {}
 
+  async findProductionHistory(tenantId: string, locationId?: string) {
+    return this.prisma.productionLog.findMany({
+      where: {
+        product: {
+          tenantId,
+          isIntermediate: true,
+          locationId,
+        },
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            unit: true,
+            locationId: true,
+            location: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
   async produceProduct(
     productId: string,
     quantity: number,
     tenantId: string,
+    allowedLocationId?: string,
     wasteQuantity = 0,
     wasteNotes?: string,
   ) {
-    if (quantity <= 0) {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
       throw new HttpException(
         'Quantity must be greater than 0',
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    if (wasteQuantity < 0) {
+    if (!Number.isFinite(wasteQuantity) || wasteQuantity < 0) {
       throw new HttpException(
         'wasteQuantity must be non-negative',
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    const product = await this.prisma.product.findFirst({
-      where: { id: productId, tenantId },
-      include: {
-        ingredients: {
-          include: {
-            ingredient: true,
-          },
-        },
-      },
-    });
-
-    if (!product) {
-      throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
-    }
-
-    if (!product.isActive) {
-      throw new HttpException(
-        'Product is not active',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const requiredIngredients = product.ingredients.map((pi) => ({
-      ingredientId: pi.ingredient.id,
-      requiredQuantity: pi.quantity * quantity,
-      name: pi.ingredient.name,
-    }));
-
     try {
       return await this.prisma.$transaction(async (tx) => {
-        for (const ri of requiredIngredients) {
-          try {
-            await this.stockSync.deductSyncedStock(tx, {
-              ingredientId: ri.ingredientId,
-              locationId: product.locationId,
-              amount: ri.requiredQuantity,
-            });
-          } catch (error) {
-            if (error instanceof InsufficientStockError) {
-              throw new HttpException(
-                {
-                  message: 'Insufficient ingredients',
-                  missing: [error.detail],
-                },
-                HttpStatus.BAD_REQUEST,
-              );
-            }
-            throw error;
-          }
-        }
-
-        const updatedProduct = await tx.product.update({
-          where: { id: productId },
-          data: { quantity: { increment: quantity } },
+        const product = await tx.product.findFirst({
+          where: {
+            id: productId,
+            tenantId,
+            isActive: true,
+            isIntermediate: true,
+            locationId: allowedLocationId,
+          },
+          include: {
+            ingredients: { include: { ingredient: true } },
+            components: { include: { component: true } },
+          },
         });
 
+        if (!product) {
+          throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
+        }
+
+        if (!product.ingredients.length && !product.components.length) {
+          throw new BadRequestException(
+            'Configure at least one ingredient or intermediate product in this recipe before producing it',
+          );
+        }
+
+        const batchQuantity = quantity + wasteQuantity;
+        const consumedIngredients = [];
+        const consumedProducts = [];
+
+        for (const recipeIngredient of product.ingredients) {
+          const amount = recipeIngredient.quantity * batchQuantity;
+          await this.stockSync.deductSyncedStock(tx, {
+            ingredientId: recipeIngredient.ingredientId,
+            locationId: product.locationId,
+            amount,
+          });
+          consumedIngredients.push({
+            id: recipeIngredient.ingredientId,
+            name: recipeIngredient.ingredient.name,
+            unit: recipeIngredient.ingredient.unit,
+            quantity: amount,
+          });
+        }
+
+        for (const recipeComponent of product.components) {
+          const amount = recipeComponent.quantity * batchQuantity;
+          await this.stockSync.deductProductStock(tx, {
+            productId: recipeComponent.componentId,
+            locationId: product.locationId,
+            amount,
+          });
+          consumedProducts.push({
+            id: recipeComponent.componentId,
+            name: recipeComponent.component.name,
+            unit: recipeComponent.component.unit,
+            quantity: amount,
+          });
+        }
+
+        const updated = await tx.product.updateMany({
+          where: {
+            id: product.id,
+            tenantId,
+            locationId: product.locationId,
+            isIntermediate: true,
+            isActive: true,
+          },
+          data: { quantity: { increment: quantity } },
+        });
+        if (updated.count !== 1) {
+          throw new HttpException(
+            'Product changed while production was being recorded',
+            HttpStatus.CONFLICT,
+          );
+        }
+
+        const updatedProduct = await tx.product.findUniqueOrThrow({
+          where: { id: product.id },
+        });
         const log = await tx.productionLog.create({
           data: {
             productId,
             quantity,
             wasteQuantity,
-            wasteNotes: wasteNotes ?? null,
+            wasteNotes: wasteNotes?.trim() || null,
           },
         });
 
@@ -102,12 +157,17 @@ export class ProductionService {
           success: true,
           product: updatedProduct,
           log,
-          ingredientsUpdated: requiredIngredients.length,
+          consumedIngredients,
+          consumedProducts,
         };
       });
     } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
+      if (error instanceof HttpException) throw error;
+      if (error instanceof InsufficientStockError) {
+        throw new BadRequestException({
+          message: 'Insumos insuficientes para registrar la producción',
+          missing: [error.detail],
+        });
       }
       throw new HttpException(
         'Database error during production process',

@@ -1,7 +1,21 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import Link from "next/link"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import {
+  getLocations,
+  getProducts,
+  getProductionHistory,
+  Location,
+  Product,
+  ProductionLog,
+  produceProduct,
+} from "@/lib/api"
+import { useAuth } from "@/hooks/use-auth"
+import { useToast } from "@/components/ui/use-toast"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,86 +26,148 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useToast } from "@/components/ui/use-toast"
-import { getProducts, produceProduct, Product } from "@/lib/api"
+import { AlertCircle, Boxes, Clock3, PackageCheck } from "lucide-react"
+
+const ALL_LOCATIONS = "all"
+
+function formatQuantity(quantity: number) {
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(quantity)
+}
 
 export function ProductionManager() {
   const { toast } = useToast()
+  const { user, isLoading: isAuthLoading } = useAuth()
+  const isSuperAdmin = user?.role === "SUPER_ADMIN"
   const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
+  const [locations, setLocations] = useState<Location[]>([])
+  const [history, setHistory] = useState<ProductionLog[]>([])
+  const [selectedLocationId, setSelectedLocationId] = useState(ALL_LOCATIONS)
   const [productId, setProductId] = useState("")
   const [quantity, setQuantity] = useState(1)
   const [wasteQuantity, setWasteQuantity] = useState(0)
   const [wasteNotes, setWasteNotes] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const activeLocationId = isSuperAdmin
+    ? selectedLocationId === ALL_LOCATIONS
+      ? undefined
+      : selectedLocationId
+    : user?.locationId ?? undefined
+
+  const loadData = useCallback(async () => {
+    if (!user) return
+
+    setLoading(true)
+    setError(null)
+    try {
+      if (!isSuperAdmin && !user.locationId) {
+        throw new Error("Tu usuario no tiene una sucursal asignada.")
+      }
+
+      const [productData, historyData, locationData] = await Promise.all([
+        getProducts(activeLocationId),
+        getProductionHistory(activeLocationId),
+        isSuperAdmin ? getLocations() : Promise.resolve([]),
+      ])
+      const producibleProducts = productData.filter(
+        (product) =>
+          product.isActive &&
+          product.isIntermediate &&
+          ((product.ingredients?.length ?? 0) > 0 ||
+            (product.components?.length ?? 0) > 0),
+      )
+
+      setProducts(producibleProducts)
+      setHistory(historyData)
+      setLocations(locationData)
+      setProductId((current) =>
+        producibleProducts.some((product) => product.id === current)
+          ? current
+          : producibleProducts[0]?.id ?? "",
+      )
+    } catch (loadError) {
+      console.error("Error loading production data:", loadError)
+      const message =
+        loadError instanceof Error
+          ? loadError.message
+          : "No se pudieron cargar los datos de producción."
+      setError(message)
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [activeLocationId, isSuperAdmin, toast, user])
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true)
-        const data = await getProducts()
-        setProducts(
-          data.filter(
-            (p) => p.isActive && p.ingredients && p.ingredients.length > 0,
-          ),
-        )
-      } catch (err) {
-        console.error("Error fetching products:", err)
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los productos",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
+    if (!isAuthLoading && user) void loadData()
+  }, [isAuthLoading, loadData, user])
 
-    fetchProducts()
-  }, [toast])
+  const selectedProduct = products.find((product) => product.id === productId)
+  const batchQuantity = quantity + wasteQuantity
+  const requiredIngredients = useMemo(
+    () =>
+      (selectedProduct?.ingredients ?? []).map((recipeLine) => ({
+        ...recipeLine,
+        required: recipeLine.quantity * batchQuantity,
+      })),
+    [batchQuantity, selectedProduct],
+  )
+  const requiredProducts = useMemo(
+    () =>
+      (selectedProduct?.components ?? []).map((recipeLine) => ({
+        ...recipeLine,
+        required: recipeLine.quantity * batchQuantity,
+      })),
+    [batchQuantity, selectedProduct],
+  )
 
   const handleSubmit = async () => {
-    if (!productId || quantity <= 0) {
+    if (!selectedProduct || !Number.isFinite(quantity) || quantity <= 0) {
       toast({
-        title: "Error",
-        description: "Selecciona un producto y una cantidad válida",
+        title: "Revisa la producción",
+        description: "Selecciona una preparación e indica una cantidad mayor que cero.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (!Number.isFinite(wasteQuantity) || wasteQuantity < 0) {
+      toast({
+        title: "Revisa la merma",
+        description: "La merma debe ser un valor igual o mayor que cero.",
         variant: "destructive",
       })
       return
     }
 
-    if (wasteQuantity < 0) {
-      toast({
-        title: "Error",
-        description: "La merma no puede ser negativa",
-        variant: "destructive",
-      })
-      return
-    }
-
+    setSubmitting(true)
     try {
-      setSubmitting(true)
       await produceProduct({
-        productId,
+        productId: selectedProduct.id,
         quantity,
-        wasteQuantity: wasteQuantity > 0 ? wasteQuantity : undefined,
+        wasteQuantity: wasteQuantity || undefined,
         wasteNotes: wasteNotes.trim() || undefined,
       })
-
       toast({
-        title: "Éxito",
-        description: "Producción registrada correctamente",
+        title: "Producción registrada",
+        description: `${formatQuantity(quantity)} ${selectedProduct.unit} de ${selectedProduct.name} agregados al inventario.`,
       })
-
-      setQuantity(1)
       setWasteQuantity(0)
       setWasteNotes("")
-    } catch (err) {
-      console.error("Error producing product:", err)
+      await loadData()
+    } catch (submitError) {
+      console.error("Error recording production:", submitError)
       toast({
-        title: "Error",
+        title: "No se pudo registrar la producción",
         description:
-          err instanceof Error ? err.message : "Error al registrar la producción",
+          submitError instanceof Error
+            ? submitError.message
+            : "Ocurrió un error inesperado al registrar la producción.",
         variant: "destructive",
       })
     } finally {
@@ -99,65 +175,270 @@ export function ProductionManager() {
     }
   }
 
-  if (loading) {
-    return <p className="text-muted-foreground">Cargando productos...</p>
+  if (isAuthLoading || loading) {
+    return <p className="text-muted-foreground">Cargando datos de producción...</p>
   }
 
   return (
-    <div className="max-w-lg space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="product">Producto a producir</Label>
-        <Select value={productId} onValueChange={setProductId}>
-          <SelectTrigger id="product">
-            <SelectValue placeholder="Selecciona un producto" />
-          </SelectTrigger>
-          <SelectContent>
-            {products.map((product) => (
-              <SelectItem key={product.id} value={product.id}>
-                {product.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="min-w-0 space-y-4 sm:space-y-6">
+      {isSuperAdmin && (
+        <div className="w-full space-y-2 sm:max-w-sm">
+          <Label htmlFor="production-location">Sucursal</Label>
+          <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+            <SelectTrigger id="production-location">
+              <SelectValue placeholder="Selecciona una sucursal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_LOCATIONS}>Todas las sucursales</SelectItem>
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
-      <div className="space-y-2">
-        <Label htmlFor="quantity">Cantidad producida</Label>
-        <Input
-          id="quantity"
-          type="number"
-          min={0.01}
-          step="any"
-          value={quantity}
-          onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
-        />
-      </div>
+      {error && (
+        <div className="flex flex-col items-stretch justify-between gap-3 rounded-md border border-destructive/40 p-4 text-sm sm:flex-row sm:items-center sm:gap-4">
+          <span>{error}</span>
+          <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void loadData()}>
+            Reintentar
+          </Button>
+        </div>
+      )}
 
-      <div className="space-y-2">
-        <Label htmlFor="wasteQuantity">Merma / residuo (opcional)</Label>
-        <Input
-          id="wasteQuantity"
-          type="number"
-          min={0}
-          step="any"
-          value={wasteQuantity}
-          onChange={(e) => setWasteQuantity(parseFloat(e.target.value) || 0)}
-        />
-      </div>
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.7fr)]">
+        <Card className="min-w-0">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2">
+              <Boxes className="h-5 w-5 shrink-0" />
+              Registrar producción
+            </CardTitle>
+            <CardDescription className="text-sm leading-relaxed">
+              Produce preparaciones y descuenta automáticamente los ingredientes y productos
+              preelaborados de la receta.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 p-4 pt-0 sm:space-y-5 sm:p-6 sm:pt-0">
+            {products.length === 0 ? (
+              <div className="space-y-3 rounded-md border border-dashed p-4 sm:p-5">
+                <p className="font-medium">Todavía no hay preparaciones listas para producir.</p>
+                <p className="text-sm text-muted-foreground">
+                  En Productos, crea una preparación intermedia, define su unidad y agrega al menos
+                  un ingrediente o producto preelaborado a la receta.
+                </p>
+                <Button asChild variant="outline" className="w-full sm:w-auto">
+                  <Link href="/admin/products">Configurar productos y recetas</Link>
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="production-product">Preparación a producir</Label>
+                  <Select value={productId} onValueChange={setProductId}>
+                    <SelectTrigger id="production-product" className="min-w-0">
+                      <SelectValue placeholder="Selecciona una preparación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name} · stock {formatQuantity(product.quantity)} {product.unit}
+                          {isSuperAdmin && selectedLocationId === ALL_LOCATIONS
+                            ? ` · ${product.location?.name ?? "Sucursal"}`
+                            : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="wasteNotes">Notas de merma (opcional)</Label>
-        <Textarea
-          id="wasteNotes"
-          placeholder="Ej: recorte, derrame, producto dañado..."
-          value={wasteNotes}
-          onChange={(e) => setWasteNotes(e.target.value)}
-        />
-      </div>
+                {selectedProduct && (
+                  <div className="min-w-0 rounded-md bg-muted/40 p-3 sm:p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="break-words font-medium">{selectedProduct.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Inventario actual: {formatQuantity(selectedProduct.quantity)}{" "}
+                          {selectedProduct.unit}
+                        </p>
+                      </div>
+                      {isSuperAdmin && (
+                        <Badge variant="outline">
+                          {selectedProduct.location?.name ?? "Sucursal"}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-      <Button onClick={handleSubmit} disabled={submitting || !productId}>
-        {submitting ? "Registrando..." : "Registrar producción"}
-      </Button>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="production-quantity">
+                      Cantidad buena ({selectedProduct?.unit || "unidad"})
+                    </Label>
+                    <Input
+                      id="production-quantity"
+                      type="number"
+                      min="0.0001"
+                      step="any"
+                      value={quantity}
+                      onChange={(event) =>
+                        setQuantity(event.target.value === "" ? 0 : Number(event.target.value))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="production-waste">
+                      Merma ({selectedProduct?.unit || "unidad"})
+                    </Label>
+                    <Input
+                      id="production-waste"
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={wasteQuantity}
+                      onChange={(event) =>
+                        setWasteQuantity(
+                          event.target.value === "" ? 0 : Number(event.target.value),
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="production-waste-notes">Notas de merma (opcional)</Label>
+                  <Textarea
+                    id="production-waste-notes"
+                    placeholder="Ej: recorte, derrame o producto dañado"
+                    value={wasteNotes}
+                    onChange={(event) => setWasteNotes(event.target.value)}
+                  />
+                </div>
+
+                <div className="min-w-0 space-y-3 rounded-md border p-3 sm:p-4">
+                  <div>
+                    <p className="font-medium">Insumos que se descontarán</p>
+                    <p className="text-sm text-muted-foreground">
+                      Cálculo para {formatQuantity(batchQuantity)} {selectedProduct?.unit}{" "}
+                      (incluye la merma).
+                    </p>
+                  </div>
+                  {requiredIngredients.map((line) => {
+                    const enough = (line.ingredient?.quantity ?? 0) >= line.required
+                    return (
+                      <div
+                        key={line.ingredientId}
+                        className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1 text-sm"
+                      >
+                        <span className="min-w-0 flex-1 break-words">
+                          {line.ingredient?.name ?? "Ingrediente"}
+                          <span className="text-muted-foreground">
+                            {" "}· disponible {formatQuantity(line.ingredient?.quantity ?? 0)}{" "}
+                            {line.ingredient?.unit}
+                          </span>
+                        </span>
+                        <span className={enough ? "shrink-0" : "shrink-0 font-medium text-destructive"}>
+                          {formatQuantity(line.required)} {line.ingredient?.unit}
+                        </span>
+                      </div>
+                    )
+                  })}
+                  {requiredProducts.map((line) => {
+                    const enough = (line.component?.quantity ?? 0) >= line.required
+                    return (
+                      <div
+                        key={line.componentId}
+                        className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1 text-sm"
+                      >
+                        <span className="min-w-0 flex-1 break-words">
+                          {line.component?.name ?? "Preparación"}
+                          <span className="text-muted-foreground">
+                            {" "}· disponible {formatQuantity(line.component?.quantity ?? 0)}{" "}
+                            {line.component?.unit}
+                          </span>
+                        </span>
+                        <span className={enough ? "shrink-0" : "shrink-0 font-medium text-destructive"}>
+                          {formatQuantity(line.required)} {line.component?.unit}
+                        </span>
+                      </div>
+                    )
+                  })}
+                  {!requiredIngredients.length && !requiredProducts.length && (
+                    <p className="text-sm text-muted-foreground">La receta no tiene insumos.</p>
+                  )}
+                  {requiredIngredients.length + requiredProducts.length > 0 && (
+                    <div className="flex items-start gap-2 border-t pt-3 text-sm text-muted-foreground">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      Si algún insumo no alcanza, la producción completa se cancela sin descontar
+                      inventario.
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  onClick={() => void handleSubmit()}
+                  disabled={submitting || !selectedProduct || quantity <= 0}
+                  className="min-h-11 w-full sm:w-auto"
+                >
+                  <PackageCheck className="mr-2 h-4 w-4" />
+                  {submitting ? "Registrando..." : "Registrar producción"}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="min-w-0">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2">
+              <Clock3 className="h-5 w-5 shrink-0" />
+              Producciones recientes
+            </CardTitle>
+            <CardDescription className="text-sm leading-relaxed">
+              Últimos 100 registros de la sucursal seleccionada.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            {history.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no hay producciones registradas para esta sucursal.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {history.map((entry) => (
+                  <div key={entry.id} className="min-w-0 space-y-1 border-b pb-3 last:border-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words font-medium">{entry.product.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(entry.createdAt).toLocaleString("es-CO")}
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
+                        +{formatQuantity(entry.quantity)} {entry.product.unit}
+                      </Badge>
+                    </div>
+                    {entry.wasteQuantity > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Merma: {formatQuantity(entry.wasteQuantity)} {entry.product.unit}
+                        {entry.wasteNotes ? ` · ${entry.wasteNotes}` : ""}
+                      </p>
+                    )}
+                    {isSuperAdmin && selectedLocationId === ALL_LOCATIONS && (
+                      <p className="text-xs text-muted-foreground">
+                        {entry.product.location?.name ?? "Sucursal"}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

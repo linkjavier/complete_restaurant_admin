@@ -52,6 +52,11 @@ export class InventoryProcessorService {
                       ingredient: true,
                     },
                   },
+                  components: {
+                    include: {
+                      component: true,
+                    },
+                  },
                 },
               },
             },
@@ -63,57 +68,80 @@ export class InventoryProcessorService {
         throw new Error(`Order ${orderId} not found`);
       }
 
-      const inventoryUpdates = [];
+      const inventoryUpdates: Array<Record<string, string | number>> = [];
 
       for (const item of order.items) {
         const { product, quantity } = item;
-
-        if (!product.ingredients || product.ingredients.length === 0) {
+        const recipeIngredients = product.ingredients ?? [];
+        const recipeComponents = product.components ?? [];
+        if (recipeIngredients.length === 0 && recipeComponents.length === 0) {
           continue;
         }
 
-        for (const productIngredient of product.ingredients) {
-          const { ingredient, quantity: requiredQuantity } = productIngredient;
-          const totalQuantityNeeded = requiredQuantity * quantity;
-          const locationId = order.locationId ?? product.locationId ?? ingredient.locationId;
+        const locationId = order.locationId ?? product.locationId;
+        if (!locationId) {
+          this.logger.warn(
+            `Skipping inventory update for product ${product.name}: no locationId on order or product`,
+          );
+          continue;
+        }
 
-          if (!locationId) {
-            this.logger.warn(
-              `Skipping inventory update for ingredient ${ingredient.name}: no locationId on order or product`,
-            );
-            continue;
-          }
-
-          try {
-            await this.prisma.$transaction(async (tx) => {
+        try {
+          const itemUpdates = await this.prisma.$transaction(async (tx) => {
+            const updates: Array<Record<string, string | number>> = [];
+            for (const recipeIngredient of recipeIngredients) {
+              const { ingredient, quantity: requiredQuantity } = recipeIngredient;
+              const amount = requiredQuantity * quantity;
               const { previousQuantity, newQuantity } =
                 await this.stockSync.deductSyncedStock(tx, {
                   ingredientId: ingredient.id,
                   locationId,
-                  amount: totalQuantityNeeded,
+                  amount,
                 });
-
-              inventoryUpdates.push({
+              updates.push({
                 ingredientId: ingredient.id,
                 ingredientName: ingredient.name,
                 previousQuantity,
                 newQuantity,
-                amountDeducted: totalQuantityNeeded,
+                amountDeducted: amount,
                 productId: product.id,
                 productName: product.name,
                 orderId,
               });
-            });
-          } catch (error) {
-            if (error instanceof InsufficientStockError) {
-              this.logger.warn(
-                `Insufficient inventory for ingredient ${error.detail.name}: ` +
-                `needed ${error.detail.required}, available ${error.detail.available}`,
-              );
-              continue;
             }
-            throw error;
+
+            for (const recipeComponent of recipeComponents) {
+              const { component } = recipeComponent;
+              const amount = recipeComponent.quantity * quantity;
+              const { previousQuantity, newQuantity } =
+                await this.stockSync.deductProductStock(tx, {
+                  productId: component.id,
+                  locationId,
+                  amount,
+                });
+              updates.push({
+                productId: component.id,
+                productName: component.name,
+                previousQuantity,
+                newQuantity,
+                amountDeducted: amount,
+                soldProductId: product.id,
+                soldProductName: product.name,
+                orderId,
+              });
+            }
+            return updates;
+          });
+          inventoryUpdates.push(...itemUpdates);
+        } catch (error) {
+          if (error instanceof InsufficientStockError) {
+            this.logger.warn(
+              `Insufficient inventory for ${error.detail.name}: ` +
+              `needed ${error.detail.required}, available ${error.detail.available}`,
+            );
+            continue;
           }
+          throw error;
         }
       }
 
@@ -122,7 +150,12 @@ export class InventoryProcessorService {
       return {
         success: true,
         orderId,
-        updatedIngredients: inventoryUpdates.length,
+        updatedIngredients: inventoryUpdates.filter(
+          (update) => 'ingredientId' in update,
+        ).length,
+        updatedProducts: inventoryUpdates.filter(
+          (update) => 'soldProductId' in update,
+        ).length,
       };
     } catch (error) {
       this.logger.error(`Error updating inventory for order ${job.data.orderId}: ${error.message}`, error.stack);

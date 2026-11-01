@@ -12,6 +12,7 @@ describe('InventoryProcessorService', () => {
 
   const mockStockSync = {
     deductSyncedStock: jest.fn(),
+    deductProductStock: jest.fn(),
   };
 
   const mockPrisma = {
@@ -58,6 +59,7 @@ describe('InventoryProcessorService', () => {
                 ingredient: { id: ingredientId, name: 'Beef', locationId },
               },
             ],
+            components: [],
           },
         },
       ],
@@ -86,6 +88,7 @@ describe('InventoryProcessorService', () => {
         success: true,
         orderId,
         updatedIngredients: 1,
+        updatedProducts: 0,
       });
     });
 
@@ -106,12 +109,12 @@ describe('InventoryProcessorService', () => {
       } as any);
 
       expect(warnSpy).toHaveBeenCalledWith(
-        'Insufficient inventory for ingredient Beef: needed 6, available 2',
+        'Insufficient inventory for Beef: needed 6, available 2',
       );
       expect(result.updatedIngredients).toBe(0);
     });
 
-    it('continues processing remaining ingredients after insufficient stock', async () => {
+    it('rolls back the complete item when any ingredient is insufficient', async () => {
       const orderWithTwoIngredients = {
         id: orderId,
         locationId,
@@ -132,31 +135,67 @@ describe('InventoryProcessorService', () => {
                   ingredient: { id: 'ing-ok', name: 'Bun', locationId },
                 },
               ],
+              components: [],
             },
           },
         ],
       };
 
       mockPrisma.order.findUnique.mockResolvedValue(orderWithTwoIngredients);
-      mockStockSync.deductSyncedStock
-        .mockRejectedValueOnce(
-          new InsufficientStockError({
-            name: 'Cheese',
-            required: 10,
-            available: 1,
-          }),
-        )
-        .mockResolvedValueOnce({
-          previousQuantity: 5,
-          newQuantity: 4,
-        });
+      mockStockSync.deductSyncedStock.mockRejectedValueOnce(
+        new InsufficientStockError({
+          name: 'Cheese',
+          required: 10,
+          available: 1,
+        }),
+      );
 
       const result = await service.updateInventoryForOrder({
         data: { orderId },
       } as any);
 
-      expect(mockStockSync.deductSyncedStock).toHaveBeenCalledTimes(2);
-      expect(result.updatedIngredients).toBe(1);
+      expect(mockStockSync.deductSyncedStock).toHaveBeenCalledTimes(1);
+      expect(result.updatedIngredients).toBe(0);
+    });
+
+    it('deducts intermediate product stock when the sold product recipe uses it', async () => {
+      mockPrisma.order.findUnique.mockResolvedValue({
+        ...baseOrder,
+        items: [
+          {
+            ...baseOrder.items[0],
+            product: {
+              ...baseOrder.items[0].product,
+              ingredients: [],
+              components: [
+                {
+                  quantity: 2,
+                  component: {
+                    id: 'patty-1',
+                    name: 'Hamburger meat',
+                    unit: 'unidad',
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      });
+      mockStockSync.deductProductStock.mockResolvedValue({
+        previousQuantity: 10,
+        newQuantity: 6,
+      });
+
+      const result = await service.updateInventoryForOrder({
+        data: { orderId },
+      } as any);
+
+      expect(mockStockSync.deductProductStock).toHaveBeenCalledWith(
+        {},
+        { productId: 'patty-1', locationId, amount: 4 },
+      );
+      expect(result.updatedIngredients).toBe(0);
+      expect(result.updatedProducts).toBe(1);
     });
 
     it('throws when order is not found', async () => {

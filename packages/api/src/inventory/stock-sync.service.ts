@@ -174,4 +174,54 @@ export class StockSyncService {
       newQuantity: updatedIngredient!.quantity,
     };
   }
+
+  async deductProductStock(
+    tx: StockTx,
+    params: { productId: string; locationId: string; amount: number },
+  ): Promise<DeductStockSuccess> {
+    const { productId, locationId, amount } = params;
+    const product = await tx.product.findFirst({
+      where: { id: productId, locationId },
+      select: { id: true, name: true, quantity: true },
+    });
+
+    if (!product) {
+      throw new InsufficientStockError({
+        name: productId,
+        required: amount,
+        available: 0,
+      });
+    }
+
+    const result = await tx.product.updateMany({
+      where: {
+        id: productId,
+        locationId,
+        quantity: { gte: amount },
+      },
+      data: { quantity: { decrement: amount } },
+    });
+
+    if (result.count === 0) {
+      const current = await tx.product.findUnique({
+        where: { id: productId },
+        select: { quantity: true },
+      });
+      throw new InsufficientStockError({
+        name: product.name,
+        required: amount,
+        available: current?.quantity ?? 0,
+      });
+    }
+
+    const updated = await tx.product.findUnique({
+      where: { id: productId },
+      select: { quantity: true },
+    });
+
+    return {
+      previousQuantity: product.quantity,
+      newQuantity: updated!.quantity,
+    };
+  }
 }

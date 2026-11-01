@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, CheckCircle2 } from "lucide-react"
+import { Search, CheckCircle2, ShoppingCart } from "lucide-react"
 import {
   getProducts,
   Product,
@@ -28,9 +28,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Cart } from "@/components/admin/pos/cart"
-import { ProductGrid, CategoryTitle } from "@/components/admin/pos/product-grid"
+import { ProductGrid } from "@/components/admin/pos/product-grid"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { useAuth } from "@/hooks/use-auth"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 const ALL_LOCATIONS = "all"
 
@@ -52,6 +59,7 @@ export default function PosPage() {
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER">("CASH")
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
   const [activeOrders, setActiveOrders] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
@@ -97,7 +105,11 @@ export default function PosPage() {
         getCategories(),
         getLocations(),
       ])
-      setProducts([...productsData].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })))
+      setProducts(
+        productsData
+          .filter((product) => !product.isIntermediate)
+          .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })),
+      )
       setTables(tablesData)
       setCategories(categoriesData)
       setLocations(locationsData)
@@ -411,6 +423,55 @@ export default function PosPage() {
 
   // Get all active orders for selected table
   const currentOrders = activeOrders
+  const cartItemCount = Object.values(cart).reduce((total, item) => total + item.quantity, 0)
+  const showMobileCart = cartItemCount > 0 || currentOrders.length > 0
+
+  const renderCart = (className?: string) => (
+    <Cart
+      className={className}
+      items={Object.values(cart)}
+      onUpdateQuantity={(key, quantity) => {
+        setCart(prev => {
+          if (quantity <= 0) {
+            const newCart = { ...prev }
+            delete newCart[key]
+            return newCart
+          } else {
+            return {
+              ...prev,
+              [key]: {
+                ...prev[key],
+                quantity
+              }
+            }
+          }
+        })
+      }}
+      onRemoveItem={handleRemoveFromCart}
+      orderType={orderType}
+      selectedTable={selectedTable}
+      tables={tables}
+      onOrderTypeChange={setOrderType}
+      onTableSelect={(tableId) => {
+        setSelectedTable(tableId)
+        setCart({})
+      }}
+      onSubmit={handleCreateOrder}
+      currentOrders={currentOrders}
+      loading={submitting}
+      customerName={customerName}
+      onCustomerNameChange={setCustomerName}
+      deliveryAddress={deliveryAddress}
+      onDeliveryAddressChange={setDeliveryAddress}
+      neighborhood={neighborhood}
+      onNeighborhoodChange={setNeighborhood}
+      phone={phone}
+      onPhoneChange={setPhone}
+      paymentMethod={paymentMethod}
+      onPaymentMethodChange={setPaymentMethod}
+      locations={locations}
+    />
+  )
 
   if (loading || isAuthLoading) {
     return (
@@ -435,9 +496,9 @@ export default function PosPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 h-[calc(100vh-4rem)]">
-      <div className="lg:col-span-3 h-full">
-        <Card className="h-full flex flex-col">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 pb-20 lg:pb-4 min-h-[calc(100dvh-4rem)] lg:h-[calc(100vh-4rem)]">
+      <div className="lg:col-span-3 lg:h-full">
+        <Card className="lg:h-full lg:flex lg:flex-col">
           <CardHeader className="flex-none">
             <div className="flex flex-col gap-4">
               <CardTitle>Punto de Venta</CardTitle>
@@ -479,7 +540,7 @@ export default function PosPage() {
                   value={selectedCategory}
                   onValueChange={setSelectedCategory}
                 >
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full md:w-[180px]">
                     <SelectValue placeholder="Categoría" />
                   </SelectTrigger>
                   <SelectContent>
@@ -494,7 +555,7 @@ export default function PosPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto">
+          <CardContent className="lg:flex-1 lg:overflow-y-auto">
             <ProductGrid
               groupedProducts={groupedProducts}
               onAddToCart={handleAddToCart}
@@ -504,53 +565,37 @@ export default function PosPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="lg:col-span-1 h-full">
+      <div className="hidden lg:col-span-1 lg:block lg:h-full">
         <div className="sticky top-4">
-          <Cart
-            items={Object.values(cart)}
-            onUpdateQuantity={(key, quantity) => {
-              setCart(prev => {
-                if (quantity <= 0) {
-                  const newCart = { ...prev }
-                  delete newCart[key]
-                  return newCart
-                } else {
-                  return {
-                    ...prev,
-                    [key]: {
-                      ...prev[key],
-                      quantity
-                    }
-                  }
-                }
-              })
-            }}
-            onRemoveItem={handleRemoveFromCart}
-            orderType={orderType}
-            selectedTable={selectedTable}
-            tables={tables}
-            onOrderTypeChange={setOrderType}
-            onTableSelect={(tableId) => {
-              setSelectedTable(tableId)
-              setCart({}) // Clear cart when changing tables
-            }}
-            onSubmit={handleCreateOrder}
-            currentOrders={currentOrders}
-            loading={submitting}
-            customerName={customerName}
-            onCustomerNameChange={setCustomerName}
-            deliveryAddress={deliveryAddress}
-            onDeliveryAddressChange={setDeliveryAddress}
-            neighborhood={neighborhood}
-            onNeighborhoodChange={setNeighborhood}
-            phone={phone}
-            onPhoneChange={setPhone}
-            paymentMethod={paymentMethod}
-            onPaymentMethodChange={setPaymentMethod}
-            locations={locations}
-          />
+          {renderCart()}
         </div>
       </div>
+      {showMobileCart && (
+        <Button
+          type="button"
+          className="fixed inset-x-4 bottom-4 z-40 h-12 justify-between shadow-lg lg:hidden"
+          onClick={() => setIsMobileCartOpen(true)}
+          disabled={submitting}
+          aria-label={`Abrir carrito con ${cartItemCount} productos`}
+        >
+          <span className="flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5" />
+            {cartItemCount > 0 ? `Ver carrito · ${cartItemCount}` : "Ver cuenta"}
+          </span>
+          <span>{currentOrders.length > 0 ? `${currentOrders.length} órdenes` : "Continuar"}</span>
+        </Button>
+      )}
+      <Dialog open={isMobileCartOpen} onOpenChange={setIsMobileCartOpen}>
+        <DialogContent className="w-[calc(100%-1rem)] max-w-lg overflow-y-auto p-2 max-h-[90dvh]">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Carrito y cuenta</DialogTitle>
+            <DialogDescription>
+              Revisa los productos, ajusta las cantidades y completa la venta.
+            </DialogDescription>
+          </DialogHeader>
+          {renderCart("h-[82dvh] min-h-0 flex flex-col")}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

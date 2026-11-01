@@ -1,4 +1,11 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -10,8 +17,15 @@ export class ProductsService {
   async create(data: any, tenantId: string): Promise<any> {
     try {
       this.logger.debug(`Creating product with data: ${JSON.stringify(data)}`);
-      const { ingredients, variantGroups, categoryName, ...productData } = data;
+      const { ingredients, components, variantGroups, categoryName, ...productData } = data;
       return await this.prisma.$transaction(async (tx) => {
+        await this.validateRecipe(tx, {
+          tenantId,
+          locationId: productData.locationId,
+          ingredients: ingredients ?? [],
+          components: components ?? [],
+        });
+
         // 1. Crear el producto base
         const product = await tx.product.create({
           data: {
@@ -30,6 +44,15 @@ export class ProductsService {
               }
             });
           }
+        }
+        for (const component of components ?? []) {
+          await tx.productComponent.create({
+            data: {
+              productId: product.id,
+              componentId: component.componentId,
+              quantity: component.quantity,
+            },
+          });
         }
         // 3. Crear grupos de variantes si existen
         if (variantGroups && variantGroups.length > 0) {
@@ -71,6 +94,7 @@ export class ProductsService {
                 ingredient: true,
               },
             },
+            components: { include: { component: true } },
             variantGroups: {
               include: {
                 variants: true,
@@ -80,6 +104,7 @@ export class ProductsService {
         });
       });
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       this.logger.error(`Error creating product: ${error.message}`);
       this.logger.error(error.stack);
       throw new InternalServerErrorException(`Error creating product: ${error.message}`);
@@ -113,6 +138,7 @@ export class ProductsService {
             orderBy: { order: 'asc' }
           },
           ingredients: { include: { ingredient: true } },
+          components: { include: { component: true } },
         },
       });
     } catch (error) {
@@ -128,6 +154,7 @@ export class ProductsService {
         include: {
           category: true,
           ingredients: { include: { ingredient: true } },
+          components: { include: { component: true } },
           variantGroups: {
             where: { isActive: true },
             include: {
@@ -145,10 +172,58 @@ export class ProductsService {
 
   async update(id: string, data: any, tenantId: string): Promise<any> {
     try {
-      const { ingredients, variantGroups, categoryId, locationId, id: _id, tenantId: _tenantId, createdAt, updatedAt, ...productData } = data;
+      const {
+        ingredients,
+        components,
+        variantGroups,
+        categoryId,
+        locationId,
+        id: _id,
+        tenantId: _tenantId,
+        createdAt,
+        updatedAt,
+        ...productData
+      } = data;
       if (categoryId) productData.category = { connect: { id: categoryId } };
       if (locationId) productData.location = { connect: { id: locationId } };
       return await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.product.findFirst({
+          where: { id, tenantId },
+          include: { ingredients: true, components: true },
+        });
+        if (!existing) {
+          throw new NotFoundException('Product not found');
+        }
+
+        if (data.isIntermediate === false) {
+          const usedInRecipes = await tx.productComponent.count({
+            where: { componentId: id },
+          });
+          if (usedInRecipes > 0) {
+            throw new BadRequestException(
+              'A product used in another recipe must remain an intermediate product',
+            );
+          }
+        }
+
+        await this.validateRecipe(tx, {
+          productId: id,
+          tenantId,
+          locationId: locationId ?? existing.locationId,
+          ingredients:
+            ingredients ??
+            existing.ingredients.map(({ ingredientId, quantity }) => ({
+              ingredientId,
+              quantity,
+            })),
+          components:
+            components ??
+            existing.components.map(({ componentId, quantity }) => ({
+              componentId,
+              quantity,
+            })),
+        });
+
         // 1. Actualizar el producto
         const product = await tx.product.update({ where: { id }, data: productData });
         // 2. Ingredientes
@@ -161,6 +236,18 @@ export class ProductsService {
                 ingredientId: ingredient.ingredientId,
                 quantity: ingredient.quantity
               }
+            });
+          }
+        }
+        if (components) {
+          await tx.productComponent.deleteMany({ where: { productId: id } });
+          for (const component of components) {
+            await tx.productComponent.create({
+              data: {
+                productId: product.id,
+                componentId: component.componentId,
+                quantity: component.quantity,
+              },
             });
           }
         }
@@ -205,6 +292,7 @@ export class ProductsService {
           include: {
             category: true,
             ingredients: { include: { ingredient: true } },
+            components: { include: { component: true } },
             variantGroups: {
               include: { variants: true },
               orderBy: { order: 'asc' }
@@ -213,6 +301,7 @@ export class ProductsService {
         });
       });
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       this.logger.error(`Error updating product ${id}: ${error.message}`);
       throw new InternalServerErrorException(`Error updating product: ${error.message}`);
     }
@@ -236,6 +325,16 @@ export class ProductsService {
           }
         });
 
+        const usedInRecipes = await tx.productComponent.count({
+          where: { componentId: id },
+        });
+        if (usedInRecipes > 0) {
+          throw new BadRequestException(
+            'Remove this product from other recipes before deleting it',
+          );
+        }
+        await tx.productComponent.deleteMany({ where: { productId: id } });
+
         // 2. Eliminar las relaciones de variantes
         await tx.productVariant.deleteMany({
           where: {
@@ -251,8 +350,91 @@ export class ProductsService {
 
       return product;
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       this.logger.error(`Error removing product ${id}: ${error.message}`);
       throw new InternalServerErrorException(`Error removing product: ${error.message}`);
+    }
+  }
+
+  private async validateRecipe(
+    tx: Prisma.TransactionClient,
+    params: {
+      productId?: string;
+      tenantId: string;
+      locationId?: string;
+      ingredients: { ingredientId: string; quantity: number }[];
+      components: { componentId: string; quantity: number }[];
+    },
+  ) {
+    const { productId, tenantId, locationId, ingredients, components } = params;
+    if (!locationId) {
+      throw new BadRequestException('A location is required to configure a recipe');
+    }
+
+    const ingredientIds = ingredients.map(({ ingredientId }) => ingredientId);
+    const componentIds = components.map(({ componentId }) => componentId);
+
+    if (new Set(ingredientIds).size !== ingredientIds.length) {
+      throw new BadRequestException('A recipe cannot contain duplicate ingredients');
+    }
+    if (new Set(componentIds).size !== componentIds.length) {
+      throw new BadRequestException('A recipe cannot contain duplicate products');
+    }
+    if (
+      [...ingredients, ...components].some(
+        ({ quantity }) => !Number.isFinite(quantity) || quantity <= 0,
+      )
+    ) {
+      throw new BadRequestException('Recipe quantities must be greater than zero');
+    }
+
+    const [validIngredients, validComponents] = await Promise.all([
+      ingredientIds.length
+        ? tx.ingredient.findMany({
+            where: { id: { in: ingredientIds }, tenantId, locationId },
+            select: { id: true },
+          })
+        : [],
+      componentIds.length
+        ? tx.product.findMany({
+            where: {
+              id: { in: componentIds },
+              tenantId,
+              locationId,
+              isIntermediate: true,
+            },
+            select: { id: true },
+          })
+        : [],
+    ]);
+
+    if (validIngredients.length !== ingredientIds.length) {
+      throw new BadRequestException(
+        'Recipe ingredients must belong to the same business and location',
+      );
+    }
+    if (validComponents.length !== componentIds.length) {
+      throw new BadRequestException(
+        'Recipe products must be intermediate products in the same business and location',
+      );
+    }
+
+    if (productId && componentIds.length) {
+      const visited = new Set<string>();
+      let pending = componentIds;
+      while (pending.length) {
+        if (pending.includes(productId)) {
+          throw new BadRequestException('Product recipes cannot contain a cycle');
+        }
+        const next = pending.filter((id) => !visited.has(id));
+        if (!next.length) break;
+        next.forEach((id) => visited.add(id));
+        const descendants = await tx.productComponent.findMany({
+          where: { productId: { in: next } },
+          select: { componentId: true },
+        });
+        pending = descendants.map(({ componentId }) => componentId);
+      }
     }
   }
 }

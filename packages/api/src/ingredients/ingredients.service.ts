@@ -1,4 +1,10 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
@@ -18,10 +24,23 @@ export class IngredientsService {
       this.logger.debug(`Creating ingredient with data: ${JSON.stringify(createIngredientDto)}`);
 
       const unit = createIngredientDto.unit || 'unidad';
-      const quantity = typeof createIngredientDto.quantity === 'number' ? createIngredientDto.quantity : 0;
-      const minQuantity = typeof createIngredientDto.minQuantity === 'number' ? createIngredientDto.minQuantity : 0;
+      const quantity =
+        typeof createIngredientDto.quantity === 'number' ? createIngredientDto.quantity : 0;
+      const minQuantity =
+        typeof createIngredientDto.minQuantity === 'number' ? createIngredientDto.minQuantity : 0;
 
       const ingredient = await this.prisma.$transaction(async (tx) => {
+        const location = await tx.location.findFirst({
+          where: {
+            id: createIngredientDto.locationId,
+            tenantId: createIngredientDto.tenantId,
+          },
+          select: { id: true },
+        });
+        if (!location) {
+          throw new BadRequestException('La sucursal seleccionada no pertenece a este negocio.');
+        }
+
         const created = await tx.ingredient.create({
           data: {
             name: createIngredientDto.name,
@@ -48,7 +67,8 @@ export class IngredientsService {
     } catch (error) {
       this.logger.error(`Error creating ingredient: ${error.message}`);
       this.logger.error(error.stack);
-      throw new InternalServerErrorException(`Error creating ingredient: ${error.message}`);
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('No se pudo crear el ingrediente.');
     }
   }
 
@@ -82,7 +102,9 @@ export class IngredientsService {
 
   async update(id: string, updateIngredientDto: UpdateIngredientDto) {
     try {
-      this.logger.debug(`Updating ingredient ${id} with data: ${JSON.stringify(updateIngredientDto)}`);
+      this.logger.debug(
+        `Updating ingredient ${id} with data: ${JSON.stringify(updateIngredientDto)}`,
+      );
 
       return this.prisma.$transaction(async (tx) => {
         const ingredient = await tx.ingredient.update({
