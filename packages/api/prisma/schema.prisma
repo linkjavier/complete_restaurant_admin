@@ -52,6 +52,7 @@ model User {
   inventoryModifications InventoryModification[] @relation("InventoryModificationCreatedBy")
   appliedInventoryModifications InventoryModification[] @relation("InventoryModificationAppliedBy")
   countedInventoryModificationItems InventoryModificationItem[] @relation("InventoryModificationItemCountedBy")
+  productionLogs ProductionLog[] @relation("ProductionLogCreatedBy")
   notifications Notification[]
   subscriptions Subscription[]
   createdAt     DateTime       @default(now())
@@ -443,13 +444,23 @@ enum NotificationType {
 }
 
 model ProductionLog {
-  id            String   @id @default(cuid())
-  product       Product  @relation(fields: [productId], references: [id])
-  productId     String
-  quantity      Float
-  wasteQuantity Float    @default(0)
-  wasteNotes    String?
-  createdAt     DateTime @default(now())
+  id                 String   @id @default(cuid())
+  number             Int      @unique @default(autoincrement())
+  product            Product  @relation(fields: [productId], references: [id])
+  productId          String
+  productCode        String?
+  productName        String?
+  productUnit        String?
+  createdBy           User?    @relation("ProductionLogCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById         String?
+  quantity            Float
+  wasteQuantity       Float    @default(0)
+  wasteNotes          String?
+  consumedMaterials   Json     @default("[]")
+  createdAt           DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@index([createdById])
 }
 
 model WhatsappMessage {

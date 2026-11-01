@@ -1145,12 +1145,34 @@ export interface ProduceProductPayload {
 
 export interface ProductionLog {
   id: string;
+  number: number;
   productId: string;
+  productCode: string | null;
+  productName: string | null;
+  productUnit: string | null;
+  createdById: string | null;
+  createdBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
   quantity: number;
   wasteQuantity: number;
   wasteNotes?: string | null;
+  consumedMaterials: Array<{
+    id: string;
+    code: string;
+    name: string;
+    unit: string;
+    quantity: number;
+    type: "INGREDIENT" | "PRODUCT";
+  }>;
   createdAt: string;
-  product: Pick<Product, "id" | "name" | "unit" | "locationId" | "location">;
+  product: Pick<
+    Product,
+    "id" | "code" | "name" | "unit" | "locationId" | "location"
+  >;
 }
 
 export async function getProductionHistory(locationId?: string): Promise<ProductionLog[]> {

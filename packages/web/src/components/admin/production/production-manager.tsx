@@ -26,12 +26,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { AlertCircle, Boxes, Clock3, PackageCheck } from "lucide-react"
+import {
+  AlertCircle,
+  Boxes,
+  Clock3,
+  Download,
+  PackageCheck,
+  Printer,
+  UserRound,
+} from "lucide-react"
+import {
+  downloadProductionPdf,
+  printProduction,
+} from "@/components/admin/production/production-report"
 
 const ALL_LOCATIONS = "all"
 
 function formatQuantity(quantity: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(quantity)
+}
+
+function formatProductionNumber(number: number) {
+  return `PRO-${String(number).padStart(6, "0")}`
+}
+
+function productionActorName(entry: ProductionLog) {
+  if (!entry.createdBy) return "Responsable no registrado"
+  return `${entry.createdBy.firstName} ${entry.createdBy.lastName}`.trim() || entry.createdBy.email
 }
 
 export function ProductionManager() {
@@ -126,6 +147,23 @@ export function ProductionManager() {
       })),
     [batchQuantity, selectedProduct],
   )
+
+  const handleReport = (entry: ProductionLog, action: "download" | "print") => {
+    try {
+      if (action === "download") downloadProductionPdf(entry)
+      else printProduction(entry)
+    } catch (reportError) {
+      console.error("Error generating production report:", reportError)
+      toast({
+        title: action === "download" ? "No se pudo descargar el PDF" : "No se pudo imprimir",
+        description:
+          reportError instanceof Error
+            ? reportError.message
+            : "Intenta de nuevo.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleSubmit = async () => {
     if (!selectedProduct || !Number.isFinite(quantity) || quantity <= 0) {
@@ -412,19 +450,64 @@ export function ProductionManager() {
                   <div key={entry.id} className="min-w-0 space-y-1 border-b pb-3 last:border-0">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="break-words font-medium">{entry.product.name}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="break-words font-medium">
+                            {entry.productName ?? entry.product.name}
+                          </p>
+                          <Badge variant="outline" className="text-[10px]">
+                            {formatProductionNumber(entry.number)}
+                          </Badge>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {new Date(entry.createdAt).toLocaleString("es-CO")}
                         </p>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                          <UserRound className="h-3 w-3" />
+                          {productionActorName(entry)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Código: {entry.productCode ?? entry.product.code}
+                        </p>
                       </div>
-                      <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
-                        +{formatQuantity(entry.quantity)} {entry.product.unit}
-                      </Badge>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <Badge variant="secondary" className="whitespace-nowrap">
+                          +{formatQuantity(entry.quantity)} {entry.productUnit ?? entry.product.unit}
+                        </Badge>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            aria-label={`Descargar PDF de ${formatProductionNumber(entry.number)}`}
+                            title="Descargar PDF"
+                            onClick={() => handleReport(entry, "download")}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            aria-label={`Imprimir ${formatProductionNumber(entry.number)}`}
+                            title="Imprimir"
+                            onClick={() => handleReport(entry, "print")}
+                          >
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                     {entry.wasteQuantity > 0 && (
                       <p className="text-sm text-muted-foreground">
-                        Merma: {formatQuantity(entry.wasteQuantity)} {entry.product.unit}
+                        Merma: {formatQuantity(entry.wasteQuantity)} {entry.productUnit ?? entry.product.unit}
                         {entry.wasteNotes ? ` · ${entry.wasteNotes}` : ""}
+                      </p>
+                    )}
+                    {entry.consumedMaterials.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {entry.consumedMaterials.length} insumos registrados
                       </p>
                     )}
                     {isSuperAdmin && selectedLocationId === ALL_LOCATIONS && (

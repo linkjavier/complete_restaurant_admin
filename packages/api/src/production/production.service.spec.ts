@@ -30,7 +30,9 @@ describe('ProductionService', () => {
 
   const intermediateProduct = {
     id: 'prep-1',
+    code: 'PRD-000001',
     name: 'Hamburger meat',
+    unit: 'unidad',
     tenantId: 'tenant-1',
     locationId: 'loc-1',
     isActive: true,
@@ -39,7 +41,12 @@ describe('ProductionService', () => {
       {
         ingredientId: 'ing-1',
         quantity: 120,
-        ingredient: { id: 'ing-1', name: 'Ground beef', unit: 'g' },
+        ingredient: {
+          id: 'ing-1',
+          code: 'ING-000001',
+          name: 'Ground beef',
+          unit: 'g',
+        },
       },
     ],
     components: [],
@@ -71,6 +78,7 @@ describe('ProductionService', () => {
       'prep-1',
       2,
       'tenant-1',
+      'user-1',
       'loc-1',
       0.5,
       'spill',
@@ -94,13 +102,33 @@ describe('ProductionService', () => {
     expect(mockTx.productionLog.create).toHaveBeenCalledWith({
       data: {
         productId: 'prep-1',
+        productCode: 'PRD-000001',
+        productName: 'Hamburger meat',
+        productUnit: 'unidad',
+        createdById: 'user-1',
         quantity: 2,
         wasteQuantity: 0.5,
         wasteNotes: 'spill',
+        consumedMaterials: [
+          {
+            id: 'ing-1',
+            code: 'ING-000001',
+            name: 'Ground beef',
+            unit: 'g',
+            quantity: 300,
+            type: 'INGREDIENT',
+          },
+        ],
       },
     });
     expect(result.consumedIngredients).toEqual([
-      { id: 'ing-1', name: 'Ground beef', unit: 'g', quantity: 300 },
+      {
+        id: 'ing-1',
+        code: 'ING-000001',
+        name: 'Ground beef',
+        unit: 'g',
+        quantity: 300,
+      },
     ]);
   });
 
@@ -117,7 +145,7 @@ describe('ProductionService', () => {
       ],
     });
 
-    await service.produceProduct('prep-1', 3, 'tenant-1', 'loc-1');
+    await service.produceProduct('prep-1', 3, 'tenant-1', 'user-1', 'loc-1');
 
     expect(mockStockSync.deductProductStock).toHaveBeenCalledWith(mockTx, {
       productId: 'prep-meat',
@@ -136,7 +164,7 @@ describe('ProductionService', () => {
     );
 
     await expect(
-      service.produceProduct('prep-1', 1, 'tenant-1', 'loc-1'),
+      service.produceProduct('prep-1', 1, 'tenant-1', 'user-1', 'loc-1'),
     ).rejects.toMatchObject({
       response: {
         message: 'Insumos insuficientes para registrar la producción',
@@ -152,7 +180,7 @@ describe('ProductionService', () => {
     mockTx.product.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.produceProduct('prep-1', 1, 'tenant-1', 'loc-other'),
+      service.produceProduct('prep-1', 1, 'tenant-1', 'user-1', 'loc-other'),
     ).rejects.toBeInstanceOf(HttpException);
   });
 
@@ -164,7 +192,7 @@ describe('ProductionService', () => {
     });
 
     await expect(
-      service.produceProduct('prep-1', 1, 'tenant-1', 'loc-1'),
+      service.produceProduct('prep-1', 1, 'tenant-1', 'user-1', 'loc-1'),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

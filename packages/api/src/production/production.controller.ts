@@ -62,6 +62,7 @@ findHistory(
       productId,
       quantity,
       tenantId,
+      user.id,
       user.role === UserRole.SUPER_ADMIN ? undefined : user.locationId ?? undefined,
       wasteQuantity ?? 0,
       wasteNotes,

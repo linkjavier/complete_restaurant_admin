@@ -27,9 +27,13 @@ export class ProductionService {
         },
       },
       include: {
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
         product: {
           select: {
             id: true,
+            code: true,
             name: true,
             unit: true,
             locationId: true,
@@ -46,6 +50,7 @@ export class ProductionService {
     productId: string,
     quantity: number,
     tenantId: string,
+    createdById: string,
     allowedLocationId?: string,
     wasteQuantity = 0,
     wasteNotes?: string,
@@ -103,6 +108,7 @@ export class ProductionService {
           });
           consumedIngredients.push({
             id: recipeIngredient.ingredientId,
+            code: recipeIngredient.ingredient.code,
             name: recipeIngredient.ingredient.name,
             unit: recipeIngredient.ingredient.unit,
             quantity: amount,
@@ -118,6 +124,7 @@ export class ProductionService {
           });
           consumedProducts.push({
             id: recipeComponent.componentId,
+            code: recipeComponent.component.code,
             name: recipeComponent.component.name,
             unit: recipeComponent.component.unit,
             quantity: amount,
@@ -147,9 +154,31 @@ export class ProductionService {
         const log = await tx.productionLog.create({
           data: {
             productId,
+            productCode: product.code,
+            productName: product.name,
+            productUnit: product.unit,
+            createdById,
             quantity,
             wasteQuantity,
             wasteNotes: wasteNotes?.trim() || null,
+            consumedMaterials: [
+              ...consumedIngredients.map((item) => ({
+                id: item.id,
+                code: item.code,
+                name: item.name,
+                unit: item.unit,
+                quantity: item.quantity,
+                type: 'INGREDIENT',
+              })),
+              ...consumedProducts.map((item) => ({
+                id: item.id,
+                code: item.code,
+                name: item.name,
+                unit: item.unit,
+                quantity: item.quantity,
+                type: 'PRODUCT',
+              })),
+            ],
           },
         });
 
