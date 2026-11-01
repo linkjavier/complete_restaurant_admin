@@ -13,6 +13,7 @@ import Image from 'next/image';
 import { ThemeSwitch } from '@/components/theme-switch';
 import { LanguageSwitch } from '@/components/language-switch';
 import { useLanguage } from '@/hooks/use-language';
+import { API_URL } from '@/lib/api';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -29,8 +30,15 @@ export default function RegisterPage() {
   const { t } = useLanguage();
   const [businessIcon, setBusinessIcon] = useState<string>("/assets/kutchen_app_logo.png");
   const [businessName, setBusinessName] = useState<string>("Kutchen AI");
+  const [tenantSubdomain, setTenantSubdomain] = useState(false);
 
   useEffect(() => {
+    const hostname = window.location.hostname;
+    const labels = hostname.split('.');
+    setTenantSubdomain(
+      hostname.endsWith('.localhost') ||
+      (labels.length > 2 && labels[0] !== 'www'),
+    );
     const fetchBusiness = async () => {
       try {
         const res = await fetch('/api/settings/business');
@@ -56,7 +64,6 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           ...formData,
-          role: 'CUSTOMER', // Default role for registration
         }),
       });
 
@@ -79,11 +86,13 @@ export default function RegisterPage() {
         throw new Error(errorMsg);
       }
 
+      const result = await response.json();
       toast({
-        title: 'Success',
-        description: 'Your account has been created.',
+        title: result.status === 'pending' ? 'Solicitud enviada' : 'Registro exitoso',
+        description: result.status === 'pending'
+          ? 'El Super Admin del negocio debe aprobar tu acceso antes de que puedas iniciar sesión.'
+          : 'Tu negocio y tu cuenta de Super Admin fueron creados.',
       });
-
       router.push('/auth/login');
     } catch (error) {
       let errorMsg = 'An error occurred';
@@ -102,6 +111,27 @@ export default function RegisterPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const startSocialRegistration = (provider: 'google' | 'facebook') => {
+    if (!tenantSubdomain && !formData.tenantName.trim()) {
+      toast({
+        title: 'Falta el nombre del negocio',
+        description: 'Ingresa el nombre del negocio antes de continuar con el registro social.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const nonce = crypto.randomUUID();
+    sessionStorage.setItem('social-login-nonce', nonce);
+    const url = new URL(`${API_URL}/auth/${provider}`);
+    url.searchParams.set('returnTo', window.location.origin);
+    url.searchParams.set('nonce', nonce);
+    url.searchParams.set('flow', 'register');
+    if (!tenantSubdomain) {
+      url.searchParams.set('tenantName', formData.tenantName);
+    }
+    window.location.assign(url.toString());
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,18 +177,24 @@ export default function RegisterPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="tenantName" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                {t('registerBusinessPlaceholder')}
-              </label>
-              <Input
-                id="tenantName"
-                placeholder={t('registerBusinessExample')}
-                value={formData.tenantName}
-                onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
-                disabled={isLoading}
-              />
-            </div>
+            {tenantSubdomain ? (
+              <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+                Tu solicitud será enviada al Super Admin de este negocio para su aprobación.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <label htmlFor="tenantName" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  {t('registerBusinessPlaceholder')}
+                </label>
+                <Input
+                  id="tenantName"
+                  placeholder={t('registerBusinessExample')}
+                  value={formData.tenantName}
+                  onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="firstName" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
@@ -239,7 +275,7 @@ export default function RegisterPage() {
               </div>
             </div>
             <div className="mt-6 grid grid-cols-2 gap-4">
-              <Button variant="outline" disabled={isLoading}>
+              <Button variant="outline" disabled={isLoading} onClick={() => startSocialRegistration('google')}>
                 {isLoading ? (
                   <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -247,7 +283,7 @@ export default function RegisterPage() {
                 )}
                 {t('loginGoogle')}
               </Button>
-              <Button variant="outline" disabled={isLoading}>
+              <Button variant="outline" disabled={isLoading} onClick={() => startSocialRegistration('facebook')}>
                 {isLoading ? (
                   <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                 ) : (

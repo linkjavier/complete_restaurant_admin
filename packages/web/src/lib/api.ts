@@ -289,6 +289,15 @@ export interface User {
   updatedAt: string;
 }
 
+export interface UserAccessRequest {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatar: string | null;
+  requestedAt: string;
+}
+
 export interface CreateUserDto {
   email: string;
   password: string;
@@ -441,6 +450,30 @@ export async function createLocation(data: {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || 'Error al crear la ubicación');
+  }
+  return response.json();
+}
+
+export async function createFirstLocation(data: {
+  name: string;
+  address: string;
+  phone: string;
+  city?: string;
+  country?: string;
+}): Promise<Location> {
+  const response = await fetch(`${API_URL}/locations/first`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.message;
+    throw new Error(
+      Array.isArray(message)
+        ? message.join(', ')
+        : message || 'No se pudo crear la ubicación inicial',
+    );
   }
   return response.json();
 }
@@ -1050,6 +1083,38 @@ export async function getUsers(): Promise<User[]> {
   })
   if (!response.ok) throw new Error('Failed to fetch users')
   return response.json()
+}
+
+export async function getUserAccessRequests(): Promise<UserAccessRequest[]> {
+  const response = await fetch(`${API_URL}/users/access-requests`, {
+    headers: getAuthHeaders(),
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('No se pudieron cargar las solicitudes de acceso');
+  return response.json();
+}
+
+export async function approveUserAccessRequest(
+  id: string,
+  role: string,
+): Promise<User> {
+  const response = await fetch(`${API_URL}/users/access-requests/${id}/approve`, {
+    method: 'PATCH',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('No se pudo aprobar la solicitud');
+  return response.json();
+}
+
+export async function rejectUserAccessRequest(id: string): Promise<void> {
+  const response = await fetch(`${API_URL}/users/access-requests/${id}/reject`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('No se pudo rechazar la solicitud');
 }
 
 export async function createUser(data: CreateUserDto): Promise<User> {

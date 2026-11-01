@@ -17,47 +17,49 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users                User[]
-  locations            Location[]
-  products             Product[]
-  orders               Order[]
-  categories           Category[]
-  ingredients          Ingredient[]
-  customers            Customer[]
-  tables               Table[]
-  payments             Payment[]
-  productVariantGroups ProductVariantGroup[]
-  productVariants      ProductVariant[]
-  settings             Settings[]
-  subscriptions        Subscription[]
-  purchases            Purchase[]
+  users                  User[]
+  locations              Location[]
+  products               Product[]
+  orders                 Order[]
+  categories             Category[]
+  ingredients            Ingredient[]
+  customers              Customer[]
+  tables                 Table[]
+  payments               Payment[]
+  productVariantGroups   ProductVariantGroup[]
+  productVariants        ProductVariant[]
+  settings               Settings[]
+  subscriptions          Subscription[]
+  purchases              Purchase[]
   inventoryModifications InventoryModification[]
+  userAccessRequests     UserAccessRequest[]
 }
 
 model User {
-  id            String         @id @default(uuid())
-  tenantId      String
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  email         String
-  password      String
-  firstName     String
-  lastName      String
-  role          UserRole
-  avatar        String?
-  location      Location?      @relation(fields: [locationId], references: [id])
-  locationId    String?
-  orders        Order[]        @relation("orderUser")
-  deletedOrders Order[]        @relation("orderDeletedBy")
-  purchases     Purchase[]     @relation("PurchaseCreatedBy")
-  inventoryModifications InventoryModification[] @relation("InventoryModificationCreatedBy")
-  appliedInventoryModifications InventoryModification[] @relation("InventoryModificationAppliedBy")
+  id                                String                      @id @default(uuid())
+  tenantId                          String
+  tenant                            Tenant                      @relation(fields: [tenantId], references: [id])
+  email                             String
+  password                          String
+  firstName                         String
+  lastName                          String
+  role                              UserRole
+  avatar                            String?
+  location                          Location?                   @relation(fields: [locationId], references: [id])
+  locationId                        String?
+  orders                            Order[]                     @relation("orderUser")
+  deletedOrders                     Order[]                     @relation("orderDeletedBy")
+  purchases                         Purchase[]                  @relation("PurchaseCreatedBy")
+  inventoryModifications            InventoryModification[]     @relation("InventoryModificationCreatedBy")
+  appliedInventoryModifications     InventoryModification[]     @relation("InventoryModificationAppliedBy")
   countedInventoryModificationItems InventoryModificationItem[] @relation("InventoryModificationItemCountedBy")
-  productionLogs ProductionLog[] @relation("ProductionLogCreatedBy")
-  notifications Notification[]
-  subscriptions Subscription[]
-  oauthLoginTickets OAuthLoginTicket[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  productionLogs                    ProductionLog[]             @relation("ProductionLogCreatedBy")
+  notifications                     Notification[]
+  subscriptions                     Subscription[]
+  oauthLoginTickets                 OAuthLoginTicket[]
+  reviewedUserAccessRequests        UserAccessRequest[]         @relation("UserAccessRequestReviewedBy")
+  createdAt                         DateTime                    @default(now())
+  updatedAt                         DateTime                    @updatedAt
 
   @@unique([tenantId, email])
 }
@@ -74,6 +76,32 @@ model OAuthLoginTicket {
   @@index([expiresAt])
 }
 
+model UserAccessRequest {
+  id           String                  @id @default(uuid())
+  tenantId     String
+  tenant       Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email        String
+  firstName    String
+  lastName     String
+  avatar       String?
+  passwordHash String?
+  status       UserAccessRequestStatus @default(PENDING)
+  requestedAt  DateTime                @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?                   @relation("UserAccessRequestReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, email])
+  @@index([tenantId, status, requestedAt])
+  @@index([reviewedById])
+}
+
+enum UserAccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum UserRole {
   ADMIN
   MANAGER
@@ -86,30 +114,30 @@ enum UserRole {
 }
 
 model Location {
-  id               String            @id @default(uuid())
-  tenantId         String
-  tenant           Tenant            @relation(fields: [tenantId], references: [id])
-  name             String
-  address          String
-  city             String?
-  country          String?
-  latitude         Float?
-  longitude        Float?
-  phone            String
-  orders           Order[]
-  users            User[]
-  products         Product[]
-  tables           Table[]
-  whatsappMessages WhatsappMessage[]
-  whatsappChats    WhatsappChat[]
-  inventoryItems   InventoryItem[]
-  ingredients      Ingredient[]
-  purchases        Purchase[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  order            Int               @default(0)
-  customers        Customer[]
-  settings         Settings[]
+  id                     String                  @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  name                   String
+  address                String
+  city                   String?
+  country                String?
+  latitude               Float?
+  longitude              Float?
+  phone                  String
+  orders                 Order[]
+  users                  User[]
+  products               Product[]
+  tables                 Table[]
+  whatsappMessages       WhatsappMessage[]
+  whatsappChats          WhatsappChat[]
+  inventoryItems         InventoryItem[]
+  ingredients            Ingredient[]
+  purchases              Purchase[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  order                  Int                     @default(0)
+  customers              Customer[]
+  settings               Settings[]
   inventoryModifications InventoryModification[]
 
   @@index([order])
@@ -139,32 +167,32 @@ enum TableStatus {
 }
 
 model Product {
-  id            String                @id @default(cuid())
-  code          String                @unique @default(dbgenerated("('PRD-'::text || lpad(nextval('product_code_seq'::regclass)::text, 6, '0'::text))"))
-  tenantId      String
-  tenant        Tenant                @relation(fields: [tenantId], references: [id])
-  name          String
-  description   String?
-  price         Float
-  image         String?
-  category      Category              @relation(fields: [categoryId], references: [id])
-  categoryId    String
-  isActive      Boolean               @default(true)
-  isFinal       Boolean               @default(false)
-  isIntermediate Boolean              @default(false)
-  quantity      Float                 @default(0)
-  unit          String                @default("unidad")
-  location      Location              @relation(fields: [locationId], references: [id])
-  locationId    String
-  ingredients   ProductIngredient[]
-  components    ProductComponent[]    @relation("ProductRecipe")
-  usedInRecipes ProductComponent[]    @relation("RecipeComponent")
-  orderItems    OrderItem[]
-  productions   ProductionLog[]
-  variants      ProductVariant[]
-  variantGroups ProductVariantGroup[]
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  id             String                @id @default(cuid())
+  code           String                @unique @default(dbgenerated("('PRD-'::text || lpad(nextval('product_code_seq'::regclass)::text, 6, '0'::text))"))
+  tenantId       String
+  tenant         Tenant                @relation(fields: [tenantId], references: [id])
+  name           String
+  description    String?
+  price          Float
+  image          String?
+  category       Category              @relation(fields: [categoryId], references: [id])
+  categoryId     String
+  isActive       Boolean               @default(true)
+  isFinal        Boolean               @default(false)
+  isIntermediate Boolean               @default(false)
+  quantity       Float                 @default(0)
+  unit           String                @default("unidad")
+  location       Location              @relation(fields: [locationId], references: [id])
+  locationId     String
+  ingredients    ProductIngredient[]
+  components     ProductComponent[]    @relation("ProductRecipe")
+  usedInRecipes  ProductComponent[]    @relation("RecipeComponent")
+  orderItems     OrderItem[]
+  productions    ProductionLog[]
+  variants       ProductVariant[]
+  variantGroups  ProductVariantGroup[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 }
 
 model Category {
@@ -218,10 +246,10 @@ model ProductIngredient {
 }
 
 model ProductComponent {
-  id          String  @id @default(cuid())
-  product     Product @relation("ProductRecipe", fields: [productId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  product     Product  @relation("ProductRecipe", fields: [productId], references: [id], onDelete: Cascade)
   productId   String
-  component   Product @relation("RecipeComponent", fields: [componentId], references: [id], onDelete: Restrict)
+  component   Product  @relation("RecipeComponent", fields: [componentId], references: [id], onDelete: Restrict)
   componentId String
   quantity    Float
   createdAt   DateTime @default(now())
@@ -457,20 +485,20 @@ enum NotificationType {
 }
 
 model ProductionLog {
-  id                 String   @id @default(cuid())
-  number             Int      @unique @default(autoincrement())
-  product            Product  @relation(fields: [productId], references: [id])
-  productId          String
-  productCode        String?
-  productName        String?
-  productUnit        String?
-  createdBy           User?    @relation("ProductionLogCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdById         String?
-  quantity            Float
-  wasteQuantity       Float    @default(0)
-  wasteNotes          String?
-  consumedMaterials   Json     @default("[]")
-  createdAt           DateTime @default(now())
+  id                String   @id @default(cuid())
+  number            Int      @unique @default(autoincrement())
+  product           Product  @relation(fields: [productId], references: [id])
+  productId         String
+  productCode       String?
+  productName       String?
+  productUnit       String?
+  createdBy         User?    @relation("ProductionLogCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById       String?
+  quantity          Float
+  wasteQuantity     Float    @default(0)
+  wasteNotes        String?
+  consumedMaterials Json     @default("[]")
+  createdAt         DateTime @default(now())
 
   @@index([productId, createdAt])
   @@index([createdById])

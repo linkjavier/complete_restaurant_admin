@@ -24,9 +24,9 @@ export class RegisterDto {
   @IsNotEmpty()
   password: string;
 
-  @ApiProperty({ enum: UserRole })
+  @ApiProperty({ enum: UserRole, required: false })
   @IsEnum(UserRole)
-  @IsNotEmpty()
+  @IsOptional()
   role: UserRole;
 
   @ApiProperty({ required: false })

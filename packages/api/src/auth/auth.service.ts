@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { UserAccessRequestStatus, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { LoginResponse, LoginUser } from './types/auth.types';
 import { RegisterDto } from './dto/register.dto';
@@ -22,7 +22,14 @@ interface SocialOAuthState {
   tenantId: string;
   returnTo: string;
   nonce: string;
+  mode: 'login' | 'business-registration';
+  tenantName?: string;
 }
+
+export type SocialLoginOutcome =
+  | { status: 'authenticated'; user: LoginUser }
+  | { status: 'pending' }
+  | { status: 'business-created'; tenantName: string; user: LoginUser };
 
 @Injectable()
 export class AuthService {
@@ -34,7 +41,12 @@ export class AuthService {
 
   async validateUser(email: string, password: string, tenantId: string): Promise<LoginUser | null> {
     console.log("[validateUser] tenantId:", tenantId, "email:", email);
-    const user = await this.prisma.user.findUnique({ where: { tenantId_email: { tenantId, email } } });
+    const user = await this.prisma.user.findFirst({
+      where: {
+        tenantId,
+        email: { equals: email.trim(), mode: 'insensitive' },
+      },
+    });
     console.log("[validateUser] user found:", !!user, user ? user.email : null, user ? user.tenantId : null);
     if (user) {
       const passwordMatch = await bcrypt.compare(password, user.password);
@@ -104,61 +116,57 @@ export class AuthService {
     };
   }
 
-  async register(data: RegisterDto, tenantId: string): Promise<LoginResponse> {
-    // Si no hay tenantId pero sí tenantName, crear el tenant
-    let finalTenantId = tenantId;
-    if (!finalTenantId && data.tenantName) {
-      // Verificar si ya existe un tenant con ese nombre
-      const existingTenant = await this.prisma.tenant.findFirst({ where: { name: data.tenantName } });
-      if (existingTenant) {
-        finalTenantId = existingTenant.id;
-      } else {
-        const newTenant = await this.prisma.tenant.create({ data: { name: data.tenantName } });
-        finalTenantId = newTenant.id;
-      }
-    }
-    if (!finalTenantId) {
-      throw new UnauthorizedException('tenantId or tenantName is required');
-    }
-    // Verificar si el email ya existe para ese tenant
-    const existingUser = await this.prisma.user.findUnique({
-      where: { tenantId_email: { tenantId: finalTenantId, email: data.email } },
-    });
-    if (existingUser) {
-      throw new ConflictException('Email already exists');
-    }
+  async register(
+    data: RegisterDto,
+    tenantId?: string,
+  ): Promise<LoginResponse | { status: 'pending' }> {
+    const email = data.email.trim().toLowerCase();
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    const dbUser = await this.prisma.user.create({
-      data: {
-        tenantId: finalTenantId,
-        email: data.email,
-        password: hashedPassword,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        role: 'SUPER_ADMIN',
-        locationId: data.locationId,
+
+    if (tenantId && tenantId !== 'default-tenant') {
+      await this.createOrRefreshAccessRequest({
+        tenantId,
+        email,
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
         avatar: data.avatar,
-      },
-      include: {
-        location: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
+        passwordHash: hashedPassword,
+      });
+      return { status: 'pending' };
+    }
+
+    const tenantName = this.normalizeTenantName(data.tenantName);
+    const existingTenant = await this.prisma.tenant.findFirst({
+      where: { name: { equals: tenantName, mode: 'insensitive' } },
+      select: { id: true },
     });
+    if (existingTenant) {
+      throw new ConflictException('A business with this name already exists');
+    }
+
+    const userId = await this.prisma.$transaction(async (transaction) => {
+      const tenant = await transaction.tenant.create({
+        data: { name: tenantName },
+      });
+      const user = await transaction.user.create({
+        data: {
+          tenantId: tenant.id,
+          email,
+          password: hashedPassword,
+          firstName: data.firstName.trim(),
+          lastName: data.lastName.trim(),
+          role: UserRole.SUPER_ADMIN,
+          avatar: data.avatar,
+        },
+      });
+      return user.id;
+    });
+
     return this.login({
-      id: dbUser.id,
-      email: dbUser.email,
-      role: dbUser.role,
-      locationId: dbUser.locationId,
+      id: userId,
+      email,
+      role: UserRole.SUPER_ADMIN,
+      locationId: null,
     });
   }
 
@@ -168,7 +176,7 @@ export class AuthService {
     lastName: string;
     avatar?: string;
     tenantId: string;
-  }): Promise<LoginUser> {
+  }): Promise<SocialLoginOutcome> {
     const email = user.email.trim().toLowerCase();
     const matchingUsers = await this.prisma.user.findMany({
       where: {
@@ -178,33 +186,40 @@ export class AuthService {
       take: 2,
     });
     if (matchingUsers.length > 1) {
-      throw new ConflictException(
-        'Multiple accounts use this email in the selected tenant',
-      );
+      throw new ConflictException('Multiple accounts use this email in the selected tenant');
     }
 
-    let dbUser = matchingUsers[0];
-    if (!dbUser) {
-      dbUser = await this.prisma.user.create({
-        data: {
-          tenantId: user.tenantId,
-          email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          password: await bcrypt.hash(randomBytes(32).toString('hex'), 10),
-          role: UserRole.CUSTOMER,
-          locationId: null,
-          avatar: user.avatar,
+    const dbUser = matchingUsers[0];
+    if (dbUser) {
+      return {
+        status: 'authenticated',
+        user: {
+          id: dbUser.id,
+          email: dbUser.email,
+          role: dbUser.role,
+          locationId: dbUser.locationId,
         },
-      });
+      };
     }
 
-    return {
-      id: dbUser.id,
-      email: dbUser.email,
-      role: dbUser.role,
-      locationId: dbUser.locationId,
-    };
+    await this.createOrRefreshAccessRequest({
+      tenantId: user.tenantId,
+      email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatar: user.avatar,
+    });
+    return { status: 'pending' };
+  }
+
+  async finishSocialLogin(
+    profile: { email: string; firstName: string; lastName: string; avatar?: string },
+    state: SocialOAuthState,
+  ): Promise<SocialLoginOutcome> {
+    if (state.mode === 'business-registration') {
+      return this.registerSocialBusiness(profile, state.tenantName);
+    }
+    return this.socialLogin({ ...profile, tenantId: state.tenantId });
   }
 
   async createSocialAuthorizationUrl(
@@ -212,6 +227,8 @@ export class AuthService {
     tenantId: string,
     returnTo: string,
     nonce: string,
+    registeringBusiness = false,
+    requestedTenantName?: string,
   ): Promise<string> {
     if (!tenantId) {
       throw new UnauthorizedException('A tenant is required for social login');
@@ -221,6 +238,15 @@ export class AuthService {
     }
 
     const safeReturnTo = await this.validateSocialReturnTo(returnTo, tenantId);
+    const mode = registeringBusiness && tenantId === 'default-tenant'
+      ? 'business-registration'
+      : 'login';
+    if (tenantId === 'default-tenant' && mode !== 'business-registration') {
+      throw new BadRequestException('Select a business before signing in');
+    }
+    const tenantName = mode === 'business-registration'
+      ? this.normalizeTenantName(requestedTenantName)
+      : undefined;
     const clientId =
       provider === 'google'
         ? this.configService.get<string>('GOOGLE_CLIENT_ID')
@@ -236,9 +262,7 @@ export class AuthService {
     );
 
     if (!clientId || !clientSecret || !callbackUrl) {
-      throw new ServiceUnavailableException(
-        `${provider} login is not configured on the server`,
-      );
+      throw new ServiceUnavailableException(`${provider} login is not configured on the server`);
     }
 
     const state = await this.jwtService.signAsync(
@@ -248,6 +272,8 @@ export class AuthService {
         tenantId,
         returnTo: safeReturnTo,
         nonce,
+        mode,
+        tenantName,
       },
       { expiresIn: '10m' },
     );
@@ -271,10 +297,7 @@ export class AuthService {
     return authorizationUrl.toString();
   }
 
-  async verifySocialOAuthState(
-    state: string,
-    provider: SocialProvider,
-  ): Promise<SocialOAuthState> {
+  async verifySocialOAuthState(state: string, provider: SocialProvider): Promise<SocialOAuthState> {
     let payload: SocialOAuthState;
     try {
       payload = await this.jwtService.verifyAsync<SocialOAuthState>(state);
@@ -287,11 +310,132 @@ export class AuthService {
       payload.provider !== provider ||
       !payload.tenantId ||
       !payload.returnTo ||
+      !['login', 'business-registration'].includes(payload.mode) ||
+      (payload.mode === 'business-registration' && !payload.tenantName) ||
       !/^[\da-f-]{36}$/i.test(payload.nonce)
     ) {
       throw new UnauthorizedException('Invalid social login state');
     }
     return payload;
+  }
+
+  private normalizeTenantName(value?: string): string {
+    if (!value?.trim()) {
+      throw new BadRequestException('Business name is required');
+    }
+    const normalized = value
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 63)
+      .replace(/-$/g, '');
+    if (!normalized || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalized)) {
+      throw new BadRequestException('Business name must contain letters or numbers');
+    }
+    return normalized;
+  }
+
+  private async createOrRefreshAccessRequest(data: {
+    tenantId: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatar?: string;
+    passwordHash?: string;
+  }) {
+    const email = data.email.trim().toLowerCase();
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        tenantId: data.tenantId,
+        email: { equals: email, mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+    if (existingUser) {
+      throw new ConflictException('Email already exists in this business');
+    }
+
+    const existing = await this.prisma.userAccessRequest.findUnique({
+      where: { tenantId_email: { tenantId: data.tenantId, email } },
+    });
+    if (existing?.status === UserAccessRequestStatus.APPROVED) {
+      throw new ConflictException('This access request has already been approved');
+    }
+    if (existing) {
+      const request = await this.prisma.userAccessRequest.update({
+        where: { id: existing.id },
+        data: {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          avatar: data.avatar,
+          passwordHash: data.passwordHash ?? existing.passwordHash,
+          status: UserAccessRequestStatus.PENDING,
+          requestedAt:
+            existing.status === UserAccessRequestStatus.REJECTED
+              ? new Date()
+              : existing.requestedAt,
+          reviewedAt: null,
+          reviewedById: null,
+        },
+      });
+      return request;
+    }
+
+    return this.prisma.userAccessRequest.create({
+      data: {
+        tenantId: data.tenantId,
+        email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        avatar: data.avatar,
+        passwordHash: data.passwordHash,
+      },
+    });
+  }
+
+  private async registerSocialBusiness(
+    profile: { email: string; firstName: string; lastName: string; avatar?: string },
+    requestedTenantName?: string,
+  ): Promise<SocialLoginOutcome> {
+    const tenantName = this.normalizeTenantName(requestedTenantName);
+    const email = profile.email.trim().toLowerCase();
+    const existingTenant = await this.prisma.tenant.findFirst({
+      where: { name: { equals: tenantName, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (existingTenant) {
+      throw new ConflictException('A business with this name already exists');
+    }
+    const password = await bcrypt.hash(randomBytes(32).toString('hex'), 10);
+    const user = await this.prisma.$transaction(async (transaction) => {
+      const tenant = await transaction.tenant.create({ data: { name: tenantName } });
+      const createdUser = await transaction.user.create({
+        data: {
+          tenantId: tenant.id,
+          email,
+          password,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          role: UserRole.SUPER_ADMIN,
+          locationId: null,
+          avatar: profile.avatar,
+        },
+      });
+      return createdUser;
+    });
+    return {
+      status: 'business-created',
+      tenantName,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        locationId: user.locationId,
+      },
+    };
   }
 
   async createSocialLoginTicket(userId: string): Promise<string> {
@@ -345,10 +489,7 @@ export class AuthService {
     });
   }
 
-  private async validateSocialReturnTo(
-    returnTo: string,
-    tenantId: string,
-  ): Promise<string> {
+  private async validateSocialReturnTo(returnTo: string, tenantId: string): Promise<string> {
     let candidate: URL;
     let configuredFrontend: URL;
     try {

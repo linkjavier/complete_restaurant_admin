@@ -7,8 +7,8 @@ import {
   Param,
   Delete,
   UseGuards,
-  Put,
   NotFoundException,
+  Req,
 } from '@nestjs/common';
 import { LocationsService } from './locations.service';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -17,6 +17,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateLocationDto } from './dto/create-location.dto';
 import { CurrentTenant } from '../auth/decorators/tenant.decorator';
+import { UserRole } from '@prisma/client';
 
 @ApiTags('locations')
 @Controller('locations')
@@ -49,6 +50,21 @@ export class LocationsController {
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   async create(@Body() data: CreateLocationDto, @CurrentTenant() tenantId: string) {
     return this.locationsService.create(data, tenantId);
+  }
+
+  @Post('first')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Create and assign the Super Admin first location' })
+  async createFirst(
+    @Body() data: CreateLocationDto,
+    @CurrentTenant() tenantId: string,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.locationsService.createAndAssignToSuperAdmin(
+      data,
+      tenantId,
+      req.user.id,
+    );
   }
 
   @Patch(':id')

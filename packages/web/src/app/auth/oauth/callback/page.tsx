@@ -21,12 +21,31 @@ export default function SocialLoginCallbackPage() {
       const callbackParams = new URLSearchParams(window.location.search);
       const code = callbackParams.get("code");
       const nonce = callbackParams.get("nonce");
+      const status = callbackParams.get("status");
+      const tenantRegistration = callbackParams.get("tenantRegistration");
       window.history.replaceState({}, document.title, window.location.pathname);
       const expectedNonce = sessionStorage.getItem("social-login-nonce");
       sessionStorage.removeItem("social-login-nonce");
-      if (!nonce || nonce !== expectedNonce) {
+      if (
+        !nonce ||
+        (expectedNonce
+          ? nonce !== expectedNonce
+          : tenantRegistration !== "1")
+      ) {
         setError(
           "No se pudo validar la solicitud de inicio de sesión. Inténtalo de nuevo.",
+        );
+        return;
+      }
+      if (status === "pending") {
+        setError(
+          "Tu solicitud de acceso fue enviada al Super Admin del negocio. Podrás iniciar sesión cuando sea aprobada.",
+        );
+        return;
+      }
+      if (status === "business_exists") {
+        setError(
+          "Ya existe un negocio con ese nombre. Vuelve al registro e ingresa otro nombre.",
         );
         return;
       }
@@ -76,7 +95,9 @@ export default function SocialLoginCallbackPage() {
         {error}
       </p>
       <Button asChild>
-        <Link href="/auth/login">Volver al inicio de sesión</Link>
+        <Link href={error.includes("Ya existe un negocio") ? "/auth/register" : "/auth/login"}>
+          {error.includes("Ya existe un negocio") ? "Volver al registro" : "Volver al inicio de sesión"}
+        </Link>
       </Button>
     </main>
   );

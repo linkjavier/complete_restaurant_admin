@@ -67,9 +67,27 @@ Set the matching client ID, secret, and callback URL in the API environment.
 Google must return a verified email; Facebook must grant the `email` permission.
 The OAuth state carries a signed tenant and validated frontend origin, and the
 API exchanges a short-lived, single-use code for the normal application session.
-An email already registered in that tenant keeps its existing role. A new
-social account is created as a `CUSTOMER`, matching the existing social account
-registration behavior.
+Registering from the root domain creates a new tenant and its first
+`SUPER_ADMIN`; email/password registration and Google/Facebook registration
+follow the same rule. A business name that is already in use is rejected.
+After Google/Facebook business registration, the one-time login ticket redirects
+the browser directly to the new tenant subdomain and completes the session
+there. The user does not need to sign in again. The same verified social email
+can own accounts in separate tenants.
+On an existing tenant subdomain, social login only signs in accounts that
+already belong to that tenant. Unknown emails create pending access requests,
+not users. The direct registration form on a tenant subdomain also creates a
+pending request; only that tenant's `SUPER_ADMIN` can approve it and choose a
+role other than `SUPER_ADMIN`, or reject it. A rejected request may be submitted
+again.
+On the first visit to the admin panel, a `SUPER_ADMIN` without an assigned
+location must create the tenant's first location. It is assigned to that user
+in the same transaction before access to the panel continues.
+
+Apply the access-request schema migration with:
+```bash
+npx prisma migrate deploy
+```
 
 ## Scripts
 

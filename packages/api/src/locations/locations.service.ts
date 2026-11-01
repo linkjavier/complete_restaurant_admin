@@ -1,7 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLocationDto } from './dto/create-location.dto';
-import { Prisma } from '@prisma/client';
 import { HereService } from '../ai/services/here.service';
 import { BadRequestException } from '@nestjs/common';
 
@@ -88,6 +87,43 @@ export class LocationsService {
     await this.validateAndEnrichAddress(data);
     return this.prisma.location.create({
       data: { ...data, tenant: { connect: { id: tenantId } } },
+    });
+  }
+
+  async createAndAssignToSuperAdmin(
+    data: CreateLocationDto,
+    tenantId: string,
+    userId: string,
+  ) {
+    await this.validateAndEnrichAddress(data);
+
+    return this.prisma.$transaction(async (transaction) => {
+      const user = await transaction.user.findFirst({
+        where: {
+          id: userId,
+          tenantId,
+          role: 'SUPER_ADMIN',
+          locationId: null,
+        },
+        select: { id: true },
+      });
+      if (!user) {
+        throw new BadRequestException(
+          'The Super Admin already has a location or does not belong to this tenant',
+        );
+      }
+
+      const location = await transaction.location.create({
+        data: {
+          ...data,
+          tenantId,
+        },
+      });
+      await transaction.user.update({
+        where: { id: user.id },
+        data: { locationId: location.id },
+      });
+      return location;
     });
   }
 

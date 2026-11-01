@@ -48,18 +48,20 @@ export class SettingsService {
   async getBusinessSettings(tenantId: string, locationId: string): Promise<BusinessSettings> {
     try {
       let settings = await this.prisma.settings.findFirst({ where: { tenantId, locationId } });
+      let tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) {
+        tenant = await this.prisma.tenant.create({
+          data: {
+            id: tenantId,
+            name: 'default-tenant',
+          },
+        });
+      }
+
+      const defaultBusinessName =
+        tenantId === 'default-tenant' ? 'Kutchen AI App' : tenant.name;
+
       if (!settings) {
-        // Verificar si el tenant existe, si no, crear uno por defecto
-        let tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-        if (!tenant) {
-          tenant = await this.prisma.tenant.create({
-            data: {
-              id: tenantId,
-              name: 'default-tenant',
-            }
-          });
-        }
-        
         // Verificar si la location existe, si no, crear una por defecto
         let location = await this.prisma.location.findUnique({ where: { id: locationId } });
         if (!location) {
@@ -78,9 +80,17 @@ export class SettingsService {
           data: {
             tenantId,
             locationId,
-            businessName: 'Kutchen AI App',
+            businessName: defaultBusinessName,
             businessLogo: null,
           },
+        });
+      } else if (
+        tenantId !== 'default-tenant' &&
+        settings.businessName === 'Kutchen AI App'
+      ) {
+        settings = await this.prisma.settings.update({
+          where: { id: settings.id },
+          data: { businessName: tenant.name },
         });
       }
       return {

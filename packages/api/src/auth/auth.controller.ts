@@ -6,7 +6,7 @@ import {
   Get,
   Req,
   Res,
-  UnauthorizedException,
+  ConflictException,
   BadRequestException,
   HttpCode,
   HttpStatus,
@@ -21,7 +21,7 @@ import { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RegisterDto } from './dto/register.dto';
 import { LoginResponse } from './types/auth.types';
-import { SocialProvider } from './auth.service';
+import { SocialLoginOutcome, SocialProvider } from './auth.service';
 
 interface SocialLoginProfile {
   email: string;
@@ -111,11 +111,8 @@ export class AuthController {
     }
   })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
-  async register(@Body() registerDto: RegisterDto): Promise<LoginResponse> {
-    if (!registerDto['tenantName']) {
-      throw new UnauthorizedException('tenantName is required');
-    }
-    return this.authService.register(registerDto, undefined);
+  async register(@Body() registerDto: RegisterDto, @Req() req: Request & { tenantId?: string }) {
+    return this.authService.register(registerDto, req.tenantId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -133,6 +130,8 @@ export class AuthController {
     @Req() req: Request & { tenantId?: string },
     @Query('returnTo') returnTo: string,
     @Query('nonce') nonce: string,
+    @Query('flow') flow: string,
+    @Query('tenantName') tenantName: string,
     @Res() res: Response,
   ) {
     const url = await this.authService.createSocialAuthorizationUrl(
@@ -140,6 +139,8 @@ export class AuthController {
       req.tenantId,
       returnTo,
       nonce,
+      flow === 'register',
+      tenantName,
     );
     return res.redirect(url);
   }
@@ -162,6 +163,8 @@ export class AuthController {
     @Req() req: Request & { tenantId?: string },
     @Query('returnTo') returnTo: string,
     @Query('nonce') nonce: string,
+    @Query('flow') flow: string,
+    @Query('tenantName') tenantName: string,
     @Res() res: Response,
   ) {
     const url = await this.authService.createSocialAuthorizationUrl(
@@ -169,6 +172,8 @@ export class AuthController {
       req.tenantId,
       returnTo,
       nonce,
+      flow === 'register',
+      tenantName,
     );
     return res.redirect(url);
   }
@@ -212,14 +217,42 @@ export class AuthController {
     res: Response,
   ) {
     const oauthState = await this.authService.verifySocialOAuthState(state, provider);
-    const user = await this.authService.socialLogin({
-      ...profile,
-      tenantId: oauthState.tenantId,
-    });
+    let callbackUrl = new URL('/auth/oauth/callback', oauthState.returnTo);
+    let outcome: SocialLoginOutcome;
+    try {
+      outcome = await this.authService.finishSocialLogin(profile, oauthState);
+    } catch (error) {
+      if (error instanceof ConflictException && oauthState.mode === 'business-registration') {
+        callbackUrl.searchParams.set('status', 'business_exists');
+        return res.redirect(callbackUrl.toString());
+      }
+      throw error;
+    }
+    if (outcome.status === 'pending') {
+      callbackUrl.searchParams.set('nonce', oauthState.nonce);
+      callbackUrl.searchParams.set('status', outcome.status);
+      return res.redirect(callbackUrl.toString());
+    }
+
+    const user = outcome.user;
+    if (outcome.status === 'business-created') {
+      const tenantUrl = new URL(oauthState.returnTo);
+      const rootHost = tenantUrl.hostname.startsWith('www.')
+        ? tenantUrl.hostname.slice(4)
+        : tenantUrl.hostname;
+      tenantUrl.hostname =
+        rootHost === 'localhost' || rootHost === '127.0.0.1'
+          ? `${outcome.tenantName}.localhost`
+          : `${outcome.tenantName}.${rootHost}`;
+      callbackUrl = new URL('/auth/oauth/callback', tenantUrl);
+      callbackUrl.searchParams.set('tenantRegistration', '1');
+      callbackUrl.searchParams.set('nonce', oauthState.nonce);
+    } else {
+      callbackUrl.searchParams.set('nonce', oauthState.nonce);
+    }
+
     const code = await this.authService.createSocialLoginTicket(user.id);
-    const callbackUrl = new URL('/auth/oauth/callback', oauthState.returnTo);
     callbackUrl.searchParams.set('code', code);
-    callbackUrl.searchParams.set('nonce', oauthState.nonce);
     return res.redirect(callbackUrl.toString());
   }
 }

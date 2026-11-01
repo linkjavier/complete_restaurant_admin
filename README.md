@@ -413,9 +413,13 @@ curl -X POST http://localhost:3000/auth/register \
     "password": "12345678",
     "firstName": "Javier",
     "lastName": "Test",
-    "role": "ADMIN"
+    "tenantName": "Javier Restaurante"
   }'
 ```
+
+On the root domain, registration creates a new tenant and its first
+`SUPER_ADMIN`. On a tenant subdomain, it creates an access request that the
+tenant's `SUPER_ADMIN` must approve.
 
 #### Database Management
 ```bash
