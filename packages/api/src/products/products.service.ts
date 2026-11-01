@@ -145,7 +145,7 @@ export class ProductsService {
 
   async update(id: string, data: any, tenantId: string): Promise<any> {
     try {
-      const { ingredients, variantGroups, categoryId, locationId, ...productData } = data;
+      const { ingredients, variantGroups, categoryId, locationId, id: _id, tenantId: _tenantId, createdAt, updatedAt, ...productData } = data;
       if (categoryId) productData.category = { connect: { id: categoryId } };
       if (locationId) productData.location = { connect: { id: locationId } };
       return await this.prisma.$transaction(async (tx) => {

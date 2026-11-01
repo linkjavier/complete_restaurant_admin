@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryItem, Prisma } from '@prisma/client';
+import { StockSyncService } from './stock-sync.service';
 
 @Injectable()
 export class InventoryService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private stockSync: StockSyncService,
+  ) {}
 
   async inventoryItem(
     inventoryItemWhereUniqueInput: Prisma.InventoryItemWhereUniqueInput,
@@ -40,12 +44,18 @@ export class InventoryService {
   }
 
   async createInventoryItem(data: Prisma.InventoryItemCreateInput): Promise<InventoryItem> {
-    return this.prisma.inventoryItem.create({
-      data,
-      include: {
-        ingredient: true,
-        location: true,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const item = await tx.inventoryItem.create({
+        data,
+        include: {
+          ingredient: true,
+          location: true,
+        },
+      });
+
+      await this.stockSync.syncFromInventoryItem(tx, item);
+
+      return item;
     });
   }
 
@@ -54,13 +64,22 @@ export class InventoryService {
     data: Prisma.InventoryItemUpdateInput;
   }): Promise<InventoryItem> {
     const { where, data } = params;
-    return this.prisma.inventoryItem.update({
-      data,
-      where,
-      include: {
-        ingredient: true,
-        location: true,
-      },
+
+    return this.prisma.$transaction(async (tx) => {
+      const item = await tx.inventoryItem.update({
+        data,
+        where,
+        include: {
+          ingredient: true,
+          location: true,
+        },
+      });
+
+      if (data.quantity !== undefined || data.minQuantity !== undefined) {
+        await this.stockSync.syncFromInventoryItem(tx, item);
+      }
+
+      return item;
     });
   }
 
@@ -73,4 +92,4 @@ export class InventoryService {
       },
     });
   }
-} 
+}

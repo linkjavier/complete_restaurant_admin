@@ -115,6 +115,32 @@ export interface Ingredient {
   updatedAt: string
 }
 
+export interface PurchaseItem {
+  id: string
+  purchaseId: string
+  ingredientId: string
+  quantity: number
+  unitCost: number
+  ingredient?: Ingredient
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Purchase {
+  id: string
+  tenantId: string
+  locationId: string
+  supplierName: string
+  purchaseDate: string
+  totalCost?: number | null
+  createdById: string
+  createdBy?: User
+  location?: Location
+  items?: PurchaseItem[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ProductIngredient {
   id: string
   productId: string
@@ -462,6 +488,54 @@ export async function deleteIngredient(id: string): Promise<void> {
   }
 }
 
+export async function getPurchases(params?: {
+  fromDate?: string
+  toDate?: string
+  ingredientId?: string
+  locationId?: string
+}): Promise<Purchase[]> {
+  const searchParams = new URLSearchParams()
+  if (params?.fromDate) searchParams.append('fromDate', params.fromDate)
+  if (params?.toDate) searchParams.append('toDate', params.toDate)
+  if (params?.ingredientId) searchParams.append('ingredientId', params.ingredientId)
+  if (params?.locationId) searchParams.append('locationId', params.locationId)
+
+  const url = `${API_URL}/purchases${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+  const response = await fetch(url, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error('Error al obtener las compras')
+  }
+  return response.json()
+}
+
+export async function createPurchase(data: {
+  supplierName: string
+  purchaseDate: string
+  locationId: string
+  totalCost?: number
+  items: {
+    ingredientId: string
+    quantity: number
+    unitCost: number
+  }[]
+}): Promise<Purchase> {
+  const response = await fetch(`${API_URL}/purchases`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(errorData.message || 'Error al crear la compra')
+  }
+  return response.json()
+}
+
 export async function createProduct(data: {
   name: string
   description?: string
@@ -708,31 +782,17 @@ export async function printKitchenTicket(orderId: string): Promise<any> {
 
 export async function getActiveOrders(tableId: string) {
   try {
-    const token = localStorage.getItem('token');
-    // if (!token) {
-    //   throw new Error('No authentication token found');
-    // }
-
-    // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?tableId=${tableId}`, {
-    //   headers: {
-    //     'Authorization': `Bearer ${token}`,
-    //     'Content-Type': 'application/json'
-    //   }
-    // });
-
-    const response = await fetch(`${API_URL}/orders?tableId=${tableId}`);
+    const response = await fetch(`${API_URL}/orders?tableId=${tableId}`, {
+      headers: getAuthHeaders(),
+    });
 
     if (!response.ok) {
-      // if (response.status === 401) {
-      //   localStorage.removeItem('token');
-      //   throw new Error('Authentication expired or invalid');
-      // }
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || 'Error al obtener las órdenes activas');
     }
 
     const orders = await response.json();
-    console.log(`Received ${orders.length} orders for table ${tableId}`);
+    console.log(`Received ${Array.isArray(orders) ? orders.length : 0} orders for table ${tableId}`);
     return orders;
   } catch (error) {
     console.error('Error fetching active orders:', error);
@@ -870,5 +930,33 @@ export async function updateCategoryOrder(orderedIds: string[]) {
   if (!response.ok) {
     throw new Error('Failed to update category order');
   }
+  return response.json();
+}
+
+export interface ProduceProductPayload {
+  productId: string;
+  quantity: number;
+  wasteQuantity?: number;
+  wasteNotes?: string;
+}
+
+export async function produceProduct(data: ProduceProductPayload) {
+  const response = await fetch(`${API_URL}/production/produce`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    const message =
+      errorBody?.message?.message ||
+      errorBody?.message ||
+      'Error al registrar la producción';
+    throw new Error(
+      typeof message === 'string' ? message : JSON.stringify(message),
+    );
+  }
+
   return response.json();
 }

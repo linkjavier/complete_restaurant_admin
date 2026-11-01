@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { InventoryModule } from '../../inventory/inventory.module';
 import { OrdersProcessorService } from './orders-processor.service';
 import { InventoryProcessorService } from './inventory-processor.service';
 import { NotificationsProcessorService } from './notifications-processor.service';
@@ -10,6 +11,7 @@ import { NotificationsProcessorService } from './notifications-processor.service
   imports: [
     ConfigModule,
     PrismaModule,
+    InventoryModule,
     BullModule.registerQueue(
       {
         name: 'orders',

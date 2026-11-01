@@ -26,6 +26,7 @@ import { STTModule } from './stt/stt.module';
 import { CustomersModule } from './customers/customers.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { GeocodingModule } from './geocoding/geocoding.module';
+import { PurchasesModule } from './purchases/purchases.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { GeocodingModule } from './geocoding/geocoding.module';
     CustomersModule,
     TenantsModule,
     GeocodingModule,
+    PurchasesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

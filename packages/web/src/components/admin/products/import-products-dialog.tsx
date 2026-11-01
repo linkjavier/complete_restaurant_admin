@@ -219,7 +219,7 @@ export function ImportProductsDialog({
                 <DialogHeader>
                     <DialogTitle>Importar desde Documento</DialogTitle>
                     <DialogDescription>
-                        Sube un PDF, Excel o Word para que la IA extraiga los productos automáticamente.
+                        Sube un PDF, una imagen (JPG, PNG, WEBP) o un Excel/Word para que la IA extraiga los productos automáticamente.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -229,13 +229,13 @@ export function ImportProductsDialog({
                             <Upload className="h-12 w-12 text-muted-foreground" />
                             <div className="text-center">
                                 <p className="font-medium">Selecciona un archivo</p>
-                                <p className="text-sm text-muted-foreground">PDF, XLSX, DOCX (Max 10MB)</p>
+                                <p className="text-sm text-muted-foreground">PDF, JPG, PNG, WEBP, XLSX, DOCX (Max 10MB)</p>
                             </div>
                             <Input
                                 type="file"
                                 className="hidden"
                                 id="file-upload"
-                                accept=".pdf,.xlsx,.xls,.docx,.doc,.csv"
+                                accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.doc,.csv,image/*"
                                 onChange={handleFileChange}
                             />
                             <Button asChild variant="outline">

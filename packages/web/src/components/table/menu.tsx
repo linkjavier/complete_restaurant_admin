@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Minus, Clock, Package, ShoppingCart, RefreshCw, Maximize2, X, Moon, Sun, Globe } from "lucide-react"
-import { getProducts, Product, Category, getActiveOrders, getCategories } from "@/lib/api"
+import { API_URL, getProducts, Product, Category, getActiveOrders, getCategories } from "@/lib/api"
 import { Cart } from "./cart"
 import Image from "next/image"
 import { toast } from "sonner"
@@ -331,7 +331,7 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
 
   // Add socket connection for real-time updates
   useEffect(() => {
-    const socket = io(`${process.env.NEXT_PUBLIC_API_URL}/orders`, {
+    const socket = io(`${API_URL}/orders`, {
       transports: ['websocket'],
       path: '/socket.io',
     });
@@ -604,26 +604,26 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
                                 </p>
                               </div>
                               <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded-full">
-                                {order.items.reduce((sum, item) => sum + item.quantity, 0)} {t('menu.items') || 'items'}
+                                {(order.items || []).reduce((sum, item) => sum + (item?.quantity || 0), 0)} {t('menu.items') || 'items'}
                               </span>
                             </div>
                             <div className="space-y-2">
-                              {order.items.map((item) => (
+                              {(order.items || []).map((item) => (
                                 <div key={item.id} className="flex justify-between items-center">
                                   <div className="flex items-center gap-2">
-                                    <p className="text-sm">{item.product.name}</p>
+                                    <p className="text-sm">{item?.product?.name || t('menu.unknownProduct') || 'Producto desconocido'}</p>
                                     <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
-                                      x{item.quantity}
+                                      x{item?.quantity || 0}
                                     </span>
                                   </div>
                                   <span className={`text-sm ${
-                                    item.status === "PENDING" ? "text-yellow-500" :
-                                    item.status === "IN_PROGRESS" ? "text-blue-500" :
+                                    item?.status === "PENDING" ? "text-yellow-500" :
+                                    item?.status === "IN_PROGRESS" ? "text-blue-500" :
                                     "text-green-500"
                                   }`}>
-                                    {item.status === "PENDING" ? t('menu.pending') || 'Pendiente' :
-                                     item.status === "IN_PROGRESS" ? t('menu.inProgress') || 'En preparación' :
-                                     item.status === "CANCELLED" ? t('menu.cancelled') || 'Cancelada' :
+                                    {item?.status === "PENDING" ? t('menu.pending') || 'Pendiente' :
+                                     item?.status === "IN_PROGRESS" ? t('menu.inProgress') || 'En preparación' :
+                                     item?.status === "CANCELLED" ? t('menu.cancelled') || 'Cancelada' :
                                      t('menu.ready') || 'Listo'}
                                   </span>
                                 </div>

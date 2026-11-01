@@ -12,6 +12,7 @@ import {
   MapPin,
   Tag,
   Package,
+  Factory,
   Users,
   Settings,
   Utensils,
@@ -96,6 +97,18 @@ const routes = [
     label: "ingredients",
     icon: Utensils,
     href: "/admin/ingredients",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
+  {
+    label: "purchases",
+    icon: ShoppingCart,
+    href: "/admin/purchases",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
+  {
+    label: "production",
+    icon: Factory,
+    href: "/admin/production",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
@@ -239,6 +252,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                 (route.href === '/admin/tables' && pathname.startsWith('/admin/tables/')) ||
                 (route.href === '/admin/products' && pathname.startsWith('/admin/products/')) ||
                 (route.href === '/admin/categories' && pathname.startsWith('/admin/categories/')) ||
+                (route.href === '/admin/purchases' && pathname.startsWith('/admin/purchases')) ||
                 (route.href === '/admin/users' && pathname.startsWith('/admin/users/')) ||
                 (route.href === '/admin/settings' && pathname.startsWith('/admin/settings/'));
 

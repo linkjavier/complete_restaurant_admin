@@ -30,6 +30,7 @@ model Tenant {
   productVariants      ProductVariant[]
   settings             Settings[]
   subscriptions        Subscription[]
+  purchases            Purchase[]
 }
 
 model User {
@@ -46,6 +47,7 @@ model User {
   locationId    String?
   orders        Order[]        @relation("orderUser")
   deletedOrders Order[]        @relation("orderDeletedBy")
+  purchases     Purchase[]     @relation("PurchaseCreatedBy")
   notifications Notification[]
   subscriptions Subscription[]
   createdAt     DateTime       @default(now())
@@ -84,6 +86,7 @@ model Location {
   whatsappChats    WhatsappChat[]
   inventoryItems   InventoryItem[]
   ingredients      Ingredient[]
+  purchases        Purchase[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   order            Int               @default(0)
@@ -156,20 +159,21 @@ model Category {
 }
 
 model Ingredient {
-  id          String              @id @default(cuid())
-  tenantId    String
-  tenant      Tenant              @relation(fields: [tenantId], references: [id])
-  name        String
-  description String?
-  quantity    Float
-  unit        String
-  minQuantity Float
-  location    Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  locationId  String
-  products    ProductIngredient[]
-  inventory   InventoryItem[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id            String              @id @default(cuid())
+  tenantId      String
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  name          String
+  description   String?
+  quantity      Float
+  unit          String
+  minQuantity   Float
+  location      Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId    String
+  products      ProductIngredient[]
+  inventory     InventoryItem[]
+  purchaseItems PurchaseItem[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@unique([tenantId, name])
   @@index([locationId])
@@ -200,6 +204,34 @@ model InventoryItem {
   updatedAt    DateTime   @updatedAt
 
   @@unique([ingredientId, locationId])
+}
+
+model Purchase {
+  id           String         @id @default(uuid())
+  tenantId     String
+  tenant       Tenant         @relation(fields: [tenantId], references: [id])
+  locationId   String
+  location     Location       @relation(fields: [locationId], references: [id])
+  supplierName String
+  purchaseDate DateTime
+  totalCost    Float?
+  createdById  String
+  createdBy    User           @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
+  items        PurchaseItem[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model PurchaseItem {
+  id           String     @id @default(cuid())
+  purchase     Purchase   @relation(fields: [purchaseId], references: [id])
+  purchaseId   String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  ingredientId String
+  quantity     Float
+  unitCost     Float
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now())
 }
 
 enum OrderType {
@@ -333,11 +365,13 @@ enum NotificationType {
 }
 
 model ProductionLog {
-  id        String   @id @default(cuid())
-  product   Product  @relation(fields: [productId], references: [id])
-  productId String
-  quantity  Float
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  product       Product  @relation(fields: [productId], references: [id])
+  productId     String
+  quantity      Float
+  wasteQuantity Float    @default(0)
+  wasteNotes    String?
+  createdAt     DateTime @default(now())
 }
 
 model WhatsappMessage {
@@ -423,52 +457,52 @@ model ProductVariant {
 }
 
 model Customer {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  name      String
-  email     String?
-  phone     String?
-  location  Location @relation(fields: [locationId], references: [id])
-  locationId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String
+  email        String?
+  phone        String?
+  location     Location @relation(fields: [locationId], references: [id])
+  locationId   String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   address      String?
-  neighborhood String?  
+  neighborhood String?
 }
 
 // Nuevos modelos para suscripciones y pagos
 model Subscription {
-  id                String              @id @default(uuid())
-  tenantId          String
-  tenant            Tenant              @relation(fields: [tenantId], references: [id])
-  userId            String
-  user              User                @relation(fields: [userId], references: [id])
-  stripeCustomerId  String?             // ID del cliente en Stripe
-  stripeSubscriptionId String?          // ID de la suscripción en Stripe
-  planName          String              // Nombre del plan (Starter, Professional, Enterprise)
-  planPrice         Decimal             @db.Decimal(10, 2)
-  status            SubscriptionStatus  @default(ACTIVE)
-  currentPeriodStart DateTime
-  currentPeriodEnd   DateTime
-  cancelAtPeriodEnd Boolean             @default(false)
-  payments          SubscriptionPayment[]
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id                   String                @id @default(uuid())
+  tenantId             String
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  userId               String
+  user                 User                  @relation(fields: [userId], references: [id])
+  stripeCustomerId     String? // ID del cliente en Stripe
+  stripeSubscriptionId String? // ID de la suscripción en Stripe
+  planName             String // Nombre del plan (Starter, Professional, Enterprise)
+  planPrice            Decimal               @db.Decimal(10, 2)
+  status               SubscriptionStatus    @default(ACTIVE)
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean               @default(false)
+  payments             SubscriptionPayment[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 }
 
 model SubscriptionPayment {
-  id              String              @id @default(uuid())
+  id              String        @id @default(uuid())
   subscriptionId  String
-  subscription    Subscription        @relation(fields: [subscriptionId], references: [id])
-  stripePaymentId String              // ID del pago en Stripe
-  amount          Decimal             @db.Decimal(10, 2)
-  currency        String              @default("USD")
-  status          PaymentStatus       @default(PENDING)
-  paymentMethod   String?             // Método de pago usado
-  metadata        Json?               // Datos adicionales del pago
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  subscription    Subscription  @relation(fields: [subscriptionId], references: [id])
+  stripePaymentId String // ID del pago en Stripe
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("USD")
+  status          PaymentStatus @default(PENDING)
+  paymentMethod   String? // Método de pago usado
+  metadata        Json? // Datos adicionales del pago
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 enum SubscriptionStatus {
