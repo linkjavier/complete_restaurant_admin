@@ -31,6 +31,7 @@ model Tenant {
   settings             Settings[]
   subscriptions        Subscription[]
   purchases            Purchase[]
+  inventoryModifications InventoryModification[]
 }
 
 model User {
@@ -48,6 +49,9 @@ model User {
   orders        Order[]        @relation("orderUser")
   deletedOrders Order[]        @relation("orderDeletedBy")
   purchases     Purchase[]     @relation("PurchaseCreatedBy")
+  inventoryModifications InventoryModification[] @relation("InventoryModificationCreatedBy")
+  appliedInventoryModifications InventoryModification[] @relation("InventoryModificationAppliedBy")
+  countedInventoryModificationItems InventoryModificationItem[] @relation("InventoryModificationItemCountedBy")
   notifications Notification[]
   subscriptions Subscription[]
   createdAt     DateTime       @default(now())
@@ -92,6 +96,7 @@ model Location {
   order            Int               @default(0)
   customers        Customer[]
   settings         Settings[]
+  inventoryModifications InventoryModification[]
 
   @@index([order])
   @@map("locations")
@@ -121,6 +126,7 @@ enum TableStatus {
 
 model Product {
   id            String                @id @default(cuid())
+  code          String                @unique @default(dbgenerated("('PRD-'::text || lpad(nextval('product_code_seq'::regclass)::text, 6, '0'::text))"))
   tenantId      String
   tenant        Tenant                @relation(fields: [tenantId], references: [id])
   name          String
@@ -164,6 +170,7 @@ model Category {
 
 model Ingredient {
   id            String              @id @default(cuid())
+  code          String              @unique @default(dbgenerated("('ING-'::text || lpad(nextval('ingredient_code_seq'::regclass)::text, 6, '0'::text))"))
   tenantId      String
   tenant        Tenant              @relation(fields: [tenantId], references: [id])
   name          String
@@ -222,6 +229,59 @@ model InventoryItem {
   updatedAt    DateTime   @updatedAt
 
   @@unique([ingredientId, locationId])
+}
+
+enum InventoryModificationStatus {
+  DRAFT
+  APPLIED
+}
+
+enum InventoryModificationItemType {
+  PRODUCT
+  INGREDIENT
+}
+
+model InventoryModification {
+  id          String                      @id @default(cuid())
+  number      Int                         @unique @default(autoincrement())
+  tenantId    String
+  tenant      Tenant                      @relation(fields: [tenantId], references: [id])
+  locationId  String
+  location    Location                    @relation(fields: [locationId], references: [id])
+  createdById String
+  createdBy   User                        @relation("InventoryModificationCreatedBy", fields: [createdById], references: [id])
+  appliedById String?
+  appliedBy   User?                       @relation("InventoryModificationAppliedBy", fields: [appliedById], references: [id])
+  status      InventoryModificationStatus @default(DRAFT)
+  notes       String?
+  appliedAt   DateTime?
+  items       InventoryModificationItem[]
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+
+  @@index([tenantId, locationId, createdAt])
+  @@index([createdById])
+}
+
+model InventoryModificationItem {
+  id              String                        @id @default(cuid())
+  modificationId  String
+  modification    InventoryModification         @relation(fields: [modificationId], references: [id], onDelete: Cascade)
+  itemType        InventoryModificationItemType
+  itemId          String
+  itemName        String
+  itemCode        String?
+  unit            String
+  countedById     String
+  countedBy       User                          @relation("InventoryModificationItemCountedBy", fields: [countedById], references: [id])
+  systemQuantity  Float
+  countedQuantity Float
+  difference      Float
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+
+  @@unique([modificationId, itemType, itemId])
+  @@index([itemId, itemType])
 }
 
 model Purchase {

@@ -47,6 +47,7 @@ export interface ProductVariantGroup {
 
 export interface Product {
   id: string;
+  code: string;
   name: string;
   description: string;
   price: number;
@@ -107,6 +108,7 @@ export interface Category {
 
 export interface Ingredient {
   id: string
+  code: string
   name: string
   description: string | null
   quantity: number
@@ -116,6 +118,93 @@ export interface Ingredient {
   location?: Location
   createdAt: string
   updatedAt: string
+}
+
+export interface InventoryStockItem {
+  id: string
+  code?: string | null
+  type: "PRODUCT" | "INGREDIENT"
+  name: string
+  description: string | null
+  quantity: number
+  unit: string
+  minQuantity?: number
+  locationId: string
+  locationName: string
+  categoryName: string | null
+  productKind: "PRODUCT" | "INTERMEDIATE" | null
+  isActive: boolean
+  image: string | null
+  updatedAt: string
+  recipeIngredients: Array<{
+    id: string
+    name: string
+    quantity: number
+    unit: string
+  }>
+  recipeComponents: Array<{
+    id: string
+    name: string
+    quantity: number
+    unit: string
+  }>
+}
+
+export interface InventoryModificationItem {
+  id: string
+  itemType: InventoryStockItem["type"]
+  itemId: string
+  itemName: string
+  itemCode: string | null
+  unit: string
+  systemQuantity: number
+  countedQuantity: number
+  difference: number
+  countedBy: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InventoryModification {
+  id: string
+  number: number
+  status: "DRAFT" | "APPLIED"
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+  appliedAt: string | null
+  createdBy: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
+  appliedBy: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  } | null
+  location: { id: string; name: string }
+  items: InventoryModificationItem[]
+}
+
+export interface InventoryModificationSummary {
+  id: string
+  number: number
+  status: InventoryModification["status"]
+  notes: string | null
+  createdAt: string
+  appliedAt: string | null
+  createdBy: InventoryModification["createdBy"]
+  appliedBy: InventoryModification["createdBy"] | null
+  location: InventoryModification["location"]
+  _count: { items: number }
 }
 
 export interface PurchaseItem {
@@ -445,6 +534,81 @@ export async function getIngredients(): Promise<Ingredient[]> {
     throw new Error("Error al obtener los ingredientes")
   }
   return response.json()
+}
+
+export async function getInventoryOverview(locationId?: string): Promise<InventoryStockItem[]> {
+  const params = new URLSearchParams()
+  if (locationId) params.set("locationId", locationId)
+  const query = params.toString()
+  const response = await fetch(
+    `${API_URL}/inventory/overview${query ? `?${query}` : ""}`,
+    { headers: getAuthHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error("No se pudo cargar el inventario")
+  }
+  return response.json()
+}
+
+async function inventoryRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_URL}/inventory/${path}`, {
+    ...init,
+    headers: { ...getAuthHeaders(), ...init?.headers },
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string | string[] } | null
+    const message = Array.isArray(body?.message) ? body.message.join(", ") : body?.message
+    throw new Error(message || "No se pudo guardar la modificación de inventario")
+  }
+  return response.json()
+}
+
+export function getInventoryModifications(): Promise<InventoryModificationSummary[]> {
+  return inventoryRequest("modifications")
+}
+
+export function getInventoryModification(id: string): Promise<InventoryModification> {
+  return inventoryRequest(`modifications/${id}`)
+}
+
+export function createInventoryModification(data: {
+  locationId: string
+  notes?: string
+}): Promise<InventoryModification> {
+  return inventoryRequest("modifications", {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+export function countInventoryModificationItem(
+  modificationId: string,
+  data: {
+    itemId: string
+    itemType: InventoryStockItem["type"]
+    countedQuantity: number
+  },
+): Promise<InventoryModificationItem> {
+  return inventoryRequest(`modifications/${modificationId}/items`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+export function removeInventoryModificationItem(
+  modificationId: string,
+  itemLineId: string,
+): Promise<{ success: boolean }> {
+  return inventoryRequest(
+    `modifications/${modificationId}/items/${itemLineId}`,
+    { method: "DELETE" },
+  )
+}
+
+export function applyInventoryModification(id: string): Promise<InventoryModification> {
+  return inventoryRequest(`modifications/${id}/apply`, {
+    method: "POST",
+  })
 }
 
 export async function createIngredient(data: {

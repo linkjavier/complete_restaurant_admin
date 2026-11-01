@@ -12,6 +12,7 @@ import {
   MapPin,
   Tag,
   Package,
+  Boxes,
   Factory,
   Users,
   Settings,
@@ -97,6 +98,12 @@ const routes = [
     label: "ingredients",
     icon: Utensils,
     href: "/admin/ingredients",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
+  {
+    label: "inventory",
+    icon: Boxes,
+    href: "/admin/inventory",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {

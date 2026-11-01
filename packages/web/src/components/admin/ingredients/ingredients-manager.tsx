@@ -124,8 +124,6 @@ export function IngredientsManager() {
         !editingIngredient.name.trim() ||
         !editingIngredient.unit.trim() ||
         !editingIngredient.locationId ||
-        !Number.isFinite(editingIngredient.quantity) ||
-        editingIngredient.quantity < 0 ||
         !Number.isFinite(editingIngredient.minQuantity) ||
         editingIngredient.minQuantity < 0
       ) {
@@ -140,7 +138,6 @@ export function IngredientsManager() {
       await updateIngredient(editingIngredient.id, {
         name: editingIngredient.name.trim(),
         description: editingIngredient.description?.trim() || undefined,
-        quantity: editingIngredient.quantity,
         unit: editingIngredient.unit.trim(),
         minQuantity: editingIngredient.minQuantity,
         locationId: editingIngredient.locationId,
@@ -157,7 +154,7 @@ export function IngredientsManager() {
       console.error('Error updating ingredient:', err)
       toast({
         title: "Error",
-        description: "Error al actualizar el ingrediente. Por favor, asegúrate de estar autenticado.",
+        description: err instanceof Error ? err.message : "No se pudo actualizar el ingrediente.",
         variant: "destructive",
       })
     }
@@ -217,22 +214,31 @@ export function IngredientsManager() {
                 }
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="quantity">Cantidad Actual</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="0"
-                step="any"
-                placeholder="Ingresa la cantidad actual"
-                value={editingIngredient ? editingIngredient.quantity : newIngredient.quantity}
-                onChange={(e) =>
-                  editingIngredient
-                    ? setEditingIngredient({ ...editingIngredient, quantity: toFiniteNumber(e.target.value) })
-                    : setNewIngredient({ ...newIngredient, quantity: toFiniteNumber(e.target.value) })
-                }
-              />
-            </div>
+            {editingIngredient ? (
+              <div className="rounded-lg border bg-muted/40 p-3">
+                <p className="text-sm font-medium">
+                  Existencias actuales: {editingIngredient.quantity} {editingIngredient.unit}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Para corregir esta cantidad, crea una modificación en Inventarios y registra el conteo físico.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label htmlFor="quantity">Cantidad inicial</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="Ingresa la cantidad inicial"
+                  value={newIngredient.quantity}
+                  onChange={(e) =>
+                    setNewIngredient({ ...newIngredient, quantity: toFiniteNumber(e.target.value) })
+                  }
+                />
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="unit">Unidad de Medida</Label>
               <Input
@@ -338,6 +344,9 @@ export function IngredientsManager() {
                   >
                     <div>
                       <p className="font-medium">{ingredient.name}</p>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground">
+                        Código: {ingredient.code}
+                      </p>
                       {ingredient.description && (
                         <p className="text-sm text-muted-foreground">
                           {ingredient.description}

@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { IngredientsService } from './ingredients.service';
 import { ApiTags } from '@nestjs/swagger';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
@@ -29,6 +39,11 @@ export class IngredientsController {
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateIngredientDto: UpdateIngredientDto) {
+    if (updateIngredientDto.quantity !== undefined) {
+      throw new BadRequestException(
+        'Para modificar existencias, crea una modificación desde el módulo Inventarios.',
+      );
+    }
     return this.ingredientsService.update(id, updateIngredientDto);
   }
 

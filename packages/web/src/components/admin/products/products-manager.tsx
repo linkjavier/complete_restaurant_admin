@@ -358,6 +358,7 @@ export function ProductsManager() {
       }
       await updateProduct(editingProduct.id, {
         ...editingProduct,
+        quantity: undefined,
         unit: editingProduct.unit.trim(),
         locationId: isSuperAdmin ? editingProduct.locationId : user?.locationId ?? "",
         ingredients: editingProduct.ingredients?.map(pi => ({
@@ -450,6 +451,7 @@ export function ProductsManager() {
       selectedProductType === "all" ||
       (selectedProductType === "intermediate" ? product.isIntermediate : !product.isIntermediate)
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesLocation && matchesCategory && matchesProductType && matchesSearch
   })
@@ -683,6 +685,9 @@ export function ProductsManager() {
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium truncate">{product.name}</p>
+                                  <p className="mt-1 font-mono text-xs text-muted-foreground">
+                                    Código: {product.code}
+                                  </p>
                                   {product.isIntermediate && (
                                     <Badge variant="secondary" className="mt-1">
                                       Preparación intermedia
@@ -841,6 +846,9 @@ export function ProductsManager() {
                                       <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0">
                                           <h3 className="font-semibold truncate">{product.name}</h3>
+                                          <p className="mt-1 font-mono text-xs text-muted-foreground">
+                                            Código: {product.code}
+                                          </p>
                                           {product.description && (
                                             <p className="text-sm text-muted-foreground line-clamp-2">
                                               {product.description}
@@ -1527,20 +1535,13 @@ export function ProductsManager() {
                       </Select>
                     </div>
                   )}
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-quantity">Stock Actual</Label>
-                    <Input
-                      id="edit-quantity"
-                      type="number"
-                      min="0"
-                      placeholder="Ingresa el stock actual"
-                      value={editingProduct.quantity || 0}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, quantity: toFiniteNumber(e.target.value) })}
-                      style={{
-                        fontSize: '16px',
-                        WebkitTextSizeAdjust: '100%'
-                      }}
-                    />
+                  <div className="rounded-lg border bg-muted/40 p-3">
+                    <p className="text-sm font-medium">
+                      Existencias actuales: {editingProduct.quantity || 0} {editingProduct.unit || "unidad"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Para corregir esta cantidad, crea una modificación en Inventarios y registra el conteo físico.
+                    </p>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-unit">Unidad de medida / producción</Label>

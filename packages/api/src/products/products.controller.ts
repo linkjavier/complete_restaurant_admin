@@ -7,13 +7,13 @@ import {
   Param,
   Delete,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
-import { CreateProductDto, UpdateProductDto, ProductVariantDto } from './product.dto';
+import { CreateProductDto, UpdateProductDto } from './product.dto';
 import { CurrentTenant } from '../auth/decorators/tenant.decorator';
-
 
 @ApiTags('products')
 @Controller('products')
@@ -52,6 +52,11 @@ export class ProductsController {
     @Body() updateProductDto: UpdateProductDto,
     @CurrentTenant() tenantId: string,
   ) {
+    if (updateProductDto.quantity !== undefined) {
+      throw new BadRequestException(
+        'Para modificar existencias, crea una modificación desde el módulo Inventarios.',
+      );
+    }
     return this.productsService.update(id, updateProductDto, tenantId);
   }
 
@@ -59,4 +64,4 @@ export class ProductsController {
   remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }
-} 
+}

@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+const { PHASE_DEVELOPMENT_SERVER } = require('next/constants');
+
+const nextConfig = (phase) => ({
+  // Keep `next build` from clearing manifests used by a running dev server.
+  distDir: phase === PHASE_DEVELOPMENT_SERVER ? '.next-dev' : '.next',
   reactStrictMode: true,
   images: {
     remotePatterns: [
@@ -24,6 +28,6 @@ const nextConfig = {
     };
     return config;
   }
-};
+});
 
 module.exports = nextConfig; 

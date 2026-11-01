@@ -17,7 +17,14 @@ export class ProductsService {
   async create(data: any, tenantId: string): Promise<any> {
     try {
       this.logger.debug(`Creating product with data: ${JSON.stringify(data)}`);
-      const { ingredients, components, variantGroups, categoryName, ...productData } = data;
+      const {
+        code: _code,
+        ingredients,
+        components,
+        variantGroups,
+        categoryName,
+        ...productData
+      } = data;
       return await this.prisma.$transaction(async (tx) => {
         await this.validateRecipe(tx, {
           tenantId,
@@ -178,6 +185,7 @@ export class ProductsService {
         variantGroups,
         categoryId,
         locationId,
+        code: _code,
         id: _id,
         tenantId: _tenantId,
         createdAt,
