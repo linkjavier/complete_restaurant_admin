@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { API_URL } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { getHomePathForRole } from "@/lib/roles";
 
 export default function SocialLoginCallbackPage() {
   const router = useRouter();
@@ -67,8 +68,8 @@ export default function SocialLoginCallbackPage() {
           );
         }
 
-        await completeLogin(result.access_token);
-        router.replace("/admin/dashboard");
+        const user = await completeLogin(result.access_token);
+        router.replace(getHomePathForRole(user.role));
       } catch (loginError) {
         setError(
           loginError instanceof Error

@@ -39,6 +39,7 @@ import { LanguageSwitch } from "@/components/language-switch"
 import "@/app/sidebar-scrollbar.css"
 import { API_URL } from '@/lib/api'
 import { useLanguage } from "@/hooks/use-language"
+import { getHomePathForRole } from "@/lib/roles"
 
 interface SidebarProps {
   isMobile?: boolean
@@ -224,7 +225,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                   </div>
                   <div
                     className="cursor-pointer"
-                    onClick={() => handleNavigation('/admin/dashboard')}
+                    onClick={() => handleNavigation(getHomePathForRole(user.role))}
                   >
                     <h1 className="text-2xl font-bold">
                       {businessName}

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { createFirstLocation } from '@/lib/api';
+import { getHomePathForRole } from '@/lib/roles';
 import { useState } from 'react';
 import {
   Dialog,
@@ -60,7 +61,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     if (!user) {
       router.push('/auth/login');
     } else if (user && allowedRoles && !allowedRoles.includes(user.role)) {
-      router.push('/');
+      router.replace(getHomePathForRole(user.role));
     }
   }, [user, isLoading, allowedRoles, router]);
 

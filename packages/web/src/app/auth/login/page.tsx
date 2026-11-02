@@ -16,6 +16,7 @@ import { API_URL } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useLanguage } from '@/hooks/use-language';
 import { LanguageSwitch } from '@/components/language-switch';
+import { getHomePathForRole } from '@/lib/roles';
 
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
@@ -126,7 +127,7 @@ export default function LoginPage() {
         description: 'You have been logged in successfully.',
       });
 
-      router.push('/admin/dashboard');
+      router.push(getHomePathForRole(data.user?.role));
     } catch (error) {
       console.error('[LoginPage] Login error:', error);
       toast({

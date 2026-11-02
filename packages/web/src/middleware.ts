@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { CHEF_HOME_PATH, getHomePathForRole, getRoleFromAccessToken } from '@/lib/roles';
 
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
@@ -17,6 +18,16 @@ export function middleware(request: NextRequest) {
   // Si hay subdominio y la ruta es '/', redirigir a /auth/login
   if (hasSubdomain && pathname === '/') {
     return NextResponse.redirect(new URL('/auth/login', request.url));
+  }
+
+  const role = token ? getRoleFromAccessToken(token) : null;
+
+  if (token && (pathname === '/' || pathname === '/auth/login')) {
+    return NextResponse.redirect(new URL(getHomePathForRole(role), request.url));
+  }
+
+  if (role === 'CHEF' && pathname.startsWith('/admin') && !pathname.startsWith(CHEF_HOME_PATH)) {
+    return NextResponse.redirect(new URL(CHEF_HOME_PATH, request.url));
   }
 
   // Public paths that don't require authentication
@@ -39,11 +50,6 @@ export function middleware(request: NextRequest) {
     const loginUrl = new URL('/auth/login', request.url);
     loginUrl.searchParams.set('from', request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
-  }
-
-  // Si el usuario ya está autenticado y accede a la landing o login, redirigir al dashboard
-  if (token && (pathname === '/' || pathname === '/auth/login')) {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url));
   }
 
   // Si hay token, permite el acceso
