@@ -251,8 +251,27 @@ export class UsersService {
 
   async remove(id: string, tenantId: string): Promise<void> {
     try {
-      await this.prisma.user.delete({ where: { id, tenantId } });
+      await this.prisma.$transaction(async (transaction) => {
+        const user = await transaction.user.findFirst({
+          where: { id, tenantId },
+          select: { email: true },
+        });
+        if (!user) {
+          throw new NotFoundException(`User with ID ${id} not found`);
+        }
+
+        await transaction.user.delete({ where: { id, tenantId } });
+        await transaction.userAccessRequest.deleteMany({
+          where: {
+            tenantId,
+            email: { equals: user.email, mode: 'insensitive' },
+          },
+        });
+      });
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       throw new NotFoundException(`User with ID ${id} not found`);
     }
   }

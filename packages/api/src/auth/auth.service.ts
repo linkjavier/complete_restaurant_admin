@@ -361,10 +361,10 @@ export class AuthService {
     const existing = await this.prisma.userAccessRequest.findUnique({
       where: { tenantId_email: { tenantId: data.tenantId, email } },
     });
-    if (existing?.status === UserAccessRequestStatus.APPROVED) {
-      throw new ConflictException('This access request has already been approved');
-    }
     if (existing) {
+      const shouldRefreshRequestDate =
+        existing.status === UserAccessRequestStatus.REJECTED ||
+        existing.status === UserAccessRequestStatus.APPROVED;
       const request = await this.prisma.userAccessRequest.update({
         where: { id: existing.id },
         data: {
@@ -373,10 +373,7 @@ export class AuthService {
           avatar: data.avatar,
           passwordHash: data.passwordHash ?? existing.passwordHash,
           status: UserAccessRequestStatus.PENDING,
-          requestedAt:
-            existing.status === UserAccessRequestStatus.REJECTED
-              ? new Date()
-              : existing.requestedAt,
+          requestedAt: shouldRefreshRequestDate ? new Date() : existing.requestedAt,
           reviewedAt: null,
           reviewedById: null,
         },
