@@ -21,6 +21,7 @@ export class TenantMiddleware implements NestMiddleware {
         '/auth/facebook',
         '/auth/oauth',
         '/settings/business',
+        '/qr-menu/public/',
         '/payments/stripe/checkout',
         '/payments/test/checkout',
         '/payments/register-with-payment',

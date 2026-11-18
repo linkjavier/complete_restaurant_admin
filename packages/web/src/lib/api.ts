@@ -67,6 +67,54 @@ export interface Product {
   variantGroups?: ProductVariantGroup[];
 }
 
+export interface QrMenuProduct {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  image: string | null;
+  categoryId: string;
+  category: { id?: string; name: string } | null;
+}
+
+export interface QrMenuBanner {
+  title: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  isActive: boolean;
+  order?: number;
+}
+
+export interface QrMenuConfiguration {
+  location: { id: string; name: string; phone: string };
+  enabled: boolean;
+  orderingEnabled: boolean;
+  primaryColor: string;
+  whatsappPhone: string;
+  products: QrMenuProduct[];
+  productIds: string[];
+  productsConfigured: boolean;
+  banners: QrMenuBanner[];
+}
+
+export interface PublicQrMenu extends Omit<QrMenuConfiguration, "productIds" | "productsConfigured"> {
+  name: string;
+  logo: string | null;
+  location: {
+    id: string;
+    name: string;
+    address: string;
+    city: string | null;
+    country: string | null;
+    phone: string;
+  };
+}
+
+export type QrMenuConfigurationUpdate = Pick<
+  QrMenuConfiguration,
+  "enabled" | "orderingEnabled" | "primaryColor" | "whatsappPhone" | "productIds" | "banners"
+>;
+
 export interface Table {
   id: string;
   number: number;
@@ -367,6 +415,49 @@ export async function getProducts(
   });
   if (!response.ok) {
     throw new Error('Error al obtener los productos');
+  }
+  return response.json();
+}
+
+export async function getQrMenuConfiguration(locationId: string): Promise<QrMenuConfiguration> {
+  const response = await fetch(
+    `${API_URL}/qr-menu/manage/${encodeURIComponent(locationId)}`,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(
+      error.message || `No se pudo cargar la configuración del Menú QR (HTTP ${response.status})`
+    );
+  }
+  return response.json();
+}
+
+export async function saveQrMenuConfiguration(
+  locationId: string,
+  configuration: QrMenuConfigurationUpdate
+): Promise<QrMenuConfiguration> {
+  const response = await fetch(
+    `${API_URL}/qr-menu/manage/${encodeURIComponent(locationId)}`,
+    {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(configuration),
+    }
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'No se pudo guardar la configuración del Menú QR');
+  }
+  return response.json();
+}
+
+export async function getPublicQrMenu(locationId: string): Promise<PublicQrMenu> {
+  const response = await fetch(
+    `${API_URL}/qr-menu/public/${encodeURIComponent(locationId)}`
+  );
+  if (!response.ok) {
+    throw new Error('Este menú no está disponible');
   }
   return response.json();
 }

@@ -359,6 +359,7 @@ export const translations = {
       pos: "POS",
       orders: "Órdenes",
       tables: "Mesas",
+      qrMenu: "Menú QR",
       kitchen: "Cocina",
       categories: "Categorías",
       products: "Productos",
@@ -689,6 +690,7 @@ export const translations = {
       pos: "POS",
       orders: "Orders",
       tables: "Tables",
+      qrMenu: "QR Menu",
       kitchen: "Kitchen",
       categories: "Categories",
       products: "Products",
@@ -1013,6 +1015,7 @@ export const translations = {
       pos: "POS",
       orders: "注文",
       tables: "テーブル",
+      qrMenu: "QRメニュー",
       kitchen: "キッチン",
       categories: "カテゴリ",
       products: "商品",
@@ -1336,6 +1339,7 @@ export const translations = {
       pos: "POS",
       orders: "Bestellungen",
       tables: "Tische",
+      qrMenu: "QR-Menü",
       kitchen: "Küche",
       categories: "Kategorien",
       products: "Produkte",
@@ -1659,6 +1663,7 @@ export const translations = {
       pos: "POS",
       orders: "Commandes",
       tables: "Tables",
+      qrMenu: "Menu QR",
       kitchen: "Cuisine",
       categories: "Catégories",
       products: "Produits",
@@ -1982,6 +1987,7 @@ export const translations = {
       pos: "POS",
       orders: "订单",
       tables: "餐桌",
+      qrMenu: "二维码菜单",
       kitchen: "厨房",
       categories: "类别",
       products: "产品",
@@ -2279,6 +2285,7 @@ export const translations = {
       pos: "POS",
       orders: "Ordini",
       tables: "Tabelle",
+      qrMenu: "Menu QR",
       kitchen: "Cucina",
       categories: "Categorie",
       products: "Prodotti",
@@ -2576,6 +2583,7 @@ export const translations = {
       pos: "POS",
       orders: "Pedidos",
       tables: "Mesas",
+      qrMenu: "Menu QR",
       kitchen: "Cozinha",
       categories: "Categorias",
       products: "Produtos",
@@ -2876,6 +2884,7 @@ export const translations = {
       pos: "POS",
       orders: "ऑर्डर",
       tables: "टेबल",
+      qrMenu: "QR मेनू",
       kitchen: "किचन",
       categories: "श्रेणियाँ",
       products: "उत्पाद",
@@ -2987,4 +2996,4 @@ export const translations = {
       noLocation: "कोई स्थान नहीं"
     }
   }
-} 
+}

@@ -6,10 +6,12 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "prebuild": "rimraf dist && npx prisma generate",
+    "prebuild": "rimraf dist && ./node_modules/.bin/prisma generate",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "prestart": "./node_modules/.bin/prisma generate",
     "start": "nest start",
+    "prestart:dev": "./node_modules/.bin/prisma generate",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
@@ -19,7 +21,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "prisma:generate": "prisma generate",
+    "prisma:generate": "./node_modules/.bin/prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "seed:dev": "ts-node prisma/seed-development.ts"
   },

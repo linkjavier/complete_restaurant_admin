@@ -27,6 +27,7 @@ import { CustomersModule } from './customers/customers.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { GeocodingModule } from './geocoding/geocoding.module';
 import { PurchasesModule } from './purchases/purchases.module';
+import { QrMenuModule } from './qr-menu/qr-menu.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { PurchasesModule } from './purchases/purchases.module';
     TenantsModule,
     GeocodingModule,
     PurchasesModule,
+    QrMenuModule,
   ],
   controllers: [AppController],
   providers: [AppService],

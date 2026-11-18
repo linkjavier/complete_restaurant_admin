@@ -24,7 +24,8 @@ import {
   Receipt,
   Bot,
   MessageCircle,
-  ContactRound
+  ContactRound,
+  QrCode
 } from "lucide-react"
 import {
   Tooltip,
@@ -76,6 +77,12 @@ const routes = [
     icon: Table,
     href: "/admin/tables",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
+  },
+  {
+    label: "qrMenu",
+    icon: QrCode,
+    href: "/admin/qr-menu",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "kitchen",
@@ -258,6 +265,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                 (route.href === '/admin/pos' && pathname.startsWith('/admin/pos/')) ||
                 (route.href === '/admin/orders' && pathname.startsWith('/admin/orders/')) ||
                 (route.href === '/admin/tables' && pathname.startsWith('/admin/tables/')) ||
+                (route.href === '/admin/qr-menu' && pathname.startsWith('/admin/qr-menu')) ||
                 (route.href === '/admin/products' && pathname.startsWith('/admin/products/')) ||
                 (route.href === '/admin/categories' && pathname.startsWith('/admin/categories/')) ||
                 (route.href === '/admin/purchases' && pathname.startsWith('/admin/purchases')) ||

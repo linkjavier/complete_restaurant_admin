@@ -31,6 +31,12 @@ Full-stack web system for comprehensive restaurant and bakery management with ta
 - Customer order history
 - Colas implementadas con bull
 
+### Public QR Menu
+- Publish a location-specific interactive menu with a shareable URL and QR code
+- Choose which active, non-intermediate sale products appear, and customize the menu color and promotional banners
+- Let customers build a cart and send a prefilled order to the business WhatsApp number
+- Online card checkout is not enabled for public menu orders until a customer-payment gateway is connected
+
 ### Kitchen Module
 - Real-time kitchen dashboard (Comunicación Websocket con Nest.js)
 - Instant order notifications

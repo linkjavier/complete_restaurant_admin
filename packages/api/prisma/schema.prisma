@@ -533,23 +533,45 @@ model WhatsappChat {
 }
 
 model Settings {
-  id           String   @id @default(cuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  locationId   String
-  location     Location @relation(fields: [locationId], references: [id])
-  aiName       String   @default("Sandra")
-  aiGender     String   @default("female")
-  aiEnabled    Boolean  @default(false)
-  businessName String   @default("Kutchen AI")
-  businessLogo String?
-  deliveryFee  Float?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                       String         @id @default(cuid())
+  tenantId                 String
+  tenant                   Tenant         @relation(fields: [tenantId], references: [id])
+  locationId               String
+  location                 Location       @relation(fields: [locationId], references: [id])
+  aiName                   String         @default("Sandra")
+  aiGender                 String         @default("female")
+  aiEnabled                Boolean        @default(false)
+  businessName             String         @default("Kutchen AI")
+  businessLogo             String?
+  deliveryFee              Float?
+  qrMenuEnabled            Boolean        @default(false)
+  qrMenuOrderingEnabled    Boolean        @default(false)
+  qrMenuPrimaryColor       String         @default("#c2410c")
+  qrMenuWhatsAppPhone      String?
+  qrMenuProductIds         String[]       @default([])
+  qrMenuProductsConfigured Boolean        @default(false)
+  qrMenuBanners            QrMenuBanner[]
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
 
   @@unique([tenantId, locationId])
   @@index([tenantId])
   @@index([locationId])
+}
+
+model QrMenuBanner {
+  id          String   @id @default(cuid())
+  settingsId  String
+  settings    Settings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([settingsId, order])
 }
 
 model ProductVariantGroup {
