@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { UploadService } from '../upload/upload.service';
 
 interface QrMenuBannerInput {
   title: string;
@@ -23,7 +24,10 @@ interface UpdateQrMenuInput {
 
 @Injectable()
 export class QrMenuService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadService: UploadService,
+  ) {}
 
   async getManagerConfiguration(locationId: string, tenantId: string) {
     const location = await this.prisma.location.findFirst({
@@ -116,6 +120,12 @@ export class QrMenuService {
         image: true,
         categoryId: true,
         category: { select: { id: true, name: true } },
+        arEnabled: true,
+        model3dUrl: true,
+        modelUsdzUrl: true,
+        modelThumbnailUrl: true,
+        modelScale: true,
+        arPlacement: true,
       },
       orderBy: { name: 'asc' },
     });
@@ -129,7 +139,29 @@ export class QrMenuService {
       primaryColor: settings.qrMenuPrimaryColor,
       whatsappPhone: settings.qrMenuWhatsAppPhone || settings.location.phone,
       banners: settings.qrMenuBanners,
-      products,
+      products: products.map((product) => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        image: product.image,
+        categoryId: product.categoryId,
+        category: product.category,
+        ar:
+          product.arEnabled && product.model3dUrl
+            ? {
+                model3dUrl: this.uploadService.toPublicModelUrl(
+                  product.model3dUrl,
+                ),
+                modelUsdzUrl: this.uploadService.toPublicModelUrl(
+                  product.modelUsdzUrl,
+                ),
+                thumbnailUrl: product.modelThumbnailUrl,
+                scale: product.modelScale,
+                placement: product.arPlacement,
+              }
+            : null,
+      })),
     };
   }
 

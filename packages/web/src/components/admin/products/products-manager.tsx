@@ -6,7 +6,17 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Trash2, Pencil, ChevronUp, List, Grid, Search, Eye, Package, AlertTriangle, Clock3 } from "lucide-react"
-import { getProducts, createProduct, deleteProduct, updateProduct, Product } from "@/lib/api"
+import {
+  getProducts,
+  createProduct,
+  deleteProduct,
+  updateProduct,
+  Product,
+  ProductArConfiguration,
+  getProductArConfiguration,
+  updateProductArConfiguration,
+  uploadProductArAsset,
+} from "@/lib/api"
 import { getCategories, Category } from "@/lib/api"
 import { getLocations, Location } from "@/lib/api"
 import { getIngredients, Ingredient } from "@/lib/api"
@@ -103,6 +113,15 @@ export function ProductsManager() {
     variantGroups: [] as any[],
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [arConfiguration, setArConfiguration] = useState<ProductArConfiguration | null>(null)
+  const [arLoading, setArLoading] = useState(false)
+  const [arLoadError, setArLoadError] = useState("")
+  const [arSaving, setArSaving] = useState(false)
+  const [arUploading, setArUploading] = useState(false)
+  const [arUploadProgress, setArUploadProgress] = useState<{
+    fileName: string
+    percent: number
+  } | null>(null)
   const { toast } = useToast()
   const { user, isLoading: isAuthLoading } = useAuth()
   const isSuperAdmin = user?.role === "SUPER_ADMIN"
@@ -397,7 +416,78 @@ export function ProductsManager() {
       ...product,
       variantGroups: product.variantGroups || [],
     })
+    setArConfiguration(null)
+    setArLoading(false)
+    setArLoadError("")
     setIsEditDialogOpen(true)
+  }
+
+  const loadArConfiguration = async () => {
+    if (!editingProduct) return
+    setArLoading(true)
+    setArLoadError("")
+    try {
+      setArConfiguration(await getProductArConfiguration(editingProduct.id))
+    } catch (cause) {
+      setArLoadError(
+        cause instanceof Error ? cause.message : "No se pudo conectar con la API.",
+      )
+    } finally {
+      setArLoading(false)
+    }
+  }
+
+  const handleArAssetUpload = async (
+    assetType: "glb" | "usdz" | "thumbnail",
+    file?: File,
+  ) => {
+    if (!editingProduct || !file) return
+    setArUploading(true)
+    setArUploadProgress({ fileName: file.name, percent: 0 })
+    try {
+      const next = await uploadProductArAsset(
+        editingProduct.id,
+        assetType,
+        file,
+        (percent) => setArUploadProgress({ fileName: file.name, percent }),
+      )
+      setArConfiguration(next)
+      toast({ title: "Archivo cargado", description: "El archivo se guardó correctamente." })
+    } catch (cause) {
+      toast({
+        title: "Error al cargar el archivo",
+        description: cause instanceof Error ? cause.message : "Intenta de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setArUploading(false)
+      setArUploadProgress(null)
+    }
+  }
+
+  const handleSaveArConfiguration = async () => {
+    if (!editingProduct || !arConfiguration) return
+    setArSaving(true)
+    try {
+      const next = await updateProductArConfiguration(editingProduct.id, {
+        enabled: arConfiguration.enabled,
+        model3dUrl: arConfiguration.model3dUrl,
+        modelUsdzUrl: arConfiguration.modelUsdzUrl,
+        modelThumbnailUrl: arConfiguration.thumbnailUrl,
+        modelScale: arConfiguration.scale,
+        arPlacement: arConfiguration.placement,
+      })
+      setArConfiguration(next)
+      toast({ title: "Configuración AR guardada" })
+    } catch (cause) {
+      toast({
+        title: "No se pudo guardar la configuración AR",
+        description: cause instanceof Error ? cause.message : "Intenta de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setArSaving(false)
+    }
   }
 
   const handleCreateDialogClose = () => {
@@ -408,6 +498,8 @@ export function ProductsManager() {
   const handleEditDialogClose = () => {
     setIsEditDialogOpen(false)
     setEditingProduct(null)
+    setArConfiguration(null)
+    setArLoadError("")
   }
 
   const addIngredient = (product: any) => {
@@ -1782,6 +1874,205 @@ export function ProductsManager() {
                     currentImage={editingProduct.image}
                   />
                 </div>
+
+                {!editingProduct.isIntermediate && (
+                  <section className="space-y-4 rounded-lg border p-4">
+                    <div>
+                      <h3 className="font-semibold">Vista 3D y realidad aumentada</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        El modelo solo aparecerá para este producto cuando esté publicado en el Menú QR.
+                      </p>
+                    </div>
+                    {arLoading ? (
+                      <p className="text-sm text-muted-foreground">Cargando configuración…</p>
+                    ) : arConfiguration?.id === editingProduct.id ? (
+                      <>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="grid gap-2">
+                            <Label htmlFor="ar-glb">Modelo 3D (GLB, la API acepta hasta 40 MB)</Label>
+                            <Input
+                              id="ar-glb"
+                              type="file"
+                              accept=".glb,model/gltf-binary"
+                              disabled={arUploading}
+                              onChange={(event) => {
+                                const file = event.currentTarget.files?.[0]
+                                event.currentTarget.value = ""
+                                void handleArAssetUpload("glb", file)
+                              }}
+                            />
+                            {arConfiguration.model3dUrl ? (
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <span className="text-green-700">
+                                  GLB listo
+                                  {arConfiguration.modelFileSize
+                                    ? ` · ${(arConfiguration.modelFileSize / (1024 * 1024)).toFixed(1)} MB`
+                                    : ""}
+                                </span>
+                                <a
+                                  href={arConfiguration.model3dUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-medium text-primary underline underline-offset-2"
+                                >
+                                  Abrir modelo
+                                </a>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">No hay modelo GLB cargado.</p>
+                            )}
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="ar-usdz">Modelo optimizado para iPhone (USDZ, la API acepta hasta 40 MB)</Label>
+                            <Input
+                              id="ar-usdz"
+                              type="file"
+                              accept=".usdz,model/vnd.usdz+zip"
+                              disabled={arUploading}
+                              onChange={(event) => {
+                                const file = event.currentTarget.files?.[0]
+                                event.currentTarget.value = ""
+                                void handleArAssetUpload("usdz", file)
+                              }}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              {arConfiguration.modelUsdzUrl ? "Modelo USDZ cargado." : "Opcional; puede generarse desde el GLB en dispositivos compatibles."}
+                            </p>
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="ar-thumbnail">Miniatura (JPG, PNG o WebP; hasta 5 MB)</Label>
+                            <Input
+                              id="ar-thumbnail"
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              disabled={arUploading}
+                              onChange={(event) => {
+                                const file = event.currentTarget.files?.[0]
+                                event.currentTarget.value = ""
+                                void handleArAssetUpload("thumbnail", file)
+                              }}
+                            />
+                            {arConfiguration.thumbnailUrl && (
+                              <img
+                                src={arConfiguration.thumbnailUrl}
+                                alt="Miniatura del modelo 3D"
+                                className="h-20 w-20 rounded-md object-cover"
+                              />
+                            )}
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="ar-placement">Ubicación sugerida en AR</Label>
+                            <Select
+                              value={arConfiguration.placement}
+                              onValueChange={(placement: "floor" | "wall") =>
+                                setArConfiguration({ ...arConfiguration, placement })
+                              }
+                            >
+                              <SelectTrigger id="ar-placement"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="floor">Mesa o superficie</SelectItem>
+                                <SelectItem value="wall">Pared</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          {(["x", "y", "z"] as const).map((axis) => (
+                            <div key={axis} className="grid gap-2">
+                              <Label htmlFor={`ar-scale-${axis}`}>Escala {axis.toUpperCase()}</Label>
+                              <Input
+                                id={`ar-scale-${axis}`}
+                                type="number"
+                                min="0.1"
+                                max="10"
+                                step="0.1"
+                                value={arConfiguration.scale?.[axis] ?? 1}
+                                onChange={(event) => {
+                                  const value = Number(event.currentTarget.value)
+                                  if (!Number.isFinite(value)) return
+                                  setArConfiguration({
+                                    ...arConfiguration,
+                                    scale: {
+                                      x: arConfiguration.scale?.x ?? 1,
+                                      y: arConfiguration.scale?.y ?? 1,
+                                      z: arConfiguration.scale?.z ?? 1,
+                                      [axis]: value,
+                                    },
+                                  })
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex flex-col gap-3 rounded-md bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-center gap-3">
+                            <Switch
+                              id="ar-enabled"
+                              checked={arConfiguration.enabled}
+                              disabled={!arConfiguration.model3dUrl || arUploading}
+                              onCheckedChange={(enabled) =>
+                                setArConfiguration({ ...arConfiguration, enabled })
+                              }
+                            />
+                            <Label htmlFor="ar-enabled">Mostrar vista 3D y botón de realidad aumentada</Label>
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={() => void handleSaveArConfiguration()}
+                            disabled={arSaving || arUploading}
+                            className="w-full sm:w-auto"
+                          >
+                            {arSaving ? "Guardando…" : "Guardar configuración AR"}
+                          </Button>
+                        </div>
+                        {arUploadProgress && (
+                          <div className="space-y-2 rounded-md border p-3" role="status" aria-live="polite">
+                            <div className="flex flex-wrap justify-between gap-2 text-sm">
+                              <span className="min-w-0 break-all">
+                                Subiendo {arUploadProgress.fileName}
+                              </span>
+                              <span>{arUploadProgress.percent}%</span>
+                            </div>
+                            <div
+                              className="h-2 overflow-hidden rounded-full bg-muted"
+                              role="progressbar"
+                              aria-label={`Progreso de carga de ${arUploadProgress.fileName}`}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-valuenow={arUploadProgress.percent}
+                            >
+                              <div
+                                className="h-full bg-primary transition-[width]"
+                                style={{ width: `${arUploadProgress.percent}%` }}
+                              />
+                            </div>
+                            {arUploadProgress.percent === 100 && (
+                              <p className="text-xs text-muted-foreground">
+                                Archivo enviado; esperando confirmación del servidor…
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="space-y-3">
+                        {arLoadError && (
+                          <p role="alert" className="text-sm text-destructive">
+                            No se pudo cargar AR: {arLoadError}. Verifica que la API esté actualizada, reiníciala y aplica las migraciones.
+                          </p>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void loadArConfiguration()}
+                          disabled={arLoading}
+                        >
+                          {arLoadError ? "Reintentar carga AR" : "Configurar vista 3D y AR"}
+                        </Button>
+                      </div>
+                    )}
+                  </section>
+                )}
 
                 <div className="grid gap-2">
                   <Label>Ingredientes</Label>

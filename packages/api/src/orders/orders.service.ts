@@ -259,7 +259,22 @@ export class OrdersService {
         this.logger.log(`Background processing jobs queued for order ${order.id}`);
       }
 
-      return order;
+      return {
+        ...order,
+        items: order.items.map((item) => {
+          const {
+            arEnabled: _arEnabled,
+            model3dUrl: _model3dUrl,
+            modelUsdzUrl: _modelUsdzUrl,
+            modelThumbnailUrl: _modelThumbnailUrl,
+            modelScale: _modelScale,
+            arPlacement: _arPlacement,
+            modelFileSize: _modelFileSize,
+            ...product
+          } = item.product;
+          return { ...item, product };
+        }),
+      };
     } catch (error) {
       this.logger.error(`Error creating order: ${error.message}`, error.stack);
       throw error;

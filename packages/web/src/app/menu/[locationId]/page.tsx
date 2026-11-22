@@ -3,10 +3,12 @@
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
-import { Minus, Plus, Search, ShoppingBag } from "lucide-react"
+import { Minus, Plus, Search, ShoppingBag, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getPublicQrMenu, PublicQrMenu } from "@/lib/api"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { getPublicQrMenu, PublicQrMenu, QrMenuProduct } from "@/lib/api"
+import { ArProductViewer } from "@/components/qr-menu/ar-product-viewer"
 
 const money = new Intl.NumberFormat("es-CO", {
   style: "currency",
@@ -24,6 +26,7 @@ export default function PublicQrMenuPage() {
   const [search, setSearch] = useState("")
   const [customerName, setCustomerName] = useState("")
   const [cart, setCart] = useState<Record<string, number>>({})
+  const [selectedArProduct, setSelectedArProduct] = useState<QrMenuProduct | null>(null)
 
   useEffect(() => {
     let active = true
@@ -221,6 +224,18 @@ export default function PublicQrMenuPage() {
                         {product.category && <p className="text-xs font-medium text-stone-500">{product.category.name}</p>}
                         {product.description && <p className="mt-2 line-clamp-3 break-words text-sm text-stone-600 [overflow-wrap:anywhere]">{product.description}</p>}
                       </div>
+                      {product.ar && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => setSelectedArProduct(product)}
+                          style={{ borderColor: menu.primaryColor, color: menu.primaryColor }}
+                        >
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Ver en 3D y realidad aumentada
+                        </Button>
+                      )}
                       {menu.orderingEnabled && (
                         <div className="flex items-center justify-between border-t pt-3">
                           <span className="text-sm text-stone-500">Agregar al pedido</span>
@@ -316,6 +331,27 @@ export default function PublicQrMenuPage() {
           <p className="text-xs text-stone-500 sm:col-span-2">© {new Date().getFullYear()} {menu.name}</p>
         </div>
       </footer>
+      <Dialog
+        open={!!selectedArProduct}
+        onOpenChange={(open) => !open && setSelectedArProduct(null)}
+      >
+        <DialogContent className="w-[calc(100%-1rem)] max-w-3xl p-4 sm:p-6">
+          {selectedArProduct?.ar && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedArProduct.name}</DialogTitle>
+                <DialogDescription>
+                  Explora el producto en 3D o usa el botón del visor para colocarlo en tu espacio con realidad aumentada.
+                </DialogDescription>
+              </DialogHeader>
+              <ArProductViewer
+                productName={selectedArProduct.name}
+                experience={selectedArProduct.ar}
+              />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }

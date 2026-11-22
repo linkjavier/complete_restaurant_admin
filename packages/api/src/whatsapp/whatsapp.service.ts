@@ -92,7 +92,6 @@ export class WhatsappService {
           puppeteer: puppeteerOptions,
           qrMaxRetries: 5,
           authTimeoutMs: 60000,
-          restartOnAuthFail: true,
           takeoverOnConflict: true,
           takeoverTimeoutMs: 10000,
         });

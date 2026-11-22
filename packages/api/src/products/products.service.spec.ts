@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { UploadService } from '../upload/upload.service';
 import { ProductsService } from './products.service';
 
 describe('ProductsService recipes', () => {
@@ -26,6 +27,7 @@ describe('ProductsService recipes', () => {
   };
   const mockPrisma = {
     $transaction: jest.fn((callback) => callback(mockTx)),
+    product: { findMany: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -40,6 +42,10 @@ describe('ProductsService recipes', () => {
       providers: [
         ProductsService,
         { provide: PrismaService, useValue: mockPrisma },
+        {
+          provide: UploadService,
+          useValue: { toPublicModelUrl: (url: string | null) => url },
+        },
       ],
     }).compile();
 
@@ -66,6 +72,7 @@ describe('ProductsService recipes', () => {
       },
       select: { id: true },
     });
+
     expect(mockTx.productComponent.create).toHaveBeenCalledWith({
       data: {
         productId: 'burger',
@@ -73,6 +80,73 @@ describe('ProductsService recipes', () => {
         quantity: 2,
       },
     });
+  });
+
+  it('does not accept AR configuration through the generic product create flow', async () => {
+    await service.create(
+      {
+        name: 'Hamburguesa',
+        locationId: 'loc-1',
+        arEnabled: true,
+        model3dUrl: 'https://example.com/model.glb',
+        modelUsdzUrl: 'https://example.com/model.usdz',
+      },
+      'tenant-1',
+    );
+
+    expect(mockTx.product.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({
+          arEnabled: true,
+          model3dUrl: 'https://example.com/model.glb',
+          modelUsdzUrl: 'https://example.com/model.usdz',
+        }),
+      }),
+    );
+  });
+
+  it('does not accept AR configuration through the generic product update flow', async () => {
+    mockTx.product.findFirst.mockResolvedValue({
+      id: 'burger',
+      locationId: 'loc-1',
+      ingredients: [],
+      components: [],
+    });
+    mockTx.product.update.mockResolvedValue({ id: 'burger' });
+
+    await service.update(
+      'burger',
+      {
+        arEnabled: true,
+        model3dUrl: 'https://example.com/model.glb',
+      },
+      'tenant-1',
+    );
+
+    expect(mockTx.product.update).toHaveBeenCalledWith({
+      where: { id: 'burger' },
+      data: {},
+    });
+  });
+
+  it('does not expose AR configuration from the general product listing', async () => {
+    mockPrisma.product.findMany.mockResolvedValue([
+      {
+        id: 'burger',
+        name: 'Hamburguesa',
+        arEnabled: true,
+        model3dUrl: 'https://example.com/model.glb',
+        modelUsdzUrl: null,
+        modelThumbnailUrl: null,
+        modelScale: null,
+        arPlacement: 'floor',
+        modelFileSize: 1024,
+      },
+    ]);
+
+    await expect(
+      service.findAll({ tenantId: 'tenant-1', locationId: 'loc-1' }),
+    ).resolves.toEqual([{ id: 'burger', name: 'Hamburguesa' }]);
   });
 
   it('rejects intermediate products from a different location', async () => {

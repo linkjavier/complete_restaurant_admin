@@ -75,6 +75,67 @@ export interface QrMenuProduct {
   image: string | null;
   categoryId: string;
   category: { id?: string; name: string } | null;
+  ar: ProductArExperience | null;
+}
+
+export interface ProductArExperience {
+  model3dUrl: string;
+  modelUsdzUrl: string | null;
+  thumbnailUrl: string | null;
+  scale: { x: number; y: number; z: number } | null;
+  placement: "floor" | "wall";
+}
+
+export interface ProductArConfiguration {
+  id: string;
+  enabled: boolean;
+  model3dUrl: string | null;
+  modelUsdzUrl: string | null;
+  thumbnailUrl: string | null;
+  scale: { x: number; y: number; z: number } | null;
+  placement: "floor" | "wall";
+  modelFileSize: number | null;
+}
+
+interface ProductArAssetResponse {
+  id: string;
+  arEnabled: boolean;
+  model3dUrl: string | null;
+  modelUsdzUrl: string | null;
+  modelThumbnailUrl: string | null;
+  modelScale: { x: number; y: number; z: number } | null;
+  arPlacement: "floor" | "wall";
+  modelFileSize: number | null;
+}
+
+interface ApiErrorResponse {
+  message?: string | string[];
+}
+
+function isProductArAssetResponse(
+  value: Partial<ProductArAssetResponse>,
+): value is ProductArAssetResponse {
+  const scale = value.modelScale
+  const validScale =
+    scale === null ||
+    (typeof scale === "object" &&
+      scale !== undefined &&
+      Number.isFinite(scale.x) &&
+      Number.isFinite(scale.y) &&
+      Number.isFinite(scale.z))
+  return (
+    typeof value.id === "string" &&
+    typeof value.arEnabled === "boolean" &&
+    (value.model3dUrl === null || typeof value.model3dUrl === "string") &&
+    (value.modelUsdzUrl === null || typeof value.modelUsdzUrl === "string") &&
+    (value.modelThumbnailUrl === null ||
+      typeof value.modelThumbnailUrl === "string") &&
+    validScale &&
+    (value.arPlacement === "floor" || value.arPlacement === "wall") &&
+    (value.modelFileSize === null ||
+      (typeof value.modelFileSize === "number" &&
+        Number.isFinite(value.modelFileSize)))
+  )
 }
 
 export interface QrMenuBanner {
@@ -919,6 +980,127 @@ export async function updateProduct(id: string, data: {
     )
   }
   return response.json()
+}
+
+export async function getProductArConfiguration(
+  productId: string,
+): Promise<ProductArConfiguration> {
+  const response = await fetch(`${API_URL}/products/${productId}/ar`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.message || "No se pudo cargar la configuración AR")
+  }
+  const data = await response.json()
+  return {
+    ...data,
+    enabled: data.arEnabled,
+    model3dUrl: data.model3dUrl,
+    modelUsdzUrl: data.modelUsdzUrl,
+    thumbnailUrl: data.modelThumbnailUrl,
+    scale: data.modelScale,
+    placement: data.arPlacement,
+  }
+}
+
+export async function updateProductArConfiguration(
+  productId: string,
+  configuration: {
+    enabled: boolean;
+    model3dUrl?: string | null;
+    modelUsdzUrl?: string | null;
+    modelThumbnailUrl?: string | null;
+    modelScale?: { x: number; y: number; z: number } | null;
+    arPlacement?: "floor" | "wall";
+  },
+): Promise<ProductArConfiguration> {
+  const response = await fetch(`${API_URL}/products/${productId}/ar`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(configuration),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.message || "No se pudo guardar la configuración AR")
+  }
+  const data = await response.json()
+  return {
+    ...data,
+    enabled: data.arEnabled,
+    model3dUrl: data.model3dUrl,
+    modelUsdzUrl: data.modelUsdzUrl,
+    thumbnailUrl: data.modelThumbnailUrl,
+    scale: data.modelScale,
+    placement: data.arPlacement,
+  }
+}
+
+export async function uploadProductArAsset(
+  productId: string,
+  assetType: "glb" | "usdz" | "thumbnail",
+  file: File,
+  onProgress?: (progress: number) => void,
+): Promise<ProductArConfiguration> {
+  const body = new FormData()
+  body.append("file", file)
+  const data = await new Promise<ProductArAssetResponse>((resolve, reject) => {
+    const request = new XMLHttpRequest()
+    request.open(
+      "POST",
+      `${API_URL}/products/${productId}/ar/assets/${assetType}`,
+    )
+    Object.entries(getAuthHeaders(true)).forEach(([name, value]) => {
+      request.setRequestHeader(name, value)
+    })
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) {
+        onProgress?.(Math.round((event.loaded / event.total) * 100))
+      }
+    })
+    request.addEventListener("load", () => {
+      let payload: unknown
+      try {
+        payload = JSON.parse(request.responseText)
+      } catch {
+        reject(new Error("La API devolvió una respuesta inválida al cargar el archivo AR"))
+        return
+      }
+      if (typeof payload !== "object" || payload === null) {
+        reject(new Error("La API devolvió una respuesta inválida al cargar el archivo AR"))
+        return
+      }
+      const response = payload as Partial<ProductArAssetResponse> & ApiErrorResponse
+      if (request.status < 200 || request.status >= 300) {
+        const message = Array.isArray(response.message)
+          ? response.message.join(", ")
+          : response.message
+        reject(new Error(message || "No se pudo cargar el archivo AR"))
+        return
+      }
+      if (!isProductArAssetResponse(response)) {
+        reject(new Error("La API devolvió datos incompletos al cargar el archivo AR"))
+        return
+      }
+      resolve(response)
+    })
+    request.addEventListener("error", () => {
+      reject(new Error("No se pudo conectar con la API para cargar el archivo AR"))
+    })
+    request.addEventListener("abort", () => {
+      reject(new Error("La carga del archivo AR fue cancelada"))
+    })
+    request.send(body)
+  })
+  return {
+    ...data,
+    enabled: data.arEnabled,
+    model3dUrl: data.model3dUrl,
+    modelUsdzUrl: data.modelUsdzUrl,
+    thumbnailUrl: data.modelThumbnailUrl,
+    scale: data.modelScale,
+    placement: data.arPlacement,
+  }
 }
 
 export async function deleteProduct(id: string): Promise<void> {

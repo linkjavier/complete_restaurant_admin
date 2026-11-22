@@ -167,32 +167,39 @@ enum TableStatus {
 }
 
 model Product {
-  id             String                @id @default(cuid())
-  code           String                @unique @default(dbgenerated("('PRD-'::text || lpad(nextval('product_code_seq'::regclass)::text, 6, '0'::text))"))
-  tenantId       String
-  tenant         Tenant                @relation(fields: [tenantId], references: [id])
-  name           String
-  description    String?
-  price          Float
-  image          String?
-  category       Category              @relation(fields: [categoryId], references: [id])
-  categoryId     String
-  isActive       Boolean               @default(true)
-  isFinal        Boolean               @default(false)
-  isIntermediate Boolean               @default(false)
-  quantity       Float                 @default(0)
-  unit           String                @default("unidad")
-  location       Location              @relation(fields: [locationId], references: [id])
-  locationId     String
-  ingredients    ProductIngredient[]
-  components     ProductComponent[]    @relation("ProductRecipe")
-  usedInRecipes  ProductComponent[]    @relation("RecipeComponent")
-  orderItems     OrderItem[]
-  productions    ProductionLog[]
-  variants       ProductVariant[]
-  variantGroups  ProductVariantGroup[]
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  id                String                @id @default(cuid())
+  code              String                @unique @default(dbgenerated("('PRD-'::text || lpad(nextval('product_code_seq'::regclass)::text, 6, '0'::text))"))
+  tenantId          String
+  tenant            Tenant                @relation(fields: [tenantId], references: [id])
+  name              String
+  description       String?
+  price             Float
+  image             String?
+  category          Category              @relation(fields: [categoryId], references: [id])
+  categoryId        String
+  isActive          Boolean               @default(true)
+  isFinal           Boolean               @default(false)
+  isIntermediate    Boolean               @default(false)
+  arEnabled         Boolean               @default(false)
+  model3dUrl        String?
+  modelUsdzUrl      String?
+  modelThumbnailUrl String?
+  modelScale        Json?
+  arPlacement       String                @default("floor")
+  modelFileSize     Int?
+  quantity          Float                 @default(0)
+  unit              String                @default("unidad")
+  location          Location              @relation(fields: [locationId], references: [id])
+  locationId        String
+  ingredients       ProductIngredient[]
+  components        ProductComponent[]    @relation("ProductRecipe")
+  usedInRecipes     ProductComponent[]    @relation("RecipeComponent")
+  orderItems        OrderItem[]
+  productions       ProductionLog[]
+  variants          ProductVariant[]
+  variantGroups     ProductVariantGroup[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 }
 
 model Category {

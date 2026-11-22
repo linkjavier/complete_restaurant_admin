@@ -9,9 +9,9 @@
     "prebuild": "rimraf dist && ./node_modules/.bin/prisma generate",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "prestart": "./node_modules/.bin/prisma generate",
+    "prestart": "npm rebuild bcrypt --workspace=@blondie/api && ./node_modules/.bin/prisma generate",
     "start": "nest start",
-    "prestart:dev": "./node_modules/.bin/prisma generate",
+    "prestart:dev": "npm rebuild bcrypt --workspace=@blondie/api && ./node_modules/.bin/prisma generate",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
@@ -26,6 +26,7 @@
     "seed:dev": "ts-node prisma/seed-development.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.750.0",
     "@nestjs/bull": "^10.2.3",
     "@nestjs/bullmq": "^11.0.2",
     "@nestjs/common": "^10.4.19",

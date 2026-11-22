@@ -8,11 +8,200 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { UpdateProductArDto } from './product-ar.dto';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private readonly uploadService: UploadService,
+  ) {}
+
+  async assertProductInTenant(id: string, tenantId: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, tenantId },
+      select: { id: true },
+    });
+    if (!product) {
+      throw new NotFoundException('Producto no encontrado');
+    }
+  }
+
+  async assertProductInLocation(
+    id: string,
+    tenantId: string,
+    locationId: string,
+  ) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, tenantId, locationId },
+      select: { id: true },
+    });
+    if (!product) {
+      throw new NotFoundException('Producto no encontrado en esta sede');
+    }
+  }
+
+  async getArConfiguration(id: string, tenantId: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, tenantId },
+      select: {
+        id: true,
+        arEnabled: true,
+        model3dUrl: true,
+        modelUsdzUrl: true,
+        modelThumbnailUrl: true,
+        modelScale: true,
+        arPlacement: true,
+        modelFileSize: true,
+      },
+    });
+    if (!product) {
+      throw new NotFoundException('Producto no encontrado');
+    }
+    return this.mapPublicModelUrls(product);
+  }
+
+  async updateArConfiguration(
+    id: string,
+    tenantId: string,
+    input: UpdateProductArDto,
+  ) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, tenantId },
+      select: { id: true, model3dUrl: true },
+    });
+    if (!product) {
+      throw new NotFoundException('Producto no encontrado');
+    }
+
+    const model3dUrl = input.model3dUrl === undefined
+      ? product.model3dUrl
+      : input.model3dUrl;
+    if (input.enabled && !model3dUrl) {
+      throw new BadRequestException(
+        'Carga un modelo GLB antes de activar la experiencia AR',
+      );
+    }
+    this.validateModelUrl(input.model3dUrl, ['glb']);
+    this.validateModelUrl(input.modelUsdzUrl, ['usdz']);
+    this.validateModelUrl(input.modelThumbnailUrl, [
+      'jpg',
+      'jpeg',
+      'png',
+      'webp',
+    ]);
+
+    const updatedProduct = await this.prisma.product.update({
+      where: { id },
+      data: {
+        arEnabled: input.enabled,
+        ...(input.model3dUrl !== undefined && {
+          model3dUrl: input.model3dUrl || null,
+        }),
+        ...(input.modelUsdzUrl !== undefined && {
+          modelUsdzUrl: input.modelUsdzUrl || null,
+        }),
+        ...(input.modelThumbnailUrl !== undefined && {
+          modelThumbnailUrl: input.modelThumbnailUrl || null,
+        }),
+        ...(input.modelScale !== undefined && {
+          modelScale:
+            input.modelScale === null
+              ? Prisma.DbNull
+              : {
+                  x: input.modelScale.x,
+                  y: input.modelScale.y,
+                  z: input.modelScale.z,
+                },
+        }),
+        ...(input.arPlacement !== undefined && {
+          arPlacement: input.arPlacement,
+        }),
+      },
+      select: {
+        id: true,
+        arEnabled: true,
+        model3dUrl: true,
+        modelUsdzUrl: true,
+        modelThumbnailUrl: true,
+        modelScale: true,
+        arPlacement: true,
+        modelFileSize: true,
+      },
+    });
+    return this.mapPublicModelUrls(updatedProduct);
+  }
+
+  async setArAsset(
+    id: string,
+    tenantId: string,
+    assetType: 'glb' | 'usdz' | 'thumbnail',
+    url: string,
+    fileSize: number,
+  ) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, tenantId },
+      select: { id: true },
+    });
+    if (!product) {
+      throw new NotFoundException('Producto no encontrado');
+    }
+    const field = {
+      glb: 'model3dUrl',
+      usdz: 'modelUsdzUrl',
+      thumbnail: 'modelThumbnailUrl',
+    } as const;
+    const updatedProduct = await this.prisma.product.update({
+      where: { id },
+      data: {
+        [field[assetType]]: url,
+        ...(assetType === 'glb' && { modelFileSize: fileSize }),
+      },
+      select: {
+        id: true,
+        arEnabled: true,
+        model3dUrl: true,
+        modelUsdzUrl: true,
+        modelThumbnailUrl: true,
+        modelScale: true,
+        arPlacement: true,
+        modelFileSize: true,
+      },
+    });
+    return this.mapPublicModelUrls(updatedProduct);
+  }
+
+  private mapPublicModelUrls<
+    T extends { model3dUrl: string | null; modelUsdzUrl: string | null },
+  >(product: T): T {
+    return {
+      ...product,
+      model3dUrl: this.uploadService.toPublicModelUrl(product.model3dUrl),
+      modelUsdzUrl: this.uploadService.toPublicModelUrl(product.modelUsdzUrl),
+    };
+  }
+
+  private validateModelUrl(value: string | null | undefined, extensions: string[]) {
+    if (value == null) {
+      return;
+    }
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new BadRequestException('La URL del modelo no es válida');
+    }
+    if (
+      url.protocol !== 'https:' ||
+      !extensions.includes(url.pathname.split('.').pop()?.toLowerCase() || '')
+    ) {
+      throw new BadRequestException(
+        `La URL del archivo debe usar HTTPS y una extensión válida (${extensions.join(', ')})`,
+      );
+    }
+  }
 
   async create(data: any, tenantId: string): Promise<any> {
     try {
@@ -23,9 +212,16 @@ export class ProductsService {
         components,
         variantGroups,
         categoryName,
+        arEnabled: _arEnabled,
+        model3dUrl: _model3dUrl,
+        modelUsdzUrl: _modelUsdzUrl,
+        modelThumbnailUrl: _modelThumbnailUrl,
+        modelScale: _modelScale,
+        arPlacement: _arPlacement,
+        modelFileSize: _modelFileSize,
         ...productData
       } = data;
-      return await this.prisma.$transaction(async (tx) => {
+      const createdProduct = await this.prisma.$transaction(async (tx) => {
         await this.validateRecipe(tx, {
           tenantId,
           locationId: productData.locationId,
@@ -110,6 +306,20 @@ export class ProductsService {
           },
         });
       });
+      if (!createdProduct) {
+        return null;
+      }
+      const {
+        arEnabled: _arEnabledResponse,
+        model3dUrl: _model3dUrlResponse,
+        modelUsdzUrl: _modelUsdzUrlResponse,
+        modelThumbnailUrl: _modelThumbnailUrlResponse,
+        modelScale: _modelScaleResponse,
+        arPlacement: _arPlacementResponse,
+        modelFileSize: _modelFileSizeResponse,
+        ...safeProduct
+      } = createdProduct;
+      return safeProduct;
     } catch (error) {
       if (error instanceof HttpException) throw error;
       this.logger.error(`Error creating product: ${error.message}`);
@@ -120,7 +330,7 @@ export class ProductsService {
 
   async findAll({ tenantId, locationId, categoryId, search }: { tenantId: string; locationId: string; categoryId?: string; search?: string; }) {
     try {
-      return this.prisma.product.findMany({
+      const products = await this.prisma.product.findMany({
         where: {
           tenantId,
           locationId,
@@ -148,6 +358,17 @@ export class ProductsService {
           components: { include: { component: true } },
         },
       });
+      return products.map((product) => {
+        const safeProduct = { ...product };
+        delete safeProduct.arEnabled;
+        delete safeProduct.model3dUrl;
+        delete safeProduct.modelUsdzUrl;
+        delete safeProduct.modelThumbnailUrl;
+        delete safeProduct.modelScale;
+        delete safeProduct.arPlacement;
+        delete safeProduct.modelFileSize;
+        return safeProduct;
+      });
     } catch (error) {
       this.logger.error(`Error finding products: ${error.message}`);
       throw new InternalServerErrorException(`Error finding products: ${error.message}`);
@@ -156,7 +377,7 @@ export class ProductsService {
 
   async findOne(id: string): Promise<any> {
     try {
-      return this.prisma.product.findUnique({
+      const product = await this.prisma.product.findUnique({
         where: { id },
         include: {
           category: true,
@@ -171,6 +392,20 @@ export class ProductsService {
           },
         },
       });
+      if (!product) {
+        return null;
+      }
+      const {
+        arEnabled,
+        model3dUrl,
+        modelUsdzUrl,
+        modelThumbnailUrl,
+        modelScale,
+        arPlacement,
+        modelFileSize,
+        ...publicProduct
+      } = product;
+      return publicProduct;
     } catch (error) {
       this.logger.error(`Error finding product ${id}: ${error.message}`);
       throw new InternalServerErrorException(`Error finding product: ${error.message}`);
@@ -190,11 +425,18 @@ export class ProductsService {
         tenantId: _tenantId,
         createdAt,
         updatedAt,
+        arEnabled: _arEnabled,
+        model3dUrl: _model3dUrl,
+        modelUsdzUrl: _modelUsdzUrl,
+        modelThumbnailUrl: _modelThumbnailUrl,
+        modelScale: _modelScale,
+        arPlacement: _arPlacement,
+        modelFileSize: _modelFileSize,
         ...productData
       } = data;
       if (categoryId) productData.category = { connect: { id: categoryId } };
       if (locationId) productData.location = { connect: { id: locationId } };
-      return await this.prisma.$transaction(async (tx) => {
+      const updatedProduct = await this.prisma.$transaction(async (tx) => {
         const existing = await tx.product.findFirst({
           where: { id, tenantId },
           include: { ingredients: true, components: true },
@@ -308,6 +550,20 @@ export class ProductsService {
           },
         });
       });
+      if (!updatedProduct) {
+        return null;
+      }
+      const {
+        arEnabled: _arEnabledResponse,
+        model3dUrl: _model3dUrlResponse,
+        modelUsdzUrl: _modelUsdzUrlResponse,
+        modelThumbnailUrl: _modelThumbnailUrlResponse,
+        modelScale: _modelScaleResponse,
+        arPlacement: _arPlacementResponse,
+        modelFileSize: _modelFileSizeResponse,
+        ...safeProduct
+      } = updatedProduct;
+      return safeProduct;
     } catch (error) {
       if (error instanceof HttpException) throw error;
       this.logger.error(`Error updating product ${id}: ${error.message}`);
