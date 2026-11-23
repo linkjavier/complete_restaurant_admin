@@ -10,21 +10,30 @@ import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import { 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  CreditCard, 
-  Printer, 
-  Receipt, 
+import {
+  Clock,
+  CheckCircle2,
+  XCircle,
+  CreditCard,
+  Printer,
+  Receipt,
   AlertCircle,
   Timer,
   Nfc,
-  HandCoins
+  HandCoins,
+  MapPin
 } from "lucide-react"
 import { useOrderSocket } from "@/hooks/use-order-socket"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { getLocations, Location } from "@/lib/api"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { API_URL } from '@/lib/api'
 
 // Tipos para las órdenes
@@ -61,6 +70,9 @@ interface Order {
   table?: {
     number: number
   }
+  location?: {
+    name: string
+  }
   items: OrderItem[]
   status: OrderStatus
   paymentMethod?: PaymentMethod
@@ -76,6 +88,7 @@ interface Order {
   source?: string
   deliveryFee?: number
   subtotal?: number
+  isDeleted?: boolean | null
   deletedBy?: {
     firstName: string
     lastName: string
@@ -85,6 +98,8 @@ interface Order {
 
 export function OrdersManager() {
   const [orders, setOrders] = useState<Order[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("all")
   const [deletedOrders, setDeletedOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,34 +121,55 @@ export function OrdersManager() {
         setLoading(false);
       }
     };
-    
+
     initialFetch();
     const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
+  }, [selectedLocationId]); // Recargar cuando cambie la ubicación seleccionada
+
+  // Fetch locations
+  useEffect(() => {
+    const fetchLocationsData = async () => {
+      try {
+        const data = await getLocations();
+        setLocations(data);
+      } catch (err) {
+        console.error('Error fetching locations:', err);
+      }
+    };
+    fetchLocationsData();
   }, []);
 
   // Join orders room when socket is connected and user has a locationId
   useEffect(() => {
-    if (connected && user?.locationId) {
-      try {
-        console.log(`Trying to join orders-${user.locationId} channel...`);
-        
-        setTimeout(() => {
-          const joined = emit('join-kitchen', user.locationId);
-          console.log(`Emit join-kitchen for location: ${user.locationId}. Success: ${joined}`);
-          
-          if (joined) {
-            setTimeout(() => {
-              console.log("Testing WebSocket by emitting a test message");
-              emit('ping', { test: 'message' });
-            }, 1000);
-          }
-        }, 500);
-      } catch (error) {
-        console.error("Error joining orders channel:", error);
+    if (connected) {
+      // Si es SUPER_ADMIN y tiene una ubicación seleccionada que no sea "todas"
+      // o si es un usuario normal con ubicación asignada.
+      const locationToJoin = (user?.role === 'SUPER_ADMIN' && selectedLocationId !== 'all')
+        ? selectedLocationId
+        : user?.locationId;
+
+      if (locationToJoin) {
+        try {
+          console.log(`Trying to join orders-${locationToJoin} channel...`);
+
+          setTimeout(() => {
+            const joined = emit('join-kitchen', locationToJoin);
+            console.log(`Emit join-kitchen for location: ${locationToJoin}. Success: ${joined}`);
+
+            if (joined) {
+              setTimeout(() => {
+                console.log("Testing WebSocket by emitting a test message");
+                emit('ping', { test: 'message' });
+              }, 1000);
+            }
+          }, 500);
+        } catch (error) {
+          console.error("Error joining orders channel:", error);
+        }
       }
     }
-  }, [connected, user, emit])
+  }, [connected, user, selectedLocationId, emit])
 
   // Set up WebSocket event listeners
   useEffect(() => {
@@ -147,14 +183,14 @@ export function OrdersManager() {
     // Listen for new orders
     const unsubscribeNewOrder = subscribe('new_order_created', (newOrderData) => {
       const newOrder = Array.isArray(newOrderData) ? newOrderData[0] : newOrderData;
-      
+
       console.log("new_order_created event received:", newOrder)
-      
+
       setOrders(prevOrders => {
         if (prevOrders.some(order => order.id === newOrder.id)) {
           return prevOrders
         }
-        
+
         return [newOrder, ...prevOrders]
       })
 
@@ -170,16 +206,16 @@ export function OrdersManager() {
     // Listen for order updates
     const unsubscribeOrderUpdated = subscribe('order_updated', (updatedOrderData) => {
       const updatedOrder = Array.isArray(updatedOrderData) ? updatedOrderData[0] : updatedOrderData;
-      
+
       console.log("order_updated event received:", updatedOrder)
-      
+
       if (!updatedOrder) {
         console.warn("Received invalid order update")
         return;
       }
-      
+
       setOrders(prevOrders => {
-        return prevOrders.map(order => 
+        return prevOrders.map(order =>
           order.id === updatedOrder.id ? updatedOrder : order
         )
       })
@@ -188,30 +224,30 @@ export function OrdersManager() {
     // Listen for order item updates
     const unsubscribeOrderItemUpdated = subscribe('order_item_updated', (dataRaw) => {
       const data = Array.isArray(dataRaw) ? dataRaw[0] : dataRaw;
-      
+
       console.log("order_item_updated event received:", data)
-      
+
       if (!data || !data.item || !data.order) {
         console.warn("Received invalid order item update", data)
         return;
       }
-      
+
       const { item, order } = data
-      
+
       setOrders(prevOrders => {
         const orderIndex = prevOrders.findIndex(o => o.id === order.id)
-        
+
         if (orderIndex === -1) {
           return [...prevOrders, order]
         }
-        
+
         const updatedOrders = [...prevOrders]
         const updatedOrder = { ...updatedOrders[orderIndex] }
-        
-        updatedOrder.items = updatedOrder.items.map(i => 
+
+        updatedOrder.items = updatedOrder.items.map(i =>
           i.id === item.id ? { ...i, ...item } : i
         )
-        
+
         updatedOrders[orderIndex] = updatedOrder
         return updatedOrders
       })
@@ -242,7 +278,18 @@ export function OrdersManager() {
   // Updated fetchOrders function to include the required kitchen=true query parameter
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`${API_URL}/orders?kitchen=false`, {
+      let url = `${API_URL}/orders?kitchen=false`;
+
+      // Aplicar filtro de ubicación
+      if (user?.role === 'SUPER_ADMIN') {
+        if (selectedLocationId !== 'all') {
+          url += `&locationId=${selectedLocationId}`;
+        }
+      } else if (user?.locationId) {
+        url += `&locationId=${user.locationId}`;
+      }
+
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -253,7 +300,7 @@ export function OrdersManager() {
       }
 
       const data = await response.json();
-      
+
       // Silently update orders without affecting UI state
       setOrders(prevOrders => {
         // Only update if there are actual changes
@@ -299,7 +346,7 @@ export function OrdersManager() {
         title: "Éxito",
         description: `Estado de la orden actualizado a ${status}`,
       })
-      
+
       fetchOrders()
     } catch (err: any) {
       console.error('Error updating order status:', err)
@@ -319,7 +366,7 @@ export function OrdersManager() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           orderId,
           method: paymentMethod,
           amount: calculateOrderTotal(orders.find(o => o.id === orderId)!)
@@ -334,7 +381,7 @@ export function OrdersManager() {
         title: "Éxito",
         description: "Pago procesado correctamente",
       })
-      
+
       fetchOrders()
     } catch (err: any) {
       console.error('Error processing payment:', err)
@@ -402,7 +449,7 @@ export function OrdersManager() {
 
     const config = statusConfig[status]
     return (
-      <Badge 
+      <Badge
         variant={config.variant as any}
         className={status === "CANCELLED" ? "bg-red-100 text-red-700 hover:bg-red-200" : ""}
       >
@@ -422,7 +469,7 @@ export function OrdersManager() {
 
     const config = statusConfig[status]
     return (
-      <Badge 
+      <Badge
         variant={config.variant as any}
         className="flex items-center"
       >
@@ -434,7 +481,7 @@ export function OrdersManager() {
 
   const getPaymentMethodIcon = (method?: PaymentMethod) => {
     if (!method) return null
-    
+
     const icons = {
       CASH: <Receipt className="h-4 w-4" />,
       CARD: <CreditCard className="h-4 w-4" />,
@@ -447,6 +494,9 @@ export function OrdersManager() {
   }
 
   const filteredOrders = orders.filter(order => {
+    // Siempre ignorar órdenes eliminadas en las pestañas normales
+    if (order.isDeleted) return false
+
     switch (activeTab) {
       case "active":
         return order.status === "PENDING" || order.status === "IN_PROGRESS"
@@ -464,7 +514,16 @@ export function OrdersManager() {
   // Fetch deleted orders
   const fetchDeletedOrders = async () => {
     try {
-      const response = await fetch(`${API_URL}/orders/deleted/list?locationId=${user?.locationId || ''}`, {
+      let locationParam = '';
+      if (user?.role === 'SUPER_ADMIN') {
+        if (selectedLocationId !== 'all') {
+          locationParam = `locationId=${selectedLocationId}`;
+        }
+      } else if (user?.locationId) {
+        locationParam = `locationId=${user.locationId}`;
+      }
+
+      const response = await fetch(`${API_URL}/orders/deleted/list${locationParam ? `?${locationParam}` : ''}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -479,7 +538,7 @@ export function OrdersManager() {
 
   useEffect(() => {
     if (activeTab === 'deleted') fetchDeletedOrders();
-  }, [activeTab, user]);
+  }, [activeTab, user, selectedLocationId]);
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
@@ -503,12 +562,38 @@ export function OrdersManager() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Gestión de Órdenes</CardTitle>
+          <div className="flex justify-between items-center sm:flex-row flex-col gap-4">
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
+              <CardTitle>Gestión de Órdenes</CardTitle>
+              <div className="text-sm text-muted-foreground">
+                {user?.role === 'SUPER_ADMIN' ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="font-medium whitespace-nowrap text-primary">Ubicación:</span>
+                    <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                      <SelectTrigger className="w-[200px] h-8 text-xs">
+                        <SelectValue placeholder="Seleccionar ubicación" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas las sedes</SelectItem>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.id}>
+                            {loc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 mt-1">
+                    <MapPin className="h-3 w-3 text-emerald-600" />
+                    <span className="font-semibold text-emerald-700">
+                      Sede: {locations.find(l => l.id === user?.locationId)?.name || user?.locationId || 'Sin asignar'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
             {connectionStatus}
-          </div>
-          <div className="text-sm text-muted-foreground mt-1">
-            {user?.locationId ? `Ubicación: ${user.locationId}` : 'Sin ubicación asignada'}
           </div>
         </CardHeader>
         <CardContent>
@@ -599,23 +684,28 @@ export function OrdersManager() {
                                     <p className="text-sm text-muted-foreground">
                                       Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                                     </p>
+                                    {order.location?.name && (
+                                      <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        Ubicación: {order.location.name}
+                                      </p>
+                                    )}
                                     {order.paymentMethod && (
                                       <p className="text-sm font-medium text-primary mt-1">
                                         Método de pago: {
                                           order.paymentMethod === "CASH" ? "Efectivo" :
-                                          order.paymentMethod === "CARD" ? "Tarjeta" :
-                                          order.paymentMethod === "TRANSFER" ? "Transferencia" :
-                                          "Otro"
+                                            order.paymentMethod === "CARD" ? "Tarjeta" :
+                                              order.paymentMethod === "TRANSFER" ? "Transferencia" :
+                                                "Otro"
                                         }
                                       </p>
                                     )}
                                     {order.source && (
                                       <p className="text-xs mt-1">
-                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${
-                                          order.source === 'WHATSAPP' 
-                                            ? 'bg-green-200 text-green-700' 
-                                            : 'bg-gray-200 text-gray-700'
-                                        }`}>{order.source}</span>
+                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${order.source === 'WHATSAPP'
+                                          ? 'bg-green-200 text-green-700'
+                                          : 'bg-gray-200 text-gray-700'
+                                          }`}>{order.source}</span>
                                       </p>
                                     )}
                                   </div>
@@ -625,7 +715,7 @@ export function OrdersManager() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="p-4">
                                 <div className="space-y-4">
                                   {order.items.map((item) => (
@@ -743,15 +833,15 @@ export function OrdersManager() {
                                 <div className="mt-4 flex justify-end gap-2">
                                   {order.status === "PENDING" && (
                                     <>
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleUpdateOrderStatus(order.id, "IN_PROGRESS")}
                                       >
                                         Iniciar Preparación
                                       </Button>
-                                      <Button 
-                                        variant="destructive" 
+                                      <Button
+                                        variant="destructive"
                                         size="sm"
                                         onClick={() => handleUpdateOrderStatus(order.id, "CANCELLED")}
                                       >
@@ -759,10 +849,10 @@ export function OrdersManager() {
                                       </Button>
                                     </>
                                   )}
-                                  
+
                                   {order.status === "IN_PROGRESS" && (
-                                    <Button 
-                                      variant="default" 
+                                    <Button
+                                      variant="default"
                                       size="sm"
                                       onClick={() => handleUpdateOrderStatus(order.id, "READY")}
                                     >
@@ -772,15 +862,15 @@ export function OrdersManager() {
 
                                   {order.status === "READY" && !order.paymentMethod && (
                                     <div className="flex gap-2">
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CASH")}
                                       >
                                         Pago en Efectivo
                                       </Button>
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CARD")}
                                       >
@@ -790,8 +880,8 @@ export function OrdersManager() {
                                   )}
 
                                   {order.status === "PAID" && (
-                                    <Button 
-                                      variant="outline" 
+                                    <Button
+                                      variant="outline"
                                       size="sm"
                                       onClick={() => handlePrintReceipt(order.id)}
                                     >
@@ -799,8 +889,8 @@ export function OrdersManager() {
                                     </Button>
                                   )}
 
-                                  <Button 
-                                    variant="destructive" 
+                                  <Button
+                                    variant="destructive"
                                     size="sm"
                                     onClick={() => setOrderToDelete(order)}
                                   >
@@ -865,23 +955,28 @@ export function OrdersManager() {
                                     <p className="text-sm text-muted-foreground">
                                       Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                                     </p>
+                                    {order.location?.name && (
+                                      <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        Ubicación: {order.location.name}
+                                      </p>
+                                    )}
                                     {order.paymentMethod && (
                                       <p className="text-sm font-medium text-primary mt-1">
                                         Método de pago: {
                                           order.paymentMethod === "CASH" ? "Efectivo" :
-                                          order.paymentMethod === "CARD" ? "Tarjeta" :
-                                          order.paymentMethod === "TRANSFER" ? "Transferencia" :
-                                          "Otro"
+                                            order.paymentMethod === "CARD" ? "Tarjeta" :
+                                              order.paymentMethod === "TRANSFER" ? "Transferencia" :
+                                                "Otro"
                                         }
                                       </p>
                                     )}
                                     {order.source && (
                                       <p className="text-xs mt-1">
-                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${
-                                          order.source === 'WHATSAPP' 
-                                            ? 'bg-green-200 text-green-700' 
-                                            : 'bg-gray-200 text-gray-700'
-                                        }`}>{order.source}</span>
+                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${order.source === 'WHATSAPP'
+                                          ? 'bg-green-200 text-green-700'
+                                          : 'bg-gray-200 text-gray-700'
+                                          }`}>{order.source}</span>
                                       </p>
                                     )}
                                   </div>
@@ -891,7 +986,7 @@ export function OrdersManager() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="p-4">
                                 <div className="space-y-4">
                                   {order.items.map((item) => (
@@ -1009,15 +1104,15 @@ export function OrdersManager() {
                                 <div className="mt-4 flex justify-end gap-2">
                                   {order.status === "READY" && !order.paymentMethod && (
                                     <div className="flex gap-2">
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CASH")}
                                       >
                                         Pago en Efectivo
                                       </Button>
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CARD")}
                                       >
@@ -1027,8 +1122,8 @@ export function OrdersManager() {
                                   )}
 
                                   {order.status === "PAID" && (
-                                    <Button 
-                                      variant="outline" 
+                                    <Button
+                                      variant="outline"
                                       size="sm"
                                       onClick={() => handlePrintReceipt(order.id)}
                                     >
@@ -1036,8 +1131,8 @@ export function OrdersManager() {
                                     </Button>
                                   )}
 
-                                  <Button 
-                                    variant="destructive" 
+                                  <Button
+                                    variant="destructive"
                                     size="sm"
                                     onClick={() => setOrderToDelete(order)}
                                   >
@@ -1102,23 +1197,28 @@ export function OrdersManager() {
                                     <p className="text-sm text-muted-foreground">
                                       Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                                     </p>
+                                    {order.location?.name && (
+                                      <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        Ubicación: {order.location.name}
+                                      </p>
+                                    )}
                                     {order.paymentMethod && (
                                       <p className="text-sm font-medium text-primary mt-1">
                                         Método de pago: {
                                           order.paymentMethod === "CASH" ? "Efectivo" :
-                                          order.paymentMethod === "CARD" ? "Tarjeta" :
-                                          order.paymentMethod === "TRANSFER" ? "Transferencia" :
-                                          "Otro"
+                                            order.paymentMethod === "CARD" ? "Tarjeta" :
+                                              order.paymentMethod === "TRANSFER" ? "Transferencia" :
+                                                "Otro"
                                         }
                                       </p>
                                     )}
                                     {order.source && (
                                       <p className="text-xs mt-1">
-                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${
-                                          order.source === 'WHATSAPP' 
-                                            ? 'bg-green-200 text-green-700' 
-                                            : 'bg-gray-200 text-gray-700'
-                                        }`}>{order.source}</span>
+                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${order.source === 'WHATSAPP'
+                                          ? 'bg-green-200 text-green-700'
+                                          : 'bg-gray-200 text-gray-700'
+                                          }`}>{order.source}</span>
                                       </p>
                                     )}
                                   </div>
@@ -1128,7 +1228,7 @@ export function OrdersManager() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="p-4">
                                 <div className="space-y-4">
                                   {order.items.map((item) => (
@@ -1246,15 +1346,15 @@ export function OrdersManager() {
                                 <div className="mt-4 flex justify-end gap-2">
                                   {order.status === "READY" && !order.paymentMethod && (
                                     <div className="flex gap-2">
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CASH")}
                                       >
                                         Pago en Efectivo
                                       </Button>
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleProcessPayment(order.id, "CARD")}
                                       >
@@ -1264,8 +1364,8 @@ export function OrdersManager() {
                                   )}
 
                                   {order.status === "PAID" && (
-                                    <Button 
-                                      variant="outline" 
+                                    <Button
+                                      variant="outline"
                                       size="sm"
                                       onClick={() => handlePrintReceipt(order.id)}
                                     >
@@ -1273,8 +1373,8 @@ export function OrdersManager() {
                                     </Button>
                                   )}
 
-                                  <Button 
-                                    variant="destructive" 
+                                  <Button
+                                    variant="destructive"
                                     size="sm"
                                     onClick={() => setOrderToDelete(order)}
                                   >
@@ -1339,23 +1439,28 @@ export function OrdersManager() {
                                     <p className="text-sm text-muted-foreground">
                                       Orden #{order.id.substring(0, 8)} - {new Date(order.createdAt).toLocaleTimeString()}
                                     </p>
+                                    {order.location?.name && (
+                                      <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        Ubicación: {order.location.name}
+                                      </p>
+                                    )}
                                     {order.paymentMethod && (
                                       <p className="text-sm font-medium text-primary mt-1">
                                         Método de pago: {
                                           order.paymentMethod === "CASH" ? "Efectivo" :
-                                          order.paymentMethod === "CARD" ? "Tarjeta" :
-                                          order.paymentMethod === "TRANSFER" ? "Transferencia" :
-                                          "Otro"
+                                            order.paymentMethod === "CARD" ? "Tarjeta" :
+                                              order.paymentMethod === "TRANSFER" ? "Transferencia" :
+                                                "Otro"
                                         }
                                       </p>
                                     )}
                                     {order.source && (
                                       <p className="text-xs mt-1">
-                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${
-                                          order.source === 'WHATSAPP' 
-                                            ? 'bg-green-200 text-green-700' 
-                                            : 'bg-gray-200 text-gray-700'
-                                        }`}>{order.source}</span>
+                                        <span className="font-semibold">Origen:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs uppercase tracking-wide ${order.source === 'WHATSAPP'
+                                          ? 'bg-green-200 text-green-700'
+                                          : 'bg-gray-200 text-gray-700'
+                                          }`}>{order.source}</span>
                                       </p>
                                     )}
                                   </div>
@@ -1365,7 +1470,7 @@ export function OrdersManager() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="p-4">
                                 <div className="space-y-4">
                                   {order.items.map((item) => (
@@ -1482,8 +1587,8 @@ export function OrdersManager() {
 
                                 <div className="mt-4 flex justify-end gap-2">
                                   {order.status === "CANCELLED" && (
-                                    <Button 
-                                      variant="outline" 
+                                    <Button
+                                      variant="outline"
                                       size="sm"
                                       onClick={() => handleDeleteOrder(order.id)}
                                     >
@@ -1549,7 +1654,7 @@ export function OrdersManager() {
           <DialogHeader>
             <DialogTitle>Confirmar Eliminación</DialogTitle>
           </DialogHeader>
-          <p>¿Estás seguro de que deseas eliminar la orden <span className="font-bold">#{orderToDelete?.id.substring(0,8)}</span>? Esta acción no se puede deshacer.</p>
+          <p>¿Estás seguro de que deseas eliminar la orden <span className="font-bold">#{orderToDelete?.id.substring(0, 8)}</span>? Esta acción no se puede deshacer.</p>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setOrderToDelete(null)}>
               Cancelar
@@ -1563,7 +1668,7 @@ export function OrdersManager() {
 
       {/* Dialog para ver detalles de la orden eliminada */}
       <Dialog open={!!selectedDeletedOrder} onOpenChange={(open) => !open && setSelectedDeletedOrder(null)}>
-        <DialogContent 
+        <DialogContent
           className={cn(
             "max-w-2xl flex flex-col",
             "h-[600px] md:h-[600px]",
@@ -1575,7 +1680,7 @@ export function OrdersManager() {
             "rounded-lg md:rounded-lg",
             "p-0 md:p-6"
           )}
-          style={{ 
+          style={{
             maxHeight: 'calc(var(--vh, 1vh) * 90)',
             height: 'calc(var(--vh, 1vh) * 90)'
           }}

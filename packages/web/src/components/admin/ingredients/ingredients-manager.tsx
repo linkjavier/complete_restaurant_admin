@@ -9,6 +9,7 @@ import { Plus, Trash2, Pencil } from "lucide-react"
 import { getIngredients, createIngredient, deleteIngredient, updateIngredient, Ingredient } from "@/lib/api"
 import { getLocations, Location } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
+import { toFiniteNumber } from "@/lib/utils"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -64,20 +65,28 @@ export function IngredientsManager() {
 
   const handleCreateIngredient = async () => {
     try {
-      if (!newIngredient.name || !newIngredient.quantity || !newIngredient.unit || !newIngredient.minQuantity || !newIngredient.locationId) {
+      if (
+        !newIngredient.name.trim() ||
+        !newIngredient.unit.trim() ||
+        !newIngredient.locationId ||
+        !Number.isFinite(newIngredient.quantity) ||
+        newIngredient.quantity < 0 ||
+        !Number.isFinite(newIngredient.minQuantity) ||
+        newIngredient.minQuantity < 0
+      ) {
         toast({
-          title: "Error",
-          description: "Por favor completa todos los campos requeridos",
+          title: "Revisa los datos del ingrediente",
+          description: "Completa el nombre, la unidad y la sucursal. Las cantidades pueden ser cero, pero no negativas.",
           variant: "destructive",
         })
         return
       }
 
       await createIngredient({
-        name: newIngredient.name,
-        description: newIngredient.description || undefined,
+        name: newIngredient.name.trim(),
+        description: newIngredient.description.trim() || undefined,
         quantity: newIngredient.quantity,
-        unit: newIngredient.unit,
+        unit: newIngredient.unit.trim(),
         minQuantity: newIngredient.minQuantity,
         locationId: newIngredient.locationId,
       })
@@ -100,8 +109,8 @@ export function IngredientsManager() {
     } catch (err) {
       console.error('Error creating ingredient:', err)
       toast({
-        title: "Error",
-        description: "Error al crear el ingrediente. Por favor, asegúrate de estar autenticado.",
+        title: "No se pudo crear el ingrediente",
+        description: err instanceof Error ? err.message : "Ocurrió un error inesperado.",
         variant: "destructive",
       })
     }
@@ -111,20 +120,25 @@ export function IngredientsManager() {
     if (!editingIngredient) return
 
     try {
-      if (!editingIngredient.name || !editingIngredient.quantity || !editingIngredient.unit || !editingIngredient.minQuantity || !editingIngredient.locationId) {
+      if (
+        !editingIngredient.name.trim() ||
+        !editingIngredient.unit.trim() ||
+        !editingIngredient.locationId ||
+        !Number.isFinite(editingIngredient.minQuantity) ||
+        editingIngredient.minQuantity < 0
+      ) {
         toast({
-          title: "Error",
-          description: "Por favor completa todos los campos requeridos",
+          title: "Revisa los datos del ingrediente",
+          description: "Completa el nombre, la unidad y la sucursal. Las cantidades pueden ser cero, pero no negativas.",
           variant: "destructive",
         })
         return
       }
 
       await updateIngredient(editingIngredient.id, {
-        name: editingIngredient.name,
-        description: editingIngredient.description || undefined,
-        quantity: editingIngredient.quantity,
-        unit: editingIngredient.unit,
+        name: editingIngredient.name.trim(),
+        description: editingIngredient.description?.trim() || undefined,
+        unit: editingIngredient.unit.trim(),
         minQuantity: editingIngredient.minQuantity,
         locationId: editingIngredient.locationId,
       })
@@ -140,7 +154,7 @@ export function IngredientsManager() {
       console.error('Error updating ingredient:', err)
       toast({
         title: "Error",
-        description: "Error al actualizar el ingrediente. Por favor, asegúrate de estar autenticado.",
+        description: err instanceof Error ? err.message : "No se pudo actualizar el ingrediente.",
         variant: "destructive",
       })
     }
@@ -200,20 +214,31 @@ export function IngredientsManager() {
                 }
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="quantity">Cantidad Actual</Label>
-              <Input
-                id="quantity"
-                type="number"
-                placeholder="Ingresa la cantidad actual"
-                value={editingIngredient ? editingIngredient.quantity : newIngredient.quantity}
-                onChange={(e) =>
-                  editingIngredient
-                    ? setEditingIngredient({ ...editingIngredient, quantity: parseFloat(e.target.value) })
-                    : setNewIngredient({ ...newIngredient, quantity: parseFloat(e.target.value) })
-                }
-              />
-            </div>
+            {editingIngredient ? (
+              <div className="rounded-lg border bg-muted/40 p-3">
+                <p className="text-sm font-medium">
+                  Existencias actuales: {editingIngredient.quantity} {editingIngredient.unit}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Para corregir esta cantidad, crea una modificación en Inventarios y registra el conteo físico.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label htmlFor="quantity">Cantidad inicial</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="Ingresa la cantidad inicial"
+                  value={newIngredient.quantity}
+                  onChange={(e) =>
+                    setNewIngredient({ ...newIngredient, quantity: toFiniteNumber(e.target.value) })
+                  }
+                />
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="unit">Unidad de Medida</Label>
               <Input
@@ -232,12 +257,14 @@ export function IngredientsManager() {
               <Input
                 id="minQuantity"
                 type="number"
+                min="0"
+                step="any"
                 placeholder="Ingresa la cantidad mínima"
                 value={editingIngredient ? editingIngredient.minQuantity : newIngredient.minQuantity}
                 onChange={(e) =>
                   editingIngredient
-                    ? setEditingIngredient({ ...editingIngredient, minQuantity: parseFloat(e.target.value) })
-                    : setNewIngredient({ ...newIngredient, minQuantity: parseFloat(e.target.value) })
+                    ? setEditingIngredient({ ...editingIngredient, minQuantity: toFiniteNumber(e.target.value) })
+                    : setNewIngredient({ ...newIngredient, minQuantity: toFiniteNumber(e.target.value) })
                 }
               />
             </div>
@@ -263,22 +290,23 @@ export function IngredientsManager() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               {editingIngredient ? (
                 <>
-                  <Button onClick={handleUpdateIngredient}>
+                  <Button className="w-full sm:w-auto" onClick={handleUpdateIngredient}>
                     <Pencil className="mr-2 h-4 w-4" />
                     Actualizar Ingrediente
                   </Button>
                   <Button
                     variant="outline"
+                    className="w-full sm:w-auto"
                     onClick={() => setEditingIngredient(null)}
                   >
                     Cancelar
                   </Button>
                 </>
               ) : (
-                <Button onClick={handleCreateIngredient}>
+                <Button className="w-full sm:w-auto" onClick={handleCreateIngredient}>
                   <Plus className="mr-2 h-4 w-4" />
                   Crear Ingrediente
                 </Button>
@@ -316,6 +344,9 @@ export function IngredientsManager() {
                   >
                     <div>
                       <p className="font-medium">{ingredient.name}</p>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground">
+                        Código: {ingredient.code}
+                      </p>
                       {ingredient.description && (
                         <p className="text-sm text-muted-foreground">
                           {ingredient.description}

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import { Sidebar } from "@/components/admin/sidebar"
 import { UserNav } from "@/components/user-nav"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
@@ -9,9 +10,34 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { Toaster } from "@/components/ui/toaster"
 import { ProtectedRoute } from "@/components/protected-route"
+import { useAuth } from "@/hooks/use-auth"
+import { getHomePathForRole, isPathAllowedForRole } from "@/lib/roles"
 
 // Create a client
 const queryClient = new QueryClient()
+
+function RoleRouteGuard({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth()
+  const pathname = usePathname()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (isLoading || !user) return
+    if (!isPathAllowedForRole(user.role, pathname)) {
+      router.replace(getHomePathForRole(user.role))
+    }
+  }, [user, isLoading, pathname, router])
+
+  if (user && !isPathAllowedForRole(user.role, pathname)) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  return <>{children}</>
+}
 
 export default function AdminLayout({
   children,
@@ -25,6 +51,7 @@ export default function AdminLayout({
   return (
     <QueryClientProvider client={queryClient}>
       <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF', 'STAFF']}>
+        <RoleRouteGuard>
         <div className="h-full">
           {/* Desktop Sidebar */}
           <div className="hidden md:flex h-full flex-col fixed inset-y-0 z-50 transition-all duration-300" id="sidebar">
@@ -55,6 +82,7 @@ export default function AdminLayout({
             {children}
           </main>
         </div>
+        </RoleRouteGuard>
       </ProtectedRoute>
       <Toaster />
     </QueryClientProvider>

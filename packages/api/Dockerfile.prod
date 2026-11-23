@@ -1,0 +1,52 @@
+FROM node:20-bookworm-slim AS build
+
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    ca-certificates \
+    openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json ./
+COPY packages/admin/package.json ./packages/admin/package.json
+COPY packages/api/package.json ./packages/api/package.json
+COPY packages/api/prisma ./packages/api/prisma
+COPY packages/web/package.json ./packages/web/package.json
+
+RUN npm ci --legacy-peer-deps
+
+COPY . .
+RUN npm run build --workspace=@blondie/api
+
+FROM build AS production-deps
+RUN npm prune --omit=dev --legacy-peer-deps
+
+FROM node:20-bookworm-slim AS runtime
+
+ENV NODE_ENV=production \
+    PUPPETEER_SKIP_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    ca-certificates \
+    openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=production-deps --chown=node:node /app/package.json ./package.json
+COPY --from=production-deps --chown=node:node /app/package-lock.json ./package-lock.json
+COPY --from=production-deps --chown=node:node /app/node_modules ./node_modules
+COPY --from=production-deps --chown=node:node /app/packages/api/package.json ./packages/api/package.json
+COPY --from=production-deps --chown=node:node /app/packages/api/dist ./packages/api/dist
+COPY --from=production-deps --chown=node:node /app/packages/api/node_modules ./packages/api/node_modules
+COPY --from=production-deps --chown=node:node /app/packages/api/prisma ./packages/api/prisma
+
+USER node
+EXPOSE 3000
+CMD ["npm", "run", "start:prod", "--workspace=@blondie/api"]

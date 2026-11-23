@@ -16,6 +16,7 @@ import { API_URL } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useLanguage } from '@/hooks/use-language';
 import { LanguageSwitch } from '@/components/language-switch';
+import { getHomePathForRole } from '@/lib/roles';
 
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
@@ -80,6 +81,7 @@ export default function LoginPage() {
   const [businessName, setBusinessName] = useState<string>("Kutchen AI");
   const [showSubdomainModal, setShowSubdomainModal] = useState(false);
   const [subdomainInput, setSubdomainInput] = useState('');
+  const [socialLoginError, setSocialLoginError] = useState(false);
   const { t } = useLanguage();
   const [subdomainChecked, setSubdomainChecked] = useState(false);
 
@@ -98,6 +100,7 @@ export default function LoginPage() {
 
     // Detectar subdominio solo en el primer render
     if (typeof window !== 'undefined') {
+      setSocialLoginError(new URLSearchParams(window.location.search).has('socialError'));
       const subdomain = getSubdomain(window.location.hostname);
       // Solo mostrar el modal si NO hay subdominio o es www
       if (!subdomain || subdomain === 'www') {
@@ -124,12 +127,7 @@ export default function LoginPage() {
         description: 'You have been logged in successfully.',
       });
 
-      // Guardar el token en localStorage
-      localStorage.setItem('token', data.access_token);
-      // Guardar el token como cookie accesible por el middleware y subdominios
-      document.cookie = `token=${data.access_token}; path=/; max-age=604800; domain=.localhost`;
-      // Redirigir al dashboard de forma fluida
-      router.push('/admin/dashboard');
+      router.push(getHomePathForRole(data.user?.role));
     } catch (error) {
       console.error('[LoginPage] Login error:', error);
       toast({
@@ -145,8 +143,10 @@ export default function LoginPage() {
   const handleSocialLogin = async (provider: 'google' | 'facebook') => {
     setIsLoading(true);
     try {
-      // Redirect to social login endpoint
-      window.location.href = `/api/auth/${provider}`;
+      const returnTo = encodeURIComponent(window.location.origin);
+      const nonce = window.crypto.randomUUID();
+      sessionStorage.setItem('social-login-nonce', nonce);
+      window.location.href = `${API_URL}/auth/${provider}?returnTo=${returnTo}&nonce=${nonce}`;
     } catch (error) {
       toast({
         title: 'Error',
@@ -284,6 +284,11 @@ export default function LoginPage() {
                   {t('loginFacebook')}
                 </Button>
               </div>
+              {socialLoginError && (
+                <p role="alert" className="text-sm text-destructive">
+                  No se pudo completar el inicio de sesión social. Verifica los permisos del proveedor e inténtalo de nuevo.
+                </p>
+              )}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />

@@ -36,7 +36,7 @@ export default function SettingsPage() {
     setIsLoading(true)
     try {
       // Cargar configuración del negocio
-      const businessRes = await fetch(`${API_URL}/settings/business`)
+      const businessRes = await fetch(`${API_URL}/settings/business${locationId ? `?locationId=${locationId}` : ''}`)
       if (businessRes.ok) {
         const data = await businessRes.json()
         setBusinessName(data.name || "")
@@ -144,7 +144,7 @@ export default function SettingsPage() {
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6">Configuración</h1>
-      
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Sección de Configuración del negocio */}
         <Card>
@@ -217,11 +217,11 @@ export default function SettingsPage() {
                 disabled={isSaving}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="ai-gender">Género del Asistente</Label>
-              <Select 
-                value={aiGender} 
+              <Select
+                value={aiGender}
                 onValueChange={setAiGender}
                 disabled={isSaving}
               >
@@ -258,7 +258,7 @@ export default function SettingsPage() {
               />
             </div>
 
-            <Button 
+            <Button
               onClick={handleSave}
               disabled={isSaving}
               className="w-full"
@@ -274,7 +274,7 @@ export default function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
-        
+
         {/* Sección de Orden de Categorías */}
         <CategoryOrderManager />
       </div>

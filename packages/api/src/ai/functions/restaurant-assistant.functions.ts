@@ -172,6 +172,10 @@ export const restaurantAssistantFunctions = [
                 type: 'string',
                 description: 'Validated product ID',
               },
+              productName: {
+                type: 'string',
+                description: 'Name of the product for display and fallback',
+              },
               quantity: {
                 type: 'integer',
                 description: 'Quantity of the product',

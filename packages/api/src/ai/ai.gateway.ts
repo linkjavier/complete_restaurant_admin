@@ -21,6 +21,7 @@ import { MenuHandlerService } from './services/menu-handler.service';
 import { OrderHandlerService } from './services/order-handler.service';
 import { FunctionExecutorService } from './services/function-executor.service';
 import { NLPService } from './services/nlp.service';
+import { CoordinatorService } from './services/coordinator.service';
 import { LocationsService } from '../locations/locations.service';
 
 function asChatType(value: any): 'whatsapp' | 'ai' | 'admin' {
@@ -53,14 +54,15 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private menuHandler: MenuHandlerService,
     private orderHandler: OrderHandlerService,
     private functionExecutor: FunctionExecutorService,
-    private locationsService: LocationsService
+    private locationsService: LocationsService,
+    private coordinatorService: CoordinatorService
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
       console.error('OPENAI_API_KEY is not set in environment variables');
       throw new Error('OPENAI_API_KEY is required');
     }
-    
+
     this.openai = new OpenAI({ apiKey });
   }
 
@@ -88,7 +90,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       customerData: {},
       step: 'awaiting_menu_confirmation',
     });
-    
+
     try {
       const tenantId = await this.getTenantId(locationId);
       const customerContext = await this.customerContextService.getCustomerContext(chatId, locationId, tenantId);
@@ -106,7 +108,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       };
 
       await this.conversationService.getOrCreateConversation(conversationContext);
-      
+
       const aiSettings = await this.settingsService.getAISettings(tenantId, locationId);
       const businessSettings = await this.settingsService.getBusinessSettings(tenantId, locationId);
       const businessName = businessSettings.name;
@@ -145,13 +147,13 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const locationId = this.locationIds.get(client.id);
     const chatType = this.chatTypes.get(client.id);
     const chatId = client.handshake.query.chatId as string;
-    
+
     if (locationId && chatType && chatId) {
       const conversationId = this.conversationService.getConversationId(locationId, chatType, chatId);
       this.conversationService.deleteConversation(conversationId);
       this.orderStateService.deleteState(conversationId);
     }
-    
+
     this.locationIds.delete(client.id);
     this.chatTypes.delete(client.id);
   }
@@ -379,7 +381,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ...validatedOrderData,
         ...state.customerData,
         chatId,
-        locationId
+        locationId: validatedOrderData.locationId || locationId
       }, tenantId);
       const response = this.orderHandler.formatOrderSuccessMessage(createdOrder.id);
       this.orderStateService.deleteState(conversationId);
@@ -465,7 +467,51 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     // --- FIN NUEVO ---
 
-    // Process with OpenAI
+    // --- NUEVO: Interceptar confirmación de menú ---
+    const lastAssistantMessage = this.conversationService.getLastAssistantMessage(conversationId);
+    if (
+      lastAssistantMessage &&
+      (
+        lastAssistantMessage.toLowerCase().includes('te gustaría ver el menú') ||
+        lastAssistantMessage.toLowerCase().includes('quieres ver el menú') ||
+        lastAssistantMessage.toLowerCase().includes('ver el menú') ||
+        lastAssistantMessage.toLowerCase().includes('ver el menu')
+      ) &&
+      this.messageHandler.isConfirmation(text)
+    ) {
+      // Llama al menú general, usando un texto genérico
+      return await this.handleMenuRequest(client, 'menú', locationId, chatType);
+    }
+    // --- NUEVO: Usar Coordinador Multi-agente ---
+    const tenantId = await this.getTenantId(locationId);
+    const context = { locationId, tenantId, chatType, chatId };
+
+    // Solo delegamos a especialistas si NO estamos en un flujo de recolección de datos activo
+    if (state.step !== 'awaiting_customer_data' && state.step !== 'awaiting_customer_data_confirmation' && !pendingSelection) {
+      const specializedResponse = await this.coordinatorService.delegate(text, context);
+
+      // Si el agente respondió algo que no es un fallback genérico (o si decidimos que siempre responde si tiene match)
+      // Por ahora, si el coordinador decidió delegar a un especialista (no CustomAgent por defecto), devolvemos su respuesta.
+      if (specializedResponse && specializedResponse.content) {
+        // Si queremos que el especialista siempre responda si el coordinador lo eligió:
+        // Pero necesitamos saber si fue una respuesta de un especialista real o el fallback.
+        // Implementemos una forma de saber si fue un match.
+        // Por ahora, asumiremos que si hay respuesta la usamos si parece relevante.
+        // MEJORA: Solo usar si no es el CustomAgent el que respondió (o si queremos que CustomAgent sea el que use OpenAI)
+
+        // Vamos a ser más selectivos: si el texto tiene palabras clave, confiamos en el especialista.
+        const normalized = text.toLowerCase();
+        if (normalized.includes('desayuno') || normalized.includes('almuerzo') || normalized.includes('ventas') || normalized.includes('reporte')) {
+          if ('emit' in client) {
+            client.emit('ai_response', { type: 'text', content: specializedResponse.content });
+          }
+          this.conversationService.addMessage(conversationId, { role: 'assistant', content: specializedResponse.content });
+          return specializedResponse.content;
+        }
+      }
+    }
+
+    // Process with OpenAI (Fallback)
     return await this.processWithOpenAI(client, text, locationId, chatType, chatId);
   }
 
@@ -510,7 +556,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const tenantId = await this.getTenantId(locationId);
       const { bestProduct, candidateProducts, matchingProducts } = await this.menuHandler.searchProducts(text, locationId, tenantId);
-      
+
       const usedGeneric = this.messageHandler.hasUsedGenericWords(text);
       if (candidateProducts.length > 1 && usedGeneric) {
         const response = this.menuHandler.formatCandidateProducts(candidateProducts);
@@ -528,10 +574,10 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       if (matchingProducts.length > 0 && !this.messageHandler.isGeneralMenuRequest(text)) {
-        const response = matchingProducts.length === 1 
+        const response = matchingProducts.length === 1
           ? this.menuHandler.formatProductResponse(matchingProducts[0])
           : this.menuHandler.formatProductList(matchingProducts);
-        
+
         if ('emit' in client) {
           client.emit('ai_response', { type: 'text', content: response });
         }
@@ -608,19 +654,19 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
       console.log(`[AI Gateway] Calling OpenAI API with ${conversation.length} messages`);
       const tenantId = await this.getTenantId(locationId);
       const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini-2024-07-18',
+        model: 'gpt-4o-mini',
         messages: conversation,
         functions: chatType === 'admin' ? adminAssistantFunctions : restaurantAssistantFunctions,
         function_call: 'auto',
       });
 
       const response = completion.choices[0].message;
-      console.log(`[AI Gateway] OpenAI response:`, { 
-        hasContent: !!response.content, 
+      console.log(`[AI Gateway] OpenAI response:`, {
+        hasContent: !!response.content,
         hasFunctionCall: !!response.function_call,
-        functionName: response.function_call?.name 
+        functionName: response.function_call?.name
       });
-      
+
       this.conversationService.addMessage(conversationId, {
         role: 'assistant',
         content: response.content || '',
@@ -636,13 +682,13 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
           chatType,
           tenantId
         );
-        
+
         this.conversationService.addMessage(conversationId, {
           role: 'function',
           name: response.function_call.name,
           content: JSON.stringify(functionResult),
         });
-        
+
         if (functionResult && (functionResult.validatedItems || functionResult.validated)) {
           console.log('[DEBUG] Guardando orderData en OrderStateService:', functionResult.orderData);
           // Si es calculate_order_subtotal, guardar validatedItems como items
@@ -681,7 +727,7 @@ export class AIGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (error) {
       console.error('Error in processWithOpenAI:', error);
       const errorMessage = 'Error processing your message. Please try again.';
-      
+
       if ('emit' in client) {
         client.emit('error', { message: errorMessage, details: error.message });
       }

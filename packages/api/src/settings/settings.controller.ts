@@ -30,8 +30,9 @@ export class SettingsController {
     @Req() req: Request,
     @Query('locationId') locationId: string
   ): Promise<BusinessSettings> {
-    const tenantId = (req as any).tenantId;
-    return this.settingsService.getBusinessSettings(tenantId, locationId);
+    // Si no hay tenantId (usuario no autenticado), usar un tenant por defecto
+    const tenantId = (req as any).tenantId || 'default-tenant';
+    return this.settingsService.getBusinessSettings(tenantId, locationId || 'default-location');
   }
 
   @Post('business')

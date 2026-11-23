@@ -6,11 +6,14 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "prebuild": "rimraf dist && npx prisma generate",
+    "prebuild": "rimraf dist && ./node_modules/.bin/prisma generate",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "prestart": "npm rebuild bcrypt --workspace=@blondie/api && ./node_modules/.bin/prisma generate",
     "start": "nest start",
+    "prestart:dev": "npm rebuild bcrypt --workspace=@blondie/api && ./node_modules/.bin/prisma generate",
     "start:dev": "nest start --watch",
+    "dev": "npm run start:dev",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -19,10 +22,12 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy"
+    "prisma:generate": "./node_modules/.bin/prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "seed:dev": "ts-node prisma/seed-development.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1176.0",
     "@nestjs/bull": "^10.2.3",
     "@nestjs/bullmq": "^11.0.2",
     "@nestjs/common": "^10.4.19",
@@ -32,15 +37,16 @@
     "@nestjs/jwt": "^10.0.0",
     "@nestjs/passport": "^10.0.0",
     "@nestjs/platform-express": "^10.4.17",
-    "@nestjs/platform-socket.io": "^10.4.18",
+    "@nestjs/platform-socket.io": "^10.4.22",
     "@nestjs/swagger": "^7.0.0",
-    "@nestjs/websockets": "^10.4.18",
+    "@nestjs/websockets": "^10.4.22",
     "@prisma/client": "^5.22.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "@types/express": "^5.0.3",
     "@types/multer": "^1.4.13",
     "@types/qrcode": "^1.5.5",
     "@types/uuid": "^10.0.0",
+    "axios": "^1.13.2",
     "bcrypt": "^5.0.0",
     "bull": "^4.16.5",
     "bullmq": "^5.51.1",
@@ -51,19 +57,23 @@
     "fuse.js": "^7.1.0",
     "heic-convert": "^2.1.0",
     "ioredis": "^5.6.1",
+    "mammoth": "^1.11.0",
     "openai": "^5.1.0",
     "passport": "^0.6.0",
     "passport-facebook": "^3.0.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.0",
     "passport-local": "^1.0.0",
+    "pdf-parse": "^2.4.5",
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
     "sharp": "^0.34.2",
     "socket.io": "^4.8.1",
+    "stripe": "^12.0.0",
     "uuid": "^11.1.0",
-    "whatsapp-web.js": "^1.30.0"
+    "whatsapp-web.js": "^1.30.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -73,6 +83,7 @@
     "@types/babel__template": "^7.4.1",
     "@types/body-parser": "^1.19.2",
     "@types/istanbul-lib-report": "^3.0.0",
+    "@types/jest": "^30.0.0",
     "@types/passport": "^1.0.12",
     "@types/passport-facebook": "^2.1.11",
     "@types/passport-google-oauth20": "^2.0.11",
@@ -113,7 +124,12 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": "<rootDir>/../tsconfig.json"
+        }
+      ]
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

@@ -1,54 +1,64 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
-
-// Definir una interfaz para el ingrediente con todos los campos necesarios
-interface IngredientWithRelations {
-  id: string;
-  name: string;
-  description?: string | null;
-  quantity: number;
-  unit: string;
-  minQuantity: number;
-  locationId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  location?: any;
-}
+import { StockSyncService } from '../inventory/stock-sync.service';
 
 @Injectable()
 export class IngredientsService {
   private readonly logger = new Logger(IngredientsService.name);
-  
-  constructor(private prisma: PrismaService) {}
+
+  constructor(
+    private prisma: PrismaService,
+    private stockSync: StockSyncService,
+  ) {}
 
   async create(createIngredientDto: CreateIngredientDto & { tenantId: string }) {
     try {
-      // Depurar los valores recibidos
       this.logger.debug(`Creating ingredient with data: ${JSON.stringify(createIngredientDto)}`);
-      
-      // Verificar y asignar valores por defecto si es necesario
+
       const unit = createIngredientDto.unit || 'unidad';
-      const quantity = typeof createIngredientDto.quantity === 'number' ? createIngredientDto.quantity : 0;
-      const minQuantity = typeof createIngredientDto.minQuantity === 'number' ? createIngredientDto.minQuantity : 0;
-      
-      this.logger.debug(`Processed values: unit=${unit}, quantity=${quantity}, minQuantity=${minQuantity}`);
-      
-      // Crear el ingrediente usando Prisma ORM
-      const ingredient = await this.prisma.ingredient.create({
-        data: {
-          name: createIngredientDto.name,
-          description: createIngredientDto.description,
-          quantity: quantity,
-          unit: unit,
-          minQuantity: minQuantity,
-          location: { connect: { id: createIngredientDto.locationId } },
-          tenant: { connect: { id: createIngredientDto.tenantId } },
-        },
-        include: {
-          location: true,
-        },
+      const quantity =
+        typeof createIngredientDto.quantity === 'number' ? createIngredientDto.quantity : 0;
+      const minQuantity =
+        typeof createIngredientDto.minQuantity === 'number' ? createIngredientDto.minQuantity : 0;
+
+      const ingredient = await this.prisma.$transaction(async (tx) => {
+        const location = await tx.location.findFirst({
+          where: {
+            id: createIngredientDto.locationId,
+            tenantId: createIngredientDto.tenantId,
+          },
+          select: { id: true },
+        });
+        if (!location) {
+          throw new BadRequestException('La sucursal seleccionada no pertenece a este negocio.');
+        }
+
+        const created = await tx.ingredient.create({
+          data: {
+            name: createIngredientDto.name,
+            description: createIngredientDto.description,
+            quantity,
+            unit,
+            minQuantity,
+            location: { connect: { id: createIngredientDto.locationId } },
+            tenant: { connect: { id: createIngredientDto.tenantId } },
+          },
+          include: {
+            location: true,
+          },
+        });
+
+        await this.stockSync.syncFromIngredient(tx, created);
+
+        return created;
       });
 
       this.logger.debug(`Created ingredient with ID: ${ingredient.id}`);
@@ -57,19 +67,19 @@ export class IngredientsService {
     } catch (error) {
       this.logger.error(`Error creating ingredient: ${error.message}`);
       this.logger.error(error.stack);
-      throw new InternalServerErrorException(`Error creating ingredient: ${error.message}`);
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('No se pudo crear el ingrediente.');
     }
   }
 
   async findAll(params?: { where?: any }) {
     try {
-      const ingredients = await this.prisma.ingredient.findMany({
+      return this.prisma.ingredient.findMany({
         where: params?.where,
         include: {
           location: true,
         },
       });
-      return ingredients;
     } catch (error) {
       this.logger.error(`Error finding all ingredients: ${error.message}`);
       throw new InternalServerErrorException(`Error finding all ingredients: ${error.message}`);
@@ -78,15 +88,12 @@ export class IngredientsService {
 
   async findOne(id: string) {
     try {
-      // Obtener el ingrediente usando Prisma ORM
-      const ingredient = await this.prisma.ingredient.findUnique({
+      return this.prisma.ingredient.findUnique({
         where: { id },
         include: {
           location: true,
         },
       });
-      
-      return ingredient;
     } catch (error) {
       this.logger.error(`Error finding ingredient ${id}: ${error.message}`);
       throw new InternalServerErrorException(`Error finding ingredient: ${error.message}`);
@@ -95,18 +102,28 @@ export class IngredientsService {
 
   async update(id: string, updateIngredientDto: UpdateIngredientDto) {
     try {
-      this.logger.debug(`Updating ingredient ${id} with data: ${JSON.stringify(updateIngredientDto)}`);
-      
-      // Actualizar el ingrediente usando Prisma ORM
-      const ingredient = await this.prisma.ingredient.update({
-        where: { id },
-        data: updateIngredientDto,
-        include: {
-          location: true,
-        },
+      this.logger.debug(
+        `Updating ingredient ${id} with data: ${JSON.stringify(updateIngredientDto)}`,
+      );
+
+      return this.prisma.$transaction(async (tx) => {
+        const ingredient = await tx.ingredient.update({
+          where: { id },
+          data: updateIngredientDto,
+          include: {
+            location: true,
+          },
+        });
+
+        if (
+          updateIngredientDto.quantity !== undefined ||
+          updateIngredientDto.minQuantity !== undefined
+        ) {
+          await this.stockSync.syncFromIngredient(tx, ingredient);
+        }
+
+        return ingredient;
       });
-      
-      return ingredient;
     } catch (error) {
       this.logger.error(`Error updating ingredient ${id}: ${error.message}`);
       throw new InternalServerErrorException(`Error updating ingredient: ${error.message}`);
@@ -115,22 +132,26 @@ export class IngredientsService {
 
   async remove(id: string) {
     try {
-      // Primero obtenemos el ingrediente para devolver su info completa
       const ingredient = await this.findOne(id);
-      
+
       if (!ingredient) {
         throw new Error(`Ingredient with id ${id} not found`);
       }
-      
-      // Eliminar el ingrediente usando Prisma ORM
-      await this.prisma.ingredient.delete({
-        where: { id },
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.inventoryItem.deleteMany({
+          where: { ingredientId: id },
+        });
+
+        await tx.ingredient.delete({
+          where: { id },
+        });
       });
-      
+
       return ingredient;
     } catch (error) {
       this.logger.error(`Error removing ingredient ${id}: ${error.message}`);
       throw new InternalServerErrorException(`Error removing ingredient: ${error.message}`);
     }
   }
-} 
+}

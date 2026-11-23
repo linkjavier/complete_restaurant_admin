@@ -1,12 +1,22 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Pencil } from "lucide-react"
-import { getUsers, createUser, deleteUser, updateUser } from "@/lib/api"
+import Image from "next/image"
+import { Plus, Trash2, Pencil, Check, X, Clock3 } from "lucide-react"
+import {
+  getUsers,
+  createUser,
+  deleteUser,
+  updateUser,
+  getUserAccessRequests,
+  approveUserAccessRequest,
+  rejectUserAccessRequest,
+  UserAccessRequest,
+} from "@/lib/api"
 import { getLocations } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/use-auth"
@@ -29,6 +39,7 @@ const USER_ROLES = [
   { value: "MANAGER", label: "Gerente" },
   { value: "CUSTOMER", label: "Cliente" },
 ]
+const APPROVAL_ROLES = USER_ROLES.filter((role) => role.value !== "SUPER_ADMIN")
 
 interface User {
   id: string;
@@ -48,6 +59,10 @@ interface Location {
 export function UsersManager() {
   const [users, setUsers] = useState<User[]>([])
   const [locations, setLocations] = useState<Location[]>([])
+  const [accessRequests, setAccessRequests] = useState<UserAccessRequest[]>([])
+  const [requestRoles, setRequestRoles] = useState<Record<string, string>>({})
+  const [requestsLoading, setRequestsLoading] = useState(false)
+  const [reviewingRequestId, setReviewingRequestId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newUser, setNewUser] = useState({
@@ -62,11 +77,38 @@ export function UsersManager() {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const { toast } = useToast()
   const { user: currentUser } = useAuth()
+  const assignableRoles = USER_ROLES.filter(
+    (role) => currentUser?.role === "SUPER_ADMIN" || role.value !== "SUPER_ADMIN",
+  )
+
+  const fetchAccessRequests = useCallback(async () => {
+    try {
+      setRequestsLoading(true)
+      setAccessRequests(await getUserAccessRequests())
+    } catch (err) {
+      console.error("Error fetching access requests:", err)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las solicitudes de acceso.",
+        variant: "destructive",
+      })
+    } finally {
+      setRequestsLoading(false)
+    }
+  }, [toast])
 
   useEffect(() => {
     fetchUsers()
     fetchLocations()
   }, [])
+
+  useEffect(() => {
+    if (currentUser?.role === "SUPER_ADMIN") {
+      fetchAccessRequests()
+    } else {
+      setAccessRequests([])
+    }
+  }, [currentUser?.role, fetchAccessRequests])
 
   const fetchUsers = async () => {
     try {
@@ -88,6 +130,40 @@ export function UsersManager() {
       setLocations(data)
     } catch (err) {
       console.error('Error fetching locations:', err)
+    }
+  }
+
+  const handleReviewAccessRequest = async (
+    request: UserAccessRequest,
+    action: "approve" | "reject",
+  ) => {
+    const role = requestRoles[request.id] || "STAFF"
+    try {
+      setReviewingRequestId(request.id)
+      if (action === "approve") {
+        await approveUserAccessRequest(request.id, role)
+        toast({
+          title: "Solicitud aprobada",
+          description: `${request.firstName} ahora tiene el rol ${APPROVAL_ROLES.find((item) => item.value === role)?.label || role}.`,
+        })
+        await fetchUsers()
+      } else {
+        await rejectUserAccessRequest(request.id)
+        toast({
+          title: "Solicitud rechazada",
+          description: `Se rechazó la solicitud de ${request.email}.`,
+        })
+      }
+      await fetchAccessRequests()
+    } catch (err) {
+      console.error(`Error reviewing access request (${action}):`, err)
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudo procesar la solicitud.",
+        variant: "destructive",
+      })
+    } finally {
+      setReviewingRequestId(null)
     }
   }
 
@@ -197,6 +273,99 @@ export function UsersManager() {
 
   return (
     <div className="space-y-4">
+      {currentUser?.role === "SUPER_ADMIN" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock3 className="h-5 w-5" />
+              Solicitudes de acceso
+              {accessRequests.length > 0 && (
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                  {accessRequests.length}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {requestsLoading ? (
+              <p className="text-center text-sm text-muted-foreground">Cargando solicitudes...</p>
+            ) : accessRequests.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground">
+                No hay solicitudes pendientes.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {accessRequests.map((request) => (
+                  <div
+                    key={request.id}
+                    className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      {request.avatar ? (
+                        <Image
+                          src={request.avatar}
+                          alt=""
+                          width={40}
+                          height={40}
+                          unoptimized
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted font-medium">
+                          {request.firstName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium">{request.firstName} {request.lastName}</p>
+                        <p className="text-sm text-muted-foreground">{request.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Solicitó acceso el {new Date(request.requestedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Select
+                        value={requestRoles[request.id] || "STAFF"}
+                        onValueChange={(role) =>
+                          setRequestRoles((current) => ({ ...current, [request.id]: role }))
+                        }
+                      >
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Rol al aprobar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {APPROVAL_ROLES.map((role) => (
+                            <SelectItem key={role.value} value={role.value}>
+                              {role.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        disabled={reviewingRequestId === request.id}
+                        onClick={() => handleReviewAccessRequest(request, "approve")}
+                      >
+                        <Check className="mr-1 h-4 w-4" />
+                        Aprobar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={reviewingRequestId === request.id}
+                        onClick={() => handleReviewAccessRequest(request, "reject")}
+                      >
+                        <X className="mr-1 h-4 w-4" />
+                        Rechazar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>
@@ -277,7 +446,7 @@ export function UsersManager() {
                   <SelectValue placeholder="Selecciona un rol" />
                 </SelectTrigger>
                 <SelectContent>
-                  {USER_ROLES.map((role) => (
+                  {assignableRoles.map((role) => (
                     <SelectItem key={role.value} value={role.value}>
                       {role.label}
                     </SelectItem>

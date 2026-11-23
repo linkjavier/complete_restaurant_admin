@@ -1,4 +1,11 @@
-import { Injectable, NotFoundException, Inject, forwardRef, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  Inject,
+  forwardRef,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Order, Prisma } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -6,6 +13,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrdersGateway } from './orders.gateway';
 import { OrdersQueueService } from './orders-workers/orders-queue.service';
 import { ProductsService } from '../products/products.service';
+import { GeocodingService } from '../geocoding/geocoding.service';
 
 @Injectable()
 export class OrdersService {
@@ -17,6 +25,7 @@ export class OrdersService {
     private ordersGateway: OrdersGateway,
     private ordersQueueService: OrdersQueueService,
     private productsService: ProductsService,
+    private geocodingService: GeocodingService,
   ) {
     // Log to verify gateway is injected
     this.logger.log(`OrdersService initialized with OrdersGateway: ${!!this.ordersGateway}`);
@@ -60,7 +69,11 @@ export class OrdersService {
       skip,
       take,
       cursor,
-      where: { ...where, tenantId },
+      where: {
+        ...where,
+        tenantId,
+        isDeleted: { not: true }
+      },
       orderBy,
       include: {
         table: true,
@@ -84,8 +97,49 @@ export class OrdersService {
   async create(createOrderDto: CreateOrderDto, tenantId: string) {
     try {
       this.logger.log(`Creating order from DTO: ${JSON.stringify(createOrderDto)}`);
-      
+
       const { userId, items, ...orderData } = createOrderDto;
+
+      // Handle Delivery Address Validation and Location Assignment
+      if (orderData.type === 'DELIVERY' && orderData.deliveryAddress) {
+        this.logger.log(`Performing backend address validation for delivery order...`);
+        try {
+          const validation = await this.geocodingService.validateAndAssignLocation(
+            orderData.deliveryAddress,
+            tenantId
+          );
+
+          if (validation.assignedLocation) {
+            this.logger.log(`Address validated. Overriding locationId to closest branch: ${validation.assignedLocation.name} (${validation.assignedLocation.id})`);
+            orderData.locationId = validation.assignedLocation.id;
+          }
+        } catch (error) {
+          this.logger.warn(`Delivery address validation failed: ${error.message}`);
+          // We still create the order but log the warning, or we could throw if strict
+          // For now, let's keep the user's manual assignment if validation fails
+        }
+      }
+
+      const requestedProductIds = [...new Set(items.map((item) => item.productId))];
+      const orderProducts = await this.prisma.product.findMany({
+        where: {
+          id: { in: requestedProductIds },
+          tenantId,
+          isActive: true,
+          ...(orderData.locationId ? { locationId: orderData.locationId } : {}),
+        },
+        select: { id: true, isIntermediate: true },
+      });
+      if (orderProducts.length !== requestedProductIds.length) {
+        throw new NotFoundException(
+          'One or more products are unavailable for this business or location',
+        );
+      }
+      if (orderProducts.some((product) => product.isIntermediate)) {
+        throw new BadRequestException(
+          'Intermediate products must be used in a recipe and cannot be sold directly',
+        );
+      }
 
       // START: Price calculation logic
       let orderSubtotal = 0;
@@ -191,29 +245,44 @@ export class OrdersService {
           this.logger.log(`Successfully emitted new order event`);
         } catch (wsError) {
           this.logger.error(
-            `WebSocket event emission failed for order ${order.id}: ${wsError.message}`, 
+            `WebSocket event emission failed for order ${order.id}: ${wsError.message}`,
             wsError.stack
           );
         }
       } else {
         this.logger.warn(`No locationId for order ${order.id}, skipping WebSocket notification`);
       }
-      
+
       // Queue background processing jobs only if status is PENDING
       if (order.status === 'PENDING') {
         await this.ordersQueueService.addOrderProcessingJob(order);
         this.logger.log(`Background processing jobs queued for order ${order.id}`);
       }
-      
-      return order;
+
+      return {
+        ...order,
+        items: order.items.map((item) => {
+          const {
+            arEnabled: _arEnabled,
+            model3dUrl: _model3dUrl,
+            modelUsdzUrl: _modelUsdzUrl,
+            modelThumbnailUrl: _modelThumbnailUrl,
+            modelScale: _modelScale,
+            arPlacement: _arPlacement,
+            modelFileSize: _modelFileSize,
+            ...product
+          } = item.product;
+          return { ...item, product };
+        }),
+      };
     } catch (error) {
       this.logger.error(`Error creating order: ${error.message}`, error.stack);
       throw error;
     }
   }
 
-  async findAll(locationId?: string, tableId?: string, kitchen?: boolean, showDeleted = false) {
-    const where: Prisma.OrderWhereInput = {};
+  async findAll(tenantId: string, locationId?: string, tableId?: string, kitchen?: boolean, showDeleted = false) {
+    const where: Prisma.OrderWhereInput = { tenantId };
 
     if (locationId) {
       where.locationId = locationId;
@@ -340,7 +409,7 @@ export class OrdersService {
         this.ordersGateway.emitOrderUpdated(updatedOrder, updatedOrder.locationId);
         this.logger.log(`WebSocket event emitted for updated order ${id}`);
       }
-      
+
       return updatedOrder;
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -399,11 +468,11 @@ export class OrdersService {
           order.locationId
         );
         this.logger.log(`WebSocket event emitted for updated item ${itemId} in order ${orderId}`);
-        
+
         // Queue notifications for status changes if needed
         await this.ordersQueueService.addOrderItemStatusChangeJob(updatedItem, order);
       }
-      
+
       return this.findOne(orderId);
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -437,6 +506,12 @@ export class OrdersService {
         },
       });
       this.logger.log(`Order ${id} marked as deleted successfully`);
+
+      // Notify clients via WebSocket
+      if (order.locationId) {
+        this.ordersGateway.emitOrderUpdated(deletedOrder as any, order.locationId);
+      }
+
       return deletedOrder;
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -447,7 +522,7 @@ export class OrdersService {
     }
   }
 
-  async findDeleted(locationId?: string) {
-    return this.findAll(locationId, undefined, false, true);
+  async findDeleted(tenantId: string, locationId?: string) {
+    return this.findAll(tenantId, locationId, undefined, false, true);
   }
 }

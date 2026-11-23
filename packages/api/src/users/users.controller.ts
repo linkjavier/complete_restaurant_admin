@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Query,
+  Req,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -32,8 +33,12 @@ export class UsersController {
   @ApiResponse({ status: 201, description: 'User created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  create(@Body() createUserDto: CreateUserDto, @CurrentTenant() tenantId: string) {
-    return this.usersService.create(createUserDto, tenantId);
+  create(
+    @Body() createUserDto: CreateUserDto,
+    @CurrentTenant() tenantId: string,
+    @Req() req: { user: { role: UserRole } },
+  ) {
+    return this.usersService.create(createUserDto, tenantId, req.user.role);
   }
 
   @Get()
@@ -43,6 +48,33 @@ export class UsersController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   findAll(@CurrentTenant() tenantId: string) {
     return this.usersService.findAll(tenantId);
+  }
+
+  @Get('access-requests')
+  @Roles(UserRole.SUPER_ADMIN)
+  findAccessRequests(@CurrentTenant() tenantId: string) {
+    return this.usersService.findAccessRequests(tenantId);
+  }
+
+  @Patch('access-requests/:id/approve')
+  @Roles(UserRole.SUPER_ADMIN)
+  approveAccessRequest(
+    @Param('id') id: string,
+    @Body('role') role: UserRole,
+    @CurrentTenant() tenantId: string,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.usersService.approveAccessRequest(id, role, tenantId, req.user.id);
+  }
+
+  @Patch('access-requests/:id/reject')
+  @Roles(UserRole.SUPER_ADMIN)
+  rejectAccessRequest(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.usersService.rejectAccessRequest(id, tenantId, req.user.id);
   }
 
   @Get(':id')
@@ -61,8 +93,13 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'User updated successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @CurrentTenant() tenantId: string) {
-    return this.usersService.update(id, updateUserDto, tenantId);
+  update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @CurrentTenant() tenantId: string,
+    @Req() req: { user: { role: UserRole } },
+  ) {
+    return this.usersService.update(id, updateUserDto, tenantId, req.user.role);
   }
 
   @Delete(':id')

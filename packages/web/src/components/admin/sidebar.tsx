@@ -12,6 +12,8 @@ import {
   MapPin,
   Tag,
   Package,
+  Boxes,
+  Factory,
   Users,
   Settings,
   Utensils,
@@ -22,7 +24,9 @@ import {
   Receipt,
   Bot,
   MessageCircle,
-  ContactRound
+  ContactRound,
+  QrCode,
+  Sparkles
 } from "lucide-react"
 import {
   Tooltip,
@@ -37,6 +41,7 @@ import { LanguageSwitch } from "@/components/language-switch"
 import "@/app/sidebar-scrollbar.css"
 import { API_URL } from '@/lib/api'
 import { useLanguage } from "@/hooks/use-language"
+import { getHomePathForRole } from "@/lib/roles"
 
 interface SidebarProps {
   isMobile?: boolean
@@ -57,6 +62,12 @@ const routes = [
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
+    label: "aiV2",
+    icon: Sparkles,
+    href: "/admin/ai-manager-v2",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
+  },
+  {
     label: "pos",
     icon: ShoppingCart,
     href: "/admin/pos",
@@ -73,6 +84,12 @@ const routes = [
     icon: Table,
     href: "/admin/tables",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
+  },
+  {
+    label: "qrMenu",
+    icon: QrCode,
+    href: "/admin/qr-menu",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "kitchen",
@@ -96,6 +113,24 @@ const routes = [
     label: "ingredients",
     icon: Utensils,
     href: "/admin/ingredients",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
+  {
+    label: "inventory",
+    icon: Boxes,
+    href: "/admin/inventory",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
+  {
+    label: "purchases",
+    icon: ShoppingCart,
+    href: "/admin/purchases",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
+  {
+    label: "production",
+    icon: Factory,
+    href: "/admin/production",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
@@ -147,13 +182,14 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     // Obtener logo y nombre del negocio desde la API
     const fetchBusiness = async () => {
       try {
-        const res = await fetch(`${API_URL}/settings/business`)
+        const locationId = user?.locationId
+        const res = await fetch(`${API_URL}/settings/business${locationId ? `?locationId=${locationId}` : ''}`)
         if (res.ok) {
           const data = await res.json()
           setBusinessIcon(data.logo || "")
           setBusinessName(data.name || "Admin Panel")
         }
-      } catch {}
+      } catch { }
     }
     fetchBusiness()
   }, [])
@@ -201,9 +237,9 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                       priority
                     />
                   </div>
-                  <div 
+                  <div
                     className="cursor-pointer"
-                    onClick={() => handleNavigation('/admin/dashboard')}
+                    onClick={() => handleNavigation(getHomePathForRole(user.role))}
                   >
                     <h1 className="text-2xl font-bold">
                       {businessName}
@@ -232,12 +268,14 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
           </div>
           <div className="space-y-1 pb-4">
             {routes.filter(route => !route.roles || route.roles.includes(user.role)).map((route) => {
-              const isActive = pathname === route.href || 
+              const isActive = pathname === route.href ||
                 (route.href === '/admin/pos' && pathname.startsWith('/admin/pos/')) ||
                 (route.href === '/admin/orders' && pathname.startsWith('/admin/orders/')) ||
                 (route.href === '/admin/tables' && pathname.startsWith('/admin/tables/')) ||
+                (route.href === '/admin/qr-menu' && pathname.startsWith('/admin/qr-menu')) ||
                 (route.href === '/admin/products' && pathname.startsWith('/admin/products/')) ||
                 (route.href === '/admin/categories' && pathname.startsWith('/admin/categories/')) ||
+                (route.href === '/admin/purchases' && pathname.startsWith('/admin/purchases')) ||
                 (route.href === '/admin/users' && pathname.startsWith('/admin/users/')) ||
                 (route.href === '/admin/settings' && pathname.startsWith('/admin/settings/'));
 

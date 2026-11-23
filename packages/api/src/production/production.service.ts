@@ -1,116 +1,207 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { HttpException, HttpStatus } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  InsufficientStockError,
+  StockSyncService,
+} from '../inventory/stock-sync.service';
 
 @Injectable()
 export class ProductionService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private stockSync: StockSyncService,
+  ) {}
 
-  async produceProduct(productId: string, quantity: number) {
-    // Check if product exists and is active
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+  async findProductionHistory(tenantId: string, locationId?: string) {
+    return this.prisma.productionLog.findMany({
+      where: {
+        product: {
+          tenantId,
+          isIntermediate: true,
+          locationId,
+        },
+      },
       include: {
-        ingredients: {
-          include: {
-            ingredient: true,
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        product: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            unit: true,
+            locationId: true,
+            location: { select: { id: true, name: true } },
           },
         },
       },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
     });
+  }
 
-    if (!product) {
-      throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
-    }
-
-    if (!product.isActive) {
-      throw new HttpException(
-        'Product is not active',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    if (quantity <= 0) {
+  async produceProduct(
+    productId: string,
+    quantity: number,
+    tenantId: string,
+    createdById: string,
+    allowedLocationId?: string,
+    wasteQuantity = 0,
+    wasteNotes?: string,
+  ) {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
       throw new HttpException(
         'Quantity must be greater than 0',
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    // Calculate required ingredients
-    const requiredIngredients = product.ingredients.map((pi) => ({
-      ingredientId: pi.ingredient.id,
-      requiredQuantity: pi.quantity * quantity,
-      currentQuantity: pi.ingredient.quantity,
-      name: pi.ingredient.name,
-    }));
-
-    // Check if we have enough stock of all ingredients
-    const missingIngredients = requiredIngredients.filter(
-      (ri) => ri.currentQuantity < ri.requiredQuantity,
-    );
-
-    if (missingIngredients.length > 0) {
+    if (!Number.isFinite(wasteQuantity) || wasteQuantity < 0) {
       throw new HttpException(
-        {
-          message: 'Insufficient ingredients',
-          missing: missingIngredients.map((mi) => ({
-            name: mi.name,
-            required: mi.requiredQuantity,
-            available: mi.currentQuantity,
-          })),
-        },
+        'wasteQuantity must be non-negative',
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    // Use a transaction to ensure atomicity
     try {
-      const result = await this.prisma.$transaction(async (tx) => {
-        // Update ingredient quantities
-        await Promise.all(
-          requiredIngredients.map((ri) =>
-            tx.$executeRaw`
-              UPDATE "Ingredient"
-              SET quantity = quantity - ${ri.requiredQuantity}
-              WHERE id = ${ri.ingredientId}
-            `
-          )
-        );
+      return await this.prisma.$transaction(async (tx) => {
+        const product = await tx.product.findFirst({
+          where: {
+            id: productId,
+            tenantId,
+            isActive: true,
+            isIntermediate: true,
+            locationId: allowedLocationId,
+          },
+          include: {
+            ingredients: { include: { ingredient: true } },
+            components: { include: { component: true } },
+          },
+        });
 
-        // Update product stock
-        const updatedProduct = await tx.$executeRaw`
-          UPDATE "Product"
-          SET quantity = quantity + ${quantity}
-          WHERE id = ${productId}
-          RETURNING *
-        `;
+        if (!product) {
+          throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
+        }
 
-        // Create production record
-        const log = await tx.$executeRaw`
-          INSERT INTO "ProductionLog" ("id", "productId", "quantity", "createdAt")
-          VALUES (${Prisma.sql`gen_random_uuid()`}, ${productId}, ${quantity}, NOW())
-          RETURNING *
-        `;
+        if (!product.ingredients.length && !product.components.length) {
+          throw new BadRequestException(
+            'Configure at least one ingredient or intermediate product in this recipe before producing it',
+          );
+        }
+
+        const batchQuantity = quantity + wasteQuantity;
+        const consumedIngredients = [];
+        const consumedProducts = [];
+
+        for (const recipeIngredient of product.ingredients) {
+          const amount = recipeIngredient.quantity * batchQuantity;
+          await this.stockSync.deductSyncedStock(tx, {
+            ingredientId: recipeIngredient.ingredientId,
+            locationId: product.locationId,
+            amount,
+          });
+          consumedIngredients.push({
+            id: recipeIngredient.ingredientId,
+            code: recipeIngredient.ingredient.code,
+            name: recipeIngredient.ingredient.name,
+            unit: recipeIngredient.ingredient.unit,
+            quantity: amount,
+          });
+        }
+
+        for (const recipeComponent of product.components) {
+          const amount = recipeComponent.quantity * batchQuantity;
+          await this.stockSync.deductProductStock(tx, {
+            productId: recipeComponent.componentId,
+            locationId: product.locationId,
+            amount,
+          });
+          consumedProducts.push({
+            id: recipeComponent.componentId,
+            code: recipeComponent.component.code,
+            name: recipeComponent.component.name,
+            unit: recipeComponent.component.unit,
+            quantity: amount,
+          });
+        }
+
+        const updated = await tx.product.updateMany({
+          where: {
+            id: product.id,
+            tenantId,
+            locationId: product.locationId,
+            isIntermediate: true,
+            isActive: true,
+          },
+          data: { quantity: { increment: quantity } },
+        });
+        if (updated.count !== 1) {
+          throw new HttpException(
+            'Product changed while production was being recorded',
+            HttpStatus.CONFLICT,
+          );
+        }
+
+        const updatedProduct = await tx.product.findUniqueOrThrow({
+          where: { id: product.id },
+        });
+        const log = await tx.productionLog.create({
+          data: {
+            productId,
+            productCode: product.code,
+            productName: product.name,
+            productUnit: product.unit,
+            createdById,
+            quantity,
+            wasteQuantity,
+            wasteNotes: wasteNotes?.trim() || null,
+            consumedMaterials: [
+              ...consumedIngredients.map((item) => ({
+                id: item.id,
+                code: item.code,
+                name: item.name,
+                unit: item.unit,
+                quantity: item.quantity,
+                type: 'INGREDIENT',
+              })),
+              ...consumedProducts.map((item) => ({
+                id: item.id,
+                code: item.code,
+                name: item.name,
+                unit: item.unit,
+                quantity: item.quantity,
+                type: 'PRODUCT',
+              })),
+            ],
+          },
+        });
 
         return {
           success: true,
-          product: updatedProduct[0],
-          log: log[0],
-          ingredientsUpdated: requiredIngredients.length,
+          product: updatedProduct,
+          log,
+          consumedIngredients,
+          consumedProducts,
         };
       });
-
-      return result;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        throw new HttpException(
-          'Database error during production process',
-          HttpStatus.INTERNAL_SERVER_ERROR,
-        );
+      if (error instanceof HttpException) throw error;
+      if (error instanceof InsufficientStockError) {
+        throw new BadRequestException({
+          message: 'Insumos insuficientes para registrar la producción',
+          missing: [error.detail],
+        });
       }
-      throw error;
+      throw new HttpException(
+        'Database error during production process',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

@@ -1,12 +1,22 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect, useRef, useMemo } from "react"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Pencil, ChevronUp, List, Grid, Search, Expand, Shrink } from "lucide-react"
-import { getProducts, createProduct, deleteProduct, updateProduct, Product } from "@/lib/api"
+import { Plus, Trash2, Pencil, ChevronUp, List, Grid, Search, Eye, Package, AlertTriangle, Clock3 } from "lucide-react"
+import {
+  getProducts,
+  createProduct,
+  deleteProduct,
+  updateProduct,
+  Product,
+  ProductArConfiguration,
+  getProductArConfiguration,
+  updateProductArConfiguration,
+  uploadProductArAsset,
+} from "@/lib/api"
 import { getCategories, Category } from "@/lib/api"
 import { getLocations, Location } from "@/lib/api"
 import { getIngredients, Ingredient } from "@/lib/api"
@@ -24,7 +34,11 @@ import { ImageUpload } from "./image-upload"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/lib/utils"
+import { cn, toFiniteNumber } from "@/lib/utils"
+
+import { ImportProductsDialog } from "./import-products-dialog"
+import { FileText } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
@@ -53,38 +67,12 @@ function useMobileViewportHeight() {
 }
 
 const CategoryTitle = ({ title }: { title: string }) => {
-  const words = title.split(' ')
-  const lastWord = words.pop() || ''
-  const firstPart = words.join(' ')
-
   return (
-    <div className="text-center my-6">
-      {firstPart && (
-        <h2
-          className="text-3xl"
-          style={{
-            fontFamily: "'Anton', sans-serif",
-            color: '#c83b3b',
-            textTransform: 'uppercase',
-            fontWeight: 400,
-            letterSpacing: '0.05em',
-            lineHeight: 1,
-          }}
-        >
-          {firstPart}
-        </h2>
-      )}
-      <h3
-        className="text-5xl"
-        style={{
-          fontFamily: "'Pacifico', cursive",
-          color: '#e58c3d',
-          lineHeight: 1.2,
-          textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
-        }}
-      >
-        {lastWord}
-      </h3>
+    <div className="mb-4 mt-2 flex items-center gap-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </h2>
+      <div className="h-px flex-1 bg-border" />
     </div>
   )
 }
@@ -92,15 +80,23 @@ const CategoryTitle = ({ title }: { title: string }) => {
 export function ProductsManager() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [hasInitializedCategory, setHasInitializedCategory] = useState(false)
   const [locations, setLocations] = useState<Location[]>([])
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [selectedProductType, setSelectedProductType] = useState<"all" | "sale" | "intermediate">("all")
+  const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "in-stock" | "out-of-stock" | "inactive">("all")
+  const [modifiedFilter, setModifiedFilter] = useState<"all" | "recent">("all")
+  const [priceRange, setPriceRange] = useState<"all" | "under-25000" | "25000-50000" | "over-50000">("all")
+  const [sortOrder, setSortOrder] = useState<"name" | "recent" | "price">("name")
+  const [selectedLocationId, setSelectedLocationId] = useState("all")
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
@@ -109,34 +105,31 @@ export function ProductsManager() {
     categoryId: "",
     locationId: "",
     isActive: true,
+    isIntermediate: false,
+    unit: "unidad",
     quantity: 0,
-    ingredients: [],
-    variantGroups: [] as {
-      id: string;
-      name: string;
-      order?: number;
-      variants: {
-        id: string;
-        name: string;
-        price?: number;
-        image?: string;
-        isActive?: boolean;
-      }[];
-    }[],
+    ingredients: [] as any[],
+    components: [] as { componentId: string; quantity: number }[],
+    variantGroups: [] as any[],
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [arConfiguration, setArConfiguration] = useState<ProductArConfiguration | null>(null)
+  const [arLoading, setArLoading] = useState(false)
+  const [arLoadError, setArLoadError] = useState("")
+  const [arSaving, setArSaving] = useState(false)
+  const [arUploading, setArUploading] = useState(false)
+  const [arUploadProgress, setArUploadProgress] = useState<{
+    fileName: string
+    percent: number
+  } | null>(null)
   const { toast } = useToast()
+  const { user, isLoading: isAuthLoading } = useAuth()
+  const isSuperAdmin = user?.role === "SUPER_ADMIN"
   const [productToDelete, setProductToDelete] = useState<{ id: string, name: string } | null>(null)
+  const [detailsProduct, setDetailsProduct] = useState<Product | null>(null)
   const [scrollToProductId, setScrollToProductId] = useState<string | null>(null)
   const productRefs = useRef<Map<string, HTMLElement>>(new Map())
   const vh = useMobileViewportHeight()
-
-  useEffect(() => {
-    fetchProducts()
-    fetchCategories()
-    fetchLocations()
-    fetchIngredients()
-  }, [])
 
   useEffect(() => {
     if (scrollToProductId && productRefs.current.has(scrollToProductId)) {
@@ -148,11 +141,17 @@ export function ProductsManager() {
     }
   }, [products, scrollToProductId])
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (locationId?: string) => {
     try {
       setLoading(true)
       setError(null)
-      const data = await getProducts()
+      if (!isSuperAdmin && !locationId) {
+        setProducts([])
+        setError("Tu usuario no tiene una sucursal asignada.")
+        return
+      }
+
+      const data = await getProducts(locationId)
       const sortedData = [...data].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }))
       setProducts(sortedData)
     } catch (err) {
@@ -163,10 +162,26 @@ export function ProductsManager() {
     }
   }
 
+  const reloadProducts = () =>
+    fetchProducts(isSuperAdmin ? undefined : user?.locationId ?? undefined)
+
+  useEffect(() => {
+    if (isAuthLoading || !user) return
+
+    void reloadProducts()
+    void fetchCategories()
+    void fetchLocations()
+    void fetchIngredients()
+  }, [isAuthLoading, isSuperAdmin, user])
+
   const fetchCategories = async () => {
     try {
       const data = await getCategories()
       setCategories(data)
+      if (!hasInitializedCategory && data.length > 0) {
+        setSelectedCategory(data[0].id)
+        setHasInitializedCategory(true)
+      }
     } catch (err) {
       console.error('Error fetching categories:', err)
     }
@@ -190,174 +205,6 @@ export function ProductsManager() {
     }
   }
 
-  const handleCreateProduct = async () => {
-    try {
-      if (!newProduct.name || !newProduct.price || !newProduct.categoryId || !newProduct.locationId) {
-        toast({
-          title: "Error",
-          description: "Por favor completa todos los campos requeridos",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Antes de enviar a la API, asegúrate de que todos los ids existen
-      const variantGroupsWithIds = (newProduct.variantGroups || []).map(group => ({
-        ...group,
-        id: group.id || crypto.randomUUID(),
-        variants: (group.variants || []).map(variant => ({
-          ...variant,
-          id: variant.id || crypto.randomUUID(),
-        }))
-      }))
-      await createProduct({
-        name: newProduct.name,
-        description: newProduct.description || undefined,
-        price: newProduct.price,
-        image: newProduct.image || undefined,
-        categoryId: newProduct.categoryId,
-        locationId: newProduct.locationId,
-        isActive: newProduct.isActive,
-        quantity: newProduct.quantity,
-        ingredients: newProduct.ingredients,
-        variantGroups: variantGroupsWithIds,
-      })
-      toast({
-        title: "Éxito",
-        description: "Producto creado correctamente",
-      })
-      resetNewProductForm()
-      setIsCreateDialogOpen(false)
-      fetchProducts()
-    } catch (err) {
-      console.error('Error creating product:', err)
-      toast({
-        title: "Error",
-        description: "Error al crear el producto. Por favor, asegúrate de estar autenticado.",
-        variant: "destructive",
-      })
-    }
-  }
-  const handleUpdateProduct = async () => {
-    if (!editingProduct) return
-    try {
-      if (!editingProduct.name || !editingProduct.price || !editingProduct.categoryId || !editingProduct.locationId) {
-        toast({
-          title: "Error",
-          description: "Por favor completa todos los campos requeridos",
-          variant: "destructive",
-        })
-        return
-      }
-      await updateProduct(editingProduct.id, {
-        name: editingProduct.name,
-        description: editingProduct.description || undefined,
-        price: editingProduct.price,
-        image: editingProduct.image || undefined,
-        categoryId: editingProduct.categoryId,
-        locationId: editingProduct.locationId,
-        isActive: editingProduct.isActive,
-        quantity: editingProduct.quantity,
-        ingredients: editingProduct.ingredients?.map(pi => ({
-          ingredientId: pi.ingredientId,
-          quantity: pi.quantity,
-        })) || [],
-        variantGroups: editingProduct.variantGroups,
-      })
-      toast({
-        title: "Éxito",
-        description: "Producto actualizado correctamente",
-      })
-      setIsEditDialogOpen(false)
-      setScrollToProductId(editingProduct.id)
-      setEditingProduct(null)
-      fetchProducts()
-    } catch (err) {
-      console.error('Error updating product:', err)
-      toast({
-        title: "Error",
-        description: "Error al actualizar el producto. Por favor, asegúrate de estar autenticado.",
-        variant: "destructive",
-      })
-    }
-  }
-  const handleDeleteProduct = async (id: string) => {
-    try {
-      await deleteProduct(id)
-      toast({
-        title: "Éxito",
-        description: "Producto eliminado correctamente",
-      })
-      fetchProducts()
-    } catch (err) {
-      console.error('Error deleting product:', err)
-      toast({
-        title: "Error",
-        description: "Error al eliminar el producto. Por favor, asegúrate de estar autenticado.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const addIngredient = (product: typeof newProduct | Product) => {
-    const newIngredient = {
-      ingredientId: "",
-      quantity: 0,
-    }
-    if ('ingredients' in product) {
-      const fullIngredient = {
-        id: `temp-${Date.now()}`,
-        productId: ('id' in product) ? product.id : "",
-        ingredientId: "",
-        quantity: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-      product.ingredients.push(fullIngredient)
-    }
-  }
-
-  const removeIngredient = (product: typeof newProduct | Product, index: number) => {
-    if ('ingredients' in product) {
-      product.ingredients.splice(index, 1)
-    }
-  }
-
-  const handleEditClick = (product: Product) => {
-    setEditingProduct({
-      ...product,
-      variantGroups: product.variantGroups || [],
-    })
-    setIsEditDialogOpen(true)
-  }
-
-  // Filter products based on search term and selected category
-  const filteredProducts = products.filter(product => {
-    const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
-
-  const groupedProducts =
-    selectedCategory === "all"
-      ? categories
-          .map(category => ({
-            categoryName: category.name,
-            categoryId: category.id,
-            products: filteredProducts.filter(p => p.categoryId === category.id),
-          }))
-          .filter(group => group.products.length > 0)
-      : filteredProducts.length > 0
-      ? [
-          {
-            categoryName: categories.find((c) => c.id === selectedCategory)?.name || "",
-            categoryId: selectedCategory,
-            products: filteredProducts,
-          },
-        ]
-      : []
-
   const resetNewProductForm = () => {
     setNewProduct({
       name: "",
@@ -367,10 +214,280 @@ export function ProductsManager() {
       categoryId: "",
       locationId: "",
       isActive: true,
+      isIntermediate: false,
+      unit: "unidad",
       quantity: 0,
       ingredients: [],
+      components: [],
       variantGroups: [],
     })
+  }
+
+  const handleCreateProduct = async () => {
+    try {
+      if (
+        !newProduct.name.trim() ||
+        !newProduct.categoryId ||
+        !newProduct.locationId ||
+        !newProduct.unit.trim() ||
+        !Number.isFinite(newProduct.price) ||
+        newProduct.price < 0 ||
+        (!newProduct.isIntermediate && newProduct.price === 0)
+      ) {
+        toast({
+          title: "Revisa los datos del producto",
+          description: newProduct.isIntermediate
+            ? "Completa el nombre, categoría, sucursal y unidad."
+            : "Completa el nombre, un precio mayor que cero, categoría, sucursal y unidad.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (
+        newProduct.ingredients.some(
+          (line) => !line.ingredientId || !Number.isFinite(line.quantity) || line.quantity <= 0,
+        ) ||
+        newProduct.components.some(
+          (line) => !line.componentId || !Number.isFinite(line.quantity) || line.quantity <= 0,
+        )
+      ) {
+        toast({
+          title: "Receta incompleta",
+          description: "Selecciona cada insumo y asigna una cantidad mayor que cero.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const variantGroupsWithIds = (newProduct.variantGroups || []).map(group => ({
+        ...group,
+        id: group.id || crypto.randomUUID(),
+        variants: (group.variants || []).map((variant: any) => ({
+          ...variant,
+          id: variant.id || crypto.randomUUID(),
+        }))
+      }))
+
+      await createProduct({
+        ...newProduct,
+        unit: newProduct.unit.trim(),
+        locationId: isSuperAdmin ? newProduct.locationId : user?.locationId ?? "",
+        variantGroups: variantGroupsWithIds,
+      })
+      toast({
+        title: "Éxito",
+        description: "Producto creado correctamente",
+      })
+      resetNewProductForm()
+      setIsCreateDialogOpen(false)
+      void reloadProducts()
+    } catch (err) {
+      console.error('Error creating product:', err)
+      toast({
+        title: "Error",
+        description:
+          err instanceof Error
+            ? err.message
+            : "Error al crear el producto. Por favor, asegúrate de estar autenticado.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleBulkImport = async (importedProducts: any[]) => {
+    try {
+      setLoading(true)
+      for (const product of importedProducts) {
+        await createProduct({
+          ...product,
+          locationId: isSuperAdmin ? product.locationId : user?.locationId ?? "",
+          isActive: true,
+          quantity: 0
+        })
+      }
+      toast({
+        title: "Éxito",
+        description: `${importedProducts.length} productos importados correctamente`,
+      })
+      void reloadProducts()
+    } catch (err) {
+      console.error('Error in bulk import:', err)
+      toast({
+        title: "Error parcial",
+        description: "Hubo un problema al importar algunos productos.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct) return
+    try {
+      if (
+        !editingProduct.name.trim() ||
+        !editingProduct.categoryId ||
+        !editingProduct.locationId ||
+        !editingProduct.unit.trim() ||
+        !Number.isFinite(editingProduct.price) ||
+        editingProduct.price < 0 ||
+        (!editingProduct.isIntermediate && editingProduct.price === 0)
+      ) {
+        toast({
+          title: "Revisa los datos del producto",
+          description: editingProduct.isIntermediate
+            ? "Completa el nombre, categoría, sucursal y unidad."
+            : "Completa el nombre, un precio mayor que cero, categoría, sucursal y unidad.",
+          variant: "destructive",
+        })
+        return
+      }
+      if (
+        (editingProduct.ingredients ?? []).some(
+          (line) => !line.ingredientId || !Number.isFinite(line.quantity) || line.quantity <= 0,
+        ) ||
+        (editingProduct.components ?? []).some(
+          (line) => !line.componentId || !Number.isFinite(line.quantity) || line.quantity <= 0,
+        )
+      ) {
+        toast({
+          title: "Receta incompleta",
+          description: "Selecciona cada insumo y asigna una cantidad mayor que cero.",
+          variant: "destructive",
+        })
+        return
+      }
+      await updateProduct(editingProduct.id, {
+        ...editingProduct,
+        quantity: undefined,
+        unit: editingProduct.unit.trim(),
+        locationId: isSuperAdmin ? editingProduct.locationId : user?.locationId ?? "",
+        ingredients: editingProduct.ingredients?.map(pi => ({
+          ingredientId: pi.ingredientId,
+          quantity: pi.quantity,
+        })) || [],
+        components: editingProduct.components?.map(({ componentId, quantity }) => ({
+          componentId,
+          quantity,
+        })) || [],
+      })
+      toast({
+        title: "Éxito",
+        description: "Producto actualizado correctamente",
+      })
+      setIsEditDialogOpen(false)
+      setEditingProduct(null)
+      void reloadProducts()
+    } catch (err) {
+      console.error('Error updating product:', err)
+      toast({
+        title: "Error",
+        description:
+          err instanceof Error
+            ? err.message
+            : "Error al actualizar el producto.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      await deleteProduct(id)
+      toast({
+        title: "Éxito",
+        description: "Producto eliminado correctamente",
+      })
+      void reloadProducts()
+    } catch (err) {
+      console.error('Error deleting product:', err)
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el producto.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditClick = (product: Product) => {
+    setEditingProduct({
+      ...product,
+      variantGroups: product.variantGroups || [],
+    })
+    setArConfiguration(null)
+    setArLoading(false)
+    setArLoadError("")
+    setIsEditDialogOpen(true)
+  }
+
+  const loadArConfiguration = async () => {
+    if (!editingProduct) return
+    setArLoading(true)
+    setArLoadError("")
+    try {
+      setArConfiguration(await getProductArConfiguration(editingProduct.id))
+    } catch (cause) {
+      setArLoadError(
+        cause instanceof Error ? cause.message : "No se pudo conectar con la API.",
+      )
+    } finally {
+      setArLoading(false)
+    }
+  }
+
+  const handleArAssetUpload = async (
+    assetType: "glb" | "usdz" | "thumbnail",
+    file?: File,
+  ) => {
+    if (!editingProduct || !file) return
+    setArUploading(true)
+    setArUploadProgress({ fileName: file.name, percent: 0 })
+    try {
+      const next = await uploadProductArAsset(
+        editingProduct.id,
+        assetType,
+        file,
+        (percent) => setArUploadProgress({ fileName: file.name, percent }),
+      )
+      setArConfiguration(next)
+      toast({ title: "Archivo cargado", description: "El archivo se guardó correctamente." })
+    } catch (cause) {
+      toast({
+        title: "Error al cargar el archivo",
+        description: cause instanceof Error ? cause.message : "Intenta de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setArUploading(false)
+      setArUploadProgress(null)
+    }
+  }
+
+  const handleSaveArConfiguration = async () => {
+    if (!editingProduct || !arConfiguration) return
+    setArSaving(true)
+    try {
+      const next = await updateProductArConfiguration(editingProduct.id, {
+        enabled: arConfiguration.enabled,
+        model3dUrl: arConfiguration.model3dUrl,
+        modelUsdzUrl: arConfiguration.modelUsdzUrl,
+        modelThumbnailUrl: arConfiguration.thumbnailUrl,
+        modelScale: arConfiguration.scale,
+        arPlacement: arConfiguration.placement,
+      })
+      setArConfiguration(next)
+      toast({ title: "Configuración AR guardada" })
+    } catch (cause) {
+      toast({
+        title: "No se pudo guardar la configuración AR",
+        description: cause instanceof Error ? cause.message : "Intenta de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setArSaving(false)
+    }
   }
 
   const handleCreateDialogClose = () => {
@@ -381,18 +498,104 @@ export function ProductsManager() {
   const handleEditDialogClose = () => {
     setIsEditDialogOpen(false)
     setEditingProduct(null)
+    setArConfiguration(null)
+    setArLoadError("")
   }
 
-  // Al agregar una nueva variante a un grupo
+  const addIngredient = (product: any) => {
+    if (product.ingredients) {
+      product.ingredients.push({
+        ingredientId: "",
+        quantity: 0,
+      })
+    }
+  }
+
+  const removeIngredient = (product: any, index: number) => {
+    if (product.ingredients) {
+      product.ingredients.splice(index, 1)
+    }
+  }
+
+  const filteredProducts = useMemo(() => products.filter(product => {
+    const matchesLocation =
+      !isSuperAdmin ||
+      selectedLocationId === "all" ||
+      product.locationId === selectedLocationId
+    const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
+    const matchesProductType =
+      selectedProductType === "all" ||
+      (selectedProductType === "intermediate" ? product.isIntermediate : !product.isIntermediate)
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesAvailability =
+      availabilityFilter === "all" ||
+      (availabilityFilter === "in-stock" && product.quantity > 0) ||
+      (availabilityFilter === "out-of-stock" && product.quantity <= 0) ||
+      (availabilityFilter === "inactive" && !product.isActive)
+    const matchesPrice =
+      priceRange === "all" ||
+      (!product.isIntermediate &&
+        ((priceRange === "under-25000" && product.price < 25000) ||
+          (priceRange === "25000-50000" && product.price >= 25000 && product.price <= 50000) ||
+          (priceRange === "over-50000" && product.price > 50000)))
+    const updatedAt = new Date(product.updatedAt ?? product.createdAt ?? 0).getTime()
+    const matchesModified =
+      modifiedFilter === "all" ||
+      (Number.isFinite(updatedAt) && Date.now() - updatedAt <= 7 * 24 * 60 * 60 * 1000)
+    return matchesLocation && matchesCategory && matchesProductType && matchesSearch && matchesAvailability && matchesPrice && matchesModified
+  }).sort((a, b) => {
+    if (sortOrder === "recent") {
+      return new Date(b.updatedAt ?? b.createdAt ?? 0).getTime() - new Date(a.updatedAt ?? a.createdAt ?? 0).getTime()
+    }
+    if (sortOrder === "price") return b.price - a.price
+    return a.name.localeCompare(b.name, "es", { sensitivity: "base" })
+  }), [
+    availabilityFilter,
+    isSuperAdmin,
+    modifiedFilter,
+    priceRange,
+    products,
+    searchTerm,
+    selectedCategory,
+    selectedLocationId,
+    selectedProductType,
+    sortOrder,
+  ])
+
+  const locationScopedProducts = products.filter((product) =>
+    !isSuperAdmin || selectedLocationId === "all" || product.locationId === selectedLocationId,
+  )
+  const productsWithNoStock = locationScopedProducts.filter((product) => product.quantity <= 0).length
+  const recentlyUpdatedCount = locationScopedProducts.filter((product) => {
+    if (!product.updatedAt) return false
+    const updatedAt = new Date(product.updatedAt).getTime()
+    return Number.isFinite(updatedAt) && Date.now() - updatedAt <= 7 * 24 * 60 * 60 * 1000
+  }).length
+
+  const groupedProducts = selectedCategory === "all"
+    ? categories.map(category => ({
+      categoryName: category.name,
+      categoryId: category.id,
+      products: filteredProducts.filter(p => p.categoryId === category.id),
+    })).filter(group => group.products.length > 0)
+    : filteredProducts.length > 0
+      ? [{
+        categoryName: categories.find(c => c.id === selectedCategory)?.name || "",
+        categoryId: selectedCategory,
+        products: filteredProducts,
+      }]
+      : []
+
   const addVariantToGroup = (groupIdx: number) => {
     setNewProduct(prev => {
       const groups = [...prev.variantGroups]
-      groups[groupIdx].variants.push({ id: crypto.randomUUID(), name: '', price: undefined, image: '', isActive: true })
+      groups[groupIdx].variants.push({ id: crypto.randomUUID(), name: '', price: undefined, isActive: true })
       return { ...prev, variantGroups: groups }
     })
   }
 
-  // Al agregar un nuevo grupo de variantes
   const addVariantGroup = () => {
     setNewProduct(prev => ({
       ...prev,
@@ -404,86 +607,245 @@ export function ProductsManager() {
   }
 
   return (
-    <div className="space-y-4 w-full max-w-full overflow-x-hidden">
-      <Card className="w-full">
-        <CardHeader className="border-b">
-          <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <CardTitle className="text-lg sm:text-xl">Productos Existentes</CardTitle>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button
-                  variant="default"
-              size="sm"
-                  onClick={() => setIsCreateDialogOpen(true)}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Crear Producto
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="flex-1 sm:flex-none"
-                >
-                  <List className="h-4 w-4" />
-                  <span className="hidden md:inline ml-2">Lista</span>
-                </Button>
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className="flex-1 sm:flex-none"
-                >
-                  <Grid className="h-4 w-4" />
-                  <span className="hidden md:inline ml-2">Grid</span>
-            </Button>
-              </div>
+    <div className="space-y-4 w-full max-w-full overflow-x-hidden" >
+      <Card className="w-full border-border/70 shadow-md shadow-black/[0.06]">
+        <CardHeader className="space-y-5 border-b bg-muted/20 p-4 sm:p-6">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                aria-label="Buscar productos"
+                placeholder="Buscar global..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                className="h-10 bg-background pl-9 shadow-sm"
+              />
             </div>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar productos..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-              <Select
-                value={selectedCategory}
-                onValueChange={setSelectedCategory}
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (!isSuperAdmin && !user?.locationId) {
+                    toast({
+                      title: "Sucursal requerida",
+                      description: "Tu usuario no tiene una sucursal asignada.",
+                      variant: "destructive",
+                    })
+                    return
+                  }
+                  setIsImportDialogOpen(true)
+                }}
               >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Categoría" />
+                <FileText className="mr-2 h-4 w-4" />
+                Importar
+              </Button>
+              <Button
+                size="sm"
+                className="w-full shadow-sm transition-shadow hover:shadow-md sm:w-auto"
+                onClick={() => {
+                  if (!isSuperAdmin && !user?.locationId) {
+                    toast({
+                      title: "Sucursal requerida",
+                      description: "Tu usuario no tiene una sucursal asignada.",
+                      variant: "destructive",
+                    })
+                    return
+                  }
+                  setNewProduct((current) => ({
+                    ...current,
+                    locationId: isSuperAdmin
+                      ? selectedLocationId === "all" ? "" : selectedLocationId
+                      : user?.locationId ?? "",
+                    isIntermediate: selectedProductType === "intermediate",
+                    price: selectedProductType === "intermediate" ? 0 : current.price,
+                  }))
+                  setIsCreateDialogOpen(true)
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Añadir producto
+              </Button>
+            </div>
+            <div className="grid shrink-0 gap-x-4 gap-y-1 rounded-lg border bg-background px-3 py-2 text-xs shadow-sm sm:grid-cols-3 xl:block xl:min-w-[180px]">
+              <p className="flex items-center justify-between gap-3">
+                <span>Total productos</span>
+                <strong>{locationScopedProducts.length}</strong>
+              </p>
+              <button
+                type="button"
+                onClick={() => setAvailabilityFilter("out-of-stock")}
+                className="flex items-center justify-between gap-3 text-left hover:text-amber-700"
+              >
+                <span>Sin existencias</span>
+                <strong className="text-amber-700">{productsWithNoStock}</strong>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setModifiedFilter("recent")
+                  setSortOrder("recent")
+                }}
+                className="flex items-center justify-between gap-3 text-left hover:text-primary"
+              >
+                <span>Editados recientemente</span>
+                <strong className="inline-flex items-center gap-1">{recentlyUpdatedCount}<ChevronUp className="h-3 w-3 rotate-90" /></strong>
+              </button>
+            </div>
+          </div>
+
+          <div className={cn("grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap", isSuperAdmin ? "xl:flex-nowrap" : "")}>
+            {isSuperAdmin && (
+              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                <SelectTrigger aria-label="Filtrar por sucursal" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                  <SelectValue placeholder="Sucursal" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las categorías</SelectItem>
-                  {categories.map(category => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
+                  <SelectItem value="all">Todas las sucursales</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            {(searchTerm || selectedCategory !== "all") && (
-              <div className="text-sm text-muted-foreground">
-                Mostrando {filteredProducts.length} de {products.length} productos
-              </div>
             )}
+            <Select
+              value={selectedCategory}
+              onValueChange={(value) => {
+                setSelectedCategory(value)
+              }}
+            >
+              <SelectTrigger aria-label="Filtrar por categoría" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                <SelectValue placeholder="Categorías" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las categorías</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={availabilityFilter}
+              onValueChange={(value) => {
+                if (value === "all" || value === "in-stock" || value === "out-of-stock" || value === "inactive") setAvailabilityFilter(value)
+              }}
+            >
+              <SelectTrigger aria-label="Filtrar por disponibilidad" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                <SelectValue placeholder="Disponibilidad" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="in-stock">Con existencias</SelectItem>
+                <SelectItem value="out-of-stock">Sin existencias</SelectItem>
+                <SelectItem value="inactive">Inactivos</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={priceRange}
+              onValueChange={(value) => {
+                if (value === "all" || value === "under-25000" || value === "25000-50000" || value === "over-50000") setPriceRange(value)
+              }}
+            >
+              <SelectTrigger aria-label="Filtrar por rango de precio" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                <SelectValue placeholder="Precio" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los precios</SelectItem>
+                <SelectItem value="under-25000">Menos de $25.000</SelectItem>
+                <SelectItem value="25000-50000">$25.000 a $50.000</SelectItem>
+                <SelectItem value="over-50000">Más de $50.000</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={modifiedFilter}
+              onValueChange={(value) => {
+                if (value === "all" || value === "recent") {
+                  setModifiedFilter(value)
+                  setSortOrder(value === "recent" ? "recent" : "name")
+                }
+              }}
+            >
+              <SelectTrigger aria-label="Filtrar por fecha de modificación" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                <Clock3 className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                <SelectValue placeholder="Fecha modificada" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Cualquier fecha</SelectItem>
+                <SelectItem value="recent">Últimos 7 días</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={selectedProductType}
+              onValueChange={(value) => {
+                if (value === "all" || value === "sale" || value === "intermediate") setSelectedProductType(value)
+              }}
+            >
+              <SelectTrigger aria-label="Filtrar tipo de producto" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los tipos</SelectItem>
+                <SelectItem value="sale">Productos de venta</SelectItem>
+                <SelectItem value="intermediate">Preparaciones</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+
+          <div className="-mb-6 flex items-center gap-2 overflow-x-auto border-b sm:-mb-6" role="tablist" aria-label="Categorías de productos">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedCategory === "all"}
+              onClick={() => setSelectedCategory("all")}
+              className={cn("shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors", selectedCategory === "all" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+            >
+              Todos
+            </button>
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                role="tab"
+                aria-selected={selectedCategory === category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={cn("shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors", selectedCategory === category.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+              >
+                {category.name}
+              </button>
+            ))}
+            <div className="ml-auto flex shrink-0 items-center gap-1 border-l pl-3">
+              <Button
+                variant={viewMode === "grid" ? "secondary" : "ghost"}
+                size="icon"
+                aria-label="Vista en cuadrícula"
+                onClick={() => setViewMode("grid")}
+              >
+                <Grid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                size="icon"
+                aria-label="Vista de lista"
+                onClick={() => setViewMode("list")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Mostrando {filteredProducts.length} de {products.length} elementos del catálogo
+          </p>
         </CardHeader>
         <CardContent className="w-full">
-          {loading ? (
+          {loading || isAuthLoading ? (
             <div className="text-center">Cargando productos...</div>
           ) : error ? (
             <div className="text-center text-red-500">
               {error}
               <div className="mt-4">
-                <Button onClick={fetchProducts}>Reintentar</Button>
+                <Button onClick={() => void reloadProducts()}>
+                  Reintentar
+                </Button>
               </div>
             </div>
           ) : (
@@ -491,8 +853,12 @@ export function ProductsManager() {
               {groupedProducts.length === 0 ? (
                 <div className="text-center text-muted-foreground pt-8">
                   {products.length === 0
-                    ? "No hay productos creados"
-                    : "No se encontraron productos que coincidan con la búsqueda"}
+                    ? "Aún no hay productos ni preparaciones creados."
+                    : selectedProductType === "intermediate"
+                      ? "No hay preparaciones intermedias que coincidan con los filtros."
+                      : selectedProductType === "sale"
+                        ? "No hay productos de venta que coincidan con los filtros."
+                        : "No se encontraron elementos que coincidan con los filtros."}
                 </div>
               ) : (
                 <div className="space-y-8 pt-4">
@@ -500,7 +866,7 @@ export function ProductsManager() {
                     <div key={categoryId}>
                       <CategoryTitle title={categoryName} />
                       {viewMode === 'list' ? (
-            <div className="grid gap-4 w-full">
+                        <div className="grid gap-4 w-full">
                           {groupProducts.map((product) => (
                             <div
                               key={product.id}
@@ -508,7 +874,7 @@ export function ProductsManager() {
                                 if (el) productRefs.current.set(product.id, el);
                                 else productRefs.current.delete(product.id);
                               }}
-                              className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4 w-full"
+                              className="flex w-full flex-col items-start justify-between gap-4 rounded-lg border border-border/70 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:flex-row sm:items-center"
                             >
                               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
                                 {product.image && (
@@ -522,26 +888,38 @@ export function ProductsManager() {
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium truncate">{product.name}</p>
+                                  <p className="mt-1 font-mono text-xs text-muted-foreground">
+                                    Código: {product.code}
+                                  </p>
+                                  {product.isIntermediate && (
+                                    <Badge variant="secondary" className="mt-1">
+                                      Preparación intermedia
+                                    </Badge>
+                                  )}
                                   {product.description && (
                                     <p className="text-sm text-muted-foreground line-clamp-2">
                                       {product.description}
                                     </p>
                                   )}
                                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
-                                    <p className="text-sm text-muted-foreground">
-                                      Precio: ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                                    </p>
+                                    {!product.isIntermediate && (
+                                      <p className="text-sm text-muted-foreground">
+                                        Precio: ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                      </p>
+                                    )}
                                     <p className="text-sm text-muted-foreground">
                                       Categoría: {product.category?.name}
                                     </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      Ubicación: {locations.find(loc => loc.id === product.locationId)?.name}
-                                    </p>
+                                    {isSuperAdmin && (
+                                      <p className="text-sm text-muted-foreground">
+                                        Ubicación: {product.location?.name || locations.find(loc => loc.id === product.locationId)?.name}
+                                      </p>
+                                    )}
                                     <p className="text-sm text-muted-foreground">
                                       Estado: {product.isActive ? "Activo" : "Inactivo"}
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                      Stock: {product.quantity || 0}
+                                      Stock: {product.quantity || 0} {product.unit}
                                     </p>
                                   </div>
                                   {product.ingredients && product.ingredients.length > 0 && (
@@ -550,7 +928,20 @@ export function ProductsManager() {
                                       <div className="flex flex-wrap gap-1 mt-1">
                                         {product.ingredients.map((pi, index) => (
                                           <Badge key={index} variant="outline" className="text-xs">
-                                            {pi.ingredient?.name}: {pi.ingredient?.unit} {pi.quantity}
+                                            {pi.ingredient?.name}: {pi.quantity} {pi.ingredient?.unit}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {product.components && product.components.length > 0 && (
+                                    <div className="mt-2">
+                                      <p className="text-sm font-medium">Productos preelaborados:</p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {product.components.map((component) => (
+                                          <Badge key={component.id} variant="outline" className="text-xs">
+                                            {component.component?.name}: {component.quantity}{" "}
+                                            {component.component?.unit}
                                           </Badge>
                                         ))}
                                       </div>
@@ -608,7 +999,7 @@ export function ProductsManager() {
                           ))}
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 w-full">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 w-full">
                           {groupProducts.map((product) => {
                             return (
                               <Card
@@ -617,118 +1008,93 @@ export function ProductsManager() {
                                   if (el) productRefs.current.set(product.id, el as HTMLElement);
                                   else productRefs.current.delete(product.id);
                                 }}
-                                className="overflow-hidden w-full flex flex-col"
+                                className="group w-full flex flex-col overflow-hidden border-border/70 shadow-md shadow-black/[0.08] transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/[0.14]"
                               >
                                 <CardContent className="p-0 flex-1 flex flex-col">
-                                  <div className="relative">
+                                  <div className="relative aspect-[4/3] overflow-hidden bg-muted">
                                     {product.image ? (
-                                      <div className="aspect-square sm:aspect-video w-full overflow-hidden">
-                                        <img
-                                          src={product.image}
-                                          alt={product.name}
-                                          className="w-full h-full object-cover"
-                                        />
-                                      </div>
+                                      <img
+                                        src={product.image}
+                                        alt={product.name}
+                                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                      />
                                     ) : (
-                                      <div className="aspect-square sm:aspect-video w-full bg-muted flex items-center justify-center">
-                                        <span className="text-muted-foreground">Sin imagen</span>
+                                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                                        <Package className="h-8 w-8 opacity-40" />
+                                        <span className="text-sm">Sin imagen</span>
                                       </div>
                                     )}
-                                    <div className="absolute top-2 right-2 flex flex-col gap-2">
+                                    <Badge
+                                      variant={product.isActive ? "default" : "secondary"}
+                                      className="absolute left-3 top-3 shadow-md"
+                                    >
+                                      {product.isActive ? "Activo" : "Inactivo"}
+                                    </Badge>
+                                    {product.quantity <= 0 && (
+                                      <Badge variant="destructive" className="absolute bottom-3 left-3 shadow-md">
+                                        Sin existencias
+                                      </Badge>
+                                    )}
+                                    <div className="absolute right-3 top-3 flex gap-2">
                                       <Button
                                         variant="outline"
                                         size="icon"
-                                        className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
+                                        aria-label={`Editar ${product.name}`}
+                                        title="Editar producto"
+                                        className="h-8 w-8 bg-background/90 shadow-md backdrop-blur-sm hover:bg-background"
                                         onClick={() => handleEditClick(product)}
                                       >
                                         <Pencil className="h-4 w-4" />
                                       </Button>
                                       <Button
-                                        variant="destructive"
+                                        variant="outline"
                                         size="icon"
-                                        className="h-8 w-8 hover:bg-destructive/90"
+                                        aria-label={`Eliminar ${product.name}`}
+                                        title="Eliminar producto"
+                                        className="h-8 w-8 bg-background/90 text-destructive shadow-md backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground"
                                         onClick={() => setProductToDelete({ id: product.id, name: product.name })}
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
                                   </div>
-                                  <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
-                                    <div>
-                                      <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                          <h3 className="font-semibold truncate">{product.name}</h3>
-                                          {product.description && (
-                                            <p className="text-sm text-muted-foreground line-clamp-2">
-                                              {product.description}
-                                            </p>
-                                          )}
-                                        </div>
-                                        <Badge variant={product.isActive ? "default" : "secondary"}>
-                                          {product.isActive ? "Activo" : "Inactivo"}
-                                        </Badge>
-                                      </div>
-                                      
-                                      <div className="space-y-1 text-sm mt-2">
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground">Precio:</span>
-                                          <span className="font-medium">
-                                            ${product.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                                          </span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground">Categoría:</span>
-                                          <span className="truncate">{product.category?.name}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground">Ubicación:</span>
-                                          <span className="truncate">{locations.find(loc => loc.id === product.locationId)?.name}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground">Stock:</span>
-                                          <span>{product.quantity || 0}</span>
-                                        </div>
-                                      </div>
+                                  <div className="flex flex-1 flex-col gap-3 p-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="min-w-0 truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        {product.isIntermediate ? "Preparación intermedia" : product.category?.name ?? "Producto"}
+                                      </p>
+                                      {isSuperAdmin && (
+                                        <span className="max-w-[45%] truncate text-xs text-muted-foreground">
+                                          {product.location?.name || locations.find((location) => location.id === product.locationId)?.name}
+                                        </span>
+                                      )}
                                     </div>
-        
-                                    {product.ingredients && product.ingredients.length > 0 && (
-                                      <div className="pt-2 border-t mt-2">
-                                        <p className="text-sm font-medium mb-1">Ingredientes:</p>
-                                        <div className="flex flex-wrap gap-1">
-                                          {product.ingredients.map((pi, index) => (
-                                            <Badge key={index} variant="outline" className="text-xs">
-                                              {pi.ingredient?.name}: {pi.ingredient?.unit} {pi.quantity}
-                                            </Badge>
-                                          ))}
-                                        </div>
-                                      </div>
+                                    <div className="min-w-0">
+                                      <h3 className="line-clamp-2 min-h-12 font-semibold leading-6">{product.name}</h3>
+                                      <p className="mt-1 font-mono text-xs text-muted-foreground">{product.code}</p>
+                                      {product.description && (
+                                        <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{product.description}</p>
+                                      )}
+                                    </div>
+                                    {!product.isIntermediate && (
+                                      <p className="text-lg font-semibold">
+                                        ${product.price.toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+                                      </p>
                                     )}
-                                    {product.variantGroups && product.variantGroups.length > 0 && (
-                                      <div className="pt-2 border-t mt-2">
-                                        <p className="text-sm font-medium mb-1">Variantes:</p>
-                                        <div className="flex flex-wrap gap-2">
-                                          {product.variantGroups.map((group, gIdx) => (
-                                            <div key={gIdx} className="border rounded p-2 bg-muted/50 w-full">
-                                              <div className="font-medium text-sm mb-1">{group.name}</div>
-                                              <div className="flex flex-wrap gap-2">
-                                                {group.variants.map((variant, vIdx) => (
-                                                  <div key={vIdx} className="flex items-center gap-2 border rounded px-2 py-1 bg-muted/70">
-                                                    {variant.image && (
-                                                      <img src={variant.image} alt={variant.name} className="w-8 h-8 object-cover rounded" />
-                                                    )}
-                                                    <span className="font-medium text-xs">{variant.name}</span>
-                                                    {typeof variant.price === 'number' && !isNaN(variant.price) && (
-                                                      <span className="text-xs text-muted-foreground">${variant.price.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-                                                    )}
-                                                    <Badge variant={variant.isActive ? 'default' : 'secondary'} className="text-[10px]">{variant.isActive ? 'Activa' : 'Inactiva'}</Badge>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
+                                    <div className="mt-auto flex items-center justify-between border-t pt-3 text-sm">
+                                      <span className="text-muted-foreground">Existencias</span>
+                                      <span className={cn("font-medium", product.quantity <= 0 && "text-destructive")}>
+                                        {product.quantity || 0} {product.unit}
+                                      </span>
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full"
+                                      onClick={() => setDetailsProduct(product)}
+                                    >
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Ver detalles
+                                    </Button>
                                   </div>
                                 </CardContent>
                               </Card>
@@ -745,9 +1111,127 @@ export function ProductsManager() {
         </CardContent>
       </Card>
 
+      <Dialog open={!!detailsProduct} onOpenChange={(open) => !open && setDetailsProduct(null)}>
+        <DialogContent className="max-h-[90dvh] w-[calc(100%-1rem)] overflow-hidden p-0 sm:max-w-2xl">
+          {detailsProduct && (
+            <>
+              <DialogHeader className="border-b p-4 pr-12 sm:p-6">
+                <DialogTitle className="text-left">{detailsProduct.name}</DialogTitle>
+                <DialogDescription className="text-left">
+                  Ficha completa del producto y su configuración.
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="max-h-[calc(90dvh-150px)]">
+                <div className="space-y-5 p-4 sm:p-6">
+                  {detailsProduct.image && (
+                    <div className="h-48 overflow-hidden rounded-xl bg-muted sm:h-64">
+                      <img src={detailsProduct.image} alt={detailsProduct.name} className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                      <p className="text-xs text-muted-foreground">Código</p>
+                      <p className="mt-1 font-mono font-medium">{detailsProduct.code}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                      <p className="text-xs text-muted-foreground">Estado</p>
+                      <Badge variant={detailsProduct.isActive ? "default" : "secondary"} className="mt-1">
+                        {detailsProduct.isActive ? "Activo" : "Inactivo"}
+                      </Badge>
+                    </div>
+                    {!detailsProduct.isIntermediate && (
+                      <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                        <p className="text-xs text-muted-foreground">Precio</p>
+                        <p className="mt-1 font-semibold">
+                          ${detailsProduct.price.toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                    )}
+                    <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                      <p className="text-xs text-muted-foreground">Existencias</p>
+                      <p className="mt-1 font-semibold">{detailsProduct.quantity} {detailsProduct.unit}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                      <p className="text-xs text-muted-foreground">Categoría</p>
+                      <p className="mt-1 font-medium">{detailsProduct.category?.name ?? "Sin categoría"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 p-3 shadow-sm">
+                      <p className="text-xs text-muted-foreground">Sucursal</p>
+                      <p className="mt-1 font-medium">
+                        {detailsProduct.location?.name || locations.find((location) => location.id === detailsProduct.locationId)?.name || "—"}
+                      </p>
+                    </div>
+                  </div>
+                  {detailsProduct.description && (
+                    <div>
+                      <h3 className="mb-1 font-medium">Descripción</h3>
+                      <p className="text-sm leading-relaxed text-muted-foreground">{detailsProduct.description}</p>
+                    </div>
+                  )}
+                  {(detailsProduct.ingredients?.length || detailsProduct.components?.length) ? (
+                    <div className="space-y-3">
+                      <h3 className="font-medium">Receta e insumos</h3>
+                      {detailsProduct.ingredients?.map((line) => (
+                        <div key={line.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+                          <span>{line.ingredient?.name ?? "Ingrediente"}</span>
+                          <span className="shrink-0 text-muted-foreground">{line.quantity} {line.ingredient?.unit}</span>
+                        </div>
+                      ))}
+                      {detailsProduct.components?.map((line) => (
+                        <div key={line.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+                          <span>{line.component?.name ?? "Preparación"}</span>
+                          <span className="shrink-0 text-muted-foreground">{line.quantity} {line.component?.unit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                      Este producto no tiene una receta configurada.
+                    </p>
+                  )}
+                  {detailsProduct.variantGroups?.length ? (
+                    <div className="space-y-3">
+                      <h3 className="font-medium">Variantes</h3>
+                      {detailsProduct.variantGroups.map((group) => (
+                        <div key={group.id} className="space-y-2 rounded-lg border border-border/70 p-3 shadow-sm">
+                          <p className="text-sm font-medium">{group.name}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {group.variants.map((variant) => (
+                              <Badge key={variant.id} variant={variant.isActive ? "secondary" : "outline"}>
+                                {variant.name}
+                                {typeof variant.price === "number" && ` · $${variant.price.toLocaleString("es-CO")}`}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </ScrollArea>
+              <div className="flex gap-2 border-t p-4 sm:justify-end">
+                <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setDetailsProduct(null)}>
+                  Cerrar
+                </Button>
+                <Button
+                  className="flex-1 sm:flex-none"
+                  onClick={() => {
+                    handleEditClick(detailsProduct)
+                    setDetailsProduct(null)
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar producto
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Create Product Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateDialogClose}>
-        <DialogContent 
+      <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateDialogClose} >
+        <DialogContent
           className={cn(
             "max-w-4xl lg:max-w-6xl xl:max-w-7xl flex flex-col",
             "h-[calc(var(--vh,1vh)*90)] md:h-[600px]",
@@ -758,56 +1242,58 @@ export function ProductsManager() {
             "rounded-lg md:rounded-lg",
             "p-0 md:p-6"
           )}
-          style={{ 
+          style={{
             maxHeight: 'calc(var(--vh, 1vh) * 90)',
             height: 'calc(var(--vh, 1vh) * 90)'
           }}
         >
           <DialogHeader className="p-4 md:p-0 border-b">
-            <DialogTitle>Crear Nuevo Producto</DialogTitle>
+            <DialogTitle>Crear producto o preparación</DialogTitle>
             <DialogDescription>
-              Completa la información del nuevo producto
+              Las preparaciones se producen por lote y se usan en las recetas; no se venden directamente.
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="flex-1 p-4 md:p-0">
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="create-name">Nombre del Producto</Label>
+                  <Label htmlFor="create-name">Nombre del producto o preparación</Label>
                   <Input
                     id="create-name"
                     placeholder="Ingresa el nombre del producto"
                     value={newProduct.name}
                     onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                    style={{ 
+                    style={{
                       fontSize: '16px',
                       WebkitTextSizeAdjust: '100%'
                     }}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="create-price">Precio</Label>
-                  <Input
-                    id="create-price"
-                    type="number"
-                    min="0"
-                    placeholder="Ingresa el precio"
-                    value={newProduct.price}
-                    onChange={(e) => {
-                      const value = e.target.value === '' ? 0 : Number(e.target.value);
+                {!newProduct.isIntermediate && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="create-price">Precio de venta</Label>
+                    <Input
+                      id="create-price"
+                      type="number"
+                      min="0"
+                      placeholder="Ingresa el precio"
+                      value={newProduct.price}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? 0 : Number(e.target.value);
                         setNewProduct({ ...newProduct, price: value });
-                    }}
-                    onFocus={(e) => {
-                      if (e.target.value === '0') {
-                        e.target.value = '';
-                      }
-                    }}
-                    style={{ 
-                      fontSize: '16px',
-                      WebkitTextSizeAdjust: '100%'
-                    }}
-                  />
-                </div>
+                      }}
+                      onFocus={(e) => {
+                        if (e.target.value === '0') {
+                          e.target.value = '';
+                        }
+                      }}
+                      style={{
+                        fontSize: '16px',
+                        WebkitTextSizeAdjust: '100%'
+                      }}
+                    />
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label htmlFor="create-categoryId">Categoría</Label>
                   <Select
@@ -826,24 +1312,26 @@ export function ProductsManager() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="create-locationId">Ubicación</Label>
-                  <Select
-                    value={newProduct.locationId}
-                    onValueChange={(value) => setNewProduct({ ...newProduct, locationId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona una ubicación" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations.map((location) => (
-                        <SelectItem key={location.id} value={location.id}>
-                          {location.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {isSuperAdmin && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="create-locationId">Ubicación</Label>
+                    <Select
+                      value={newProduct.locationId}
+                      onValueChange={(value) => setNewProduct({ ...newProduct, locationId: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una ubicación" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {locations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label htmlFor="create-quantity">Stock Actual</Label>
                   <Input
@@ -852,11 +1340,20 @@ export function ProductsManager() {
                     min="0"
                     placeholder="Ingresa el stock actual"
                     value={newProduct.quantity}
-                    onChange={(e) => setNewProduct({ ...newProduct, quantity: parseFloat(e.target.value) })}
-                    style={{ 
+                    onChange={(e) => setNewProduct({ ...newProduct, quantity: toFiniteNumber(e.target.value) })}
+                    style={{
                       fontSize: '16px',
                       WebkitTextSizeAdjust: '100%'
                     }}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="create-unit">Unidad de medida / producción</Label>
+                  <Input
+                    id="create-unit"
+                    placeholder="unidad, porción, kg..."
+                    value={newProduct.unit}
+                    onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}
                   />
                 </div>
                 <div className="flex items-center space-x-2">
@@ -867,7 +1364,24 @@ export function ProductsManager() {
                   />
                   <Label htmlFor="create-isActive">Producto Activo</Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="create-isIntermediate"
+                    checked={newProduct.isIntermediate}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({
+                        ...newProduct,
+                        isIntermediate: checked,
+                        price: checked ? 0 : newProduct.price,
+                      })
+                    }
+                  />
+                  <Label htmlFor="create-isIntermediate">Es una preparación intermedia</Label>
+                </div>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Una preparación (por ejemplo, carne de hamburguesa) se produce desde Producción y se agrega a la receta del producto final. No aparece en el POS.
+              </p>
 
               <div className="grid gap-2">
                 <Label htmlFor="create-description">Descripción</Label>
@@ -876,7 +1390,7 @@ export function ProductsManager() {
                   placeholder="Ingresa una descripción (opcional)"
                   value={newProduct.description}
                   onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                  style={{ 
+                  style={{
                     fontSize: '16px',
                     WebkitTextSizeAdjust: '100%'
                   }}
@@ -901,18 +1415,18 @@ export function ProductsManager() {
                         <Select
                           value={ingredient.ingredientId}
                           onValueChange={(value) => {
-                              const newIngredients = [...newProduct.ingredients]
-                              newIngredients[index].ingredientId = value
-                              setNewProduct({ ...newProduct, ingredients: newIngredients })
+                            const newIngredients = [...newProduct.ingredients]
+                            newIngredients[index].ingredientId = value
+                            setNewProduct({ ...newProduct, ingredients: newIngredients })
                           }}
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Selecciona un ingrediente" />
                           </SelectTrigger>
                           <SelectContent>
-                            {ingredients.map((ing) => (
+                            {ingredients.filter((ing) => ing.locationId === newProduct.locationId).map((ing) => (
                               <SelectItem key={ing.id} value={ing.id}>
-                                {ing.name}
+                                {ing.name} ({ing.unit})
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -922,13 +1436,15 @@ export function ProductsManager() {
                         <Label>Cantidad</Label>
                         <Input
                           type="number"
+                          min="0.0001"
+                          step="any"
                           value={ingredient.quantity}
                           onChange={(e) => {
-                              const newIngredients = [...newProduct.ingredients]
-                              newIngredients[index].quantity = parseFloat(e.target.value)
-                              setNewProduct({ ...newProduct, ingredients: newIngredients })
+                            const newIngredients = [...newProduct.ingredients]
+                            newIngredients[index].quantity = toFiniteNumber(e.target.value)
+                            setNewProduct({ ...newProduct, ingredients: newIngredients })
                           }}
-                          style={{ 
+                          style={{
                             fontSize: '16px',
                             WebkitTextSizeAdjust: '100%'
                           }}
@@ -939,9 +1455,9 @@ export function ProductsManager() {
                         size="icon"
                         className="w-full lg:w-10"
                         onClick={() => {
-                            const newIngredients = [...newProduct.ingredients]
-                            newIngredients.splice(index, 1)
-                            setNewProduct({ ...newProduct, ingredients: newIngredients })
+                          const newIngredients = [...newProduct.ingredients]
+                          newIngredients.splice(index, 1)
+                          setNewProduct({ ...newProduct, ingredients: newIngredients })
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -951,22 +1467,126 @@ export function ProductsManager() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                        const newIngredients = [...newProduct.ingredients]
-                        newIngredients.push({
-                          id: `temp-${Date.now()}`,
-                          productId: "",
-                          ingredientId: "",
-                          quantity: 0,
-                          createdAt: new Date().toISOString(),
-                          updatedAt: new Date().toISOString(),
-                        })
-                        setNewProduct({ ...newProduct, ingredients: newIngredients })
+                      const newIngredients = [...newProduct.ingredients]
+                      newIngredients.push({
+                        id: `temp-${Date.now()}`,
+                        productId: "",
+                        ingredientId: "",
+                        quantity: 0,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                      })
+                      setNewProduct({ ...newProduct, ingredients: newIngredients })
                     }}
                     className="w-full sm:w-auto"
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Agregar Ingrediente
                   </Button>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Productos preelaborados de la receta</Label>
+                <p className="text-sm text-muted-foreground">
+                  Por ejemplo, agrega Carne de hamburguesa y define cuántas unidades lleva cada plato.
+                </p>
+                <div className="space-y-4 w-full">
+                  {newProduct.components.map((component, index) => {
+                    const selectedComponent = products.find(
+                      (product) => product.id === component.componentId,
+                    )
+                    const availableComponents = products.filter(
+                      (product) =>
+                        product.isIntermediate &&
+                        product.locationId === newProduct.locationId,
+                    )
+
+                    return (
+                      <div key={index} className="flex flex-col lg:flex-row gap-2 items-end w-full">
+                        <div className="w-full lg:flex-1">
+                          <Label>Preparación</Label>
+                          <Select
+                            value={component.componentId}
+                            onValueChange={(value) => {
+                              const next = [...newProduct.components]
+                              next[index] = { ...next[index], componentId: value }
+                              setNewProduct({ ...newProduct, components: next })
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona una preparación" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableComponents.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.name} ({product.unit})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-full lg:w-40">
+                          <Label>Cantidad por producto ({selectedComponent?.unit || "unidad"})</Label>
+                          <Input
+                            type="number"
+                            min="0.0001"
+                            step="any"
+                            value={component.quantity}
+                            onChange={(e) => {
+                              const next = [...newProduct.components]
+                              next[index] = { ...next[index], quantity: Number(e.target.value) }
+                              setNewProduct({ ...newProduct, components: next })
+                            }}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          onClick={() =>
+                            setNewProduct({
+                              ...newProduct,
+                              components: newProduct.components.filter((_, i) => i !== index),
+                            })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      setNewProduct({
+                        ...newProduct,
+                        components: [
+                          ...newProduct.components,
+                          { componentId: "", quantity: 1 },
+                        ],
+                      })
+                    }
+                    disabled={!products.some(
+                      (product) =>
+                        product.isIntermediate &&
+                        product.locationId === newProduct.locationId,
+                    )}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Agregar preparación
+                  </Button>
+                  {newProduct.locationId &&
+                    !products.some(
+                      (product) =>
+                        product.isIntermediate &&
+                        product.locationId === newProduct.locationId,
+                    ) && (
+                      <p className="text-sm text-muted-foreground">
+                        Primero crea un producto y márcalo como preparación intermedia.
+                      </p>
+                    )}
                 </div>
               </div>
 
@@ -1074,19 +1694,19 @@ export function ProductsManager() {
           </ScrollArea>
           <div className="flex-none p-4 flex gap-2 border-t">
             <Button variant="outline" onClick={handleCreateDialogClose} className="flex-1">
-                      Cancelar
-                    </Button>
+              Cancelar
+            </Button>
             <Button onClick={handleCreateProduct} className="flex-1">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Crear Producto
-                  </Button>
-              </div>
+              <Plus className="mr-2 h-4 w-4" />
+              Crear Producto
+            </Button>
+          </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Edit Product Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>
-        <DialogContent 
+      < Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose} >
+        <DialogContent
           className={cn(
             "max-w-4xl lg:max-w-6xl xl:max-w-7xl flex flex-col",
             "h-[calc(var(--vh,1vh)*90)] md:h-[600px]",
@@ -1097,7 +1717,7 @@ export function ProductsManager() {
             "rounded-lg md:rounded-lg",
             "p-0 md:p-6"
           )}
-          style={{ 
+          style={{
             maxHeight: 'calc(var(--vh, 1vh) * 90)',
             height: 'calc(var(--vh, 1vh) * 90)'
           }}
@@ -1113,41 +1733,43 @@ export function ProductsManager() {
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="edit-name">Nombre del Producto</Label>
+                    <Label htmlFor="edit-name">Nombre del producto o preparación</Label>
                     <Input
                       id="edit-name"
                       placeholder="Ingresa el nombre del producto"
                       value={editingProduct.name}
                       onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                      style={{ 
+                      style={{
                         fontSize: '16px',
                         WebkitTextSizeAdjust: '100%'
                       }}
                     />
-            </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-price">Precio</Label>
-                    <Input
-                      id="edit-price"
-                      type="number"
-                      min="0"
-                      placeholder="Ingresa el precio"
-                      value={editingProduct.price}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? 0 : Number(e.target.value);
-                        setEditingProduct({ ...editingProduct, price: value });
-                      }}
-                      onFocus={(e) => {
-                        if (e.target.value === '0') {
-                          e.target.value = '';
-                        }
-                      }}
-                      style={{ 
-                        fontSize: '16px',
-                        WebkitTextSizeAdjust: '100%'
-                      }}
-                    />
-          </div>
+                  </div>
+                  {!editingProduct.isIntermediate && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-price">Precio de venta</Label>
+                      <Input
+                        id="edit-price"
+                        type="number"
+                        min="0"
+                        placeholder="Ingresa el precio"
+                        value={editingProduct.price}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? 0 : Number(e.target.value);
+                          setEditingProduct({ ...editingProduct, price: value });
+                        }}
+                        onFocus={(e) => {
+                          if (e.target.value === '0') {
+                            e.target.value = '';
+                          }
+                        }}
+                        style={{
+                          fontSize: '16px',
+                          WebkitTextSizeAdjust: '100%'
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="grid gap-2">
                     <Label htmlFor="edit-categoryId">Categoría</Label>
                     <Select
@@ -1165,40 +1787,45 @@ export function ProductsManager() {
                         ))}
                       </SelectContent>
                     </Select>
-              </div>
+                  </div>
+                  {isSuperAdmin && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-locationId">Ubicación</Label>
+                      <Select
+                        value={editingProduct.locationId}
+                        onValueChange={(value) => setEditingProduct({ ...editingProduct, locationId: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona una ubicación" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locations.map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="rounded-lg border bg-muted/40 p-3">
+                    <p className="text-sm font-medium">
+                      Existencias actuales: {editingProduct.quantity || 0} {editingProduct.unit || "unidad"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Para corregir esta cantidad, crea una modificación en Inventarios y registra el conteo físico.
+                    </p>
+                  </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="edit-locationId">Ubicación</Label>
-                    <Select
-                      value={editingProduct.locationId}
-                      onValueChange={(value) => setEditingProduct({ ...editingProduct, locationId: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una ubicación" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            {location.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-            </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-quantity">Stock Actual</Label>
+                    <Label htmlFor="edit-unit">Unidad de medida / producción</Label>
                     <Input
-                      id="edit-quantity"
-                      type="number"
-                      min="0"
-                      placeholder="Ingresa el stock actual"
-                      value={editingProduct.quantity || 0}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, quantity: parseFloat(e.target.value) })}
-                      style={{ 
-                        fontSize: '16px',
-                        WebkitTextSizeAdjust: '100%'
-                      }}
+                      id="edit-unit"
+                      value={editingProduct.unit || "unidad"}
+                      onChange={(e) =>
+                        setEditingProduct({ ...editingProduct, unit: e.target.value })
+                      }
                     />
-                </div>
+                  </div>
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="edit-isActive"
@@ -1206,8 +1833,25 @@ export function ProductsManager() {
                       onCheckedChange={(checked) => setEditingProduct({ ...editingProduct, isActive: checked })}
                     />
                     <Label htmlFor="edit-isActive">Producto Activo</Label>
-                          </div>
-                          </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="edit-isIntermediate"
+                      checked={editingProduct.isIntermediate}
+                      onCheckedChange={(checked) =>
+                        setEditingProduct({
+                          ...editingProduct,
+                          isIntermediate: checked,
+                          price: checked ? 0 : editingProduct.price,
+                        })
+                      }
+                    />
+                      <Label htmlFor="edit-isIntermediate">Es una preparación intermedia</Label>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Una preparación (por ejemplo, carne de hamburguesa) se produce desde Producción y se agrega a la receta del producto final. No aparece en el POS.
+                </p>
 
                 <div className="grid gap-2">
                   <Label htmlFor="edit-description">Descripción</Label>
@@ -1216,12 +1860,12 @@ export function ProductsManager() {
                     placeholder="Ingresa una descripción (opcional)"
                     value={editingProduct.description || ""}
                     onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
-                    style={{ 
+                    style={{
                       fontSize: '16px',
                       WebkitTextSizeAdjust: '100%'
                     }}
                   />
-                              </div>
+                </div>
 
                 <div className="grid gap-2">
                   <Label>Imagen del Producto</Label>
@@ -1229,7 +1873,206 @@ export function ProductsManager() {
                     onImageUploaded={(url) => setEditingProduct({ ...editingProduct, image: url })}
                     currentImage={editingProduct.image}
                   />
+                </div>
+
+                {!editingProduct.isIntermediate && (
+                  <section className="space-y-4 rounded-lg border p-4">
+                    <div>
+                      <h3 className="font-semibold">Vista 3D y realidad aumentada</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        El modelo solo aparecerá para este producto cuando esté publicado en el Menú QR.
+                      </p>
+                    </div>
+                    {arLoading ? (
+                      <p className="text-sm text-muted-foreground">Cargando configuración…</p>
+                    ) : arConfiguration?.id === editingProduct.id ? (
+                      <>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="grid gap-2">
+                            <Label htmlFor="ar-glb">Modelo 3D (GLB, la API acepta hasta 40 MB)</Label>
+                            <Input
+                              id="ar-glb"
+                              type="file"
+                              accept=".glb,model/gltf-binary"
+                              disabled={arUploading}
+                              onChange={(event) => {
+                                const file = event.currentTarget.files?.[0]
+                                event.currentTarget.value = ""
+                                void handleArAssetUpload("glb", file)
+                              }}
+                            />
+                            {arConfiguration.model3dUrl ? (
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <span className="text-green-700">
+                                  GLB listo
+                                  {arConfiguration.modelFileSize
+                                    ? ` · ${(arConfiguration.modelFileSize / (1024 * 1024)).toFixed(1)} MB`
+                                    : ""}
+                                </span>
+                                <a
+                                  href={arConfiguration.model3dUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-medium text-primary underline underline-offset-2"
+                                >
+                                  Abrir modelo
+                                </a>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">No hay modelo GLB cargado.</p>
+                            )}
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="ar-usdz">Modelo optimizado para iPhone (USDZ, la API acepta hasta 40 MB)</Label>
+                            <Input
+                              id="ar-usdz"
+                              type="file"
+                              accept=".usdz,model/vnd.usdz+zip"
+                              disabled={arUploading}
+                              onChange={(event) => {
+                                const file = event.currentTarget.files?.[0]
+                                event.currentTarget.value = ""
+                                void handleArAssetUpload("usdz", file)
+                              }}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              {arConfiguration.modelUsdzUrl ? "Modelo USDZ cargado." : "Opcional; puede generarse desde el GLB en dispositivos compatibles."}
+                            </p>
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="ar-thumbnail">Miniatura (JPG, PNG o WebP; hasta 5 MB)</Label>
+                            <Input
+                              id="ar-thumbnail"
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              disabled={arUploading}
+                              onChange={(event) => {
+                                const file = event.currentTarget.files?.[0]
+                                event.currentTarget.value = ""
+                                void handleArAssetUpload("thumbnail", file)
+                              }}
+                            />
+                            {arConfiguration.thumbnailUrl && (
+                              <img
+                                src={arConfiguration.thumbnailUrl}
+                                alt="Miniatura del modelo 3D"
+                                className="h-20 w-20 rounded-md object-cover"
+                              />
+                            )}
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="ar-placement">Ubicación sugerida en AR</Label>
+                            <Select
+                              value={arConfiguration.placement}
+                              onValueChange={(placement: "floor" | "wall") =>
+                                setArConfiguration({ ...arConfiguration, placement })
+                              }
+                            >
+                              <SelectTrigger id="ar-placement"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="floor">Mesa o superficie</SelectItem>
+                                <SelectItem value="wall">Pared</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          {(["x", "y", "z"] as const).map((axis) => (
+                            <div key={axis} className="grid gap-2">
+                              <Label htmlFor={`ar-scale-${axis}`}>Escala {axis.toUpperCase()}</Label>
+                              <Input
+                                id={`ar-scale-${axis}`}
+                                type="number"
+                                min="0.1"
+                                max="10"
+                                step="0.1"
+                                value={arConfiguration.scale?.[axis] ?? 1}
+                                onChange={(event) => {
+                                  const value = Number(event.currentTarget.value)
+                                  if (!Number.isFinite(value)) return
+                                  setArConfiguration({
+                                    ...arConfiguration,
+                                    scale: {
+                                      x: arConfiguration.scale?.x ?? 1,
+                                      y: arConfiguration.scale?.y ?? 1,
+                                      z: arConfiguration.scale?.z ?? 1,
+                                      [axis]: value,
+                                    },
+                                  })
+                                }}
+                              />
                             </div>
+                          ))}
+                        </div>
+                        <div className="flex flex-col gap-3 rounded-md bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-center gap-3">
+                            <Switch
+                              id="ar-enabled"
+                              checked={arConfiguration.enabled}
+                              disabled={!arConfiguration.model3dUrl || arUploading}
+                              onCheckedChange={(enabled) =>
+                                setArConfiguration({ ...arConfiguration, enabled })
+                              }
+                            />
+                            <Label htmlFor="ar-enabled">Mostrar vista 3D y botón de realidad aumentada</Label>
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={() => void handleSaveArConfiguration()}
+                            disabled={arSaving || arUploading}
+                            className="w-full sm:w-auto"
+                          >
+                            {arSaving ? "Guardando…" : "Guardar configuración AR"}
+                          </Button>
+                        </div>
+                        {arUploadProgress && (
+                          <div className="space-y-2 rounded-md border p-3" role="status" aria-live="polite">
+                            <div className="flex flex-wrap justify-between gap-2 text-sm">
+                              <span className="min-w-0 break-all">
+                                Subiendo {arUploadProgress.fileName}
+                              </span>
+                              <span>{arUploadProgress.percent}%</span>
+                            </div>
+                            <div
+                              className="h-2 overflow-hidden rounded-full bg-muted"
+                              role="progressbar"
+                              aria-label={`Progreso de carga de ${arUploadProgress.fileName}`}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-valuenow={arUploadProgress.percent}
+                            >
+                              <div
+                                className="h-full bg-primary transition-[width]"
+                                style={{ width: `${arUploadProgress.percent}%` }}
+                              />
+                            </div>
+                            {arUploadProgress.percent === 100 && (
+                              <p className="text-xs text-muted-foreground">
+                                Archivo enviado; esperando confirmación del servidor…
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="space-y-3">
+                        {arLoadError && (
+                          <p role="alert" className="text-sm text-destructive">
+                            No se pudo cargar AR: {arLoadError}. Verifica que la API esté actualizada, reiníciala y aplica las migraciones.
+                          </p>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void loadArConfiguration()}
+                          disabled={arLoading}
+                        >
+                          {arLoadError ? "Reintentar carga AR" : "Configurar vista 3D y AR"}
+                        </Button>
+                      </div>
+                    )}
+                  </section>
+                )}
 
                 <div className="grid gap-2">
                   <Label>Ingredientes</Label>
@@ -1250,9 +2093,9 @@ export function ProductsManager() {
                               <SelectValue placeholder="Selecciona un ingrediente" />
                             </SelectTrigger>
                             <SelectContent>
-                              {ingredients.map((ing) => (
+                              {ingredients.filter((ing) => ing.locationId === editingProduct.locationId).map((ing) => (
                                 <SelectItem key={ing.id} value={ing.id}>
-                                  {ing.name}
+                                  {ing.name} ({ing.unit})
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1262,13 +2105,15 @@ export function ProductsManager() {
                           <Label>Cantidad</Label>
                           <Input
                             type="number"
+                            min="0.0001"
+                            step="any"
                             value={ingredient.quantity}
                             onChange={(e) => {
                               const newIngredients = [...editingProduct.ingredients || []]
-                              newIngredients[index].quantity = parseFloat(e.target.value)
+                              newIngredients[index].quantity = toFiniteNumber(e.target.value)
                               setEditingProduct({ ...editingProduct, ingredients: newIngredients })
                             }}
-                            style={{ 
+                            style={{
                               fontSize: '16px',
                               WebkitTextSizeAdjust: '100%'
                             }}
@@ -1288,7 +2133,7 @@ export function ProductsManager() {
                         </Button>
                       </div>
                     ))}
-                        <Button
+                    <Button
                       variant="outline"
                       onClick={() => {
                         const newIngredients = [...editingProduct.ingredients || []]
@@ -1306,9 +2151,114 @@ export function ProductsManager() {
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Agregar Ingrediente
-                        </Button>
-                      </div>
-                    </div>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Productos preelaborados de la receta</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Define cuántas unidades de cada preparación consume este producto.
+                  </p>
+                  <div className="space-y-4 w-full">
+                    {(editingProduct.components || []).map((component, index) => {
+                      const selectedComponent = products.find(
+                        (product) => product.id === component.componentId,
+                      )
+                      const availableComponents = products.filter(
+                        (product) =>
+                          product.id !== editingProduct.id &&
+                          product.isIntermediate &&
+                          product.locationId === editingProduct.locationId,
+                      )
+
+                      return (
+                        <div key={component.id || index} className="flex flex-col lg:flex-row gap-2 items-end w-full">
+                          <div className="w-full lg:flex-1">
+                            <Label>Preparación</Label>
+                            <Select
+                              value={component.componentId}
+                              onValueChange={(value) => {
+                                const next = [...(editingProduct.components || [])]
+                                next[index] = { ...next[index], componentId: value }
+                                setEditingProduct({ ...editingProduct, components: next })
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona una preparación" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableComponents.map((product) => (
+                                  <SelectItem key={product.id} value={product.id}>
+                                    {product.name} ({product.unit})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="w-full lg:w-40">
+                            <Label>Cantidad por producto ({selectedComponent?.unit || "unidad"})</Label>
+                            <Input
+                              type="number"
+                              min="0.0001"
+                              step="any"
+                              value={component.quantity}
+                              onChange={(e) => {
+                                const next = [...(editingProduct.components || [])]
+                                next[index] = { ...next[index], quantity: Number(e.target.value) }
+                                setEditingProduct({ ...editingProduct, components: next })
+                              }}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            onClick={() =>
+                              setEditingProduct({
+                                ...editingProduct,
+                                components: (editingProduct.components || []).filter(
+                                  (_, i) => i !== index,
+                                ),
+                              })
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        setEditingProduct({
+                          ...editingProduct,
+                          components: [
+                            ...(editingProduct.components || []),
+                            {
+                              id: `temp-${Date.now()}`,
+                              productId: editingProduct.id,
+                              componentId: "",
+                              quantity: 1,
+                              createdAt: new Date().toISOString(),
+                              updatedAt: new Date().toISOString(),
+                            },
+                          ],
+                        })
+                      }
+                      disabled={!products.some(
+                        (product) =>
+                          product.id !== editingProduct.id &&
+                          product.isIntermediate &&
+                          product.locationId === editingProduct.locationId,
+                      )}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Agregar preparación
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="grid gap-2">
                   <Label>Variantes</Label>
@@ -1412,7 +2362,7 @@ export function ProductsManager() {
                     </Button>
                   </div>
                 </div>
-                                  </div>
+              </div>
             </ScrollArea>
           )}
           <div className="flex-none p-4 flex gap-2 border-t">
@@ -1423,9 +2373,9 @@ export function ProductsManager() {
               <Pencil className="mr-2 h-4 w-4" />
               Actualizar Producto
             </Button>
-                        </div>
+          </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       <Dialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
         <DialogContent className="sm:max-w-md w-[calc(100%-2rem)] mx-auto">
@@ -1458,6 +2408,16 @@ export function ProductsManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      <ImportProductsDialog
+        isOpen={isImportDialogOpen}
+        onClose={() => setIsImportDialogOpen(false)}
+        onProductsImported={handleBulkImport}
+        categories={categories}
+        locations={isSuperAdmin ? locations : locations.filter((location) => location.id === user?.locationId)}
+        showLocationSelector={isSuperAdmin}
+        defaultLocationId={!isSuperAdmin ? user?.locationId ?? "" : undefined}
+        onCategoryCreated={fetchCategories}
+      />
+    </div >
   )
 }

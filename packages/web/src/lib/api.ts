@@ -47,6 +47,7 @@ export interface ProductVariantGroup {
 
 export interface Product {
   id: string;
+  code: string;
   name: string;
   description: string;
   price: number;
@@ -54,13 +55,126 @@ export interface Product {
   categoryId: string;
   category?: Category;
   isActive: boolean;
-  locationId?: string;
+  isIntermediate: boolean;
+  unit: string;
+  locationId: string;
+  location?: Location;
   ingredients?: ProductIngredient[];
+  components?: ProductComponent[];
   createdAt?: string;
   updatedAt?: string;
   quantity: number;
   variantGroups?: ProductVariantGroup[];
 }
+
+export interface QrMenuProduct {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  image: string | null;
+  categoryId: string;
+  category: { id?: string; name: string } | null;
+  ar: ProductArExperience | null;
+}
+
+export interface ProductArExperience {
+  model3dUrl: string;
+  modelUsdzUrl: string | null;
+  thumbnailUrl: string | null;
+  scale: { x: number; y: number; z: number } | null;
+  placement: "floor" | "wall";
+}
+
+export interface ProductArConfiguration {
+  id: string;
+  enabled: boolean;
+  model3dUrl: string | null;
+  modelUsdzUrl: string | null;
+  thumbnailUrl: string | null;
+  scale: { x: number; y: number; z: number } | null;
+  placement: "floor" | "wall";
+  modelFileSize: number | null;
+}
+
+interface ProductArAssetResponse {
+  id: string;
+  arEnabled: boolean;
+  model3dUrl: string | null;
+  modelUsdzUrl: string | null;
+  modelThumbnailUrl: string | null;
+  modelScale: { x: number; y: number; z: number } | null;
+  arPlacement: "floor" | "wall";
+  modelFileSize: number | null;
+}
+
+interface ApiErrorResponse {
+  message?: string | string[];
+}
+
+function isProductArAssetResponse(
+  value: Partial<ProductArAssetResponse>,
+): value is ProductArAssetResponse {
+  const scale = value.modelScale
+  const validScale =
+    scale === null ||
+    (typeof scale === "object" &&
+      scale !== undefined &&
+      Number.isFinite(scale.x) &&
+      Number.isFinite(scale.y) &&
+      Number.isFinite(scale.z))
+  return (
+    typeof value.id === "string" &&
+    typeof value.arEnabled === "boolean" &&
+    (value.model3dUrl === null || typeof value.model3dUrl === "string") &&
+    (value.modelUsdzUrl === null || typeof value.modelUsdzUrl === "string") &&
+    (value.modelThumbnailUrl === null ||
+      typeof value.modelThumbnailUrl === "string") &&
+    validScale &&
+    (value.arPlacement === "floor" || value.arPlacement === "wall") &&
+    (value.modelFileSize === null ||
+      (typeof value.modelFileSize === "number" &&
+        Number.isFinite(value.modelFileSize)))
+  )
+}
+
+export interface QrMenuBanner {
+  title: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  isActive: boolean;
+  order?: number;
+}
+
+export interface QrMenuConfiguration {
+  location: { id: string; name: string; phone: string };
+  enabled: boolean;
+  orderingEnabled: boolean;
+  primaryColor: string;
+  whatsappPhone: string;
+  products: QrMenuProduct[];
+  productIds: string[];
+  productsConfigured: boolean;
+  banners: QrMenuBanner[];
+}
+
+export interface PublicQrMenu extends Omit<QrMenuConfiguration, "productIds" | "productsConfigured"> {
+  name: string;
+  logo: string | null;
+  location: {
+    id: string;
+    name: string;
+    address: string;
+    city: string | null;
+    country: string | null;
+    phone: string;
+  };
+}
+
+export type QrMenuConfigurationUpdate = Pick<
+  QrMenuConfiguration,
+  "enabled" | "orderingEnabled" | "primaryColor" | "whatsappPhone" | "productIds" | "banners"
+>;
 
 export interface Table {
   id: string;
@@ -76,6 +190,10 @@ export interface Location {
   id: string;
   name: string;
   address: string;
+  city?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
   phone: string;
   createdAt: string;
   updatedAt: string;
@@ -99,6 +217,7 @@ export interface Category {
 
 export interface Ingredient {
   id: string
+  code: string
   name: string
   description: string | null
   quantity: number
@@ -110,6 +229,119 @@ export interface Ingredient {
   updatedAt: string
 }
 
+export interface InventoryStockItem {
+  id: string
+  code?: string | null
+  type: "PRODUCT" | "INGREDIENT"
+  name: string
+  description: string | null
+  quantity: number
+  unit: string
+  minQuantity?: number
+  locationId: string
+  locationName: string
+  categoryName: string | null
+  productKind: "PRODUCT" | "INTERMEDIATE" | null
+  isActive: boolean
+  image: string | null
+  updatedAt: string
+  recipeIngredients: Array<{
+    id: string
+    name: string
+    quantity: number
+    unit: string
+  }>
+  recipeComponents: Array<{
+    id: string
+    name: string
+    quantity: number
+    unit: string
+  }>
+}
+
+export interface InventoryModificationItem {
+  id: string
+  itemType: InventoryStockItem["type"]
+  itemId: string
+  itemName: string
+  itemCode: string | null
+  unit: string
+  systemQuantity: number
+  countedQuantity: number
+  difference: number
+  countedBy: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InventoryModification {
+  id: string
+  number: number
+  status: "DRAFT" | "APPLIED"
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+  appliedAt: string | null
+  createdBy: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
+  appliedBy: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  } | null
+  location: { id: string; name: string }
+  items: InventoryModificationItem[]
+}
+
+export interface InventoryModificationSummary {
+  id: string
+  number: number
+  status: InventoryModification["status"]
+  notes: string | null
+  createdAt: string
+  appliedAt: string | null
+  createdBy: InventoryModification["createdBy"]
+  appliedBy: InventoryModification["createdBy"] | null
+  location: InventoryModification["location"]
+  _count: { items: number }
+}
+
+export interface PurchaseItem {
+  id: string
+  purchaseId: string
+  ingredientId: string
+  quantity: number
+  unitCost: number
+  ingredient?: Ingredient
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Purchase {
+  id: string
+  tenantId: string
+  locationId: string
+  supplierName: string
+  purchaseDate: string
+  totalCost?: number | null
+  createdById: string
+  createdBy?: User
+  location?: Location
+  items?: PurchaseItem[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ProductIngredient {
   id: string
   productId: string
@@ -117,6 +349,16 @@ export interface ProductIngredient {
   quantity: number
   product?: Product
   ingredient?: Ingredient
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProductComponent {
+  id: string
+  productId: string
+  componentId: string
+  quantity: number
+  component?: Product
   createdAt: string
   updatedAt: string
 }
@@ -156,6 +398,15 @@ export interface User {
   updatedAt: string;
 }
 
+export interface UserAccessRequest {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatar: string | null;
+  requestedAt: string;
+}
+
 export interface CreateUserDto {
   email: string;
   password: string;
@@ -185,14 +436,18 @@ export const getTenantIdFromSubdomain = () => {
   return null;
 };
 
-export const getAuthHeaders = () => {
+export const getAuthHeaders = (isMultipart = false) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const tenantId = getTenantIdFromSubdomain();
-  const headers = {
-    'Content-Type': 'application/json',
+  const headers: Record<string, string> = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}),
   };
+
+  if (!isMultipart) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   if (!tenantId) {
     console.warn('[getAuthHeaders] WARNING: No tenantId detected from subdomain! Host:', window.location.hostname);
   } else {
@@ -221,6 +476,49 @@ export async function getProducts(
   });
   if (!response.ok) {
     throw new Error('Error al obtener los productos');
+  }
+  return response.json();
+}
+
+export async function getQrMenuConfiguration(locationId: string): Promise<QrMenuConfiguration> {
+  const response = await fetch(
+    `${API_URL}/qr-menu/manage/${encodeURIComponent(locationId)}`,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(
+      error.message || `No se pudo cargar la configuración del Menú QR (HTTP ${response.status})`
+    );
+  }
+  return response.json();
+}
+
+export async function saveQrMenuConfiguration(
+  locationId: string,
+  configuration: QrMenuConfigurationUpdate
+): Promise<QrMenuConfiguration> {
+  const response = await fetch(
+    `${API_URL}/qr-menu/manage/${encodeURIComponent(locationId)}`,
+    {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(configuration),
+    }
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'No se pudo guardar la configuración del Menú QR');
+  }
+  return response.json();
+}
+
+export async function getPublicQrMenu(locationId: string): Promise<PublicQrMenu> {
+  const response = await fetch(
+    `${API_URL}/qr-menu/public/${encodeURIComponent(locationId)}`
+  );
+  if (!response.ok) {
+    throw new Error('Este menú no está disponible');
   }
   return response.json();
 }
@@ -289,26 +587,58 @@ export async function getLocations(): Promise<Location[]> {
   return response.json();
 }
 
-export async function createLocation(data: { name: string; address: string; phone: string }): Promise<Location> {
+export async function createLocation(data: {
+  name: string;
+  address: string;
+  phone: string;
+  city?: string;
+  country?: string;
+}): Promise<Location> {
   const response = await fetch(`${API_URL}/locations`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error('Error al crear la ubicación');
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al crear la ubicación');
   }
   return response.json();
 }
 
-export async function updateLocation(id: string, data: { name: string }): Promise<Location> {
+export async function createFirstLocation(data: {
+  name: string;
+  address: string;
+  phone: string;
+  city?: string;
+  country?: string;
+}): Promise<Location> {
+  const response = await fetch(`${API_URL}/locations/first`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.message;
+    throw new Error(
+      Array.isArray(message)
+        ? message.join(', ')
+        : message || 'No se pudo crear la ubicación inicial',
+    );
+  }
+  return response.json();
+}
+
+export async function updateLocation(id: string, data: Partial<Omit<Location, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Location> {
   const response = await fetch(`${API_URL}/locations/${id}`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error('Error al actualizar la ubicación');
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Error al actualizar la ubicación');
   }
   return response.json();
 }
@@ -391,6 +721,81 @@ export async function getIngredients(): Promise<Ingredient[]> {
   return response.json()
 }
 
+export async function getInventoryOverview(locationId?: string): Promise<InventoryStockItem[]> {
+  const params = new URLSearchParams()
+  if (locationId) params.set("locationId", locationId)
+  const query = params.toString()
+  const response = await fetch(
+    `${API_URL}/inventory/overview${query ? `?${query}` : ""}`,
+    { headers: getAuthHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error("No se pudo cargar el inventario")
+  }
+  return response.json()
+}
+
+async function inventoryRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_URL}/inventory/${path}`, {
+    ...init,
+    headers: { ...getAuthHeaders(), ...init?.headers },
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string | string[] } | null
+    const message = Array.isArray(body?.message) ? body.message.join(", ") : body?.message
+    throw new Error(message || "No se pudo guardar la modificación de inventario")
+  }
+  return response.json()
+}
+
+export function getInventoryModifications(): Promise<InventoryModificationSummary[]> {
+  return inventoryRequest("modifications")
+}
+
+export function getInventoryModification(id: string): Promise<InventoryModification> {
+  return inventoryRequest(`modifications/${id}`)
+}
+
+export function createInventoryModification(data: {
+  locationId: string
+  notes?: string
+}): Promise<InventoryModification> {
+  return inventoryRequest("modifications", {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+export function countInventoryModificationItem(
+  modificationId: string,
+  data: {
+    itemId: string
+    itemType: InventoryStockItem["type"]
+    countedQuantity: number
+  },
+): Promise<InventoryModificationItem> {
+  return inventoryRequest(`modifications/${modificationId}/items`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+export function removeInventoryModificationItem(
+  modificationId: string,
+  itemLineId: string,
+): Promise<{ success: boolean }> {
+  return inventoryRequest(
+    `modifications/${modificationId}/items/${itemLineId}`,
+    { method: "DELETE" },
+  )
+}
+
+export function applyInventoryModification(id: string): Promise<InventoryModification> {
+  return inventoryRequest(`modifications/${id}/apply`, {
+    method: "POST",
+  })
+}
+
 export async function createIngredient(data: {
   name: string
   description?: string
@@ -408,7 +813,11 @@ export async function createIngredient(data: {
     body: JSON.stringify(data),
   })
   if (!response.ok) {
-    throw new Error("Error al crear el ingrediente")
+    const body = await response.json().catch(() => null) as { message?: string | string[] } | null
+    const message = Array.isArray(body?.message)
+      ? body.message.join(", ")
+      : body?.message
+    throw new Error(message || "Error al crear el ingrediente")
   }
   return response.json()
 }
@@ -445,6 +854,54 @@ export async function deleteIngredient(id: string): Promise<void> {
   }
 }
 
+export async function getPurchases(params?: {
+  fromDate?: string
+  toDate?: string
+  ingredientId?: string
+  locationId?: string
+}): Promise<Purchase[]> {
+  const searchParams = new URLSearchParams()
+  if (params?.fromDate) searchParams.append('fromDate', params.fromDate)
+  if (params?.toDate) searchParams.append('toDate', params.toDate)
+  if (params?.ingredientId) searchParams.append('ingredientId', params.ingredientId)
+  if (params?.locationId) searchParams.append('locationId', params.locationId)
+
+  const url = `${API_URL}/purchases${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+  const response = await fetch(url, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error('Error al obtener las compras')
+  }
+  return response.json()
+}
+
+export async function createPurchase(data: {
+  supplierName: string
+  purchaseDate: string
+  locationId: string
+  totalCost?: number
+  items: {
+    ingredientId: string
+    quantity: number
+    unitCost: number
+  }[]
+}): Promise<Purchase> {
+  const response = await fetch(`${API_URL}/purchases`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(errorData.message || 'Error al crear la compra')
+  }
+  return response.json()
+}
+
 export async function createProduct(data: {
   name: string
   description?: string
@@ -453,9 +910,15 @@ export async function createProduct(data: {
   categoryId: string
   locationId: string
   isActive: boolean
+  isIntermediate?: boolean
+  unit?: string
   quantity: number
   ingredients?: {
     ingredientId: string
+    quantity: number
+  }[]
+  components?: {
+    componentId: string
     quantity: number
   }[]
   variantGroups?: Omit<ProductVariantGroup, 'id'>[]
@@ -469,7 +932,12 @@ export async function createProduct(data: {
     body: JSON.stringify(data),
   })
   if (!response.ok) {
-    throw new Error("Error al crear el producto")
+    const error = await response.json().catch(() => ({}))
+    throw new Error(
+      typeof error.message === "string"
+        ? error.message
+        : "Error al crear el producto",
+    )
   }
   return response.json()
 }
@@ -482,9 +950,15 @@ export async function updateProduct(id: string, data: {
   categoryId?: string
   locationId?: string
   isActive?: boolean
+  isIntermediate?: boolean
+  unit?: string
   quantity?: number
   ingredients?: {
     ingredientId: string
+    quantity: number
+  }[]
+  components?: {
+    componentId: string
     quantity: number
   }[]
   variantGroups?: Omit<ProductVariantGroup, 'id'>[]
@@ -498,9 +972,135 @@ export async function updateProduct(id: string, data: {
     body: JSON.stringify(data),
   })
   if (!response.ok) {
-    throw new Error("Error al actualizar el producto")
+    const error = await response.json().catch(() => ({}))
+    throw new Error(
+      typeof error.message === "string"
+        ? error.message
+        : "Error al actualizar el producto",
+    )
   }
   return response.json()
+}
+
+export async function getProductArConfiguration(
+  productId: string,
+): Promise<ProductArConfiguration> {
+  const response = await fetch(`${API_URL}/products/${productId}/ar`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.message || "No se pudo cargar la configuración AR")
+  }
+  const data = await response.json()
+  return {
+    ...data,
+    enabled: data.arEnabled,
+    model3dUrl: data.model3dUrl,
+    modelUsdzUrl: data.modelUsdzUrl,
+    thumbnailUrl: data.modelThumbnailUrl,
+    scale: data.modelScale,
+    placement: data.arPlacement,
+  }
+}
+
+export async function updateProductArConfiguration(
+  productId: string,
+  configuration: {
+    enabled: boolean;
+    model3dUrl?: string | null;
+    modelUsdzUrl?: string | null;
+    modelThumbnailUrl?: string | null;
+    modelScale?: { x: number; y: number; z: number } | null;
+    arPlacement?: "floor" | "wall";
+  },
+): Promise<ProductArConfiguration> {
+  const response = await fetch(`${API_URL}/products/${productId}/ar`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(configuration),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.message || "No se pudo guardar la configuración AR")
+  }
+  const data = await response.json()
+  return {
+    ...data,
+    enabled: data.arEnabled,
+    model3dUrl: data.model3dUrl,
+    modelUsdzUrl: data.modelUsdzUrl,
+    thumbnailUrl: data.modelThumbnailUrl,
+    scale: data.modelScale,
+    placement: data.arPlacement,
+  }
+}
+
+export async function uploadProductArAsset(
+  productId: string,
+  assetType: "glb" | "usdz" | "thumbnail",
+  file: File,
+  onProgress?: (progress: number) => void,
+): Promise<ProductArConfiguration> {
+  const body = new FormData()
+  body.append("file", file)
+  const data = await new Promise<ProductArAssetResponse>((resolve, reject) => {
+    const request = new XMLHttpRequest()
+    request.open(
+      "POST",
+      `${API_URL}/products/${productId}/ar/assets/${assetType}`,
+    )
+    Object.entries(getAuthHeaders(true)).forEach(([name, value]) => {
+      request.setRequestHeader(name, value)
+    })
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) {
+        onProgress?.(Math.round((event.loaded / event.total) * 100))
+      }
+    })
+    request.addEventListener("load", () => {
+      let payload: unknown
+      try {
+        payload = JSON.parse(request.responseText)
+      } catch {
+        reject(new Error("La API devolvió una respuesta inválida al cargar el archivo AR"))
+        return
+      }
+      if (typeof payload !== "object" || payload === null) {
+        reject(new Error("La API devolvió una respuesta inválida al cargar el archivo AR"))
+        return
+      }
+      const response = payload as Partial<ProductArAssetResponse> & ApiErrorResponse
+      if (request.status < 200 || request.status >= 300) {
+        const message = Array.isArray(response.message)
+          ? response.message.join(", ")
+          : response.message
+        reject(new Error(message || "No se pudo cargar el archivo AR"))
+        return
+      }
+      if (!isProductArAssetResponse(response)) {
+        reject(new Error("La API devolvió datos incompletos al cargar el archivo AR"))
+        return
+      }
+      resolve(response)
+    })
+    request.addEventListener("error", () => {
+      reject(new Error("No se pudo conectar con la API para cargar el archivo AR"))
+    })
+    request.addEventListener("abort", () => {
+      reject(new Error("La carga del archivo AR fue cancelada"))
+    })
+    request.send(body)
+  })
+  return {
+    ...data,
+    enabled: data.arEnabled,
+    model3dUrl: data.model3dUrl,
+    modelUsdzUrl: data.modelUsdzUrl,
+    thumbnailUrl: data.modelThumbnailUrl,
+    scale: data.modelScale,
+    placement: data.arPlacement,
+  }
 }
 
 export async function deleteProduct(id: string): Promise<void> {
@@ -614,14 +1214,19 @@ export async function getUser(): Promise<User> {
   return userData;
 }
 
-export async function getKitchenOrders(): Promise<any[]> {
+export async function getKitchenOrders(locationId?: string): Promise<any[]> {
   console.log("Fetching kitchen orders DEEPER...")
   const token = getAuthToken();
   if (!token) {
     throw new Error("No authentication token found");
   }
-  
-  const response = await fetch(`${API_URL}/orders?kitchen=true`, {
+
+  let url = `${API_URL}/orders?kitchen=true`;
+  if (locationId && locationId !== 'all') {
+    url += `&locationId=${locationId}`;
+  }
+
+  const response = await fetch(url, {
     headers: getAuthHeaders(),
   });
 
@@ -646,13 +1251,13 @@ export async function updateKitchenOrderItemStatus(
   if (!token) {
     throw new Error("No authentication token found");
   }
-  
+
   const response = await fetch(`${API_URL}/kitchen/orders/items/${itemId}/status`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ status }),
   });
-  
+
   if (!response.ok) {
     if (response.status === 401) {
       localStorage.removeItem('token');
@@ -668,12 +1273,12 @@ export async function printKitchenTicket(orderId: string): Promise<any> {
   if (!token) {
     throw new Error("No authentication token found");
   }
-  
+
   const response = await fetch(`${API_URL}/kitchen/orders/${orderId}/print`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  
+
   if (!response.ok) {
     if (response.status === 401) {
       localStorage.removeItem('token');
@@ -686,31 +1291,17 @@ export async function printKitchenTicket(orderId: string): Promise<any> {
 
 export async function getActiveOrders(tableId: string) {
   try {
-    const token = localStorage.getItem('token');
-    // if (!token) {
-    //   throw new Error('No authentication token found');
-    // }
-
-    // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders?tableId=${tableId}`, {
-    //   headers: {
-    //     'Authorization': `Bearer ${token}`,
-    //     'Content-Type': 'application/json'
-    //   }
-    // });
-
-    const response = await fetch(`${API_URL}/orders?tableId=${tableId}`);
+    const response = await fetch(`${API_URL}/orders?tableId=${tableId}`, {
+      headers: getAuthHeaders(),
+    });
 
     if (!response.ok) {
-      // if (response.status === 401) {
-      //   localStorage.removeItem('token');
-      //   throw new Error('Authentication expired or invalid');
-      // }
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || 'Error al obtener las órdenes activas');
     }
 
     const orders = await response.json();
-    console.log(`Received ${orders.length} orders for table ${tableId}`);
+    console.log(`Received ${Array.isArray(orders) ? orders.length : 0} orders for table ${tableId}`);
     return orders;
   } catch (error) {
     console.error('Error fetching active orders:', error);
@@ -765,6 +1356,38 @@ export async function getUsers(): Promise<User[]> {
   })
   if (!response.ok) throw new Error('Failed to fetch users')
   return response.json()
+}
+
+export async function getUserAccessRequests(): Promise<UserAccessRequest[]> {
+  const response = await fetch(`${API_URL}/users/access-requests`, {
+    headers: getAuthHeaders(),
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('No se pudieron cargar las solicitudes de acceso');
+  return response.json();
+}
+
+export async function approveUserAccessRequest(
+  id: string,
+  role: string,
+): Promise<User> {
+  const response = await fetch(`${API_URL}/users/access-requests/${id}/approve`, {
+    method: 'PATCH',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('No se pudo aprobar la solicitud');
+  return response.json();
+}
+
+export async function rejectUserAccessRequest(id: string): Promise<void> {
+  const response = await fetch(`${API_URL}/users/access-requests/${id}/reject`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('No se pudo rechazar la solicitud');
 }
 
 export async function createUser(data: CreateUserDto): Promise<User> {
@@ -831,11 +1454,11 @@ export async function updateCustomer(id: string, data: {
     },
     body: JSON.stringify(data),
   });
-  
+
   if (!response.ok) {
     throw new Error('Error al actualizar el cliente');
   }
-  
+
   return response.json();
 }
 
@@ -848,5 +1471,92 @@ export async function updateCategoryOrder(orderedIds: string[]) {
   if (!response.ok) {
     throw new Error('Failed to update category order');
   }
+  return response.json();
+}
+
+export interface ProduceProductPayload {
+  productId: string;
+  quantity: number;
+  wasteQuantity?: number;
+  wasteNotes?: string;
+}
+
+export interface ProductionLog {
+  id: string;
+  number: number;
+  productId: string;
+  productCode: string | null;
+  productName: string | null;
+  productUnit: string | null;
+  createdById: string | null;
+  createdBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+  quantity: number;
+  wasteQuantity: number;
+  wasteNotes?: string | null;
+  consumedMaterials: Array<{
+    id: string;
+    code: string;
+    name: string;
+    unit: string;
+    quantity: number;
+    type: "INGREDIENT" | "PRODUCT";
+  }>;
+  createdAt: string;
+  product: Pick<
+    Product,
+    "id" | "code" | "name" | "unit" | "locationId" | "location"
+  >;
+}
+
+export async function getProductionHistory(locationId?: string): Promise<ProductionLog[]> {
+  const searchParams = new URLSearchParams();
+  if (locationId) searchParams.set("locationId", locationId);
+
+  const response = await fetch(
+    `${API_URL}/production${searchParams.size ? `?${searchParams.toString()}` : ""}`,
+    { headers: getAuthHeaders() },
+  );
+  if (!response.ok) {
+    throw new Error("No se pudo cargar el historial de producción");
+  }
+  return response.json();
+}
+
+export async function produceProduct(data: ProduceProductPayload) {
+  const response = await fetch(`${API_URL}/production/produce`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    const responseMessage = errorBody?.message;
+    const baseMessage =
+      typeof responseMessage === 'string'
+        ? responseMessage
+        : responseMessage?.message || 'Error al registrar la producción';
+    const missing = responseMessage?.missing as
+      | { name: string; required: number; available: number }[]
+      | undefined;
+    const message =
+      missing?.length
+        ? `${baseMessage}: ${missing
+            .map(
+              (item) =>
+                `${item.name}: requiere ${item.required}, disponibles ${item.available}`,
+            )
+            .join("; ")}`
+        : baseMessage;
+    throw new Error(
+      typeof message === 'string' ? message : JSON.stringify(message),
+    );
+  }
+
   return response.json();
 }

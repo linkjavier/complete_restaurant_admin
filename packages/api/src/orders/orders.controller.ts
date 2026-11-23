@@ -25,7 +25,7 @@ import { CurrentTenant } from '../auth/decorators/tenant.decorator';
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) { }
 
   @Public()
   @Post()
@@ -33,21 +33,15 @@ export class OrdersController {
     return this.ordersService.create(createOrderDto, tenantId);
   }
 
-  @Public()
   @Get()
-  findAll(
+  async findAll(
     @CurrentTenant() tenantId: string,
     @Query('locationId') locationId?: string,
     @Query('tableId') tableId?: string,
-    @Query('kitchen') kitchen?: boolean,
+    @Query('kitchen') kitchen?: string,
   ) {
-    if (!kitchen && !tableId) {
-      throw new BadRequestException('tableId is required for non-kitchen requests');
-    }
-    return this.ordersService.orders({
-      tenantId,
-      where: { locationId, tableId },
-    });
+    const isKitchen = kitchen === 'true';
+    return this.ordersService.findAll(tenantId, locationId, tableId, isKitchen, false);
   }
 
   @Get(':id')
@@ -81,7 +75,7 @@ export class OrdersController {
   }
 
   @Get('/deleted/list')
-  findDeleted(@Query('locationId') locationId?: string) {
-    return this.ordersService.findDeleted(locationId);
+  findDeleted(@CurrentTenant() tenantId: string, @Query('locationId') locationId?: string) {
+    return this.ordersService.findDeleted(tenantId, locationId);
   }
 } 

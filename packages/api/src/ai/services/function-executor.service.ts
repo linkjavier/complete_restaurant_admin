@@ -8,6 +8,9 @@ import { OrderStateService } from './order-state.service';
 import { NLPService } from './nlp.service';
 import { CustomersService } from '../../customers/customers.service';
 import { OrderHandlerService } from './order-handler.service';
+import { HereService } from './here.service';
+import { LocationsService } from '../../locations/locations.service';
+import { forwardRef, Inject } from '@nestjs/common';
 import Fuse from 'fuse.js';
 
 @Injectable()
@@ -22,7 +25,14 @@ export class FunctionExecutorService {
     private orderStateService: OrderStateService,
     private customersService: CustomersService,
     private orderHandler: OrderHandlerService,
-  ) {}
+    private hereService: HereService,
+    @Inject(forwardRef(() => LocationsService))
+    private locationsService: LocationsService,
+  ) { }
+
+  private normalizeString(str: string): string {
+    return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  }
 
   private async getNLPService(locationId: string, tenantId: string): Promise<NLPService> {
     const menu = await this.productsService.findAll({ locationId, tenantId });
@@ -35,18 +45,18 @@ export class FunctionExecutorService {
   }
 
   async executeFunction(
-    functionName: string, 
-    functionArgs: any, 
-    locationId: string, 
+    functionName: string,
+    functionArgs: any,
+    locationId: string,
     chatType: string,
     tenantId: string
   ): Promise<{ message: string; validatedItems?: any[]; totalAmount?: number; validated?: boolean; orderData?: any }> {
     console.log(`[Function Executor] Processing ${functionName} for ${chatType}`);
-    
+
     if (chatType === 'admin') {
       return this.handleAdminFunction(functionName, functionArgs);
     }
-    
+
     return this.handleRestaurantFunction(functionName, functionArgs, locationId, tenantId);
   }
 
@@ -84,8 +94,8 @@ export class FunctionExecutorService {
     try {
       const { productName, locationId: searchLocationId } = functionArgs;
       const menu = await this.productsService.findAll({ locationId: searchLocationId, tenantId });
-      
-      const matchingProducts = menu.filter(product => 
+
+      const matchingProducts = menu.filter(product =>
         product.name.toLowerCase().includes(productName.toLowerCase())
       );
 
@@ -126,13 +136,13 @@ export class FunctionExecutorService {
 
       let menuText = '🍽️ *Menú del Restaurante*\n';
       let prodCount = 1;
-      
+
       for (const product of menu) {
         const price = formatPrice(product.price);
         menuText += `\n${prodCount}. *${product.name}* - $${price}`;
         prodCount++;
       }
-      
+
       return { message: menuText };
     } catch (error) {
       console.error('Error in get_menu:', error);
@@ -151,7 +161,7 @@ export class FunctionExecutorService {
 
       const menu = await this.productsService.findAll({ locationId, tenantId });
       const deliveryFee = await this.settingsService.getDeliveryFee(tenantId, locationId);
-      
+
       // --- HIDRATAR variantes con IDs reales ANTES de cualquier cálculo ---
       const itemsWithSyncedVariants = this.syncVariantsWithIds(items, menu);
       // Validar variantes mapeadas
@@ -179,10 +189,10 @@ export class FunctionExecutorService {
 
       for (let i = 0; i < itemsWithSyncedVariants.length; i++) {
         const item = itemsWithSyncedVariants[i];
-        let matchingProducts = menu.filter(product => 
+        let matchingProducts = menu.filter(product =>
           product.name.toLowerCase().includes(item.productName.toLowerCase())
         );
-        
+
         if (matchingProducts.length === 0) {
           return { message: `❌ Producto no encontrado: "${item.productName}"` };
         }
@@ -324,7 +334,7 @@ export class FunctionExecutorService {
             return { message: msg };
           }
         }
-        
+
         let variantTotal = 0;
         let variantDetails = [];
         if (item.variants && item.variants.length > 0 && product.variantGroups) {
@@ -345,7 +355,7 @@ export class FunctionExecutorService {
         }
         const subtotal = (product.price + variantTotal) * item.quantity;
         totalAmount += subtotal;
-        
+
         validatedItems.push({
           productId: product.id,
           productName: product.name,
@@ -374,8 +384,8 @@ export class FunctionExecutorService {
       }).join('\n');
 
       const formattedTotal = formatPrice(totalAmount + deliveryFee);
-      const deliveryFeeText = deliveryFee > 0 
-        ? `\n🚚 *Domicilio:* $${formatPrice(deliveryFee)}` 
+      const deliveryFeeText = deliveryFee > 0
+        ? `\n🚚 *Domicilio:* $${formatPrice(deliveryFee)}`
         : '';
 
       const response = `📋 *Resumen de tu Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ Todos los productos fueron validados correctamente.\n\n¿Deseas agregar algo más a tu orden o procedemos con tus datos de entrega?`;
@@ -394,7 +404,7 @@ export class FunctionExecutorService {
   private async validateOrderBeforeCreation(functionArgs: any, locationId: string, tenantId: string) {
     try {
       const { items, totalAmount, customerName, deliveryAddress, phone, neighborhood, paymentMethod, chatId } = functionArgs;
-      
+
       // --- NUEVO: Verificar si el cliente existe en la base de datos ---
       let existingCustomer = null;
       if (chatId) {
@@ -461,7 +471,7 @@ export class FunctionExecutorService {
       // --- NUEVO: Si faltan datos, mostrar mensaje con datos existentes confirmados ---
       if (missingFields.length > 0) {
         let message = '';
-        
+
         if (existingCustomer && Object.keys(customerDataToConfirm).length > 0) {
           message += `👋 ¡Hola ${existingCustomer.name}! Veo que ya tienes datos registrados:\n\n`;
           message += `✅ *Datos confirmados:*\n`;
@@ -473,16 +483,78 @@ export class FunctionExecutorService {
         } else {
           message += `Para completar tu pedido, necesito algunos datos de entrega:\n\n`;
         }
-        
+
         message += missingFields.map((field, index) => `${index + 1}. *${field}*`).join('\n');
-        
+
         if (missingFields.includes('Método de pago')) {
           message += `\n\n💳 *Método de pago:* Efectivo, Tarjeta de Crédito, Tarjeta Débito, o Transferencia`;
         }
-        
+
         message += `\n\nPor favor, proporcióname esta información. 📝`;
-        
+
         return { message };
+      }
+
+      // --- NUEVO: Validar dirección con HERE ---
+      if (deliveryAddress) {
+        // Enriquecer la dirección con ciudad y país del local para mejor precisión
+        const currentLoc = await this.locationsService.findOne(locationId, tenantId);
+        const enrichedAddress = [deliveryAddress, currentLoc?.city, currentLoc?.country].filter(Boolean).join(', ');
+
+        const validation = await this.hereService.validateAddress(enrichedAddress);
+        if (!validation.isValid) {
+          return {
+            message: `📍 *Dirección de Entrega*\n\nNo pudimos validar la dirección: *"${deliveryAddress}"*.\n\nPor favor, ingresa una dirección más precisa para que podamos entregarte tu pedido sin problemas. 😊`
+          };
+        }
+
+        if (validation.isValid) {
+          console.log(`[HERE] Dirección normalizada: ${deliveryAddress} -> ${validation.formattedAddress}`);
+
+          // --- NUEVO: Seleccionar ubicación más cercana ---
+          if (validation.lat && validation.lng) {
+            const cityName = validation.details?.address?.city || validation.details?.address?.locality;
+
+            // Buscar todas las sedes cercanas en la ciudad (ordenadas por distancia en el futuro, pero por ahora buscaremos la más cercana)
+            // Mejoraremos LocationsService para que pueda devolver una lista si es necesario, 
+            // pero por ahora usaremos findNearestLocation y validaremos disponibilidad.
+            const nearestResult = await this.locationsService.findNearestLocation(tenantId, validation.lat, validation.lng, cityName);
+
+            if (!nearestResult) {
+              return {
+                message: `📍 *Ubicación de Entrega*\n\nLo sentimos, actualmente no contamos con sedes para realizar entregas en *${cityName || deliveryAddress}*. 😔\n\nPor favor, verifica la ciudad o intenta con otra dirección.`
+              };
+            }
+
+            if (nearestResult.location.id !== locationId) {
+              // VERIFICAR DISPONIBILIDAD en la nueva sede antes de cambiar
+              console.log(`[PROXIMIDAD] Sede más cercana: ${nearestResult.location.name}. Verificando disponibilidad de productos...`);
+              const nearestMenu = await this.productsService.findAll({ locationId: nearestResult.location.id, tenantId });
+
+              const missingProducts = items.filter(item => {
+                const product = nearestMenu.find(p => p.id === item.productId || normalizeName(p.name) === normalizeName(item.productName));
+                return !product;
+              });
+
+              if (missingProducts.length > 0) {
+                console.log(`[PROXIMIDAD] La sede más cercana (${nearestResult.location.name}) no tiene: ${missingProducts.map(p => p.productName).join(', ')}. Manteniendo sede original o informando.`);
+                // Por ahora, si no están todos los productos, mantenemos la sede que ya los tenía validada (la original)
+                // e informamos al usuario.
+                const originalLoc = await this.locationsService.findOne(locationId, tenantId);
+                const proximityMessage = `\n⚠️ *Nota:* Tu dirección está más cerca de nuestra sede *${nearestResult.location.name}*, pero algunos de tus productos solo están disponibles en nuestra sede *${originalLoc?.name || 'principal'}*, por lo que esta última atenderá tu pedido.`;
+                functionArgs.nearestLocationInfo = proximityMessage;
+              } else {
+                console.log(`[PROXIMIDAD] Cambiando locationId de ${locationId} a ${nearestResult.location.id} por cercanía (${nearestResult.distance.toFixed(2)} km)`);
+                locationId = nearestResult.location.id;
+                const proximityMessage = `\n🏠 *Sede:* Tu pedido será atendido por nuestra sede en *${nearestResult.location.name}* (a ${nearestResult.distance.toFixed(1)} km de distancia).`;
+                functionArgs.nearestLocationInfo = proximityMessage;
+              }
+            } else {
+              const proximityMessage = `\n🏠 *Sede:* Tu pedido será atendido por nuestra sede en *${nearestResult.location.name}* (a ${nearestResult.distance.toFixed(1)} km de distancia).`;
+              functionArgs.nearestLocationInfo = proximityMessage;
+            }
+          }
+        }
       }
 
       if (!items || items.length === 0) {
@@ -491,19 +563,14 @@ export class FunctionExecutorService {
 
       const deliveryFee = await this.settingsService.getDeliveryFee(tenantId, locationId);
       const calculatedTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-      const totalWithDelivery = calculatedTotal + deliveryFee;
 
       const menu = await this.productsService.findAll({ locationId, tenantId });
-      // --- HIDRATAR variantes con IDs reales ANTES de cualquier cálculo ---
       const itemsWithSyncedVariants = this.syncVariantsWithIds(items, menu);
-      console.log('[VALIDATE ORDER] Items con variantes sincronizadas:', JSON.stringify(itemsWithSyncedVariants, null, 2));
 
-      // --- Validar que todas las variantes estén correctamente mapeadas ---
       for (const item of itemsWithSyncedVariants) {
         if (item.variants && item.variants.length > 0) {
           for (const v of item.variants) {
             if (!v.productVariantId) {
-              // Buscar variantes válidas para sugerir
               const product = menu.find(p => p.id === item.productId);
               let validVariantsMsg = '';
               if (product && product.variantGroups) {
@@ -519,7 +586,6 @@ export class FunctionExecutorService {
         }
       }
 
-      // --- NUEVO: Calcular unitPrice y subtotal sumando variantes ---
       const itemsWithPrices = itemsWithSyncedVariants.map(item => {
         const product = menu.find(p => p.id === item.productId);
         let variantTotal = 0;
@@ -536,11 +602,7 @@ export class FunctionExecutorService {
         }
         const unitPrice = (product ? product.price : 0) + variantTotal;
         const subtotal = unitPrice * item.quantity;
-        return {
-          ...item,
-          unitPrice,
-          subtotal
-        };
+        return { ...item, unitPrice, subtotal };
       });
 
       const itemsSummary = itemsWithPrices.map((item, index) => {
@@ -553,48 +615,32 @@ export class FunctionExecutorService {
             if (group) {
               const variant = group.variants.find(va => normalizeName(va.name) === normalizeName(v.variantName));
               if (variant) {
-                if (variant.price && variant.price > 0) {
-                  variantDetails.push({ groupName: v.groupName, variantName: v.variantName, price: variant.price });
-                } else {
-                  variantDetails.push({ groupName: v.groupName, variantName: v.variantName, price: 0 });
-                }
+                variantDetails.push({ groupName: v.groupName, variantName: v.variantName, price: variant.price || 0 });
               }
             }
           }
         }
         if (variantDetails.length > 0) {
-          variantLines = variantDetails.map(v => {
-            if (v.price && v.price > 0) {
-              return `   • ${v.groupName}: ${v.variantName} ($${formatPrice(v.price)})`;
-            } else {
-              return `   • ${v.groupName}: ${v.variantName}`;
-            }
-          }).join('\n');
+          variantLines = variantDetails.map(v =>
+            `   • ${v.groupName}: ${v.variantName}${v.price > 0 ? ` ($${formatPrice(v.price)})` : ''}`
+          ).join('\n');
         }
         return `${index + 1}. *${item.productName}*${variantLines ? '\n' + variantLines : ''}\n   └ ${item.quantity} × $${formatPrice(item.unitPrice || 0)} = *$${formatPrice(item.subtotal || 0)}*`;
       }).join('\n');
 
       const formattedTotal = formatPrice(itemsWithPrices.reduce((sum, item) => sum + item.subtotal, 0) + deliveryFee);
-      const deliveryFeeText = deliveryFee > 0 
-        ? `\n🚚 *Domicilio:* $${formatPrice(deliveryFee)}` 
-        : '';
+      const deliveryFeeText = deliveryFee > 0 ? `\n🚚 *Domicilio:* $${formatPrice(deliveryFee)}` : '';
 
-      // --- NUEVO: Mensaje personalizado según si es cliente existente o nuevo ---
-      let customerInfoHeader = '';
-      if (existingCustomer) {
-        customerInfoHeader = `👤 *Datos del Cliente (Confirmados)*\n━━━━━━━━━━━━━━━━━━━━━━━━`;
-      } else {
-        customerInfoHeader = `👤 *Datos del Cliente*\n━━━━━━━━━━━━━━━━━━━━━━━━`;
-      }
+      const customerInfoHeader = existingCustomer ? `👤 *Datos del Cliente (Confirmados)*\n━━━━━━━━━━━━━━━━━━━━━━━━` : `👤 *Datos del Cliente*\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+      const customerInfo = `${customerInfoHeader}\n• *Nombre:* ${customerDataToConfirm.name}\n• *Dirección:* ${customerDataToConfirm.deliveryAddress}\n• *Teléfono:* ${customerDataToConfirm.phone}\n• *Barrio:* ${customerDataToConfirm.neighborhood}\n• *Método de pago:* ${getPaymentEmoji(customerDataToConfirm.paymentMethod)} ${getPaymentDisplay(customerDataToConfirm.paymentMethod)}${functionArgs.nearestLocationInfo || ''}`;
 
-      const customerInfo = `${customerInfoHeader}\n• *Nombre:* ${customerDataToConfirm.name}\n• *Dirección:* ${customerDataToConfirm.deliveryAddress}\n• *Teléfono:* ${customerDataToConfirm.phone}\n• *Barrio:* ${customerDataToConfirm.neighborhood}\n• *Método de pago:* ${getPaymentEmoji(customerDataToConfirm.paymentMethod)} ${getPaymentDisplay(customerDataToConfirm.paymentMethod)}`;
-
-      const result = {
+      return {
         message: `📋 *RESUMEN FINAL DE LA ORDEN*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${customerInfo}\n\n🍽️ *Detalles del Pedido*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n${itemsSummary}${deliveryFeeText}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n💰 *Total a pagar: $${formattedTotal}*\n\n✅ La orden está validada y lista para crear.\n\n¿Confirmas que toda la información es correcta?\n\nResponde *\"Sí\"* o *\"Confirmo\"* para proceder con la orden.`,
         validated: true,
         orderData: {
           items: itemsWithSyncedVariants.map(item => ({
             productId: item.productId,
+            productName: item.productName,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             subtotal: item.subtotal,
@@ -610,109 +656,79 @@ export class FunctionExecutorService {
           deliveryFee
         }
       };
-
-      return result;
     } catch (error) {
       console.error('Error in validate_order_before_creation:', error);
       return { message: `❌ Error validando la orden: ${error.message}` };
     }
   }
 
-  /**
-   * Sincroniza las variantes del usuario con sus IDs reales en la base de datos
-   * Si el match exacto falla, usa NLP/Fuse.js para buscar la mejor coincidencia.
-   * Si hay varias variantes similares, devuelve un mensaje de selección.
-   * Si no hay ninguna, devuelve mensaje humanizado con sugerencias.
-   */
   private syncVariantsWithIds(items: any[], menu: any[]): any[] {
+    console.log(`[SYNC VARIANTS] Iniciando sincronización de ${items.length} items con un menú de ${menu.length} productos.`);
     return items.map(item => {
-      // 1. Buscar el producto por ID o por nombre (exacto o fuzzy)
       let product = item.productId ? menu.find(p => p.id === item.productId) : undefined;
-      if (!product) {
-        // Buscar por nombre exacto normalizado
+      if (!product && item.productName) {
         product = menu.find(p => normalizeName(p.name) === normalizeName(item.productName));
+        if (product) console.log(`[SYNC VARIANTS] Producto "${item.productName}" encontrado por nombre exacto.`);
       }
-      if (!product) {
-        // Buscar por fuzzy search (Fuse.js)
+
+      if (!product && item.productName) {
+        console.log(`[SYNC VARIANTS] Producto "${item.productName}" no encontrado por ID/nombre exacto. Probando Fuse...`);
         const fuse = new Fuse(menu, { keys: ['name'], threshold: 0.4 });
         const results = fuse.search(item.productName);
         if (results.length > 0) {
           product = results[0].item;
-          console.warn(`[VARIANT SYNC] Producto encontrado por fuzzy: "${item.productName}" → "${product.name}"`);
+          console.log(`[SYNC VARIANTS] Producto "${item.productName}" encontrado por Fuse -> "${product.name}" (score: ${results[0].score})`);
         }
       }
-      if (!product || !product.variantGroups) {
-        // Si no se encuentra, log y error humanizado
-        const opciones = menu.map(p => p.name).join(', ');
-        throw new Error(`No se pudo identificar el producto "${item.productName}". Opciones válidas: ${opciones}`);
+
+      // Si se proporcionó un productId pero no se encontró en este menú (ej: cambio de sede), 
+      // y no tenemos productName, intentamos buscar el producto por el nombre que tenía originalmente si es posible,
+      // o lanzamos un error más descriptivo.
+      if (!product && item.productId) {
+        console.warn(`[SYNC VARIANTS] El productId ${item.productId} no corresponde a esta sede. Intentando recuperar por nombre de referencia si existe.`);
+        // Aquí no tenemos el nombre si no vino en el item, por eso es vital que venga.
       }
-      // 2. Mapear variantes como antes
+
+      if (!product || !product.variantGroups) {
+        const itemIdentifier = item.productName || item.productId || 'desconocido';
+        console.error(`[SYNC VARIANTS] ERROR: No se encontró el producto "${itemIdentifier}" en el menú actual.`);
+        console.log(`[SYNC VARIANTS] Menu disponible para esta sede (${menu.length} productos):`, menu.map(p => `${p.name} (${p.id})`).join(', ').substring(0, 500));
+
+        const options = menu.map(p => p.name).join(', ');
+        throw new Error(`No se pudo identificar el producto "${itemIdentifier}". Por favor, asegúrate de que el producto esté disponible en la sede seleccionada. Opciones disponibles: ${options.substring(0, 200)}${options.length > 200 ? '...' : ''}`);
+      }
+
       const syncedVariants = (item.variants || []).map(variant => {
         const group = product.variantGroups.find(g => normalizeName(g.name) === normalizeName(variant.groupName));
-        if (!group) {
-          console.warn(`[VARIANT SYNC] Grupo no encontrado: "${variant.groupName}" en producto "${product.name}"`);
-          return null;
-        }
+        if (!group) return null;
         let variantRecord = group.variants.find(v => normalizeName(v.name) === normalizeName(variant.variantName));
-        if (!variantRecord) {
+        if (!variantRecord && variant.variantName) {
           const fuse = new Fuse(group.variants, { keys: ['name'], threshold: 0.4 });
           const results = fuse.search(variant.variantName);
-          if (results.length === 1) {
-            variantRecord = results[0].item;
-          } else if (results.length > 1) {
-            console.warn(`[VARIANT SYNC] Varias variantes similares encontradas para "${variant.variantName}" en grupo "${group.name}" del producto "${product.name}": ${results.map((r: any) => r.item.name).join(', ')}`);
-            variantRecord = results[0].item;
-          } else {
-            console.warn(`[VARIANT SYNC] Variante no encontrada (ni fuzzy) para "${variant.variantName}" en grupo "${group.name}" del producto "${product.name}"`);
-            return null;
-          }
+          if (results.length > 0) variantRecord = results[0].item;
         }
-        return {
+        return variantRecord ? {
           groupName: variant.groupName,
           variantName: variant.variantName,
           productVariantId: variantRecord.id
-        };
+        } : null;
       }).filter(v => v !== null);
-      console.log(`[VARIANT SYNC] Producto "${product.name}": ${item.variants ? item.variants.length : 0} variantes originales, ${syncedVariants.length} sincronizadas`);
-      return {
-        ...item,
-        productId: product.id,
-        productName: product.name,
-        variants: syncedVariants
-      };
+
+      return { ...item, productId: product.id, productName: product.name, variants: syncedVariants };
     });
   }
 
   private async createOrder(functionArgs: any, tenantId: string) {
     try {
-      // --- HIDRATAR variantes con IDs reales ANTES de crear la orden ---
-      const locationId = functionArgs.locationId;
+      const { locationId } = functionArgs;
       const menu = await this.productsService.findAll({ locationId, tenantId });
       const itemsWithSyncedVariants = this.syncVariantsWithIds(functionArgs.items, menu);
-      for (const item of itemsWithSyncedVariants) {
-        if (item.variants && item.variants.length > 0) {
-          for (const v of item.variants) {
-            if (!v.productVariantId) {
-              const product = menu.find(p => p.id === item.productId);
-              let validVariantsMsg = '';
-              if (product && product.variantGroups) {
-                const group = product.variantGroups.find(g => normalizeName(g.name) === normalizeName(v.groupName));
-                if (group) {
-                  const validNames = group.variants.map(va => va.name).join(', ');
-                  validVariantsMsg = `Opciones válidas para "${group.name}": ${validNames}`;
-                }
-              }
-              throw new Error(`No se pudo identificar la variante "${v.groupName}: ${v.variantName}" para el producto "${item.productName}". ${validVariantsMsg ? validVariantsMsg : ''} Por favor, revisa tu selección o elige una opción válida.`);
-            }
-          }
-        }
-      }
-      // --- Refuerzo: asegurar deliveryFee ---
+
       let deliveryFee = functionArgs.deliveryFee;
       if (typeof deliveryFee !== 'number') {
         deliveryFee = await this.settingsService.getDeliveryFee(tenantId, locationId);
       }
-      // Llama a la orden usando los items ya hidratados y deliveryFee seguro
+
       const createdOrder = await this.orderHandler.createOrder({ ...functionArgs, items: itemsWithSyncedVariants, deliveryFee }, tenantId);
       return {
         message: `✅ ¡Tu orden ha sido creada exitosamente!\n\nNúmero de orden: *${createdOrder.id}*\n\nPronto recibirás la confirmación de tu pedido. ¡Gracias por confiar en nosotros!`,
@@ -723,4 +739,4 @@ export class FunctionExecutorService {
       return { message: `❌ Error creando la orden: ${error.message}` };
     }
   }
-} 
+}

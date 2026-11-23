@@ -25,11 +25,16 @@ import { UploadModule } from './upload/upload.module';
 import { STTModule } from './stt/stt.module';
 import { CustomersModule } from './customers/customers.module';
 import { TenantsModule } from './tenants/tenants.module';
+import { GeocodingModule } from './geocoding/geocoding.module';
+import { PurchasesModule } from './purchases/purchases.module';
+import { QrMenuModule } from './qr-menu/qr-menu.module';
+import { WhatsappCloudModule } from './whatsapp-cloud/whatsapp-cloud.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['../../.env', '.env'],
     }),
     BullModule.forRoot({
       url: `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || '6379'}`,
@@ -56,8 +61,12 @@ import { TenantsModule } from './tenants/tenants.module';
     STTModule,
     CustomersModule,
     TenantsModule,
+    GeocodingModule,
+    PurchasesModule,
+    QrMenuModule,
+    WhatsappCloudModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
