@@ -25,7 +25,8 @@ import {
   Bot,
   MessageCircle,
   ContactRound,
-  QrCode
+  QrCode,
+  Sparkles
 } from "lucide-react"
 import {
   Tooltip,
@@ -58,6 +59,12 @@ const routes = [
     label: "ai",
     icon: Bot,
     href: "/admin/ai-manager",
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
+  },
+  {
+    label: "aiV2",
+    icon: Sparkles,
+    href: "/admin/ai-manager-v2",
     roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {

@@ -12,10 +12,24 @@ import { PrismaService } from './prisma/prisma.service';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   try {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, {
+      bodyParser: false,
+      rawBody: true,
+    });
 
     // Set body size limits
-    app.use(express.json({ limit: '15mb' }));
+    app.use(
+      express.json({
+        limit: '15mb',
+        verify: (request, _response, buffer) => {
+          if (request.url?.startsWith('/webhooks/meta/whatsapp')) {
+            (
+              request as typeof request & { rawBody?: Buffer }
+            ).rawBody = Buffer.from(buffer);
+          }
+        },
+      }),
+    );
     app.use(express.urlencoded({ limit: '15mb', extended: true }));
     
     const configService = app.get(ConfigService);
@@ -37,9 +51,43 @@ async function bootstrap() {
       logger.log('Redis adapter disabled by configuration, using default adapter');
     }
 
-    // Enable CORS con header X-Tenant-ID
+    const allowedOrigins = new Set(
+      configService
+        .get('CORS_ALLOWED_ORIGINS', 'http://localhost:3001')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    );
+    const allowedHostSuffixes = configService
+      .get('CORS_ALLOWED_HOST_SUFFIXES', 'localhost')
+      .split(',')
+      .map((hostname) => hostname.trim().toLowerCase().replace(/^\./, ''))
+      .filter(Boolean);
+
     app.enableCors({
-      origin: true,
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.has(origin)) {
+          return callback(null, true);
+        }
+
+        let parsedOrigin: URL;
+        try {
+          parsedOrigin = new URL(origin);
+        } catch {
+          return callback(null, false);
+        }
+
+        const hostname = parsedOrigin.hostname.toLowerCase();
+        const isAllowedHost = allowedHostSuffixes.some(
+          (suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`),
+        );
+        const isSecureProtocol =
+          parsedOrigin.protocol === 'https:' ||
+          hostname === 'localhost' ||
+          hostname.endsWith('.localhost');
+
+        return callback(null, isAllowedHost && isSecureProtocol);
+      },
       credentials: true,
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID'],
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

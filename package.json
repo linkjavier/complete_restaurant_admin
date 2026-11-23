@@ -2,11 +2,15 @@
   "name": "kutchen-app",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "npm@10.8.1",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "predev": "npm run dev:services",
+    "dev": "turbo run dev --filter=@blondie/api --filter=@kutchen/web",
+    "dev:services": "docker compose up -d --wait postgres redis",
+    "dev:stop": "docker compose stop postgres redis",
     "build": "turbo run build",
     "start": "turbo run start",
     "lint": "turbo run lint",

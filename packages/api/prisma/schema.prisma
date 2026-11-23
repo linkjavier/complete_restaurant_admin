@@ -17,22 +17,24 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users                  User[]
-  locations              Location[]
-  products               Product[]
-  orders                 Order[]
-  categories             Category[]
-  ingredients            Ingredient[]
-  customers              Customer[]
-  tables                 Table[]
-  payments               Payment[]
-  productVariantGroups   ProductVariantGroup[]
-  productVariants        ProductVariant[]
-  settings               Settings[]
-  subscriptions          Subscription[]
-  purchases              Purchase[]
-  inventoryModifications InventoryModification[]
-  userAccessRequests     UserAccessRequest[]
+  users                      User[]
+  locations                  Location[]
+  products                   Product[]
+  orders                     Order[]
+  categories                 Category[]
+  ingredients                Ingredient[]
+  customers                  Customer[]
+  tables                     Table[]
+  payments                   Payment[]
+  productVariantGroups       ProductVariantGroup[]
+  productVariants            ProductVariant[]
+  settings                   Settings[]
+  subscriptions              Subscription[]
+  purchases                  Purchase[]
+  inventoryModifications     InventoryModification[]
+  userAccessRequests         UserAccessRequest[]
+  whatsappCloudIntegrations  WhatsappCloudIntegration[]
+  whatsappCloudConversations WhatsappCloudConversation[]
 }
 
 model User {
@@ -114,31 +116,33 @@ enum UserRole {
 }
 
 model Location {
-  id                     String                  @id @default(uuid())
-  tenantId               String
-  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
-  name                   String
-  address                String
-  city                   String?
-  country                String?
-  latitude               Float?
-  longitude              Float?
-  phone                  String
-  orders                 Order[]
-  users                  User[]
-  products               Product[]
-  tables                 Table[]
-  whatsappMessages       WhatsappMessage[]
-  whatsappChats          WhatsappChat[]
-  inventoryItems         InventoryItem[]
-  ingredients            Ingredient[]
-  purchases              Purchase[]
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  order                  Int                     @default(0)
-  customers              Customer[]
-  settings               Settings[]
-  inventoryModifications InventoryModification[]
+  id                         String                      @id @default(uuid())
+  tenantId                   String
+  tenant                     Tenant                      @relation(fields: [tenantId], references: [id])
+  name                       String
+  address                    String
+  city                       String?
+  country                    String?
+  latitude                   Float?
+  longitude                  Float?
+  phone                      String
+  orders                     Order[]
+  users                      User[]
+  products                   Product[]
+  tables                     Table[]
+  whatsappMessages           WhatsappMessage[]
+  whatsappChats              WhatsappChat[]
+  whatsappCloudIntegrations  WhatsappCloudIntegration[]
+  whatsappCloudConversations WhatsappCloudConversation[]
+  inventoryItems             InventoryItem[]
+  ingredients                Ingredient[]
+  purchases                  Purchase[]
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  order                      Int                         @default(0)
+  customers                  Customer[]
+  settings                   Settings[]
+  inventoryModifications     InventoryModification[]
 
   @@index([order])
   @@map("locations")
@@ -537,6 +541,93 @@ model WhatsappChat {
   updatedAt  DateTime @updatedAt
 
   @@index([locationId])
+}
+
+enum WhatsappCloudMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsappCloudMessageStatus {
+  PENDING
+  RECEIVED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum WhatsappCloudProcessingStatus {
+  PENDING
+  RESPONSE_READY
+  COMPLETED
+}
+
+model WhatsappCloudIntegration {
+  id                   String                      @id @default(cuid())
+  tenantId             String
+  tenant               Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationId           String                      @unique
+  location             Location                    @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  phoneNumberId        String                      @unique
+  wabaId               String
+  accessTokenEncrypted String                      @db.Text
+  displayPhoneNumber   String?
+  verifiedName         String?
+  isActive             Boolean                     @default(true)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  conversations        WhatsappCloudConversation[]
+  messages             WhatsappCloudMessage[]
+
+  @@index([tenantId])
+}
+
+model WhatsappCloudConversation {
+  id              String                   @id @default(cuid())
+  integrationId   String
+  integration     WhatsappCloudIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  tenantId        String
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationId      String
+  location        Location                 @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  contactId       String
+  phoneNumber     String?
+  profileName     String?
+  aiEnabled       Boolean                  @default(true)
+  lastMessageText String?                  @db.Text
+  lastMessageAt   DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  messages        WhatsappCloudMessage[]
+
+  @@unique([integrationId, contactId])
+  @@index([tenantId, locationId, lastMessageAt])
+}
+
+model WhatsappCloudMessage {
+  id                       String                        @id @default(cuid())
+  integrationId            String
+  integration              WhatsappCloudIntegration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  conversationId           String
+  conversation             WhatsappCloudConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  providerMessageId        String
+  direction                WhatsappCloudMessageDirection
+  type                     String
+  body                     String?                       @db.Text
+  assistantResponse        String?                       @db.Text
+  status                   WhatsappCloudMessageStatus    @default(RECEIVED)
+  processingStatus         WhatsappCloudProcessingStatus @default(PENDING)
+  replyToProviderMessageId String?
+  timestamp                DateTime
+  mediaId                  String?
+  mimeType                 String?
+  isVoiceNote              Boolean                       @default(false)
+  createdAt                DateTime                      @default(now())
+
+  @@unique([integrationId, providerMessageId])
+  @@unique([integrationId, replyToProviderMessageId])
+  @@index([conversationId, timestamp])
 }
 
 model Settings {

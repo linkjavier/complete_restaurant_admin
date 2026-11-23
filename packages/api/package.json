@@ -13,6 +13,7 @@
     "start": "nest start",
     "prestart:dev": "npm rebuild bcrypt --workspace=@blondie/api && ./node_modules/.bin/prisma generate",
     "start:dev": "nest start --watch",
+    "dev": "npm run start:dev",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -26,7 +27,7 @@
     "seed:dev": "ts-node prisma/seed-development.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.750.0",
+    "@aws-sdk/client-s3": "3.1176.0",
     "@nestjs/bull": "^10.2.3",
     "@nestjs/bullmq": "^11.0.2",
     "@nestjs/common": "^10.4.19",

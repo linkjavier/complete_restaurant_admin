@@ -1,5 +1,14 @@
 node_modules
 **/node_modules
+**/.next
+**/dist
+.git
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+.wwebjs_auth
+**/.wwebjs_auth
 npm-debug.log
 Dockerfile
-dist

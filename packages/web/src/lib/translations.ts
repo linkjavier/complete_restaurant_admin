@@ -356,6 +356,7 @@ export const translations = {
     sidebar: {
       dashboard: "Dashboard",
       ai: "Inteligencia Artificial",
+      aiV2: "Inteligencia Artificial V2.0",
       pos: "POS",
       orders: "Órdenes",
       tables: "Mesas",
@@ -688,6 +689,7 @@ export const translations = {
     sidebar: {
       dashboard: "Dashboard",
       ai: "Artificial Intelligence",
+      aiV2: "Artificial Intelligence V2.0",
       pos: "POS",
       orders: "Orders",
       tables: "Tables",
@@ -1014,6 +1016,7 @@ export const translations = {
     sidebar: {
       dashboard: "ダッシュボード",
       ai: "AI",
+      aiV2: "AI V2.0",
       pos: "POS",
       orders: "注文",
       tables: "テーブル",
@@ -1339,6 +1342,7 @@ export const translations = {
     sidebar: {
       dashboard: "Dashboard",
       ai: "Künstliche Intelligenz",
+      aiV2: "Künstliche Intelligenz V2.0",
       pos: "POS",
       orders: "Bestellungen",
       tables: "Tische",
@@ -1664,6 +1668,7 @@ export const translations = {
     sidebar: {
       dashboard: "Tableau de bord",
       ai: "Intelligence Artificielle",
+      aiV2: "Intelligence Artificielle V2.0",
       pos: "POS",
       orders: "Commandes",
       tables: "Tables",
@@ -1989,6 +1994,7 @@ export const translations = {
     sidebar: {
       dashboard: "仪表盘",
       ai: "人工智能",
+      aiV2: "人工智能 V2.0",
       pos: "POS",
       orders: "订单",
       tables: "餐桌",
@@ -2288,6 +2294,7 @@ export const translations = {
     sidebar: {
       dashboard: "Dashboard",
       ai: "Intelligenza Artificiale",
+      aiV2: "Intelligenza Artificiale V2.0",
       pos: "POS",
       orders: "Ordini",
       tables: "Tabelle",
@@ -2587,6 +2594,7 @@ export const translations = {
     sidebar: {
       dashboard: "Dashboard",
       ai: "Inteligência Artificial",
+      aiV2: "Inteligência Artificial V2.0",
       pos: "POS",
       orders: "Pedidos",
       tables: "Mesas",
@@ -2889,6 +2897,7 @@ export const translations = {
     sidebar: {
       dashboard: "डैशबोर्ड",
       ai: "आर्टिफिशियल इंटेलिजेंस",
+      aiV2: "कृत्रिम बुद्धिमत्ता V2.0",
       pos: "POS",
       orders: "ऑर्डर",
       tables: "टेबल",

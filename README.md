@@ -350,6 +350,26 @@ Open in browser: https://blondieapp.xyz
 
 ## 💻 Development
 
+### Local development (macOS)
+
+Docker Desktop is needed only for PostgreSQL and Redis. In Docker Desktop, enable
+**Start Docker Desktop when you sign in** once; then from the repository root:
+
+```bash
+npm install
+npm run dev
+```
+
+`npm run dev` starts the `postgres` and `redis` services and then runs the API
+and web app together. The API is at `http://localhost:3000` and the web app at
+`http://localhost:3001`. Set `DATABASE_URL` in `packages/api/.env` to
+`postgresql://postgres:postgres@localhost:5432/blondie?schema=public`.
+
+On a fresh database, start the services first with `npm run dev:services`, then
+apply the API migrations from `packages/api` with `npx prisma migrate dev`.
+Stop the database containers without deleting their data with
+`npm run dev:stop`. Press `Ctrl+C` to stop the API and web processes.
+
 ### Start the Project
 
 1. **Install Node.js**
@@ -479,6 +499,75 @@ override the demo credentials before running the seed. Each run resets the
 development administrator's password to the configured value.
 
 ## 🚀 Deployment
+
+### Production deployment on Oracle Cloud
+
+The production stack runs the API, PostgreSQL, and Redis on the VPS. Vercel
+continues to host the web app. The production Compose file is separate from the
+local development setup.
+
+On the VPS, clone the repository, create `.env.production` from
+`.env.production.example`, and replace the database password and JWT secret
+with private values. Generate each secret separately:
+
+```bash
+openssl rand -hex 32
+openssl rand -hex 32
+```
+
+Keep `.env.production` only on the server; it is ignored by Git. Ensure
+`api.kutchen.xyz` resolves to the VPS and that inbound TCP ports 80 and 443 are
+open before starting Caddy. Do not expose ports 3000, 5432, or 6379.
+
+From the repository root on the VPS, start the stack:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml \
+  up -d --build
+```
+
+Compose runs Prisma migrations before starting the API. Caddy obtains and
+renews the HTTPS certificate for `api.kutchen.xyz`. The
+PostgreSQL, Redis, Caddy certificate, and WhatsApp session data use persistent
+Docker volumes. Set `NEXT_PUBLIC_API_URL=https://api.kutchen.xyz`,
+`NEXTAUTH_URL=https://kutchen.online`, and a private `NEXTAUTH_SECRET` in the
+Vercel production environment, then redeploy the web app. Back up the
+PostgreSQL volume off-server regularly.
+
+### WhatsApp Cloud API V2 (experimental)
+
+The separate dashboard module is available at `/admin/ai-manager-v2`; the
+existing WhatsApp module remains unchanged. The V2 API receives Meta webhooks
+at `/webhooks/meta/whatsapp`, queues events through Redis, stores conversations
+and messages in PostgreSQL, and reuses the current AI sales flow. Incoming
+audio messages are downloaded from Meta and transcribed before being sent to
+the assistant.
+
+Before connecting a test number:
+
+1. Start Redis and apply the API migration:
+   ```bash
+   docker-compose up -d redis
+   cd packages/api
+   npx prisma migrate deploy
+   ```
+2. Set `WHATSAPP_CLOUD_VERIFY_TOKEN` and `WHATSAPP_CLOUD_APP_SECRET` in the API
+   environment. Generate a dedicated encryption key with
+   `openssl rand -base64 32` and set it as
+   `WHATSAPP_CLOUD_TOKEN_ENCRYPTION_KEY`. Keep these values in a secret manager;
+   never commit them.
+3. Configure the Meta App webhook callback as
+   `https://<API_HOST>/webhooks/meta/whatsapp`, using the same verification
+   token, and subscribe the app to the `messages` webhook field.
+4. In the V2 dashboard, an administrator enters the Meta phone number ID, WABA
+   ID, and a System User access token. The token is validated before it is
+   encrypted and saved; it is not returned to the frontend.
+
+The webhook endpoint requires publicly reachable HTTPS. Meta's webhook
+signature secret and token-encryption key must be configured before production
+traffic. The AI conversation/order working state still uses the existing
+in-memory agent services, so this first V2 iteration is for integration
+testing and is not yet a production-readiness sign-off.
 
 ### Production Requirements
 - Ubuntu 20.04+ server
