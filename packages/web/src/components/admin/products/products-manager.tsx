@@ -1891,6 +1891,7 @@ export function ProductsManager() {
                       <h3 className="font-semibold">Vista 3D y realidad aumentada</h3>
                       <p className="mt-1 text-sm text-muted-foreground">
                         El modelo solo aparecerá para este producto cuando esté publicado en el Menú QR.
+                        La escala configurada se conservará en realidad aumentada y no se podrá cambiar con gestos.
                       </p>
                     </div>
                     {arLoading ? (
@@ -1946,7 +1947,9 @@ export function ProductsManager() {
                               }}
                             />
                             <p className="text-xs text-muted-foreground">
-                              {arConfiguration.modelUsdzUrl ? "Modelo USDZ cargado." : "Opcional; puede generarse desde el GLB en dispositivos compatibles."}
+                              {arConfiguration.modelUsdzUrl
+                                ? "USDZ cargado; iPhone usará este archivo en Quick Look."
+                                : "iPhone convierte el GLB automáticamente. Si el modelo aparece gris, carga un USDZ exportado con sus materiales y texturas."}
                             </p>
                           </div>
                           <div className="grid gap-2">
@@ -1987,6 +1990,9 @@ export function ProductsManager() {
                           </div>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-3">
+                          <p className="text-sm text-muted-foreground sm:col-span-3">
+                            La escala es un multiplicador del tamaño original del archivo: 1 conserva el tamaño y 0.2 equivale al 20%. Usa el mismo valor en X, Y y Z para conservar la proporción. Por ejemplo, un modelo de 1 m de ancho queda en unos 20 cm con escala 0.2.
+                          </p>
                           {(["x", "y", "z"] as const).map((axis) => (
                             <div key={axis} className="grid gap-2">
                               <Label htmlFor={`ar-scale-${axis}`}>Escala {axis.toUpperCase()}</Label>

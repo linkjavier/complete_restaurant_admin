@@ -72,6 +72,7 @@ export function ArProductViewer({
         "ios-src": experience.modelUsdzUrl ?? undefined,
         "ar-modes": "webxr scene-viewer quick-look",
         "ar-placement": experience.placement,
+        "ar-scale": "fixed",
         "camera-controls": true,
         "touch-action": "pan-y",
         "shadow-intensity": "1",
