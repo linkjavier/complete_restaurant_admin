@@ -1,8 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,8 +16,6 @@ import { API_URL } from '@/lib/api';
 import { Check, Shield, Zap } from 'lucide-react';
 
 export default function RegisterWithPaymentPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>('');
@@ -172,8 +168,7 @@ export default function RegisterWithPaymentPage() {
   };
 
   return (
-    <Suspense fallback={<div>Cargando...</div>}>
-          <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
         {/* Header */}
         <div className="text-center mb-8">
@@ -406,7 +401,5 @@ export default function RegisterWithPaymentPage() {
         </div>
       </div>
     </div>
-    </Suspense>
-
   );
 } 

@@ -42,6 +42,7 @@ type PaymentMethod = "CASH" | "CARD" | "TRANSFER" | "OTHER"
 
 interface OrderItem {
   id: string
+  price?: number
   product: {
     name: string
     price: number
@@ -312,10 +313,11 @@ export function OrdersManager() {
     } catch (err) {
       console.error('Error fetching orders:', err);
 
+      const message = err instanceof Error ? err.message : ''
       if (
-        err.message?.includes('No authentication token found') ||
-        err.message?.includes('Authentication expired') ||
-        err.message?.includes('Unauthorized')
+        message.includes('No authentication token found') ||
+        message.includes('Authentication expired') ||
+        message.includes('Unauthorized')
       ) {
         setError('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
         setTimeout(() => {
@@ -348,7 +350,7 @@ export function OrdersManager() {
       })
 
       fetchOrders()
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating order status:', err)
       toast({
         title: "Error",
@@ -383,7 +385,7 @@ export function OrdersManager() {
       })
 
       fetchOrders()
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error processing payment:', err)
       toast({
         title: "Error",
@@ -409,7 +411,7 @@ export function OrdersManager() {
         title: "Éxito",
         description: "Ticket enviado a la impresora",
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error printing receipt:', err)
       toast({
         title: "Error",
@@ -439,7 +441,7 @@ export function OrdersManager() {
   };
 
   const getStatusBadge = (status: OrderStatus) => {
-    const statusConfig = {
+    const statusConfig: Record<OrderStatus, { label: string; variant: "warning" | "info" | "success" | "destructive" | "default" }> = {
       PENDING: { label: "Pendiente", variant: "warning" },
       IN_PROGRESS: { label: "En Progreso", variant: "info" },
       READY: { label: "Completada", variant: "success" },
@@ -450,7 +452,7 @@ export function OrdersManager() {
     const config = statusConfig[status]
     return (
       <Badge
-        variant={config.variant as any}
+        variant={config.variant}
         className={status === "CANCELLED" ? "bg-red-100 text-red-700 hover:bg-red-200" : ""}
       >
         {config.label}
@@ -459,7 +461,7 @@ export function OrdersManager() {
   }
 
   const getItemStatusBadge = (status: OrderStatus) => {
-    const statusConfig = {
+    const statusConfig: Record<OrderStatus, { label: string; variant: "warning" | "info" | "success" | "destructive" | "default"; icon: React.ReactNode }> = {
       PENDING: { label: "Pendiente", variant: "warning", icon: <Clock className="h-3 w-3 mr-1" /> },
       IN_PROGRESS: { label: "En Progreso", variant: "info", icon: <Timer className="h-3 w-3 mr-1" /> },
       READY: { label: "Listo", variant: "success", icon: <CheckCircle2 className="h-3 w-3 mr-1" /> },
@@ -470,7 +472,7 @@ export function OrdersManager() {
     const config = statusConfig[status]
     return (
       <Badge
-        variant={config.variant as any}
+        variant={config.variant}
         className="flex items-center"
       >
         {config.icon}
@@ -766,7 +768,7 @@ export function OrdersManager() {
                                         )}
                                         <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -775,7 +777,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}
@@ -1037,7 +1039,7 @@ export function OrdersManager() {
                                         )}
                                         <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -1046,7 +1048,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}
@@ -1279,7 +1281,7 @@ export function OrdersManager() {
                                         )}
                                         <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -1288,7 +1290,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}
@@ -1521,7 +1523,7 @@ export function OrdersManager() {
                                         )}
                                         <div className="ml-4 text-xs text-muted-foreground mt-3 font-bold text-xl sm:text-2xl md:text-2xl" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                                           {item.quantity} x $
-                                          {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                          {((item.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                         </div>
                                         {item.notes && (
                                           <div className="ml-4 mt-1 text-xs text-yellow-800 bg-yellow-50 rounded px-2 py-1">
@@ -1530,7 +1532,7 @@ export function OrdersManager() {
                                         )}
                                       </div>
                                       <Badge variant="outline" className="mt-2">
-                                        {((item as any).price * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                                        {((item.price ?? item.product.price) * item.quantity).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                                       </Badge>
                                     </div>
                                   ))}

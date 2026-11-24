@@ -34,12 +34,28 @@ import {
 } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
 
+interface TableOrder {
+  id: string
+  tableId?: string
+  createdAt: string
+  status: string
+  paymentMethod?: string
+  items: Array<{
+    id: string
+    quantity: number
+    notes?: string
+    status: string
+    product: { name: string; price: number }
+    productVariant?: { name: string; image?: string; price?: number }
+  }>
+}
+
 export function TablesManager() {
   const [tables, setTables] = useState<Table[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeOrders, setActiveOrders] = useState<any[]>([])
+  const [activeOrders, setActiveOrders] = useState<Array<{ tableId?: string }>>([])
   const [lastOrders, setLastOrders] = useState<{[key: string]: Date}>({})
   const [newTable, setNewTable] = useState({
     number: "",
@@ -51,7 +67,7 @@ export function TablesManager() {
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null)
   const [qrUrl, setQrUrl] = useState<string>("")
   const [tableDetailsOpen, setTableDetailsOpen] = useState<string | null>(null)
-  const [tableOrders, setTableOrders] = useState<any[]>([])
+  const [tableOrders, setTableOrders] = useState<TableOrder[]>([])
   const [isCreateFormVisible, setIsCreateFormVisible] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const { toast } = useToast()
@@ -151,11 +167,11 @@ export function TablesManager() {
       const data = await response.json();
       const lastOrdersByTable: {[key: string]: Date} = {};
       
-      data.forEach((order: any) => {
+      data.forEach((order: { tableId?: string; createdAt: string }) => {
         if (order.tableId) {
           const orderDate = new Date(order.createdAt);
           if (!lastOrdersByTable[order.tableId] || orderDate > new Date(lastOrdersByTable[order.tableId])) {
-            lastOrdersByTable[order.tableId] = order.createdAt;
+            lastOrdersByTable[order.tableId] = orderDate;
           }
         }
       });

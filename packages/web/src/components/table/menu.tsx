@@ -53,7 +53,7 @@ function useMenuLanguage(defaultLang: MenuLanguage = 'es') {
     const currentTranslations = translations[language] || translations.es
     return key.split('.').reduce((obj, key) => obj?.[key], currentTranslations) || key
   }
-  const tNested = (path: string): any => {
+  const tNested = (path: string): Record<string, unknown> => {
     const currentTranslations = translations[language] || translations.es
     return path.split('.').reduce((obj, key) => obj?.[key], currentTranslations) || {}
   }
@@ -186,7 +186,16 @@ export function Menu({ locationId, tableId, customerName, businessIcon, menuThem
   const [searchTerm, setSearchTerm] = useState("")
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [activeOrders, setActiveOrders] = useState<any[]>([])
+  const [activeOrders, setActiveOrders] = useState<Array<{
+    id: string
+    createdAt: string
+    items: Array<{
+      id: string
+      quantity: number
+      status: string
+      product?: { name: string }
+    }>
+  }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'menu' | 'orders'>("menu")

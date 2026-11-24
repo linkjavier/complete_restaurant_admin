@@ -25,7 +25,7 @@ const renderWhatsAppText = (text: string) => {
   if (!text) return '';
   
   // Convertir el texto a HTML manteniendo el formato de WhatsApp
-  let html = text
+  const html = text
     // Convertir *texto* a <strong>texto</strong> (negritas)
     .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
     // Convertir _texto_ a <em>texto</em> (cursivas)
@@ -150,7 +150,6 @@ export default function AIManagerPage() {
     });
 
     let reconnectTimer: NodeJS.Timeout;
-    let statusCheckTimer: NodeJS.Timeout;
     let initialConnectionAttempted = false;
 
     socketInstance.on('connect', () => {
@@ -226,7 +225,7 @@ export default function AIManagerPage() {
     });
 
     // Configurar un timer para verificar el estado periódicamente
-    statusCheckTimer = setInterval(() => {
+    const statusCheckTimer = setInterval(() => {
       if (socketInstance.connected) {
         console.log('Periodic status check...');
         socketInstance.emit('whatsapp:getStatus');

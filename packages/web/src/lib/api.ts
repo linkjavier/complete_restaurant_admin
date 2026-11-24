@@ -206,6 +206,35 @@ export interface OrderItem {
   price: number
 }
 
+export interface Customer {
+  id: string
+  name: string
+  phone: string
+  address?: string
+  neighborhood?: string
+  whatsappId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface KitchenOrderItem {
+  id: string
+  status: "PENDING" | "IN_PROGRESS" | "READY" | "COMPLETED" | "CANCELLED"
+  quantity: number
+  notes?: string
+  product: { id: string; name: string; image?: string }
+  productVariant?: { id?: string; name: string; image?: string; price?: number }
+}
+
+export interface KitchenOrder {
+  id: string
+  type: "TABLE" | "TAKEOUT" | "DELIVERY"
+  customerName?: string
+  createdAt: string
+  table?: { number: number }
+  items: KitchenOrderItem[]
+}
+
 export interface Category {
   id: string
   name: string
@@ -1127,14 +1156,30 @@ export async function getOrders(locationId?: string) {
   return response.json();
 }
 
-export async function createOrder(data: any) {
+export interface CreateOrderItem {
+  productId: string
+  quantity: number
+  variants?: Array<{ productVariantId?: string; id?: string; groupName?: string }>
+  variant?: { id: string; name?: string; groupName?: string }
+}
+
+export interface CreateOrderData {
+  items?: CreateOrderItem[]
+  tableId?: string
+  locationId?: string
+  type?: "TABLE" | "TAKEOUT" | "DELIVERY"
+  source?: string
+  splitBill?: string[]
+}
+
+export async function createOrder(data: CreateOrderData) {
   // Adaptar items con variantes múltiples al formato backend y asegurar que 'variants' siempre es array
-  const items = (data.items || []).map((item: any) => {
+  const items = (data.items || []).map((item) => {
     // Si ya tiene 'variants' como array, transformar
     if (Array.isArray(item.variants)) {
       return {
         ...item,
-        variants: item.variants.map((v: any) => ({
+        variants: item.variants.map((v) => ({
           productVariantId: v.productVariantId || v.id,
           groupName: v.groupName || undefined,
         })),
@@ -1214,7 +1259,7 @@ export async function getUser(): Promise<User> {
   return userData;
 }
 
-export async function getKitchenOrders(locationId?: string): Promise<any[]> {
+export async function getKitchenOrders(locationId?: string): Promise<KitchenOrder[]> {
   console.log("Fetching kitchen orders DEEPER...")
   const token = getAuthToken();
   if (!token) {
@@ -1246,7 +1291,7 @@ export async function getKitchenOrders(locationId?: string): Promise<any[]> {
 export async function updateKitchenOrderItemStatus(
   itemId: string,
   status: 'PENDING' | 'IN_PROGRESS' | 'READY' | 'COMPLETED' | 'CANCELLED'
-): Promise<any> {
+): Promise<unknown> {
   const token = getAuthToken();
   if (!token) {
     throw new Error("No authentication token found");
@@ -1268,7 +1313,7 @@ export async function updateKitchenOrderItemStatus(
   return response.json();
 }
 
-export async function printKitchenTicket(orderId: string): Promise<any> {
+export async function printKitchenTicket(orderId: string): Promise<unknown> {
   const token = getAuthToken();
   if (!token) {
     throw new Error("No authentication token found");
@@ -1428,7 +1473,7 @@ export async function deleteUser(id: string): Promise<void> {
   }
 }
 
-export async function getCustomers(): Promise<any[]> {
+export async function getCustomers(): Promise<Customer[]> {
   const response = await fetch(`${API_URL}/customers`, {
     headers: getAuthHeaders(),
   });
@@ -1445,7 +1490,7 @@ export async function updateCustomer(id: string, data: {
   neighborhood?: string;
   whatsappId?: string;
   locationId?: string;
-}): Promise<any> {
+}): Promise<unknown> {
   const response = await fetch(`${API_URL}/customers/${id}`, {
     method: 'PUT',
     headers: {

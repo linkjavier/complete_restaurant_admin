@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Card, CardContent } from "@/components/ui/card"
-import { PaymentMethod, processPayment, getOrderPaymentDetails } from "@/lib/api"
+import { PaymentMethod, processPayment, getOrderPaymentDetails, PaymentDetails } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import {
   Select,
@@ -43,7 +43,7 @@ export function PaymentDialog({
   const [amount, setAmount] = useState<string>("")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH")
   const [isProcessing, setIsProcessing] = useState(false)
-  const [paymentDetails, setPaymentDetails] = useState<any>(null)
+  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
 
@@ -52,10 +52,12 @@ export function PaymentDialog({
       if (isPrePayment) {
         // Para pre-pagos, usar el monto del carrito
         setPaymentDetails({
+          orderId,
           totalAmount: prePaymentAmount,
           paidAmount: 0,
           remainingBalance: prePaymentAmount,
           orderStatus: "PENDING",
+          isFullyPaid: false,
           payments: []
         })
         setAmount(prePaymentAmount.toString())
@@ -178,7 +180,7 @@ export function PaymentDialog({
             <div className="space-y-2">
               <h3 className="font-medium">Pagos Realizados:</h3>
               <div className="space-y-2 max-h-32 overflow-y-auto">
-                {paymentDetails.payments.map((payment: any) => (
+                {paymentDetails.payments.map((payment) => (
                   <div
                     key={payment.id}
                     className="text-sm border rounded p-2 flex justify-between"

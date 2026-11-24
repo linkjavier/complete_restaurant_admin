@@ -6,8 +6,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password } = body;
 
-    console.log(email, password);
-
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
       method: 'POST',
       headers: {
@@ -15,8 +13,6 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({ email, password }), // usa "username" si tu backend espera eso
     });
-
-    console.log(response)
 
     // Manejo de error
     if (!response.ok) {
@@ -31,7 +27,6 @@ export async function POST(request: NextRequest) {
 
     // ✅ Aquí el body está disponible
     const data = await response.json();
-    console.log("Respuesta recibida:", data);
 
     // Create response with cookie
     const resp = NextResponse.json(data);
@@ -44,7 +39,7 @@ export async function POST(request: NextRequest) {
     });
 
     return resp;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Login error:', error);
 
     return NextResponse.json(

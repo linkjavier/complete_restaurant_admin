@@ -1,8 +1,8 @@
 declare module 'body-parser' {
   import { RequestHandler } from 'express';
   
-  export function json(options?: any): RequestHandler;
-  export function urlencoded(options?: any): RequestHandler;
-  export function raw(options?: any): RequestHandler;
-  export function text(options?: any): RequestHandler;
+  export function json(options?: unknown): RequestHandler;
+  export function urlencoded(options?: unknown): RequestHandler;
+  export function raw(options?: unknown): RequestHandler;
+  export function text(options?: unknown): RequestHandler;
 } 

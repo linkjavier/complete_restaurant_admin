@@ -181,8 +181,8 @@ export default function HomePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {t.features.map((f, i) => {
                 const imageSrc = features[i].icon;
-                let imgWidth = 500;
-                let imgHeight = 320;
+                const imgWidth = 500;
+                const imgHeight = 320;
                 return (
                   <article
                     key={i}
@@ -276,7 +276,7 @@ export default function HomePage() {
                       </div>
                     </div>
                     <blockquote className="text-muted-foreground mb-6 italic leading-relaxed">
-                      "{story.testimonial}"
+                      &quot;{story.testimonial}&quot;
                     </blockquote>
                     <div className="space-y-2">
                       {story.metrics.map((metric, idx) => (

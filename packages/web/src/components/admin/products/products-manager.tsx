@@ -12,6 +12,9 @@ import {
   deleteProduct,
   updateProduct,
   Product,
+  ProductVariant,
+  ProductVariantGroup,
+  ProductIngredient,
   ProductArConfiguration,
   getProductArConfiguration,
   updateProductArConfiguration,
@@ -108,9 +111,9 @@ export function ProductsManager() {
     isIntermediate: false,
     unit: "unidad",
     quantity: 0,
-    ingredients: [] as any[],
+    ingredients: [] as ProductIngredient[],
     components: [] as { componentId: string; quantity: number }[],
-    variantGroups: [] as any[],
+    variantGroups: [] as ProductVariantGroup[],
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [arConfiguration, setArConfiguration] = useState<ProductArConfiguration | null>(null)
@@ -263,7 +266,7 @@ export function ProductsManager() {
       const variantGroupsWithIds = (newProduct.variantGroups || []).map(group => ({
         ...group,
         id: group.id || crypto.randomUUID(),
-        variants: (group.variants || []).map((variant: any) => ({
+        variants: (group.variants || []).map((variant: ProductVariant) => ({
           ...variant,
           id: variant.id || crypto.randomUUID(),
         }))
@@ -295,12 +298,17 @@ export function ProductsManager() {
     }
   }
 
-  const handleBulkImport = async (importedProducts: any[]) => {
+  const handleBulkImport = async (importedProducts: Array<{ name: string; description: string; price: number; categoryId?: string; locationId?: string }>) => {
     try {
       setLoading(true)
       for (const product of importedProducts) {
+        if (!product.categoryId) {
+          throw new Error(`El producto "${product.name}" no tiene una categoría asignada.`)
+        }
+
         await createProduct({
           ...product,
+          categoryId: product.categoryId,
           locationId: isSuperAdmin ? product.locationId : user?.locationId ?? "",
           isActive: true,
           quantity: 0
@@ -315,7 +323,9 @@ export function ProductsManager() {
       console.error('Error in bulk import:', err)
       toast({
         title: "Error parcial",
-        description: "Hubo un problema al importar algunos productos.",
+        description: err instanceof Error
+          ? err.message
+          : "Hubo un problema al importar algunos productos.",
         variant: "destructive",
       })
     } finally {
@@ -502,7 +512,7 @@ export function ProductsManager() {
     setArLoadError("")
   }
 
-  const addIngredient = (product: any) => {
+  const addIngredient = (product: { ingredients?: Array<Pick<ProductIngredient, "ingredientId" | "quantity">> }) => {
     if (product.ingredients) {
       product.ingredients.push({
         ingredientId: "",
@@ -511,7 +521,7 @@ export function ProductsManager() {
     }
   }
 
-  const removeIngredient = (product: any, index: number) => {
+  const removeIngredient = (product: { ingredients?: Array<Pick<ProductIngredient, "ingredientId" | "quantity">> }, index: number) => {
     if (product.ingredients) {
       product.ingredients.splice(index, 1)
     }

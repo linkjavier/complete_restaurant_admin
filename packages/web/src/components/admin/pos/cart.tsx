@@ -133,11 +133,11 @@ export function Cart({
         distance: data.distance,
         assignedLocation: data.assignedLocation,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error validating address:", error)
       setAddressValidation({
         isValid: false,
-        error: error.message || "Error al validar la dirección"
+        error: error instanceof Error ? error.message : "Error al validar la dirección"
       })
     } finally {
       setIsValidating(false)

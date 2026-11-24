@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Trash2, Pencil, Volume2, VolumeX } from "lucide-react"
-import { getKitchenOrders, updateKitchenOrderItemStatus, printKitchenTicket } from "@/lib/api"
+import { getKitchenOrders, updateKitchenOrderItemStatus, printKitchenTicket, KitchenOrder, KitchenOrderItem } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { useOrderSocket } from "@/hooks/use-order-socket"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { getLocations, Location } from "@/lib/api"
+
 import {
   Select,
   SelectContent,
@@ -23,7 +24,7 @@ import {
 import { MapPin } from "lucide-react"
 
 export function KitchenManager() {
-  const [orders, setOrders] = useState<any[]>([])
+  const [orders, setOrders] = useState<KitchenOrder[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [selectedLocationId, setSelectedLocationId] = useState<string>("all")
   const [loading, setLoading] = useState(true)
@@ -129,13 +130,14 @@ export function KitchenManager() {
         )
       )
       setOrders(activeOrders)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching orders:', err)
 
       // Check if the error is authentication related
-      if (err.message?.includes('No authentication token found') ||
-        err.message?.includes('Authentication expired') ||
-        err.message?.includes('Unauthorized')) {
+      const message = err instanceof Error ? err.message : ''
+      if (message.includes('No authentication token found') ||
+        message.includes('Authentication expired') ||
+        message.includes('Unauthorized')) {
         setError("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.")
 
         // Redirect to login after a short delay
@@ -191,13 +193,14 @@ export function KitchenManager() {
         ),
         duration: 3000
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating item status:', err)
 
       // Check if the error is authentication related
-      if (err.message?.includes('No authentication token found') ||
-        err.message?.includes('Authentication expired') ||
-        err.message?.includes('Unauthorized')) {
+      const message = err instanceof Error ? err.message : ''
+      if (message.includes('No authentication token found') ||
+        message.includes('Authentication expired') ||
+        message.includes('Unauthorized')) {
         toast({
           title: "Error de autenticación",
           description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
@@ -228,13 +231,14 @@ export function KitchenManager() {
         description: "Ticket enviado a la impresora",
         duration: 3000
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error printing ticket:', err)
 
       // Check if the error is authentication related
-      if (err.message?.includes('No authentication token found') ||
-        err.message?.includes('Authentication expired') ||
-        err.message?.includes('Unauthorized')) {
+      const message = err instanceof Error ? err.message : ''
+      if (message.includes('No authentication token found') ||
+        message.includes('Authentication expired') ||
+        message.includes('Unauthorized')) {
         toast({
           title: "Error de autenticación",
           description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
@@ -257,7 +261,7 @@ export function KitchenManager() {
     }
   }
 
-  const handleStartOrder = async (orderId: string, items: any[]) => {
+  const handleStartOrder = async (orderId: string, items: KitchenOrderItem[]) => {
     try {
       const pendingItems = items.filter(item => item.status === "PENDING");
 
@@ -286,7 +290,7 @@ export function KitchenManager() {
         description: "Orden iniciada correctamente",
         duration: 3000
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error starting order:', err);
       toast({
         title: "Error",

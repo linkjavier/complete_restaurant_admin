@@ -53,13 +53,14 @@ export default function CustomersPage() {
       setError(null);
       const data = await getCustomers();
       setCustomers(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching customers:', error);
-      
+      const message = error instanceof Error ? error.message : '';
+
       // Check if the error is authentication related
-      if (error.message?.includes('No authentication token found') || 
-          error.message?.includes('Authentication expired') ||
-          error.message?.includes('Unauthorized')) {
+      if (message.includes('No authentication token found') ||
+          message.includes('Authentication expired') ||
+          message.includes('Unauthorized')) {
         setError("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.");
         
         // Redirect to login after a short delay
@@ -118,13 +119,14 @@ export default function CustomersPage() {
           variant: "destructive",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error syncing WhatsApp:', error);
-      
+      const message = error instanceof Error ? error.message : '';
+
       // Check if the error is authentication related
-      if (error.message?.includes('No authentication token found') || 
-          error.message?.includes('Authentication expired') ||
-          error.message?.includes('Unauthorized')) {
+      if (message.includes('No authentication token found') ||
+          message.includes('Authentication expired') ||
+          message.includes('Unauthorized')) {
         toast({
           title: "Error de autenticación",
           description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
@@ -182,7 +184,7 @@ export default function CustomersPage() {
 
     setSavingCustomer(customerId);
     try {
-      const updateData: any = {};
+      const updateData: Partial<Pick<Customer, 'name' | 'phone' | 'address' | 'neighborhood' | 'whatsappId'>> = {};
       customerFields.forEach(field => {
         if (field.value !== field.originalValue) {
           updateData[field.type] = field.value;
@@ -211,13 +213,14 @@ export default function CustomersPage() {
           description: "Los cambios se han guardado correctamente",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating customer:', error);
-      
+      const message = error instanceof Error ? error.message : '';
+
       // Check if the error is authentication related
-      if (error.message?.includes('No authentication token found') || 
-          error.message?.includes('Authentication expired') ||
-          error.message?.includes('Unauthorized')) {
+      if (message.includes('No authentication token found') ||
+          message.includes('Authentication expired') ||
+          message.includes('Unauthorized')) {
         toast({
           title: "Error de autenticación",
           description: "Tu sesión ha expirado. Redirigiendo al inicio de sesión...",
@@ -283,7 +286,7 @@ export default function CustomersPage() {
     const targetValue = getFieldValue(customer, targetField);
 
     // Swap the values
-    const newUpdateData: any = {};
+    const newUpdateData: Partial<Pick<Customer, 'name' | 'phone' | 'address' | 'neighborhood' | 'whatsappId'>> = {};
     newUpdateData[dragState.sourceField] = targetValue;
     newUpdateData[targetField] = sourceValue;
 

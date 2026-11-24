@@ -26,6 +26,7 @@ interface Order {
   }>
   isPaid: boolean
   total: number
+  source?: string
 }
 
 interface OrderStats {
@@ -471,8 +472,8 @@ export default function AdminDashboard() {
   }
 
   // Custom heatmap cell component
-  const CustomHeatMapCell = (props: any) => {
-    const { x, y, width, height, value } = props;
+  const CustomHeatMapCell = (props: { x?: number; y?: number; width?: number; height?: number; value?: number }) => {
+    const { x = 0, y = 0, width = 0, height = 0, value = 0 } = props;
     const color = value > 80 ? "#0284c7" : value > 40 ? "#38bdf8" : "#e0f2fe";
     
     return (
@@ -493,7 +494,7 @@ export default function AdminDashboard() {
     const hours = Array.from(new Set(data.map(d => d.hour)));
     
     return categories.map(category => {
-      const row: any = { category };
+      const row: Record<string, string | number> = { category };
       hours.forEach(hour => {
         const cell = data.find(d => d.category === category && d.hour === hour);
         row[hour] = cell?.value || 0;
@@ -543,14 +544,14 @@ export default function AdminDashboard() {
 
   // Contadores de órdenes por canal
   const countBySource = (src: string) =>
-    orders.filter(order => (order as any).source === src).length
+    orders.filter(order => order.source === src).length
   const countMeseros = () =>
-    orders.filter(order => !(order as any).source || !['POS','WHATSAPP','QR','DIDDI','RAPPI'].includes((order as any).source)).length
+    orders.filter(order => !order.source || !['POS','WHATSAPP','QR','DIDDI','RAPPI'].includes(order.source)).length
   // Total de ventas por canal
   const totalBySource = (src: string) =>
-    orders.filter(order => (order as any).source === src).reduce((sum, order) => sum + calculateOrderTotal(order), 0)
+    orders.filter(order => order.source === src).reduce((sum, order) => sum + calculateOrderTotal(order), 0)
   const totalMeseros = () =>
-    orders.filter(order => !(order as any).source || !['POS','WHATSAPP','QR','DIDDI','RAPPI'].includes((order as any).source)).reduce((sum, order) => sum + calculateOrderTotal(order), 0)
+    orders.filter(order => !order.source || !['POS','WHATSAPP','QR','DIDDI','RAPPI'].includes(order.source)).reduce((sum, order) => sum + calculateOrderTotal(order), 0)
 
   // Utilidad para pluralizar 'órden/órdenes'
   const ordenesLabel = (count: number) => {

@@ -49,7 +49,7 @@ export default function PosPage() {
   const [selectedLocationId, setSelectedLocationId] = useState(ALL_LOCATIONS)
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
-  const [cart, setCart] = useState<Record<string, { product: Product, variant?: ProductVariant, quantity: number }>>({})
+  const [cart, setCart] = useState<Record<string, { product: Product, variant?: ProductVariant, variants?: Array<ProductVariant & { groupName?: string }>, quantity: number }>>({})
   const [orderType, setOrderType] = useState<"table" | "takeout" | "delivery">("takeout")
   const [selectedTable, setSelectedTable] = useState<string>("")
   const [customerName, setCustomerName] = useState("")
@@ -60,7 +60,12 @@ export default function PosPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
-  const [activeOrders, setActiveOrders] = useState<any[]>([])
+  const [activeOrders, setActiveOrders] = useState<Array<{
+    id: string
+    status: string
+    total: number
+    items: Array<{ id: string; product: { name: string; price: number }; quantity: number; status: string }>
+  }>>([])
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
   const { user, isLoading: isAuthLoading } = useAuth()
@@ -296,13 +301,13 @@ export default function PosPage() {
       const orderItems = Object.values(cart).map(item => {
         let variantsArr: { productVariantId: string, groupName?: string }[] = [];
         // Soporte para múltiples variantes por item
-        if (Array.isArray((item as any).variants) && (item as any).variants.length > 0) {
-          variantsArr = (item as any).variants.map((v: any) => ({
+        if (Array.isArray(item.variants) && item.variants.length > 0) {
+          variantsArr = item.variants.map(v => ({
             productVariantId: v.id,
             groupName: v.groupName || undefined
           }))
-        } else if ((item as any).variant) {
-          variantsArr = [{ productVariantId: (item as any).variant.id }]
+        } else if (item.variant) {
+          variantsArr = [{ productVariantId: item.variant.id }]
         }
         return {
           productId: item.product.id,

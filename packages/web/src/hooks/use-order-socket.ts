@@ -7,14 +7,14 @@ import { API_URL } from '@/lib/api';
 interface UseOrderSocketReturn {
   socket: Socket | null;
   connected: boolean;
-  subscribe: (event: string, callback: (...args: any[]) => void) => () => void;
-  emit: (event: string, ...args: any[]) => boolean;
+  subscribe: (event: string, callback: (...args: unknown[]) => void) => () => void;
+  emit: (event: string, ...args: unknown[]) => boolean;
 }
 
 export function useOrderSocket(): UseOrderSocketReturn {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
-  const subscribersRef = useRef<Map<string, Set<(...args: any[]) => void>>>(new Map());
+  const subscribersRef = useRef<Map<string, Set<(...args: unknown[]) => void>>>(new Map());
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
@@ -70,7 +70,7 @@ export function useOrderSocket(): UseOrderSocketReturn {
           reconnectTimeoutRef.current = null;
         }
 
-        socket.emit('ping', null, (response: any) => {
+        socket.emit('ping', null, (response: unknown) => {
           console.log('Received ping acknowledgment from server:', response);
         });
       });
@@ -80,7 +80,7 @@ export function useOrderSocket(): UseOrderSocketReturn {
       });
 
       socket.on('connect_error', (error) => {
-        console.error('Orders socket connection error:', error.message);
+        console.error('Orders socket connection error:', error instanceof Error ? error.message : String(error));
         scheduleReconnect();
       });
 
@@ -165,7 +165,7 @@ export function useOrderSocket(): UseOrderSocketReturn {
     };
   }, []);
 
-  const subscribe = useCallback((event: string, callback: (...args: any[]) => void): (() => void) => {
+  const subscribe = useCallback((event: string, callback: (...args: unknown[]) => void): (() => void) => {
     if (!subscribersRef.current.has(event)) {
       subscribersRef.current.set(event, new Set());
     }
@@ -176,7 +176,7 @@ export function useOrderSocket(): UseOrderSocketReturn {
     if (subscribers.size === 1 && socketRef.current) {
       console.log(`Setting up listener for orders ${event} event`);
 
-      socketRef.current.on(event, (...args: any[]) => {
+      socketRef.current.on(event, (...args: unknown[]) => {
         console.log(`Received orders ${event} event:`, args.length > 0 ? JSON.stringify(args[0]).substring(0, 200) + '...' : 'no data');
 
         subscribers.forEach(cb => {
@@ -204,7 +204,7 @@ export function useOrderSocket(): UseOrderSocketReturn {
     };
   }, []);
 
-  const emit = useCallback((event: string, ...args: any[]): boolean => {
+  const emit = useCallback((event: string, ...args: unknown[]): boolean => {
     if (socketRef.current && connected) {
       console.log(`Emitting orders ${event} event:`, args);
       socketRef.current.emit(event, ...args);

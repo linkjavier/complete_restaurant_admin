@@ -23,7 +23,7 @@ interface ExtractedProduct {
 interface ImportProductsDialogProps {
     isOpen: boolean
     onClose: () => void
-    onProductsImported: (products: any[]) => void
+    onProductsImported: (products: ExtractedProduct[]) => void
     categories: Category[]
     locations: Location[]
     showLocationSelector?: boolean

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Minus, Users, CheckCircle2 } from "lucide-react"
-import { OrderItem, Product, getAuthToken, API_URL } from "@/lib/api"
+import { OrderItem, getAuthToken, API_URL, ProductVariant } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { io } from "socket.io-client"
 
@@ -16,6 +16,11 @@ interface CartProps {
   items: OrderItem[]
   onItemsChange: (items: OrderItem[]) => void
   t: (key: string) => string
+}
+
+type CartItemWithVariants = OrderItem & {
+  variants?: Array<ProductVariant & { groupName?: string }>
+  variant?: ProductVariant
 }
 
 export function Cart({ customerName, tableId, locationId, items, onItemsChange, t }: CartProps) {
@@ -47,21 +52,28 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange, 
       setIsSubmitting(true)
       
       // Construir el objeto de datos para la orden
-      const orderData = {
+      const orderData: {
+        tableId: string
+        locationId: string
+        type: "TABLE"
+        items: Array<{ productId: string; quantity: number; variants: ProductVariant[] }>
+        source: "QR"
+        splitBill?: string[]
+      } = {
         tableId,
         locationId,
         type: "TABLE" as const,
         items: items.map(item => ({
           productId: item.product.id,
           quantity: item.quantity,
-          variants: Array.isArray((item as any).variants) ? (item as any).variants : [],
+          variants: Array.isArray((item as CartItemWithVariants).variants) ? (item as CartItemWithVariants).variants : [],
         })),
         source: 'QR',
       };
       
       // Solo añadir splitBill si es necesario
       if (splitBill && splitNames.length > 0) {
-        (orderData as any).splitBill = splitNames;
+        orderData.splitBill = splitNames;
       }
       
       const response = await fetch(`${API_URL}/orders`, {
@@ -75,7 +87,10 @@ export function Cart({ customerName, tableId, locationId, items, onItemsChange, 
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Error response:', errorData);
-        throw new Error('Error al crear el pedido: ' + (errorData.message || response.statusText));
+        const message = typeof errorData === 'object' && errorData !== null && 'message' in errorData && typeof errorData.message === 'string'
+          ? errorData.message
+          : response.statusText
+        throw new Error('Error al crear el pedido: ' + message);
       }
 
       const newOrder = await response.json();

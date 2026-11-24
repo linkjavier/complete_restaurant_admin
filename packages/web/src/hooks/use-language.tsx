@@ -9,7 +9,7 @@ interface LanguageContextType {
   language: Language
   changeLanguage: (newLanguage: Language) => void
   t: (key: string) => string
-  tNested: (path: string) => any
+  tNested: (path: string) => Record<string, string>
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
@@ -41,7 +41,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Nested translation function for complex objects
-  const tNested = (path: string): any => {
+  const tNested = (path: string): Record<string, string> => {
     const currentTranslations = translations[language] || translations.es
     return path.split('.').reduce((obj, key) => obj?.[key], currentTranslations) || {}
   }
