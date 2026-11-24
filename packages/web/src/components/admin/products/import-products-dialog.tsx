@@ -98,7 +98,12 @@ export function ImportProductsDialog({
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || 'Error al extraer productos')
+                const message = typeof errorData.message === "string"
+                    ? errorData.message
+                    : Array.isArray(errorData.message)
+                        ? errorData.message.join(". ")
+                        : "Error al extraer productos"
+                throw new Error(message)
             }
 
             const data = await response.json()
@@ -113,7 +118,9 @@ export function ImportProductsDialog({
             console.error('Error uploading document:', error)
             toast({
                 title: "Error",
-                description: "No se pudo procesar el documento. Intenta con otro formato.",
+                description: error instanceof Error
+                    ? error.message
+                    : "No se pudo procesar el documento. Intenta con otro formato.",
                 variant: "destructive",
             })
         } finally {

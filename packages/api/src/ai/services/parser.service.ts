@@ -114,7 +114,7 @@ for index, page in enumerate(doc, start=1):
     pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
     image_path = os.path.join(output_dir, f'page_{index}.png')
     pix.save(image_path)
-    result = subprocess.run(['tesseract', image_path, 'stdout', '--psm', '6'], capture_output=True, text=True)
+    result = subprocess.run(['tesseract', image_path, 'stdout', '--psm', '6', '-l', 'spa+eng'], capture_output=True, text=True)
     if result.returncode == 0 and result.stdout.strip():
         texts.append(result.stdout.strip())
 
@@ -143,7 +143,7 @@ image_path, output_dir = sys.argv[1], sys.argv[2]
 image = Image.open(image_path).convert('RGB')
 ocr_path = os.path.join(output_dir, 'ocr.png')
 image.save(ocr_path)
-result = subprocess.run(['tesseract', ocr_path, 'stdout', '--psm', '6'], capture_output=True, text=True)
+result = subprocess.run(['tesseract', ocr_path, 'stdout', '--psm', '6', '-l', 'spa+eng'], capture_output=True, text=True)
 print(result.stdout if result.returncode == 0 else '')
 `;
 

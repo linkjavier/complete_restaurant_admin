@@ -9,6 +9,14 @@ ENV REDIS_PORT=6379
 # Establecemos el directorio de trabajo
 WORKDIR /app
 
+# OCR dependencies required by product imports from images.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pil \
+    tesseract-ocr \
+    tesseract-ocr-spa \
+  && rm -rf /var/lib/apt/lists/*
+
 # Copiamos el package.json
 COPY package.json ./
 

@@ -15,7 +15,7 @@ export class AIImportController {
     constructor(private readonly parserService: ParserService) { }
 
     @Post('extract-products')
-    @ApiOperation({ summary: 'Extract products from a document (PDF, Excel, Word)' })
+    @ApiOperation({ summary: 'Extract products from a document or image (PDF, Excel, Word, JPEG, PNG, WebP)' })
     @ApiConsumes('multipart/form-data')
     @ApiBody({
         schema: {
