@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TenantMiddleware } from './tenant.middleware';
 
 describe('TenantMiddleware', () => {
-  const tenant = { id: 'tenant-id', name: 'san-jose' };
+  const tenant = { id: 'tenant-id', name: 'restaurant-test' };
   let prisma: { tenant: { findFirst: jest.Mock } };
   let middleware: TenantMiddleware;
 
@@ -18,7 +18,7 @@ describe('TenantMiddleware', () => {
 
   it('resolves a tenant from X-Tenant-ID when requests use the shared API host', async () => {
     const request = {
-      headers: { host: 'api.kutchen.xyz', 'x-tenant-id': 'San-Jose' },
+      headers: { host: 'api.kutchen.xyz', 'x-tenant-id': 'Restaurant-Test' },
       path: '/auth/login',
       originalUrl: '/auth/login',
     } as unknown as Request & { tenantId?: string };
@@ -31,7 +31,7 @@ describe('TenantMiddleware', () => {
     await middleware.use(request, response, next);
 
     expect(prisma.tenant.findFirst).toHaveBeenCalledWith({
-      where: { name: { equals: 'san-jose', mode: 'insensitive' } },
+      where: { name: { equals: 'restaurant-test', mode: 'insensitive' } },
     });
     expect(request.tenantId).toBe(tenant.id);
     expect(next).toHaveBeenCalledTimes(1);
@@ -39,7 +39,7 @@ describe('TenantMiddleware', () => {
 
   it('continues resolving tenants from the request subdomain', async () => {
     const request = {
-      headers: { host: 'san-jose.kutchen.online' },
+      headers: { host: 'restaurant-test.kutchen.online' },
       path: '/auth/login',
       originalUrl: '/auth/login',
     } as unknown as Request & { tenantId?: string };
@@ -52,7 +52,7 @@ describe('TenantMiddleware', () => {
     await middleware.use(request, response, next);
 
     expect(prisma.tenant.findFirst).toHaveBeenCalledWith({
-      where: { name: { equals: 'san-jose', mode: 'insensitive' } },
+      where: { name: { equals: 'restaurant-test', mode: 'insensitive' } },
     });
     expect(request.tenantId).toBe(tenant.id);
     expect(next).toHaveBeenCalledTimes(1);
