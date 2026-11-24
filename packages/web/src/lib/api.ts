@@ -2,12 +2,13 @@ function getApiUrl() {
   if (typeof window === 'undefined') {
     return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
   }
-  const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-  const backendDomain = backendBase.replace(/^https?:\/\//, '');
-  const backendProtocol = backendBase.startsWith('https://') ? 'https://' : 'http://';
+  const backendBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000')
+    .replace(/\/+$/, '');
   const host = window.location.hostname; // gluonico.localhost o gluonico.kutchenbrain.xyz
   const parts = host.split('.');
-  const subdomain = (parts.length > 2) ? parts[0] : (parts.length === 2 && parts[1] === 'localhost' ? parts[0] : null);
+  const subdomain = host.endsWith('.localhost') && parts.length > 1
+    ? parts[0]
+    : null;
 
   // LOCALHOST con subdominio (ej: gluonico.localhost:3001)
   if (host.endsWith('.localhost') && subdomain) {
@@ -17,12 +18,7 @@ function getApiUrl() {
   if (host === 'localhost' || host === 'localhost:3000' || host === 'localhost:3001') {
     return 'http://localhost:3000';
   }
-  // PRODUCCIÓN con subdominio (ej: gluonico.kutchenbrain.xyz)
-  if (subdomain && backendDomain) {
-    return `${backendProtocol}${subdomain}.${backendDomain}`;
-  }
-  // PRODUCCIÓN sin subdominio
-  return `${backendProtocol}${backendDomain}`;
+  return backendBase;
 }
 
 export const API_URL = getApiUrl();
@@ -459,8 +455,11 @@ export const getTenantIdFromSubdomain = () => {
   if (typeof window === 'undefined') return null;
   const host = window.location.hostname; // Ej: gluonico.kutchenbrain.xyz o gluonico.localhost
   const parts = host.split('.');
-  if (parts.length >= 2) {
-    return parts[0]; // Siempre toma el subdominio
+  if (host.endsWith('.localhost') && parts.length > 1) {
+    return parts[0];
+  }
+  if (parts.length > 2 && parts[0] !== 'www') {
+    return parts[0];
   }
   return null;
 };

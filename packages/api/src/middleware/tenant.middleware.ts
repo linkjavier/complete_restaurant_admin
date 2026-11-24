@@ -35,6 +35,10 @@ export class TenantMiddleware implements NestMiddleware {
       console.log('[TenantMiddleware] Host header:', req.headers.host);
       const hostHeader = req.headers.host;
       const host = hostHeader ? hostHeader.split(':')[0] : '';
+      const tenantHeader = req.headers['x-tenant-id'];
+      const requestedTenant = Array.isArray(tenantHeader)
+        ? tenantHeader[0]?.trim().toLowerCase()
+        : tenantHeader?.trim().toLowerCase();
       
       let tenantId: string | null = null;
       let tenant = null;
@@ -46,7 +50,7 @@ export class TenantMiddleware implements NestMiddleware {
       } else {
         // Extraer subdominio (empresa1.tuapp.com)
         const parts = host.split('.');
-        const subdomain = parts.length >= 2 ? parts[0].toLowerCase() : null;
+        const subdomain = requestedTenant || (parts.length >= 2 ? parts[0].toLowerCase() : null);
 
         if (subdomain) {
            // Buscar el tenantId en la base de datos (insensible a mayúsculas/minúsculas)
