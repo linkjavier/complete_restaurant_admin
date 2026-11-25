@@ -237,11 +237,12 @@ export class AuthService {
       throw new BadRequestException('Invalid social login nonce');
     }
 
-    const safeReturnTo = await this.validateSocialReturnTo(returnTo, tenantId);
-    const mode = registeringBusiness && tenantId === 'default-tenant'
+    const validatedReturn = await this.validateSocialReturnTo(returnTo, tenantId);
+    const resolvedTenantId = validatedReturn.tenantId;
+    const mode = registeringBusiness && resolvedTenantId === 'default-tenant'
       ? 'business-registration'
       : 'login';
-    if (tenantId === 'default-tenant' && mode !== 'business-registration') {
+    if (resolvedTenantId === 'default-tenant' && mode !== 'business-registration') {
       throw new BadRequestException('Select a business before signing in');
     }
     const tenantName = mode === 'business-registration'
@@ -269,8 +270,8 @@ export class AuthService {
       {
         purpose: 'social-login',
         provider,
-        tenantId,
-        returnTo: safeReturnTo,
+        tenantId: resolvedTenantId,
+        returnTo: validatedReturn.returnTo,
         nonce,
         mode,
         tenantName,
@@ -486,7 +487,10 @@ export class AuthService {
     });
   }
 
-  private async validateSocialReturnTo(returnTo: string, tenantId: string): Promise<string> {
+  private async validateSocialReturnTo(
+    returnTo: string,
+    tenantId: string,
+  ): Promise<{ returnTo: string; tenantId: string }> {
     let candidate: URL;
     let configuredFrontend: URL;
     try {
@@ -518,23 +522,33 @@ export class AuthService {
       throw new BadRequestException('Social login return URL is not allowed');
     }
 
+    const returnSubdomainLabels = candidate.hostname.endsWith(`.${allowedBaseDomain}`)
+      ? candidate.hostname.slice(0, -(allowedBaseDomain.length + 1)).split('.')
+      : [];
+    const returnSubdomain =
+      returnSubdomainLabels.length === 1 ? returnSubdomainLabels[0] : null;
+
+    let resolvedTenantId = tenantId;
     if (tenantId === 'default-tenant') {
       if (candidate.hostname !== configuredFrontend.hostname) {
-        throw new BadRequestException('Social login return URL does not match the tenant');
+        const tenant = returnSubdomain
+          ? await this.prisma.tenant.findFirst({
+              where: { name: { equals: returnSubdomain, mode: 'insensitive' } },
+            })
+          : null;
+        if (!tenant) {
+          throw new BadRequestException('Social login return URL does not match the tenant');
+        }
+        resolvedTenantId = tenant.id;
       }
     } else {
       const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-      const returnSubdomainLabels = candidate.hostname.endsWith(`.${allowedBaseDomain}`)
-        ? candidate.hostname.slice(0, -(allowedBaseDomain.length + 1)).split('.')
-        : [];
-      const returnSubdomain =
-        returnSubdomainLabels.length === 1 ? returnSubdomainLabels[0] : null;
       if (!tenant || returnSubdomain?.toLowerCase() !== tenant.name.toLowerCase()) {
         throw new BadRequestException('Social login return URL does not match the tenant');
       }
     }
 
-    return candidate.origin;
+    return { returnTo: candidate.origin, tenantId: resolvedTenantId };
   }
 
   async verifyToken(token: string) {
