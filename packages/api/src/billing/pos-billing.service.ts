@@ -34,6 +34,23 @@ const POS_ORDER_INCLUDE = Prisma.validator<Prisma.OrderInclude>()({
 
 export type PosOrder = Prisma.OrderGetPayload<{ include: typeof POS_ORDER_INCLUDE }>;
 
+const POS_PAYMENT_INCLUDE = Prisma.validator<Prisma.PaymentInclude>()({
+  order: {
+    include: {
+      items: {
+        include: {
+          product: true,
+          variants: { include: { productVariant: true } },
+        },
+      },
+    },
+  },
+});
+
+type PosPayment = Prisma.PaymentGetPayload<{
+  include: typeof POS_PAYMENT_INCLUDE;
+}>;
+
 @Injectable()
 export class PosBillingService {
   constructor(
@@ -110,11 +127,12 @@ export class PosBillingService {
     if (orders.some((order) => !order.isPaid)) {
       throw new BadRequestException('Pay all orders on the table before issuing its invoice.');
     }
-    if (
-      orders.some(
-        (order) => order.billingRequestStatus === BillingRequestStatus.DECLINED,
-      )
-    ) {
+    if (orders.some(hasItemizedPayments)) {
+      throw new ConflictException(
+        'This table account contains individual diner payments. Issue invoices from each payment instead of invoicing the whole table again.',
+      );
+    }
+    if (orders.some((order) => order.billingRequestStatus === BillingRequestStatus.DECLINED)) {
       throw new ConflictException('An order was already declined for electronic billing.');
     }
 
@@ -130,6 +148,188 @@ export class PosBillingService {
       }
       throw error;
     }
+  }
+
+  async issueForTablePayments(
+    tenantId: string,
+    user: User,
+    tableId: string,
+    paymentIds: string[],
+    customer: BillingCustomer,
+  ) {
+    const table = await this.prisma.table.findFirst({
+      where: { id: tableId, tenantId },
+      select: { id: true, locationId: true },
+    });
+    if (!table) {
+      throw new NotFoundException('Table not found for this tenant.');
+    }
+    this.assertLocationAccess(user, tenantId, table.locationId);
+
+    const payments = await this.loadTablePayments(tenantId, table, paymentIds);
+    const payerGroupId = payments[0]?.payerGroupId;
+    const payerLabel = payments[0]?.payerLabel?.trim();
+    if (
+      !payerLabel ||
+      payments.some(
+        (payment) =>
+          payment.payerLabel?.trim() !== payerLabel ||
+          payment.method !== payments[0].method ||
+          (payerGroupId ? payment.payerGroupId !== payerGroupId : Boolean(payment.payerGroupId)),
+      )
+    ) {
+      throw new BadRequestException('Invoice payments must belong to the same table guest.');
+    }
+    if (
+      payments.some((payment) => payment.billingRequestStatus === BillingRequestStatus.DECLINED)
+    ) {
+      throw new ConflictException(
+        'Electronic billing was declined for one or more of these payments.',
+      );
+    }
+    if (payments.some((payment) => !readInvoiceAllocations(payment.allocations).length)) {
+      throw new BadRequestException(
+        'Only itemized guest payments can receive an individual table invoice.',
+      );
+    }
+    if (
+      payments.some(
+        (payment) =>
+          payment.billingDocumentId && payment.billingDocumentId !== payments[0].billingDocumentId,
+      )
+    ) {
+      throw new ConflictException('These payments already belong to different billing documents.');
+    }
+
+    const invoice = buildSplitPaymentInvoice(payments, customer);
+    const orderIds = [...new Set(payments.map(({ orderId }) => orderId))].sort();
+    const sortedPaymentIds = payments.map(({ id }) => id).sort();
+    const idempotencyKey = `pos-split-${createHash('sha256')
+      .update(sortedPaymentIds.join('|'))
+      .digest('hex')}`;
+    const command: EmitInvoiceCommand = {
+      tenantId,
+      locationId: table.locationId,
+      orderId: orderIds[0],
+      orderIds,
+      paymentIds: sortedPaymentIds,
+      idempotencyKey,
+      invoice,
+    };
+
+    const linkedDocumentId = payments[0].billingDocumentId;
+    if (payments.some((payment) => payment.billingDocumentId !== linkedDocumentId)) {
+      throw new ConflictException(
+        'These guest payments are already attached to different billing documents.',
+      );
+    }
+    if (linkedDocumentId) {
+      if (
+        payments.some((payment) => payment.billingRequestStatus !== BillingRequestStatus.REQUESTED)
+      ) {
+        throw new ConflictException(
+          'Guest payment billing states are inconsistent; reconcile them before retrying.',
+        );
+      }
+      return this.billingService.issueInvoice(command);
+    }
+    if (
+      payments.some(
+        (payment) => payment.billingRequestStatus !== BillingRequestStatus.NOT_REQUESTED,
+      )
+    ) {
+      throw new ConflictException(
+        'A billing decision has already been recorded for one or more of these payments.',
+      );
+    }
+    await this.claimPaymentsForBilling(sortedPaymentIds);
+
+    try {
+      const document = await this.billingService.issueInvoice(command);
+      await this.markPaymentsRequested(sortedPaymentIds, document.id);
+      return document;
+    } catch (error) {
+      if (error instanceof BillingEmissionError) {
+        await this.markPaymentsRequested(sortedPaymentIds, error.billingDocumentId);
+      } else {
+        await this.releasePaymentBillingClaim(sortedPaymentIds);
+      }
+      throw error;
+    }
+  }
+
+  async declineTablePaymentInvoice(
+    tenantId: string,
+    user: User,
+    tableId: string,
+    paymentIds: string[],
+  ): Promise<void> {
+    const table = await this.prisma.table.findFirst({
+      where: { id: tableId, tenantId },
+      select: { id: true, locationId: true },
+    });
+    if (!table) {
+      throw new NotFoundException('Table not found for this tenant.');
+    }
+    this.assertLocationAccess(user, tenantId, table.locationId);
+
+    const payments = await this.loadTablePayments(tenantId, table, paymentIds);
+    if (
+      payments.some(
+        (payment) =>
+          !payment.payerLabel?.trim() || !readInvoiceAllocations(payment.allocations).length,
+      )
+    ) {
+      throw new BadRequestException(
+        'Only itemized guest payments can be declined for individual billing.',
+      );
+    }
+    if (
+      payments.some(
+        (payment) =>
+          payment.payerLabel?.trim() !== payments[0].payerLabel?.trim() ||
+          payment.method !== payments[0].method ||
+          (payments[0].payerGroupId
+            ? payment.payerGroupId !== payments[0].payerGroupId
+            : Boolean(payment.payerGroupId)),
+      )
+    ) {
+      throw new BadRequestException(
+        'Receipt decisions must be made for one table guest at a time.',
+      );
+    }
+    if (
+      payments.every((payment) => payment.billingRequestStatus === BillingRequestStatus.DECLINED)
+    ) {
+      return;
+    }
+    if (
+      payments.some(
+        (payment) => payment.billingRequestStatus !== BillingRequestStatus.NOT_REQUESTED,
+      )
+    ) {
+      throw new ConflictException(
+        'An electronic invoice request already exists for one or more of these payments.',
+      );
+    }
+
+    await this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.payment.updateMany({
+        where: {
+          id: { in: payments.map(({ id }) => id) },
+          tenantId,
+          status: PaymentStatus.COMPLETED,
+          billingRequestStatus: BillingRequestStatus.NOT_REQUESTED,
+          billingDocumentId: null,
+        },
+        data: { billingRequestStatus: BillingRequestStatus.DECLINED },
+      });
+      if (result.count !== payments.length) {
+        throw new ConflictException(
+          'A billing decision changed while recording this guest receipt.',
+        );
+      }
+    });
   }
 
   async declineTableInvoice(
@@ -160,6 +360,11 @@ export class PosBillingService {
     ) {
       throw new BadRequestException('Only fully paid orders from this table can be declined.');
     }
+    if (orders.some(hasItemizedPayments)) {
+      throw new ConflictException(
+        'This table account has individual diner payments; decide billing separately for each payment.',
+      );
+    }
 
     await this.prisma.order.updateMany({
       where: {
@@ -181,6 +386,42 @@ export class PosBillingService {
     }
     this.assertLocationAccess(user, tenantId, document.locationId);
     return this.billingService.retryStoredInvoice(tenantId, billingDocumentId);
+  }
+
+  private async loadTablePayments(
+    tenantId: string,
+    table: { id: string; locationId: string },
+    paymentIds: string[],
+  ): Promise<PosPayment[]> {
+    const normalizedIds = [...new Set(paymentIds.map((id) => id.trim()).filter(Boolean))];
+    if (normalizedIds.length === 0 || normalizedIds.length > 100) {
+      throw new BadRequestException('Provide between one and 100 valid payment IDs.');
+    }
+
+    const payments = await this.prisma.payment.findMany({
+      where: { id: { in: normalizedIds }, tenantId },
+      include: POS_PAYMENT_INCLUDE,
+      orderBy: { id: 'asc' },
+    });
+    if (payments.length !== normalizedIds.length) {
+      throw new NotFoundException('One or more payments were not found for this tenant.');
+    }
+    if (
+      payments.some(
+        (payment) =>
+          payment.status !== PaymentStatus.COMPLETED ||
+          payment.order.type !== 'TABLE' ||
+          payment.order.tableId !== table.id ||
+          payment.order.locationId !== table.locationId ||
+          payment.order.status === OrderStatus.CANCELLED ||
+          payment.order.isDeleted === true,
+      )
+    ) {
+      throw new BadRequestException(
+        'All payments must be completed table payments from this location.',
+      );
+    }
+    return payments;
   }
 
   private async loadOrders(tenantId: string, orderIds: string[]): Promise<PosOrder[]> {
@@ -219,7 +460,11 @@ export class PosBillingService {
     return orders;
   }
 
-  private assertLocationAccess(user: User, tenantId: string, locationId: string | null): asserts locationId is string {
+  private assertLocationAccess(
+    user: User,
+    tenantId: string,
+    locationId: string | null,
+  ): asserts locationId is string {
     if (user.tenantId !== tenantId) {
       throw new ForbiddenException('User does not belong to this tenant.');
     }
@@ -235,6 +480,52 @@ export class PosBillingService {
     await this.prisma.order.updateMany({
       where: { id: { in: orderIds }, billingRequestStatus: BillingRequestStatus.NOT_REQUESTED },
       data: { billingRequestStatus: BillingRequestStatus.REQUESTED },
+    });
+  }
+
+  private async markPaymentsRequested(
+    paymentIds: string[],
+    billingDocumentId: string,
+  ): Promise<void> {
+    await this.prisma.payment.updateMany({
+      where: {
+        id: { in: paymentIds },
+        billingRequestStatus: BillingRequestStatus.REQUESTED,
+      },
+      data: {
+        billingRequestStatus: BillingRequestStatus.REQUESTED,
+        billingDocumentId,
+      },
+    });
+  }
+
+  private async claimPaymentsForBilling(paymentIds: string[]): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.payment.updateMany({
+        where: {
+          id: { in: paymentIds },
+          status: PaymentStatus.COMPLETED,
+          billingRequestStatus: BillingRequestStatus.NOT_REQUESTED,
+          billingDocumentId: null,
+        },
+        data: { billingRequestStatus: BillingRequestStatus.REQUESTED },
+      });
+      if (result.count !== paymentIds.length) {
+        throw new ConflictException(
+          'A billing decision changed while preparing this guest invoice.',
+        );
+      }
+    });
+  }
+
+  private async releasePaymentBillingClaim(paymentIds: string[]): Promise<void> {
+    await this.prisma.payment.updateMany({
+      where: {
+        id: { in: paymentIds },
+        billingRequestStatus: BillingRequestStatus.REQUESTED,
+        billingDocumentId: null,
+      },
+      data: { billingRequestStatus: BillingRequestStatus.NOT_REQUESTED },
     });
   }
 }
@@ -298,14 +589,10 @@ export function buildPosInvoice(
     throw new BadRequestException('Cannot issue an invoice without order items.');
   }
 
-  const orderTotal = roundMoney(
-    orders.reduce((sum, order) => sum + Number(order.total ?? 0), 0),
-  );
+  const orderTotal = roundMoney(orders.reduce((sum, order) => sum + Number(order.total ?? 0), 0));
   const calculatedGrossTotal = roundMoney(
     items.reduce(
-      (sum, item) =>
-        sum +
-        roundMoney(Number(item.unitPrice) * Number(item.quantity) * 1.08),
+      (sum, item) => sum + roundMoney(Number(item.unitPrice) * Number(item.quantity) * 1.08),
       0,
     ),
   );
@@ -319,9 +606,7 @@ export function buildPosInvoice(
     ? [
         {
           paymentForm: '2',
-          paymentMethodCode: factusPaymentMethod(
-            orders[0].paymentMethod ?? PaymentMethod.CASH,
-          ),
+          paymentMethodCode: factusPaymentMethod(orders[0].paymentMethod ?? PaymentMethod.CASH),
           amount: orderTotal.toFixed(2),
           dueDate: todayInBogota(),
         },
@@ -333,6 +618,94 @@ export function buildPosInvoice(
     items,
     paymentDetails,
     observation: `POS order${orders.length > 1 ? 's' : ''}: ${orders
+      .map(({ id }) => id)
+      .join(', ')}`.slice(0, 500),
+  };
+}
+
+function readInvoiceAllocations(
+  value: Prisma.JsonValue | null,
+): Array<{ orderItemId: string; quantity: number }> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const orderItemId = entry.orderItemId;
+    const quantity = entry.quantity;
+    return typeof orderItemId === 'string' &&
+      typeof quantity === 'number' &&
+      Number.isInteger(quantity) &&
+      quantity > 0
+      ? [{ orderItemId, quantity }]
+      : [];
+  });
+}
+
+function hasItemizedPayments(order: PosOrder): boolean {
+  return order.payments.some((payment) => readInvoiceAllocations(payment.allocations).length > 0);
+}
+
+function buildSplitPaymentInvoice(
+  payments: PosPayment[],
+  customer: BillingCustomer,
+): BillingInvoiceInput {
+  const items = payments.flatMap((payment) =>
+    readInvoiceAllocations(payment.allocations).map((allocation) => {
+      const item = payment.order.items.find(({ id }) => id === allocation.orderItemId);
+      if (!item || allocation.quantity > item.quantity) {
+        throw new BadRequestException(
+          'A paid item allocation no longer matches the original order.',
+        );
+      }
+
+      const grossUnitPrice = item.price ?? item.product.price;
+      const variantNames = item.variants
+        .map(({ productVariant }) => productVariant.name)
+        .join(', ');
+      return {
+        codeReference: item.product.code,
+        name: variantNames ? `${item.product.name} (${variantNames})` : item.product.name,
+        quantity: allocation.quantity.toFixed(2),
+        unitPrice: (grossUnitPrice / 1.08).toFixed(2),
+        unitMeasureCode: '94',
+        standardCode: '999',
+        taxes: [{ code: '04', rate: '8.00' }],
+      };
+    }),
+  );
+  if (items.length === 0) {
+    throw new BadRequestException(
+      'Cannot issue an individual invoice without allocated order items.',
+    );
+  }
+
+  const paymentTotal = roundMoney(payments.reduce((sum, payment) => sum + payment.amount, 0));
+  const invoiceItemsTotal = roundMoney(
+    items.reduce(
+      (sum, item) => sum + roundMoney(Number(item.unitPrice) * Number(item.quantity) * 1.08),
+      0,
+    ),
+  );
+  if (Math.abs(paymentTotal - invoiceItemsTotal) > 0.02) {
+    throw new BadRequestException(
+      'Allocated items do not match this guest payment; reconcile the payment before billing.',
+    );
+  }
+
+  const totalsByMethod = new Map<PaymentMethod, number>();
+  for (const payment of payments) {
+    totalsByMethod.set(payment.method, (totalsByMethod.get(payment.method) ?? 0) + payment.amount);
+  }
+  const paymentDetails = [...totalsByMethod.entries()].map(([method, amount]) => ({
+    paymentForm: '1',
+    paymentMethodCode: factusPaymentMethod(method),
+    amount: roundMoney(amount).toFixed(2),
+  }));
+
+  return {
+    customer,
+    items,
+    paymentDetails,
+    observation: `POS table guest: ${payments[0].payerLabel ?? 'Guest'}; payments: ${payments
       .map(({ id }) => id)
       .join(', ')}`.slice(0, 500),
   };

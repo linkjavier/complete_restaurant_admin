@@ -37,6 +37,8 @@ model Tenant {
   whatsappCloudConversations WhatsappCloudConversation[]
   billingDocuments           BillingDocument[]
   billingConfigurations      BillingLocationConfiguration[]
+  tableShifts                TableShift[]
+  tableAccountSessions       TableAccountSession[]
 }
 
 model User {
@@ -62,6 +64,9 @@ model User {
   subscriptions                     Subscription[]
   oauthLoginTickets                 OAuthLoginTicket[]
   reviewedUserAccessRequests        UserAccessRequest[]         @relation("UserAccessRequestReviewedBy")
+  openedTableShifts                 TableShift[]                @relation("TableShiftOpenedBy")
+  closedTableShifts                 TableShift[]                @relation("TableShiftClosedBy")
+  closedTableAccountSessions        TableAccountSession[]       @relation("TableAccountSessionClosedBy")
   createdAt                         DateTime                    @default(now())
   updatedAt                         DateTime                    @updatedAt
 
@@ -118,9 +123,9 @@ enum UserRole {
 }
 
 model Location {
-  id                         String                      @id @default(uuid())
+  id                         String                        @id @default(uuid())
   tenantId                   String
-  tenant                     Tenant                      @relation(fields: [tenantId], references: [id])
+  tenant                     Tenant                        @relation(fields: [tenantId], references: [id])
   name                       String
   address                    String
   city                       String?
@@ -139,32 +144,81 @@ model Location {
   inventoryItems             InventoryItem[]
   ingredients                Ingredient[]
   purchases                  Purchase[]
-  createdAt                  DateTime                    @default(now())
-  updatedAt                  DateTime                    @updatedAt
-  order                      Int                         @default(0)
+  createdAt                  DateTime                      @default(now())
+  updatedAt                  DateTime                      @updatedAt
+  order                      Int                           @default(0)
   customers                  Customer[]
   settings                   Settings[]
   inventoryModifications     InventoryModification[]
   billingDocuments           BillingDocument[]
   billingConfiguration       BillingLocationConfiguration?
+  tableShifts                TableShift[]
+  tableAccountSessions       TableAccountSession[]
 
   @@index([order])
   @@map("locations")
 }
 
 model Table {
+  id                  String                @id @default(uuid())
+  tenantId            String
+  tenant              Tenant                @relation(fields: [tenantId], references: [id])
+  number              Int
+  seats               Int
+  status              TableStatus           @default(AVAILABLE)
+  qrCode              String?               @unique
+  location            Location              @relation(fields: [locationId], references: [id])
+  locationId          String
+  orders              Order[]
+  lastAccountClosedAt DateTime?
+  accountSessions     TableAccountSession[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+}
+
+model TableShift {
+  id              String                @id @default(uuid())
+  tenantId        String
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationId      String
+  location        Location              @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  openedById      String?
+  openedBy        User?                 @relation("TableShiftOpenedBy", fields: [openedById], references: [id], onDelete: SetNull)
+  closedById      String?
+  closedBy        User?                 @relation("TableShiftClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  startedAt       DateTime              @default(now())
+  endedAt         DateTime?
+  openingCash     Float                 @default(0)
+  closingDeclared Json?
+  closingExpected Json?
+  closingVariance Json?
+  closingNote     String?
+  sessions        TableAccountSession[]
+  payments        Payment[]
+
+  @@index([tenantId, locationId, startedAt])
+}
+
+model TableAccountSession {
   id         String      @id @default(uuid())
   tenantId   String
-  tenant     Tenant      @relation(fields: [tenantId], references: [id])
-  number     Int
-  seats      Int
-  status     TableStatus @default(AVAILABLE)
-  qrCode     String?     @unique
-  location   Location    @relation(fields: [locationId], references: [id])
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   locationId String
+  location   Location    @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  tableId    String
+  table      Table       @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  shiftId    String?
+  shift      TableShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  closedById String?
+  closedBy   User?       @relation("TableAccountSessionClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  startedAt  DateTime
+  endedAt    DateTime
+  orderCount Int
+  total      Float
   orders     Order[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+
+  @@index([tableId, startedAt])
+  @@index([tenantId, locationId, shiftId])
 }
 
 enum TableStatus {
@@ -382,38 +436,42 @@ enum OrderSource {
 }
 
 model Order {
-  id              String         @id @default(uuid())
-  tenantId        String
-  tenant          Tenant         @relation(fields: [tenantId], references: [id])
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  location        Location?      @relation(fields: [locationId], references: [id])
-  locationId      String?
-  table           Table?         @relation(fields: [tableId], references: [id])
-  tableId         String?
-  type            OrderType      @default(TABLE)
-  status          OrderStatus    @default(PENDING)
-  isPaid          Boolean        @default(false)
-  user            User?          @relation("orderUser", fields: [userId], references: [id])
-  userId          String?
-  customerName    String?
-  deliveryAddress String?
-  neighborhood    String?
-  phone           String?
-  paymentMethod   PaymentMethod?
-  source          OrderSource
-  items           OrderItem[]
-  payments        Payment[]
-  billingDocuments BillingDocument[]
-  billingDocumentLinks BillingDocumentOrder[]
-  billingRequestStatus BillingRequestStatus @default(NOT_REQUESTED)
-  deliveryFee     Float?
-  subtotal        Float?
-  total           Float?
-  isDeleted       Boolean?       @default(false)
-  deletedAt       DateTime?
-  deletedById     String?
-  deletedBy       User?          @relation("orderDeletedBy", fields: [deletedById], references: [id])
+  id                    String                 @id @default(uuid())
+  tenantId              String
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id])
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  location              Location?              @relation(fields: [locationId], references: [id])
+  locationId            String?
+  table                 Table?                 @relation(fields: [tableId], references: [id])
+  tableId               String?
+  type                  OrderType              @default(TABLE)
+  status                OrderStatus            @default(PENDING)
+  isPaid                Boolean                @default(false)
+  user                  User?                  @relation("orderUser", fields: [userId], references: [id])
+  userId                String?
+  customerName          String?
+  deliveryAddress       String?
+  neighborhood          String?
+  phone                 String?
+  paymentMethod         PaymentMethod?
+  source                OrderSource
+  items                 OrderItem[]
+  payments              Payment[]
+  tableAccountSessionId String?
+  tableAccountSession   TableAccountSession?   @relation(fields: [tableAccountSessionId], references: [id], onDelete: SetNull)
+  billingDocuments      BillingDocument[]
+  billingDocumentLinks  BillingDocumentOrder[]
+  billingRequestStatus  BillingRequestStatus   @default(NOT_REQUESTED)
+  deliveryFee           Float?
+  subtotal              Float?
+  total                 Float?
+  isDeleted             Boolean?               @default(false)
+  deletedAt             DateTime?
+  deletedById           String?
+  deletedBy             User?                  @relation("orderDeletedBy", fields: [deletedById], references: [id])
+
+  @@index([tableAccountSessionId])
 }
 
 enum OrderStatus {
@@ -462,16 +520,28 @@ enum OrderItemStatus {
 }
 
 model Payment {
-  id        String        @id @default(cuid())
-  tenantId  String
-  tenant    Tenant        @relation(fields: [tenantId], references: [id])
-  order     Order         @relation(fields: [orderId], references: [id])
-  orderId   String
-  amount    Float
-  method    PaymentMethod
-  status    PaymentStatus @default(PENDING)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id                   String               @id @default(cuid())
+  tenantId             String
+  tenant               Tenant               @relation(fields: [tenantId], references: [id])
+  order                Order                @relation(fields: [orderId], references: [id])
+  orderId              String
+  amount               Float
+  method               PaymentMethod
+  status               PaymentStatus        @default(PENDING)
+  billingRequestStatus BillingRequestStatus @default(NOT_REQUESTED)
+  billingDocumentId    String?
+  billingDocument      BillingDocument?     @relation(fields: [billingDocumentId], references: [id], onDelete: SetNull)
+  payerGroupId         String?
+  shiftId              String?
+  shift                TableShift?          @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  payerLabel           String?
+  allocations          Json?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@index([shiftId, status])
+  @@index([billingDocumentId])
+  @@index([payerGroupId])
 }
 
 enum PaymentMethod {
@@ -655,6 +725,7 @@ model Settings {
   businessName             String         @default("Kutchen AI")
   businessLogo             String?
   deliveryFee              Float?
+  defaultOpeningCash       Float          @default(0)
   qrMenuEnabled            Boolean        @default(false)
   qrMenuOrderingEnabled    Boolean        @default(false)
   qrMenuPrimaryColor       String         @default("#c2410c")
@@ -747,17 +818,17 @@ enum BillingDocumentStatus {
 }
 
 model BillingDocument {
-  id                  String                @id @default(cuid())
+  id                  String                 @id @default(cuid())
   tenantId            String
-  tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   locationId          String
-  location            Location              @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  location            Location               @relation(fields: [locationId], references: [id], onDelete: Restrict)
   orderId             String?
-  order               Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  countryCode         String                @db.VarChar(2)
+  order               Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  countryCode         String                 @db.VarChar(2)
   providerName        String
   type                BillingDocumentType
-  status              BillingDocumentStatus @default(PENDING)
+  status              BillingDocumentStatus  @default(PENDING)
   idempotencyKey      String
   referenceCode       String
   providerReferenceId String?
@@ -768,9 +839,10 @@ model BillingDocument {
   requestPayload      Json?
   errorCode           String?
   errorMessage        String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
   orderLinks          BillingDocumentOrder[]
+  payments            Payment[]
 
   @@unique([tenantId, locationId, idempotencyKey])
   @@unique([tenantId, providerName, referenceCode])
@@ -785,7 +857,7 @@ model BillingDocumentOrder {
   order             Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@id([billingDocumentId, orderId])
-  @@unique([orderId])
+  @@index([orderId])
 }
 
 model BillingLocationConfiguration {

@@ -28,8 +28,10 @@ export default function SettingsPage() {
   const [aiGender, setAiGender] = useState("")
   const [aiEnabled, setAiEnabled] = useState(false)
   const [deliveryFee, setDeliveryFee] = useState<number>(0)
+  const [defaultOpeningCash, setDefaultOpeningCash] = useState("0")
   const { user, isLoading: isAuthLoading } = useAuth()
   const isSuperAdmin = user?.role === "SUPER_ADMIN"
+  const canManageCashShift = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(user?.role ?? "")
   const locationId = selectedLocationId
 
   const { toast } = useToast()
@@ -114,6 +116,16 @@ export default function SettingsPage() {
         setAiGender(aiData.gender)
         setAiEnabled(aiData.enabled)
         setDeliveryFee(aiData.deliveryFee ?? 0)
+
+        if (canManageCashShift) {
+          const cashShiftRes = await fetch(`${API_URL}/settings/cash-shift${query}`, {
+            headers: getAuthHeaders(),
+          })
+          if (!cashShiftRes.ok) throw new Error("Error al cargar la base inicial de caja")
+          const cashShiftData = await cashShiftRes.json()
+          if (cancelled) return
+          setDefaultOpeningCash(String(cashShiftData.defaultOpeningCash ?? 0))
+        }
       } catch (error) {
         if (!cancelled) {
           toast({
@@ -130,7 +142,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true
     }
-  }, [locationId, toast])
+  }, [canManageCashShift, locationId, toast])
 
   const handleSaveBusiness = async () => {
     setIsSaving(true)
@@ -197,6 +209,47 @@ export default function SettingsPage() {
         title: "Error",
         description: error instanceof Error ? error.message : "Error al guardar la configuración",
         variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveCashShift = async () => {
+    const amount = Number(defaultOpeningCash)
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast({
+        title: "Valor no válido",
+        description: "La base inicial debe ser un valor igual o mayor que cero.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      if (!locationId) throw new Error("Selecciona una ubicación antes de guardar.")
+      const response = await fetch(`${API_URL}/settings/cash-shift`, {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ locationId, defaultOpeningCash: amount }),
+      })
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}))
+        const message = Array.isArray(errorBody.message)
+          ? errorBody.message.join(", ")
+          : errorBody.message
+        throw new Error(typeof message === "string" ? message : "Error al guardar la base inicial")
+      }
+      toast({
+        title: "Base inicial guardada",
+        description: "Este valor se sugerirá al abrir los próximos turnos de esta sede.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al guardar la base inicial",
+        variant: "destructive",
       })
     } finally {
       setIsSaving(false)
@@ -312,6 +365,40 @@ export default function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
+
+        {canManageCashShift && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Turnos de caja</CardTitle>
+              <CardDescription>
+                Define el efectivo que se sugerirá como base al iniciar un turno en esta sede.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="default-opening-cash">Base inicial sugerida (COP)</Label>
+                <Input
+                  id="default-opening-cash"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="decimal"
+                  value={defaultOpeningCash}
+                  onChange={(event) => setDefaultOpeningCash(event.target.value)}
+                  disabled={isSaving}
+                />
+              </div>
+              <Button
+                onClick={handleSaveCashShift}
+                disabled={isSaving || !locationId}
+                className="w-full"
+              >
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Guardar base inicial
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Sección de Configuración del Asistente IA */}
         <Card>

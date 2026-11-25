@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { CHEF_HOME_PATH, getHomePathForRole, getRoleFromAccessToken } from '@/lib/roles';
+import {
+  getHomePathForRole,
+  getRoleFromAccessToken,
+  isPathAllowedForRole,
+} from '@/lib/roles';
 
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
@@ -22,12 +26,11 @@ export function middleware(request: NextRequest) {
 
   const role = token ? getRoleFromAccessToken(token) : null;
 
-  if (token && (pathname === '/' || pathname === '/auth/login')) {
-    return NextResponse.redirect(new URL(getHomePathForRole(role), request.url));
-  }
-
-  if (role === 'CHEF' && pathname.startsWith('/admin') && !pathname.startsWith(CHEF_HOME_PATH)) {
-    return NextResponse.redirect(new URL(CHEF_HOME_PATH, request.url));
+  if (token && role && (pathname === '/' || pathname === '/auth/login')) {
+    const homePath = getHomePathForRole(role);
+    if (pathname !== homePath) {
+      return NextResponse.redirect(new URL(homePath, request.url));
+    }
   }
 
   // Public paths that don't require authentication
@@ -41,7 +44,13 @@ export function middleware(request: NextRequest) {
                         '/api/products',
                         '/api/orders',
                         '/_next']
-  if (publicPaths.some(path => pathname.startsWith(path))) {
+  if (
+    publicPaths.some(
+      (path) =>
+        pathname === path ||
+        (path !== '/' && pathname.startsWith(`${path}/`)),
+    )
+  ) {
     return NextResponse.next();
   }
 
@@ -50,6 +59,18 @@ export function middleware(request: NextRequest) {
     const loginUrl = new URL('/auth/login', request.url);
     loginUrl.searchParams.set('from', request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (pathname === '/admin') {
+    return NextResponse.redirect(
+      new URL(getHomePathForRole(role), request.url),
+    );
+  }
+
+  if (pathname.startsWith('/admin/') && (!role || !isPathAllowedForRole(role, pathname))) {
+    return NextResponse.redirect(
+      new URL(getHomePathForRole(role), request.url),
+    );
   }
 
   // Si hay token, permite el acceso

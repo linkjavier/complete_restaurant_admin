@@ -328,7 +328,7 @@ export function OrdersManager() {
 
   const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus) => {
     try {
-      const response = await fetch(`${API_URL}/orders/${orderId}/status`, {
+      const response = await fetch(`${API_URL}/orders/${orderId}`, {
         method: 'PATCH',
         headers: {
           ...getAuthHeaders(),

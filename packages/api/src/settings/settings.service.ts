@@ -1,11 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AISettings } from './types';
 import { PrismaService } from '../prisma/prisma.service';
+import { User, UserRole } from '@prisma/client';
 
 export interface BusinessSettings {
   name: string;
   logo: string | null;
+}
+
+export interface CashShiftSettings {
+  defaultOpeningCash: number;
 }
 
 @Injectable()
@@ -178,6 +188,62 @@ export class SettingsService {
       await this.prisma.settings.create({ data: { tenantId, locationId, deliveryFee: value } });
     } else {
       await this.prisma.settings.update({ where: { id: settings.id }, data: { deliveryFee: value } });
+    }
+  }
+
+  async getCashShiftSettings(
+    tenantId: string,
+    user: User,
+    locationId: string,
+  ): Promise<CashShiftSettings> {
+    await this.assertLocationAccess(tenantId, user, locationId);
+    const settings = await this.prisma.settings.findUnique({
+      where: { tenantId_locationId: { tenantId, locationId } },
+      select: { defaultOpeningCash: true },
+    });
+    return { defaultOpeningCash: settings?.defaultOpeningCash ?? 0 };
+  }
+
+  async updateCashShiftSettings(
+    tenantId: string,
+    user: User,
+    locationId: string,
+    defaultOpeningCash: number,
+  ): Promise<CashShiftSettings> {
+    await this.assertLocationAccess(tenantId, user, locationId);
+    if (!Number.isFinite(defaultOpeningCash) || defaultOpeningCash < 0) {
+      throw new BadRequestException('Opening cash must be a non-negative number.');
+    }
+
+    const settings = await this.prisma.settings.upsert({
+      where: { tenantId_locationId: { tenantId, locationId } },
+      create: { tenantId, locationId, defaultOpeningCash },
+      update: { defaultOpeningCash },
+      select: { defaultOpeningCash: true },
+    });
+    return settings;
+  }
+
+  private async assertLocationAccess(
+    tenantId: string,
+    user: User,
+    locationId: string,
+  ): Promise<void> {
+    if (user.tenantId !== tenantId) {
+      throw new ForbiddenException('User does not belong to this tenant.');
+    }
+    if (
+      user.role !== UserRole.SUPER_ADMIN &&
+      user.locationId !== locationId
+    ) {
+      throw new ForbiddenException("Location is outside the user's assigned location.");
+    }
+    const location = await this.prisma.location.findFirst({
+      where: { id: locationId, tenantId },
+      select: { id: true },
+    });
+    if (!location) {
+      throw new NotFoundException('Location not found for this tenant.');
     }
   }
 } 

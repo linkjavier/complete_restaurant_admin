@@ -1,25 +1,14 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-  UseGuards,
-  Req,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
 import { TablesService } from './tables.service';
-import { Table as TableModel, Prisma } from '@prisma/client';
+import { Table as TableModel, Prisma, User, UserRole } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
 import { Public } from '../auth/decorators/public.decorator';
 import { Request } from 'express';
-
+import { CurrentTenant } from '../auth/decorators/tenant.decorator';
+import { CurrentUser } from '../auth/decorators/user.decorator';
 
 @ApiTags('tables')
 @Controller('tables')
@@ -34,7 +23,9 @@ export class TablesController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async create(@Body() data: { number: number; seats: number; locationId: string }) {
     // Obtener tenantId a partir de locationId
-    const location = await this.tablesService['prisma'].location.findUnique({ where: { id: data.locationId } });
+    const location = await this.tablesService['prisma'].location.findUnique({
+      where: { id: data.locationId },
+    });
     if (!location) throw new Error('Location not found');
     return this.tablesService.create({ ...data, tenantId: location.tenantId });
   }
@@ -48,6 +39,16 @@ export class TablesController {
     return this.tablesService.findAll({ where: { tenantId } });
   }
 
+  @Get(':id/shift-activity')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
+  async getShiftActivity(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.tablesService.getTableShiftActivity(tenantId, user, id);
+  }
+
   @Public()
   @Get(':id')
   // @Roles('SUPER_ADMIN', 'ADMIN')
@@ -56,6 +57,23 @@ export class TablesController {
   @ApiResponse({ status: 404, description: 'Table not found' })
   async findOne(@Param('id') id: string) {
     return this.tablesService.findOne(id);
+  }
+
+  @Post(':id/close-account')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF, UserRole.CASHIER)
+  @ApiOperation({ summary: 'Close a fully paid and completed table account' })
+  async closeAccount(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: User,
+    @Body() options?: { allowIncompleteOrders?: boolean },
+  ) {
+    return this.tablesService.closeAccountForPos(
+      tenantId,
+      user,
+      id,
+      options?.allowIncompleteOrders === true,
+    );
   }
 
   @Patch(':id')
@@ -101,4 +119,4 @@ export class TablesController {
   async createWaiterCall(@Param('id') id: string) {
     return this.tablesService.createWaiterCall(id);
   }
-} 
+}

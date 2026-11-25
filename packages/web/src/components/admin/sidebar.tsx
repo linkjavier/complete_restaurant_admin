@@ -41,7 +41,7 @@ import { LanguageSwitch } from "@/components/language-switch"
 import "@/app/sidebar-scrollbar.css"
 import { API_URL } from '@/lib/api'
 import { useLanguage } from "@/hooks/use-language"
-import { getHomePathForRole } from "@/lib/roles"
+import { getHomePathForRole, isPathAllowedForRole } from "@/lib/roles"
 
 interface SidebarProps {
   isMobile?: boolean
@@ -53,110 +53,92 @@ const routes = [
     label: "dashboard",
     icon: LayoutDashboard,
     href: "/admin/dashboard",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "ai",
     icon: Bot,
     href: "/admin/ai-manager",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
     label: "aiV2",
     icon: Sparkles,
     href: "/admin/ai-manager-v2",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
     label: "pos",
     icon: ShoppingCart,
     href: "/admin/pos",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'CASHIER'],
   },
   {
     label: "orders",
     icon: Receipt,
     href: "/admin/orders",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
     label: "tables",
     icon: Table,
     href: "/admin/tables",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   },
   {
     label: "qrMenu",
     icon: QrCode,
     href: "/admin/qr-menu",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "kitchen",
     icon: ChefHat,
     href: "/admin/kitchen-manager",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF'],
   },
   {
     label: "categories",
     icon: Tag,
     href: "/admin/categories",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "products",
     icon: Package,
     href: "/admin/products",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "ingredients",
     icon: Utensils,
     href: "/admin/ingredients",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "inventory",
     icon: Boxes,
     href: "/admin/inventory",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "purchases",
     icon: ShoppingCart,
     href: "/admin/purchases",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "production",
     icon: Factory,
     href: "/admin/production",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "locations",
     icon: MapPin,
     href: "/admin/locations",
-    roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
     label: "customers",
     icon: ContactRound,
     href: "/admin/customers",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
   },
   {
     label: "users",
     icon: Users,
     href: "/admin/users",
-    roles: ['SUPER_ADMIN', 'ADMIN'],
   },
 
   {
     label: "settings",
     icon: Settings,
     href: "/admin/settings",
-    roles: ['SUPER_ADMIN', 'ADMIN'],
   },
 ]
 
@@ -267,7 +249,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
             />
           </div>
           <div className="space-y-1 pb-4">
-            {routes.filter(route => !route.roles || route.roles.includes(user.role)).map((route) => {
+            {routes.filter(route => isPathAllowedForRole(user.role, route.href)).map((route) => {
               const isActive = pathname === route.href ||
                 (route.href === '/admin/pos' && pathname.startsWith('/admin/pos/')) ||
                 (route.href === '/admin/orders' && pathname.startsWith('/admin/orders/')) ||

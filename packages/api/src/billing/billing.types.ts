@@ -64,6 +64,7 @@ export interface EmitInvoiceCommand {
   invoice: BillingInvoiceInput;
   orderId?: string;
   orderIds?: string[];
+  paymentIds?: string[];
 }
 
 export interface BillingProviderContext {

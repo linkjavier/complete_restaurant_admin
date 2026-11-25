@@ -42,13 +42,13 @@ export class BillingService {
     return this.issueInvoiceInternal(command, true);
   }
 
-  async retryStoredInvoice(
-    tenantId: string,
-    billingDocumentId: string,
-  ): Promise<BillingDocument> {
+  async retryStoredInvoice(tenantId: string, billingDocumentId: string): Promise<BillingDocument> {
     const document = await this.prisma.billingDocument.findFirst({
       where: { id: billingDocumentId, tenantId },
-      include: { orderLinks: { select: { orderId: true } } },
+      include: {
+        orderLinks: { select: { orderId: true } },
+        payments: { select: { id: true } },
+      },
     });
     if (!document) {
       throw new NotFoundException('Billing document not found for this tenant.');
@@ -63,6 +63,7 @@ export class BillingService {
       idempotencyKey: document.idempotencyKey,
       orderId: document.orderId ?? undefined,
       orderIds: document.orderLinks.map(({ orderId }) => orderId),
+      paymentIds: document.payments?.map(({ id }) => id) ?? [],
       invoice: parseBillingInvoiceInput(document.requestPayload),
     });
   }
@@ -93,6 +94,7 @@ export class BillingService {
       numberingRangeId: context.numberingRangeId,
     };
     const orderIds = normalizeOrderIds(command);
+    const paymentIds = normalizePaymentIds(command);
     const primaryOrderId = command.orderId ?? orderIds[0];
 
     const provider = this.providers.forCountry(countryCode);
@@ -103,6 +105,7 @@ export class BillingService {
       providerName: provider.name,
       orderId: primaryOrderId ?? null,
       orderIds,
+      ...(paymentIds.length > 0 ? { paymentIds } : {}),
       locationId,
       invoice,
     });
@@ -120,6 +123,21 @@ export class BillingService {
     }
     if (retryFailed) {
       throw new NotFoundException('No retryable billing document exists for this idempotency key.');
+    }
+
+    if (paymentIds.length > 0) {
+      const payments = await this.prisma.payment.findMany({
+        where: { id: { in: paymentIds }, tenantId },
+        select: { id: true, billingDocumentId: true },
+      });
+      if (payments.length !== paymentIds.length) {
+        throw new NotFoundException('One or more payments were not found for this tenant.');
+      }
+      if (payments.some(({ billingDocumentId }) => billingDocumentId)) {
+        throw new ConflictException(
+          'One or more payments are already attached to another billing document.',
+        );
+      }
     }
 
     if (orderIds.length > 1) {
@@ -167,6 +185,13 @@ export class BillingService {
                   create: orderIds.map((orderId) => ({
                     order: { connect: { id: orderId } },
                   })),
+                },
+              }
+            : {}),
+          ...(paymentIds.length > 0
+            ? {
+                payments: {
+                  connect: paymentIds.map((id) => ({ id })),
                 },
               }
             : {}),
@@ -359,6 +384,10 @@ function normalizeOrderIds(command: EmitInvoiceCommand): string[] {
     .map((orderId) => orderId.trim())
     .filter(Boolean)
     .sort();
+}
+
+function normalizePaymentIds(command: EmitInvoiceCommand): string[] {
+  return [...new Set((command.paymentIds ?? []).map((id) => id.trim()).filter(Boolean))].sort();
 }
 
 function stableSerialize(value: unknown): string {

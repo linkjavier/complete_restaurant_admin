@@ -91,3 +91,21 @@ export class DeclineTableInvoiceDto {
   @IsString({ each: true })
   orderIds: string[];
 }
+
+export class IssueSplitPaymentInvoiceDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  paymentIds: string[];
+
+  @ValidateNested()
+  @Type(() => BillingCustomerDto)
+  customer: BillingCustomerDto;
+}
+
+export class DeclineSplitPaymentInvoiceDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  paymentIds: string[];
+}

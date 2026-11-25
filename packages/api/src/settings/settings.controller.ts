@@ -1,7 +1,22 @@
-import { Controller, Post, Body, Get, Req, Query } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Req,
+  Query,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { SettingsService, BusinessSettings } from './settings.service';
 import { AISettings } from './types';
 import { Request } from 'express';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentTenant } from '../auth/decorators/tenant.decorator';
+import { CurrentUser } from '../auth/decorators/user.decorator';
+import { User, UserRole } from '@prisma/client';
 
 @Controller('settings')
 export class SettingsController {
@@ -42,5 +57,38 @@ export class SettingsController {
   ): Promise<BusinessSettings> {
     const tenantId = (req as any).tenantId;
     return this.settingsService.updateBusinessSettings(tenantId, settings.locationId, settings);
+  }
+
+  @Get('cash-shift')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
+  async getCashShiftSettings(
+    @Query('locationId') locationId: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: User,
+  ) {
+    if (!locationId) {
+      throw new BadRequestException('Location ID is required.');
+    }
+    return this.settingsService.getCashShiftSettings(tenantId, user, locationId);
+  }
+
+  @Post('cash-shift')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
+  async updateCashShiftSettings(
+    @Body() settings: { locationId: string; defaultOpeningCash: number },
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: User,
+  ) {
+    if (!settings.locationId) {
+      throw new BadRequestException('Location ID is required.');
+    }
+    return this.settingsService.updateCashShiftSettings(
+      tenantId,
+      user,
+      settings.locationId,
+      settings.defaultOpeningCash,
+    );
   }
 } 

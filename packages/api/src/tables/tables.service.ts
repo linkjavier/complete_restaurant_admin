@@ -1,6 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Table, Prisma, Order, Notification, NotificationType } from '@prisma/client';
+import {
+  BillingRequestStatus,
+  OrderStatus,
+  Table,
+  Prisma,
+  Order,
+  Notification,
+  NotificationType,
+  User,
+  UserRole,
+} from '@prisma/client';
 import * as QRCode from 'qrcode';
 import { ConfigService } from '@nestjs/config';
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
@@ -22,9 +37,7 @@ export class TablesService {
     private configService: ConfigService,
   ) {}
 
-  async table(
-    tableWhereUniqueInput: Prisma.TableWhereUniqueInput,
-  ): Promise<Table | null> {
+  async table(tableWhereUniqueInput: Prisma.TableWhereUniqueInput): Promise<Table | null> {
     return this.prisma.table.findUnique({
       where: tableWhereUniqueInput,
     });
@@ -47,7 +60,12 @@ export class TablesService {
     });
   }
 
-  async create(data: { number: number; seats: number; locationId: string; tenantId: string }): Promise<Table> {
+  async create(data: {
+    number: number;
+    seats: number;
+    locationId: string;
+    tenantId: string;
+  }): Promise<Table> {
     const location = await this.prisma.location.findUnique({ where: { id: data.locationId } });
     if (!location) {
       throw new NotFoundException(`Ubicación con ID ${data.locationId} no encontrada`);
@@ -62,7 +80,10 @@ export class TablesService {
     });
   }
 
-  async update(id: string, data: { number?: number; seats?: number; locationId?: string }): Promise<Table> {
+  async update(
+    id: string,
+    data: { number?: number; seats?: number; locationId?: string },
+  ): Promise<Table> {
     try {
       if (data.locationId) {
         // Verificar si la nueva ubicación existe
@@ -223,4 +244,224 @@ export class TablesService {
 
     return table;
   }
-} 
+
+  async getActiveShift(tenantId: string, user: User, requestedLocationId?: string) {
+    const locationId = user.role === UserRole.SUPER_ADMIN ? requestedLocationId : user.locationId;
+    if (!locationId) {
+      throw new BadRequestException('Select a location to view its active shift.');
+    }
+    if (
+      user.role !== UserRole.SUPER_ADMIN &&
+      requestedLocationId &&
+      requestedLocationId !== user.locationId
+    ) {
+      throw new ForbiddenException("Location is outside the user's assigned location.");
+    }
+
+    await this.assertShiftLocationAccess(tenantId, user, locationId);
+    return this.prisma.tableShift.findFirst({
+      where: { tenantId, locationId, endedAt: null },
+      include: {
+        openedBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+  }
+
+  async getTableShiftActivity(tenantId: string, user: User, tableId: string) {
+    const table = await this.prisma.table.findFirst({
+      where: { id: tableId, tenantId },
+      select: { id: true, locationId: true, lastAccountClosedAt: true },
+    });
+    if (!table) {
+      throw new NotFoundException('Table not found for this tenant.');
+    }
+
+    const shift = await this.getActiveShift(tenantId, user, table.locationId);
+    if (!shift) {
+      return {
+        shift: null,
+        orders: [],
+        openAccountStartedAt: null,
+        openAccountOrderCount: 0,
+        openAccountTotal: 0,
+      };
+    }
+
+    const [orders, openAccount] = await Promise.all([
+      this.prisma.order.findMany({
+        where: {
+          tenantId,
+          tableId,
+          type: 'TABLE',
+          AND: [
+            {
+              OR: [
+                { createdAt: { gte: shift.startedAt } },
+                { tableAccountSession: { is: { shiftId: shift.id } } },
+              ],
+            },
+            { OR: [{ isDeleted: false }, { isDeleted: null }] },
+          ],
+        },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true } },
+          items: {
+            include: {
+              product: true,
+              variants: { include: { productVariant: true } },
+            },
+          },
+          payments: true,
+          tableAccountSession: {
+            select: { id: true, startedAt: true, endedAt: true, orderCount: true, total: true },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.order.aggregate({
+        where: {
+          tenantId,
+          tableId,
+          type: 'TABLE',
+          tableAccountSessionId: null,
+          AND: [
+            { createdAt: { gte: shift.startedAt } },
+            ...(table.lastAccountClosedAt
+              ? [{ createdAt: { gt: table.lastAccountClosedAt } }]
+              : []),
+          ],
+          OR: [{ isDeleted: false }, { isDeleted: null }],
+        },
+        _count: { _all: true },
+        _min: { createdAt: true },
+        _sum: { total: true },
+      }),
+    ]);
+
+    return {
+      shift,
+      orders,
+      openAccountStartedAt: openAccount._min.createdAt,
+      openAccountOrderCount: openAccount._count._all,
+      openAccountTotal: openAccount._sum.total ?? 0,
+    };
+  }
+
+  async closeAccountForPos(
+    tenantId: string,
+    user: User,
+    tableId: string,
+    allowIncompleteOrders = false,
+  ): Promise<{ tableId: string; closedAt: Date; closedOrderCount: number }> {
+    return this.prisma.$transaction(async (transaction) => {
+      const table = await transaction.table.findFirst({
+        where: { id: tableId, tenantId },
+        select: { id: true, locationId: true, lastAccountClosedAt: true },
+      });
+      if (!table) {
+        throw new NotFoundException('Table not found for this tenant.');
+      }
+      if (user.tenantId !== tenantId) {
+        throw new ForbiddenException('User does not belong to this tenant.');
+      }
+      if (user.role !== UserRole.SUPER_ADMIN && user.locationId !== table.locationId) {
+        throw new ForbiddenException("Table is outside the user's assigned location.");
+      }
+
+      const orders = await transaction.order.findMany({
+        where: {
+          tenantId,
+          tableId,
+          type: 'TABLE',
+          isDeleted: { not: true },
+          status: { not: OrderStatus.CANCELLED },
+          ...(table.lastAccountClosedAt ? { createdAt: { gt: table.lastAccountClosedAt } } : {}),
+        },
+        select: {
+          id: true,
+          status: true,
+          isPaid: true,
+          billingRequestStatus: true,
+          createdAt: true,
+          total: true,
+        },
+      });
+      if (orders.length === 0) {
+        throw new BadRequestException('There is no open account to close for this table.');
+      }
+      if (orders.some((order) => !order.isPaid)) {
+        throw new BadRequestException('Pay every order on the table before closing its account.');
+      }
+      if (
+        !allowIncompleteOrders &&
+        orders.some(
+          (order) => order.status !== OrderStatus.READY && order.status !== OrderStatus.DELIVERED,
+        )
+      ) {
+        throw new BadRequestException(
+          'Complete every order on the table before closing its account, or confirm closing the fully paid account with orders still in progress.',
+        );
+      }
+      if (
+        orders.some((order) => order.billingRequestStatus === BillingRequestStatus.NOT_REQUESTED)
+      ) {
+        throw new BadRequestException(
+          'Choose a normal receipt or process electronic billing before closing the account.',
+        );
+      }
+
+      const closedAt = new Date();
+      const shift = await transaction.tableShift.findFirst({
+        where: { tenantId, locationId: table.locationId, endedAt: null },
+        select: { id: true },
+      });
+      const session = await transaction.tableAccountSession.create({
+        data: {
+          tenantId,
+          locationId: table.locationId,
+          tableId,
+          shiftId: shift?.id,
+          closedById: user.id,
+          startedAt: new Date(Math.min(...orders.map((order) => order.createdAt.getTime()))),
+          endedAt: closedAt,
+          orderCount: orders.length,
+          total: orders.reduce((sum, order) => sum + (order.total ?? 0), 0),
+        },
+      });
+      await transaction.order.updateMany({
+        where: {
+          tenantId,
+          tableId,
+          id: { in: orders.map((order) => order.id) },
+        },
+        data: { tableAccountSessionId: session.id },
+      });
+      await transaction.table.update({
+        where: { id: tableId },
+        data: { lastAccountClosedAt: closedAt },
+      });
+
+      return { tableId, closedAt, closedOrderCount: orders.length };
+    });
+  }
+
+  private async assertShiftLocationAccess(
+    tenantId: string,
+    user: User,
+    locationId: string,
+  ): Promise<void> {
+    if (user.tenantId !== tenantId) {
+      throw new ForbiddenException('User does not belong to this tenant.');
+    }
+    const location = await this.prisma.location.findFirst({
+      where: { id: locationId, tenantId },
+      select: { id: true },
+    });
+    if (!location) {
+      throw new NotFoundException('Location not found for this tenant.');
+    }
+    if (user.role !== UserRole.SUPER_ADMIN && user.locationId !== locationId) {
+      throw new ForbiddenException("Location is outside the user's assigned location.");
+    }
+  }
+}

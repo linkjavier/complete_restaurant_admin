@@ -5,6 +5,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'socket.io';
+import { PosShiftService } from '../pos/pos-shift.service';
 
 @Injectable()
 @WebSocketGateway({
@@ -17,7 +18,10 @@ export class PaymentsService {
   @WebSocketServer()
   server: Server;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private posShiftService: PosShiftService,
+  ) {}
 
   async create(createPaymentDto: CreatePaymentDto & { tenantId: string }) {
     const { tenantId, orderId, ...rest } = createPaymentDto;
@@ -33,9 +37,9 @@ export class PaymentsService {
     });
   }
 
-  async getOrderPaymentDetails(orderId: string) {
+  async getOrderPaymentDetails(orderId: string, tenantId?: string) {
     const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
+      where: { id: orderId, ...(tenantId ? { tenantId } : {}) },
       include: {
         items: {
           include: {
@@ -73,6 +77,8 @@ export class PaymentsService {
 
     return {
       orderId,
+      locationId: order.locationId,
+      source: order.source,
       orderStatus: order.status,
       totalAmount,
       paidAmount,
@@ -89,7 +95,17 @@ export class PaymentsService {
     tenantId: string,
   ): Promise<Payment> {
     // Validar la orden
-    const paymentDetails = await this.getOrderPaymentDetails(orderId);
+    const paymentDetails = await this.getOrderPaymentDetails(orderId, tenantId);
+    if (!paymentDetails.locationId) {
+      throw new BadRequestException('The order has no assigned location.');
+    }
+    const shift =
+      paymentDetails.source === 'POS'
+        ? await this.posShiftService.requireOpenShift(
+            tenantId,
+            paymentDetails.locationId,
+          )
+        : null;
 
     // Validar el monto
     if (amount <= 0) {
@@ -108,6 +124,7 @@ export class PaymentsService {
         method,
         status: PaymentStatus.COMPLETED,
         tenant: { connect: { id: tenantId } },
+        ...(shift ? { shift: { connect: { id: shift.id } } } : {}),
       },
       include: {
         order: true,

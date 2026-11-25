@@ -9,6 +9,7 @@ import { OrdersQueueService } from './orders-workers/orders-queue.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ProductsModule } from '../products/products.module';
 import { GeocodingModule } from '../geocoding/geocoding.module';
+import { PosModule } from '../pos/pos.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { GeocodingModule } from '../geocoding/geocoding.module';
     ),
     NotificationsModule,
     GeocodingModule,
+    PosModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService, OrdersGateway, OrdersProcessor, OrdersQueueService],

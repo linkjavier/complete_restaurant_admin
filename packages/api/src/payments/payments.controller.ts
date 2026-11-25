@@ -13,6 +13,7 @@ import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PaymentMethod } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { CurrentTenant } from '../auth/decorators/tenant.decorator';
 
 @ApiTags('payments')
 @Controller('payments')
@@ -123,8 +124,11 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get payment details for an order' })
   @ApiResponse({ status: 200, description: 'Return payment details' })
-  async getOrderPaymentDetails(@Param('orderId') orderId: string) {
-    return this.paymentsService.getOrderPaymentDetails(orderId);
+  async getOrderPaymentDetails(
+    @Param('orderId') orderId: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.paymentsService.getOrderPaymentDetails(orderId, tenantId);
   }
 
   @Post('process')
@@ -138,15 +142,14 @@ export class PaymentsController {
       amount: number;
       method: PaymentMethod;
     },
+    @CurrentTenant() tenantId: string,
   ) {
     try {
-      const order = await this.paymentsService['prisma'].order.findUnique({ where: { id: paymentData.orderId } });
-      if (!order) throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
       return await this.paymentsService.processPayment(
         paymentData.orderId,
         paymentData.amount,
         paymentData.method,
-        order.tenantId,
+        tenantId,
       );
     } catch (error) {
       throw new HttpException(

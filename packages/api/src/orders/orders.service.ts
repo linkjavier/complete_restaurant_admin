@@ -15,6 +15,7 @@ import { OrdersGateway } from './orders.gateway';
 import { OrdersQueueService } from './orders-workers/orders-queue.service';
 import { ProductsService } from '../products/products.service';
 import { GeocodingService } from '../geocoding/geocoding.service';
+import { PosShiftService } from '../pos/pos-shift.service';
 
 @Injectable()
 export class OrdersService {
@@ -27,6 +28,7 @@ export class OrdersService {
     private ordersQueueService: OrdersQueueService,
     private productsService: ProductsService,
     private geocodingService: GeocodingService,
+    private posShiftService: PosShiftService,
   ) {
     // Log to verify gateway is injected
     this.logger.log(`OrdersService initialized with OrdersGateway: ${!!this.ordersGateway}`);
@@ -118,6 +120,7 @@ export class OrdersService {
     if (!location) {
       throw new NotFoundException('Selected location was not found for this tenant.');
     }
+    await this.posShiftService.requireOpenShift(tenantId, locationId);
 
     if (createOrderDto.tableId) {
       const table = await this.prisma.table.findFirst({
@@ -336,6 +339,13 @@ export class OrdersService {
 
     if (tableId) {
       where.tableId = tableId;
+      const table = await this.prisma.table.findFirst({
+        where: { id: tableId, tenantId },
+        select: { lastAccountClosedAt: true },
+      });
+      if (table?.lastAccountClosedAt) {
+        where.createdAt = { gt: table.lastAccountClosedAt };
+      }
     }
 
     if (kitchen) {
