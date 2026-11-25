@@ -195,6 +195,38 @@ export interface Location {
   updatedAt: string;
 }
 
+export interface BillingLocationConfiguration {
+  locationId: string;
+  countryCode: string;
+  issuerLegalName: string | null;
+  issuerTaxId: string | null;
+  issuerTaxIdDv: string | null;
+  establishmentName: string | null;
+  establishmentAddress: string | null;
+  establishmentMunicipalityCode: string | null;
+  establishmentPhone: string | null;
+  establishmentEmail: string | null;
+  numberingRangeId: number | null;
+  credentialsConfigured: boolean;
+  isReady: boolean;
+}
+
+export interface BillingLocationConfigurationUpdate {
+  issuerLegalName: string | null;
+  issuerTaxId: string | null;
+  issuerTaxIdDv: string | null;
+  establishmentName: string | null;
+  establishmentAddress: string | null;
+  establishmentMunicipalityCode: string | null;
+  establishmentPhone: string | null;
+  establishmentEmail: string | null;
+  numberingRangeId: number | null;
+  factusClientId?: string;
+  factusClientSecret?: string;
+  factusUsername?: string;
+  factusPassword?: string;
+}
+
 export interface OrderItem {
   id: string
   product: Product
@@ -609,6 +641,49 @@ export async function getLocations(): Promise<Location[]> {
   });
   if (!response.ok) {
     throw new Error('Error al obtener las ubicaciones');
+  }
+  return response.json();
+}
+
+export async function getBillingLocationConfiguration(
+  locationId: string,
+): Promise<BillingLocationConfiguration> {
+  const response = await fetch(
+    `${API_URL}/billing/configuration/${encodeURIComponent(locationId)}`,
+    { headers: getAuthHeaders() },
+  );
+  if (!response.ok) {
+    const error = (await response.json().catch(() => ({}))) as ApiErrorResponse;
+    const message = Array.isArray(error.message)
+      ? error.message.join(', ')
+      : error.message;
+    throw new Error(
+      message || `No se pudo cargar la configuración de facturación (HTTP ${response.status})`,
+    );
+  }
+  return response.json();
+}
+
+export async function saveBillingLocationConfiguration(
+  locationId: string,
+  configuration: BillingLocationConfigurationUpdate,
+): Promise<BillingLocationConfiguration> {
+  const response = await fetch(
+    `${API_URL}/billing/configuration/${encodeURIComponent(locationId)}`,
+    {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(configuration),
+    },
+  );
+  if (!response.ok) {
+    const error = (await response.json().catch(() => ({}))) as ApiErrorResponse;
+    const message = Array.isArray(error.message)
+      ? error.message.join(', ')
+      : error.message;
+    throw new Error(
+      message || `No se pudo guardar la configuración de facturación (HTTP ${response.status})`,
+    );
   }
   return response.json();
 }

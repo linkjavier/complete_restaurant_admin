@@ -11,56 +11,126 @@ import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { ImageUpload } from "@/components/admin/products/image-upload"
 import { CategoryOrderManager } from "@/components/admin/settings/category-order-manager"
-import { API_URL } from '@/lib/api'
+import { API_URL, getAuthHeaders, getLocations, type Location } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { BillingSettingsTab } from "@/components/admin/settings/billing-settings-tab"
 
 export default function SettingsPage() {
   const [businessName, setBusinessName] = useState("")
   const [businessIcon, setBusinessIcon] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false)
+  const [locations, setLocations] = useState<Location[]>([])
+  const [selectedLocationId, setSelectedLocationId] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [aiName, setAiName] = useState("")
   const [aiGender, setAiGender] = useState("")
   const [aiEnabled, setAiEnabled] = useState(false)
   const [deliveryFee, setDeliveryFee] = useState<number>(0)
-  const { user } = useAuth()
-  const locationId = user?.locationId
+  const { user, isLoading: isAuthLoading } = useAuth()
+  const isSuperAdmin = user?.role === "SUPER_ADMIN"
+  const locationId = selectedLocationId
 
   const { toast } = useToast()
 
   useEffect(() => {
-    loadSettings()
-  }, [])
+    if (isAuthLoading) return
+    if (!user) {
+      setSelectedLocationId("")
+      setIsLoadingLocations(false)
+      setIsLoading(false)
+      return
+    }
 
-  const loadSettings = async () => {
+    if (user.role !== "SUPER_ADMIN") {
+      setSelectedLocationId(user.locationId ?? "")
+      return
+    }
+
+    let cancelled = false
+    setIsLoadingLocations(true)
+    getLocations()
+      .then((result) => {
+        if (cancelled) return
+        setLocations(result)
+        const preferredLocationId =
+          user.locationId && result.some((location) => location.id === user.locationId)
+            ? user.locationId
+            : result[0]?.id ?? ""
+        setSelectedLocationId((current) =>
+          result.some((location) => location.id === current)
+            ? current
+            : preferredLocationId,
+        )
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          toast({
+            title: "Error",
+            description: error instanceof Error ? error.message : "Error al cargar las ubicaciones",
+            variant: "destructive",
+          })
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingLocations(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthLoading, user, toast])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!locationId) {
+      setIsLoading(false)
+      return () => {
+        cancelled = true
+      }
+    }
+
     setIsLoading(true)
-    try {
-      // Cargar configuración del negocio
-      const businessRes = await fetch(`${API_URL}/settings/business${locationId ? `?locationId=${locationId}` : ''}`)
-      if (businessRes.ok) {
+    const loadSettings = async () => {
+      try {
+        const query = `?locationId=${encodeURIComponent(locationId)}`
+        const businessRes = await fetch(`${API_URL}/settings/business${query}`, {
+          headers: getAuthHeaders(),
+        })
+        if (!businessRes.ok) throw new Error("Error al cargar la configuración del negocio")
         const data = await businessRes.json()
+        if (cancelled) return
         setBusinessName(data.name || "")
         setBusinessIcon(data.logo || "")
+
+        const aiRes = await fetch(`${API_URL}/settings/ai${query}`, {
+          headers: getAuthHeaders(),
+        })
+        if (!aiRes.ok) throw new Error("Error al cargar la configuración de IA")
+        const aiData = await aiRes.json()
+        if (cancelled) return
+        setAiName(aiData.name)
+        setAiGender(aiData.gender)
+        setAiEnabled(aiData.enabled)
+        setDeliveryFee(aiData.deliveryFee ?? 0)
+      } catch (error) {
+        if (!cancelled) {
+          toast({
+            title: "Error",
+            description: error instanceof Error ? error.message : "Error al cargar la configuración",
+            variant: "destructive"
+          })
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false)
       }
-      // Cargar configuración de IA
-      const aiRes = await fetch(`${API_URL}/settings/ai`)
-      if (aiRes.ok) {
-        const data = await aiRes.json()
-        setAiName(data.name)
-        setAiGender(data.gender)
-        setAiEnabled(data.enabled)
-        setDeliveryFee(data.deliveryFee ?? 0)
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Error al cargar la configuración",
-        variant: "destructive"
-      })
-    } finally {
-      setIsLoading(false)
     }
-  }
+    void loadSettings()
+    return () => {
+      cancelled = true
+    }
+  }, [locationId, toast])
 
   const handleSaveBusiness = async () => {
     setIsSaving(true)
@@ -68,7 +138,7 @@ export default function SettingsPage() {
       if (!locationId) throw new Error('No tienes una ubicación asignada. Contacta al administrador.')
       const response = await fetch(`${API_URL}/settings/business`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ name: businessName, logo: businessIcon, locationId })
       })
       if (!response.ok) throw new Error("Error al guardar la configuración del negocio")
@@ -103,7 +173,7 @@ export default function SettingsPage() {
       const response = await fetch(`${API_URL}/settings/ai`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           name: aiName,
@@ -133,7 +203,7 @@ export default function SettingsPage() {
     }
   }
 
-  if (isLoading) {
+  if (isAuthLoading || isLoadingLocations) {
     return (
       <div className="p-6 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -145,6 +215,51 @@ export default function SettingsPage() {
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6">Configuración</h1>
 
+      {isSuperAdmin ? (
+        <div className="mb-6 max-w-sm space-y-2">
+          <Label htmlFor="settings-location">Ubicación</Label>
+          <Select
+            value={locationId || undefined}
+            onValueChange={setSelectedLocationId}
+            disabled={locations.length === 0}
+          >
+            <SelectTrigger id="settings-location">
+              <SelectValue placeholder="Selecciona una ubicación" />
+            </SelectTrigger>
+            <SelectContent>
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}{location.city ? ` · ${location.city}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      <Tabs defaultValue="general" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          {isSuperAdmin ? (
+            <TabsTrigger value="billing">Facturación electrónica</TabsTrigger>
+          ) : null}
+        </TabsList>
+
+        <TabsContent value="general">
+          {!locationId ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Selecciona una ubicación</CardTitle>
+                <CardDescription>
+                  Asigna una ubicación a tu usuario o selecciona una para editar su configuración.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : isLoading ? (
+            <div className="flex items-center justify-center p-10">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Sección de Configuración del negocio */}
         <Card>
@@ -278,6 +393,15 @@ export default function SettingsPage() {
         {/* Sección de Orden de Categorías */}
         <CategoryOrderManager />
       </div>
+          )}
+        </TabsContent>
+
+        {isSuperAdmin ? (
+          <TabsContent value="billing">
+            <BillingSettingsTab key={locationId} locationId={locationId} />
+          </TabsContent>
+        ) : null}
+      </Tabs>
     </div>
   )
 } 

@@ -1,0 +1,339 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { BillingDocument, BillingDocumentStatus, BillingDocumentType } from '@prisma/client';
+import { createHash } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
+import { BillingEmissionError, BillingProviderError } from './billing.errors';
+import { BillingProviderRegistry } from './billing-provider.registry';
+import { BillingLocationConfigurationService } from './billing-location-configuration.service';
+import { parseBillingInvoiceInput } from './billing.validation';
+import {
+  BillingProvider,
+  BillingProviderContext,
+  BillingProviderResult,
+  EmitInvoiceCommand,
+} from './billing.types';
+
+@Injectable()
+export class BillingService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly providers: BillingProviderRegistry,
+    private readonly configService: ConfigService,
+    private readonly locationConfigurations: BillingLocationConfigurationService,
+  ) {}
+
+  async issueInvoice(command: EmitInvoiceCommand): Promise<BillingDocument> {
+    return this.issueInvoiceInternal(command, false);
+  }
+
+  async retryInvoice(command: EmitInvoiceCommand): Promise<BillingDocument> {
+    return this.issueInvoiceInternal(command, true);
+  }
+
+  private async issueInvoiceInternal(
+    command: EmitInvoiceCommand,
+    retryFailed: boolean,
+  ): Promise<BillingDocument> {
+    const tenantId = command.tenantId.trim();
+    const locationId = command.locationId.trim();
+    const idempotencyKey = command.idempotencyKey.trim();
+
+    if (!tenantId || !locationId || !idempotencyKey) {
+      throw new BadRequestException('Tenant, location, and idempotency key are required.');
+    }
+    if (idempotencyKey.length > 128) {
+      throw new BadRequestException('Idempotency key exceeds 128 characters.');
+    }
+    const inputInvoice = parseBillingInvoiceInput(command.invoice);
+    const billingConfiguration = await this.locationConfigurations.getForEmission(
+      tenantId,
+      locationId,
+    );
+    const countryCode = billingConfiguration.countryCode.trim().toUpperCase();
+    const context = billingConfiguration.context;
+    const invoice = {
+      ...inputInvoice,
+      numberingRangeId: context.numberingRangeId,
+    };
+
+    const provider = this.providers.forCountry(countryCode);
+    this.assertSandboxEnabled(provider);
+
+    const requestHash = hashPayload({
+      countryCode,
+      providerName: provider.name,
+      orderId: command.orderId ?? null,
+      locationId,
+      invoice,
+    });
+    const referenceCode = createReferenceCode(tenantId, locationId, idempotencyKey);
+    const existing = await this.prisma.billingDocument.findUnique({
+      where: {
+        tenantId_locationId_idempotencyKey: { tenantId, locationId, idempotencyKey },
+      },
+    });
+    if (existing) {
+      const matchingDocument = this.assertSameRequest(existing, requestHash);
+      return retryFailed
+        ? this.retryFailedDocument(matchingDocument, provider, invoice, context)
+        : matchingDocument;
+    }
+    if (retryFailed) {
+      throw new NotFoundException('No retryable billing document exists for this idempotency key.');
+    }
+
+    if (command.orderId) {
+      const order = await this.prisma.order.findFirst({
+        where: { id: command.orderId, tenantId },
+        select: { id: true, locationId: true },
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found for this tenant.');
+      }
+      if (order.locationId !== locationId) {
+        throw new BadRequestException('Order does not belong to the configured location.');
+      }
+    }
+
+    let document: BillingDocument;
+    try {
+      document = await this.prisma.billingDocument.create({
+        data: {
+          tenantId,
+          locationId,
+          orderId: command.orderId,
+          countryCode,
+          providerName: provider.name,
+          type: BillingDocumentType.SALES_INVOICE,
+          status: BillingDocumentStatus.PENDING,
+          idempotencyKey,
+          referenceCode,
+          requestHash,
+        },
+      });
+    } catch (error) {
+      if (!hasPrismaErrorCode(error, 'P2002')) {
+        throw error;
+      }
+      const concurrentDocument = await this.prisma.billingDocument.findUnique({
+        where: {
+          tenantId_locationId_idempotencyKey: { tenantId, locationId, idempotencyKey },
+        },
+      });
+      if (!concurrentDocument) {
+        throw error;
+      }
+      const matchingDocument = this.assertSameRequest(concurrentDocument, requestHash);
+      return retryFailed
+        ? this.retryFailedDocument(matchingDocument, provider, invoice, context)
+        : matchingDocument;
+    }
+
+    return this.submitInvoice(document, provider, invoice, context);
+  }
+
+  private async retryFailedDocument(
+    document: BillingDocument,
+    provider: BillingProvider,
+    invoice: ReturnType<typeof parseBillingInvoiceInput>,
+    context: BillingProviderContext,
+  ): Promise<BillingDocument> {
+    if (document.status !== BillingDocumentStatus.FAILED_RETRYABLE) {
+      return document;
+    }
+
+    const claim = await this.prisma.billingDocument.updateMany({
+      where: {
+        id: document.id,
+        tenantId: document.tenantId,
+        status: BillingDocumentStatus.FAILED_RETRYABLE,
+      },
+      data: {
+        status: BillingDocumentStatus.PENDING,
+        errorCode: null,
+        errorMessage: null,
+      },
+    });
+    if (claim.count === 0) {
+      const currentDocument = await this.prisma.billingDocument.findFirst({
+        where: { id: document.id, tenantId: document.tenantId },
+      });
+      if (!currentDocument) {
+        throw new NotFoundException('Billing document no longer exists.');
+      }
+      return currentDocument;
+    }
+
+    return this.submitInvoice(document, provider, invoice, context);
+  }
+
+  private async submitInvoice(
+    document: Pick<BillingDocument, 'id' | 'referenceCode'>,
+    provider: BillingProvider,
+    invoice: ReturnType<typeof parseBillingInvoiceInput>,
+    context: BillingProviderContext,
+  ): Promise<BillingDocument> {
+    let providerResult: BillingProviderResult;
+    try {
+      providerResult = await provider.issueInvoice(document.referenceCode, invoice, context);
+    } catch (error) {
+      const providerError =
+        error instanceof BillingProviderError
+          ? error
+          : new BillingProviderError(
+              'BILLING_PROVIDER_OUTCOME_UNKNOWN',
+              'RECONCILIATION_REQUIRED',
+              'The provider outcome is unknown; reconcile before retrying.',
+            );
+      const status = dispositionToStatus(providerError.disposition);
+      await this.prisma.billingDocument.update({
+        where: { id: document.id },
+        data: {
+          status,
+          errorCode: providerError.code,
+          errorMessage: providerError.message,
+        },
+      });
+      throw new BillingEmissionError(
+        document.id,
+        status,
+        providerError.code,
+        providerError.message,
+      );
+    }
+
+    return this.prisma.billingDocument.update({
+      where: { id: document.id },
+      data: {
+        status: providerResult.status,
+        providerReferenceId: providerResult.providerReferenceId,
+        documentNumber: providerResult.documentNumber,
+        cufe: providerResult.cufe,
+        responseMetadata: {
+          isValidated: providerResult.isValidated,
+          errorCodes: providerResult.errorCodes,
+        },
+        errorCode: providerResult.errorCodes.length ? 'FACTUS_VALIDATION_WARNINGS' : null,
+        errorMessage: null,
+      },
+    });
+  }
+
+  async refreshInvoiceStatus(
+    tenantId: string,
+    billingDocumentId: string,
+  ): Promise<BillingDocument> {
+    const document = await this.prisma.billingDocument.findFirst({
+      where: { id: billingDocumentId, tenantId },
+    });
+    if (!document) {
+      throw new NotFoundException('Billing document not found for this tenant.');
+    }
+
+    const billingConfiguration = await this.locationConfigurations.getForEmission(
+      tenantId,
+      document.locationId,
+    );
+    if (billingConfiguration.countryCode !== document.countryCode) {
+      throw new ConflictException(
+        'The location billing country changed after this document was issued.',
+      );
+    }
+    const provider = this.providers.forCountry(document.countryCode);
+    this.assertSandboxEnabled(provider);
+    const providerResult = document.providerReferenceId
+      ? await provider.getInvoiceStatus(document.providerReferenceId, billingConfiguration.context)
+      : await provider.findInvoiceByReferenceCode(
+          document.referenceCode,
+          billingConfiguration.context,
+        );
+
+    if (!providerResult) {
+      throw new ConflictException('Factus has not returned a document for this reference yet.');
+    }
+
+    return this.prisma.billingDocument.update({
+      where: { id: document.id },
+      data: {
+        status: providerResult.status,
+        providerReferenceId: providerResult.providerReferenceId,
+        documentNumber: providerResult.documentNumber,
+        cufe: providerResult.cufe,
+        responseMetadata: {
+          isValidated: providerResult.isValidated,
+          errorCodes: providerResult.errorCodes,
+        },
+        errorCode: providerResult.errorCodes.length ? 'FACTUS_VALIDATION_WARNINGS' : null,
+        errorMessage: null,
+      },
+    });
+  }
+
+  private assertSameRequest(document: BillingDocument, requestHash: string): BillingDocument {
+    if (document.requestHash !== requestHash) {
+      throw new ConflictException(
+        'This idempotency key was already used with a different invoice payload.',
+      );
+    }
+    return document;
+  }
+
+  private assertSandboxEnabled(provider: BillingProvider): void {
+    if (provider.name !== 'FACTUS') {
+      return;
+    }
+
+    if (this.configService.get<string>('BILLING_ENV', '').trim().toLowerCase() !== 'sandbox') {
+      throw new ForbiddenException('Factus billing is disabled unless BILLING_ENV=sandbox.');
+    }
+  }
+}
+
+function hashPayload(value: unknown): string {
+  return createHash('sha256').update(stableSerialize(value)).digest('hex');
+}
+
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableSerialize).join(',')}]`;
+  }
+  if (typeof value === 'object' && value !== null) {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, entry]) => entry !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableSerialize(entry)}`);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+function createReferenceCode(tenantId: string, locationId: string, idempotencyKey: string): string {
+  return `K${createHash('sha256')
+    .update(`${tenantId}:${locationId}:${idempotencyKey}`)
+    .digest('hex')
+    .slice(0, 31)}`;
+}
+
+function dispositionToStatus(
+  disposition: BillingProviderError['disposition'],
+): BillingDocumentStatus {
+  switch (disposition) {
+    case 'REJECTED':
+      return BillingDocumentStatus.REJECTED;
+    case 'FAILED_RETRYABLE':
+      return BillingDocumentStatus.FAILED_RETRYABLE;
+    case 'RECONCILIATION_REQUIRED':
+      return BillingDocumentStatus.RECONCILIATION_REQUIRED;
+  }
+}
+
+function hasPrismaErrorCode(error: unknown, code: string): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
+}

@@ -29,6 +29,7 @@ import { GeocodingModule } from './geocoding/geocoding.module';
 import { PurchasesModule } from './purchases/purchases.module';
 import { QrMenuModule } from './qr-menu/qr-menu.module';
 import { WhatsappCloudModule } from './whatsapp-cloud/whatsapp-cloud.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -65,8 +66,9 @@ import { WhatsappCloudModule } from './whatsapp-cloud/whatsapp-cloud.module';
     PurchasesModule,
     QrMenuModule,
     WhatsappCloudModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

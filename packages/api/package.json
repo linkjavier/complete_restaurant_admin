@@ -24,7 +24,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prisma:generate": "./node_modules/.bin/prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "seed:dev": "ts-node prisma/seed-development.ts"
+    "seed:dev": "ts-node prisma/seed-development.ts",
+    "billing:test:factus:sandbox": "ts-node -r tsconfig-paths/register scripts/test-factus-sandbox.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1176.0",

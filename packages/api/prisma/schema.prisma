@@ -35,6 +35,8 @@ model Tenant {
   userAccessRequests         UserAccessRequest[]
   whatsappCloudIntegrations  WhatsappCloudIntegration[]
   whatsappCloudConversations WhatsappCloudConversation[]
+  billingDocuments           BillingDocument[]
+  billingConfigurations      BillingLocationConfiguration[]
 }
 
 model User {
@@ -143,6 +145,8 @@ model Location {
   customers                  Customer[]
   settings                   Settings[]
   inventoryModifications     InventoryModification[]
+  billingDocuments           BillingDocument[]
+  billingConfiguration       BillingLocationConfiguration?
 
   @@index([order])
   @@map("locations")
@@ -400,6 +404,7 @@ model Order {
   source          OrderSource
   items           OrderItem[]
   payments        Payment[]
+  billingDocuments BillingDocument[]
   deliveryFee     Float?
   subtotal        Float?
   total           Float?
@@ -719,6 +724,72 @@ model Customer {
   updatedAt    DateTime @updatedAt
   address      String?
   neighborhood String?
+}
+
+enum BillingDocumentType {
+  SALES_INVOICE
+}
+
+enum BillingDocumentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  FAILED_RETRYABLE
+  RECONCILIATION_REQUIRED
+}
+
+model BillingDocument {
+  id                  String                @id @default(cuid())
+  tenantId            String
+  tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  locationId          String
+  location            Location              @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  orderId             String?
+  order               Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  countryCode         String                @db.VarChar(2)
+  providerName        String
+  type                BillingDocumentType
+  status              BillingDocumentStatus @default(PENDING)
+  idempotencyKey      String
+  referenceCode       String
+  providerReferenceId String?
+  documentNumber      String?
+  cufe                String?
+  requestHash         String
+  responseMetadata    Json?
+  errorCode           String?
+  errorMessage        String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@unique([tenantId, locationId, idempotencyKey])
+  @@unique([tenantId, providerName, referenceCode])
+  @@index([tenantId, locationId, createdAt])
+  @@index([orderId])
+}
+
+model BillingLocationConfiguration {
+  id                            String   @id @default(cuid())
+  tenantId                      String
+  tenant                        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationId                    String   @unique
+  location                      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  countryCode                   String   @default("CO") @db.VarChar(2)
+  issuerLegalName               String?
+  issuerTaxId                   String?
+  issuerTaxIdDv                 String?
+  establishmentName             String?
+  establishmentAddress          String?
+  establishmentMunicipalityCode String?
+  establishmentPhone            String?
+  establishmentEmail            String?
+  numberingRangeId              Int?
+  factusCredentialsEncrypted    String?  @db.Text
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  @@unique([tenantId, locationId])
+  @@index([tenantId])
 }
 
 // Nuevos modelos para suscripciones y pagos
