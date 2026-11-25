@@ -11,6 +11,9 @@ import {
   Clock3,
   Loader2,
   LockKeyhole,
+  ShoppingBag,
+  Bike,
+  Utensils,
 } from "lucide-react";
 import {
   getProducts,
@@ -71,6 +74,12 @@ const PAYMENT_METHODS: Array<{ value: PaymentMethod; label: string }> = [
   { value: "TRANSFER", label: "Transferencia" },
   { value: "QR", label: "QR / billetera digital" },
 ];
+
+const POS_ORDER_TYPES = [
+  { value: "takeout", label: "Para llevar", Icon: ShoppingBag },
+  { value: "delivery", label: "Domicilio", Icon: Bike },
+  { value: "table", label: "Mesas", Icon: Utensils },
+] as const;
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("es-CO", {
@@ -852,7 +861,6 @@ export default function PosPage() {
             : tables.filter((table) => table.locationId === selectedLocationId)
           : tables.filter((table) => table.locationId === user?.locationId)
       }
-      onOrderTypeChange={setOrderType}
       onTableSelect={(tableId) => {
         setSelectedTable(tableId);
         setCart({});
@@ -1065,6 +1073,29 @@ export default function PosPage() {
                   Cerrar turno
                 </Button>
               </div>
+              <section
+                className="space-y-2"
+                aria-labelledby="pos-order-type-heading"
+              >
+                <h2 id="pos-order-type-heading" className="text-sm font-medium">
+                  ¿Cómo deseas tomar el pedido?
+                </h2>
+                <div className="grid grid-cols-3 gap-2">
+                  {POS_ORDER_TYPES.map(({ value, label, Icon }) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      variant={orderType === value ? "default" : "outline"}
+                      className="h-auto min-h-20 flex-col gap-2 whitespace-normal px-2 py-3 text-center"
+                      aria-pressed={orderType === value}
+                      onClick={() => setOrderType(value)}
+                    >
+                      <Icon className="h-6 w-6 shrink-0" />
+                      <span className="text-xs sm:text-sm">{label}</span>
+                    </Button>
+                  ))}
+                </div>
+              </section>
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
                   <div className="relative">

@@ -71,7 +71,6 @@ interface CartProps {
   orderType: "table" | "takeout" | "delivery";
   selectedTable: string | null;
   tables: Table[];
-  onOrderTypeChange: (type: "table" | "takeout" | "delivery") => void;
   onTableSelect: (tableId: string) => void;
   onSubmit: (
     assignedLocationId?: string,
@@ -108,7 +107,6 @@ export function Cart({
   orderType,
   selectedTable,
   tables,
-  onOrderTypeChange,
   onTableSelect,
   onSubmit,
   loading = false,
@@ -543,33 +541,6 @@ export function Cart({
         ) : (
           <div className="flex flex-col h-full">
             <div className="flex-none space-y-1">
-              <div className="flex gap-1">
-                <Button
-                  variant={orderType === "takeout" ? "default" : "outline"}
-                  onClick={() => onOrderTypeChange("takeout")}
-                  disabled={isProcessing}
-                  size="sm"
-                >
-                  Para Llevar
-                </Button>
-                <Button
-                  variant={orderType === "table" ? "default" : "outline"}
-                  onClick={() => onOrderTypeChange("table")}
-                  disabled={isProcessing}
-                  size="sm"
-                >
-                  Mesa
-                </Button>
-                <Button
-                  variant={orderType === "delivery" ? "default" : "outline"}
-                  onClick={() => onOrderTypeChange("delivery")}
-                  disabled={isProcessing}
-                  size="sm"
-                >
-                  Domicilio
-                </Button>
-              </div>
-
               {orderType === "takeout" && (
                 <Input
                   placeholder="Nombre del cliente"
