@@ -12,12 +12,21 @@ import {
   Category,
   getTables,
   Table,
-  createOrder,
+  createPosOrder,
   getActiveOrders,
   processPayment,
   getCategories,
   getLocations,
-  Location
+  Location,
+  issuePosInvoice,
+  issuePosTableInvoice,
+  declinePosTableInvoice,
+} from "@/lib/api"
+import type {
+  ActiveOrder,
+  BillingCustomerInput,
+  BillingDocumentResult,
+  PaymentMethod,
 } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -56,16 +65,11 @@ export default function PosPage() {
   const [deliveryAddress, setDeliveryAddress] = useState("")
   const [neighborhood, setNeighborhood] = useState("")
   const [phone, setPhone] = useState("")
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER">("CASH")
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH")
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
-  const [activeOrders, setActiveOrders] = useState<Array<{
-    id: string
-    status: string
-    total: number
-    items: Array<{ id: string; product: { name: string; price: number }; quantity: number; status: string }>
-  }>>([])
+  const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>([])
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
   const { user, isLoading: isAuthLoading } = useAuth()
@@ -74,24 +78,24 @@ export default function PosPage() {
   // Fetch active orders when table is selected
   useEffect(() => {
     if (selectedTable) {
-      refreshActiveOrders()
+      void refreshActiveOrders().catch((err) => {
+        console.error('Error fetching active orders:', err)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar las órdenes activas",
+          variant: "destructive",
+        })
+      })
     } else {
       setActiveOrders([])
     }
-  }, [selectedTable])
+  }, [selectedTable, toast])
 
   const refreshActiveOrders = async () => {
-    try {
-      const orders = await getActiveOrders(selectedTable)
-      setActiveOrders(orders)
-    } catch (err) {
-      console.error('Error fetching active orders:', err)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las órdenes activas",
-        variant: "destructive",
-      })
-    }
+    const orders = await getActiveOrders(selectedTable)
+    const currentOrders = orders.filter((order) => order.status !== "CANCELLED")
+    setActiveOrders(currentOrders)
+    return currentOrders
   }
 
   const fetchData = useCallback(async () => {
@@ -150,6 +154,18 @@ export default function PosPage() {
 
   // Actualizar handleAddToCart para soportar múltiples variantes
   const handleAddToCart = (product: Product, variantsOrVariant?: ProductVariant[] | ProductVariant) => {
+    if (
+      isSuperAdmin &&
+      (selectedLocationId === ALL_LOCATIONS || product.locationId !== selectedLocationId)
+    ) {
+      toast({
+        title: "Selecciona una sede",
+        description: "Elige la sede de esta venta antes de agregar productos.",
+        variant: "destructive",
+      })
+      return
+    }
+
     const cartLocationIds = new Set(
       Object.values(cart)
         .map((item) => item.product.locationId)
@@ -216,8 +232,31 @@ export default function PosPage() {
     })
   }
 
-  const handleCreateOrder = async (assignedLocationId?: string) => {
+  const handleCreateOrder = async (
+    assignedLocationId?: string,
+    invoiceCustomer?: BillingCustomerInput | null,
+    checkoutPaymentMethod?: PaymentMethod,
+  ) => {
     try {
+      const orderLocationId = isSuperAdmin ? selectedLocationId : user?.locationId
+      if (!orderLocationId || orderLocationId === ALL_LOCATIONS) {
+        toast({
+          title: "Selecciona una sede",
+          description: "Debes seleccionar una sede antes de crear el pedido.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (assignedLocationId && assignedLocationId !== orderLocationId) {
+        toast({
+          title: "La sede no coincide",
+          description: "La dirección de entrega está asignada a otra sede. Selecciona esa sede para continuar.",
+          variant: "destructive",
+        })
+        return
+      }
+
       if (orderType === "table" && !selectedTable) {
         toast({
           title: "Error",
@@ -256,7 +295,10 @@ export default function PosPage() {
       }
 
       setSubmitting(true)
-      const selectedTableData = tables.find(t => t.id === selectedTable)
+      const availableTables = isSuperAdmin
+        ? tables.filter((table) => table.locationId === orderLocationId)
+        : tables.filter((table) => table.locationId === user?.locationId)
+      const selectedTableData = availableTables.find((table) => table.id === selectedTable)
       if (!selectedTableData && orderType === "table") {
         toast({
           title: "Error",
@@ -281,13 +323,6 @@ export default function PosPage() {
       }
 
       const [productLocationId] = [...cartLocationIds]
-      const orderLocationId =
-        (orderType === "delivery" && assignedLocationId) ||
-        (orderType === "table" ? selectedTableData?.locationId : undefined) ||
-        (isSuperAdmin && selectedLocationId !== ALL_LOCATIONS ? selectedLocationId : undefined) ||
-        productLocationId ||
-        user?.locationId ||
-        tables[0]?.locationId
 
       if (productLocationId && orderLocationId !== productLocationId) {
         toast({
@@ -336,23 +371,34 @@ export default function PosPage() {
         deliveryAddress: orderType === "delivery" ? deliveryAddress : undefined,
         neighborhood: orderType === "delivery" ? neighborhood : undefined,
         phone: orderType === "delivery" ? phone : undefined,
-        paymentMethod: orderType === "delivery" ? paymentMethod : undefined,
+        paymentMethod: orderType === "delivery"
+          ? checkoutPaymentMethod ?? paymentMethod
+          : undefined,
         items: orderItems,
         status: orderType === "takeout" ? "IN_PROGRESS" as const : "PENDING" as const,
-        isPaid: orderType === "takeout" ? true : false,
+        isPaid: false,
         source: 'POS' as const,
       }
 
-      const createdOrder = await createOrder(orderData)
+      const createdOrder = await createPosOrder(orderData)
 
       // Si es para llevar, crear el pago automáticamente
       if (orderType === "takeout") {
-        const total = orderItems.reduce((sum, item) => {
-          const product = products.find(p => p.id === item.productId)
-          return sum + (product?.price || 0) * item.quantity
-        }, 0)
+        await processPayment(
+          createdOrder.id,
+          createdOrder.total,
+          checkoutPaymentMethod ?? "CASH",
+        )
+      }
 
-        await processPayment(createdOrder.id, total, "CASH")
+      let billingResult: BillingDocumentResult | null = null
+      let billingError: string | null = null
+      if (invoiceCustomer) {
+        try {
+          billingResult = await issuePosInvoice([createdOrder.id], invoiceCustomer)
+        } catch (error) {
+          billingError = error instanceof Error ? error.message : "No se pudo emitir la factura."
+        }
       }
 
       // Clear cart and form fields
@@ -369,14 +415,24 @@ export default function PosPage() {
       }
 
       toast({
-        title: "Éxito",
+        title: billingError
+          ? "Pedido creado; factura pendiente"
+          : billingResult
+            ? "Pedido y factura procesados"
+            : "Éxito",
         description: (
-          <span className="flex items-center justify-between text-green-600">
-            <span>Pedido creado correctamente</span>
+          <span className={`flex items-center justify-between ${billingError ? "text-destructive" : "text-green-600"}`}>
+            <span>
+              {billingError
+                ? `El pedido quedó creado${orderType === "takeout" ? " y cobrado" : ""}, pero Factus no emitió la factura: ${billingError}`
+                : billingResult
+                  ? `Pedido creado. Estado de factura: ${billingResult.status}.`
+                  : "Pedido creado correctamente"}
+            </span>
             <CheckCircle2 className="ml-4" style={{ width: '60px', height: '60px' }} />
           </span>
         ),
-        variant: "default"
+        variant: billingError ? "destructive" : "default"
       })
     } catch (err) {
       console.error('Error creating order:', err)
@@ -390,17 +446,41 @@ export default function PosPage() {
     }
   }
 
-  const handlePaymentProcessed = async () => {
-    if (selectedTable) {
-      await refreshActiveOrders()
+  const handleTableOrdersChanged = async () => {
+    if (!selectedTable) return []
+    return refreshActiveOrders()
+  }
+
+  const handleTableInvoiceDecision = async (
+    customer: BillingCustomerInput | null,
+    orderIds: string[],
+  ) => {
+    if (!selectedTable) {
+      throw new Error("Selecciona una mesa antes de facturar.")
     }
+
+    if (!customer) {
+      await declinePosTableInvoice(selectedTable, orderIds)
+      await refreshActiveOrders()
+      toast({
+        title: "Cuenta cerrada",
+        description: "Se registró el recibo normal sin factura electrónica.",
+      })
+      return
+    }
+
+    const document = await issuePosTableInvoice(selectedTable, orderIds, customer)
+    await refreshActiveOrders()
+    toast({
+      title: "Factura de mesa procesada",
+      description: `Estado de Factus: ${document.status}.`,
+    })
   }
 
   const filteredProducts = products.filter(product => {
     const matchesLocation =
       !isSuperAdmin ||
-      selectedLocationId === ALL_LOCATIONS ||
-      product.locationId === selectedLocationId
+      (selectedLocationId !== ALL_LOCATIONS && product.locationId === selectedLocationId)
     const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -455,7 +535,13 @@ export default function PosPage() {
       onRemoveItem={handleRemoveFromCart}
       orderType={orderType}
       selectedTable={selectedTable}
-      tables={tables}
+      tables={
+        isSuperAdmin
+          ? selectedLocationId === ALL_LOCATIONS
+            ? []
+            : tables.filter((table) => table.locationId === selectedLocationId)
+          : tables.filter((table) => table.locationId === user?.locationId)
+      }
       onOrderTypeChange={setOrderType}
       onTableSelect={(tableId) => {
         setSelectedTable(tableId)
@@ -463,6 +549,8 @@ export default function PosPage() {
       }}
       onSubmit={handleCreateOrder}
       currentOrders={currentOrders}
+      onTableOrdersChanged={handleTableOrdersChanged}
+      onTableInvoiceDecision={handleTableInvoiceDecision}
       loading={submitting}
       customerName={customerName}
       onCustomerNameChange={setCustomerName}
@@ -521,7 +609,7 @@ export default function PosPage() {
                 </div>
                 {isSuperAdmin && (
                   <Select
-                    value={selectedLocationId}
+                    value={selectedLocationId === ALL_LOCATIONS ? undefined : selectedLocationId}
                     onValueChange={(locationId) => {
                       setSelectedLocationId(locationId)
                       setCart({})
@@ -529,10 +617,9 @@ export default function PosPage() {
                     }}
                   >
                     <SelectTrigger className="w-full md:w-[200px]">
-                      <SelectValue placeholder="Sucursal" />
+                      <SelectValue placeholder="Selecciona una sede" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={ALL_LOCATIONS}>Todas las sucursales</SelectItem>
                       {locations.map((location) => (
                         <SelectItem key={location.id} value={location.id}>
                           {location.name}
@@ -561,12 +648,18 @@ export default function PosPage() {
             </div>
           </CardHeader>
           <CardContent className="lg:flex-1 lg:overflow-y-auto">
-            <ProductGrid
-              groupedProducts={groupedProducts}
-              onAddToCart={handleAddToCart}
-              cart={Object.fromEntries(Object.entries(cart).map(([key, item]) => [key, item.quantity]))}
-              showLocationName={isSuperAdmin}
-            />
+            {isSuperAdmin && selectedLocationId === ALL_LOCATIONS ? (
+              <div className="flex h-full items-center justify-center text-center text-muted-foreground">
+                Selecciona una sede para ver sus productos y crear pedidos.
+              </div>
+            ) : (
+              <ProductGrid
+                groupedProducts={groupedProducts}
+                onAddToCart={handleAddToCart}
+                cart={Object.fromEntries(Object.entries(cart).map(([key, item]) => [key, item.quantity]))}
+                showLocationName={isSuperAdmin}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

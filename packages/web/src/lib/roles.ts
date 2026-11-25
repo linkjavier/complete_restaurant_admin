@@ -6,6 +6,10 @@ export function getHomePathForRole(role?: string | null): string {
     return CHEF_HOME_PATH;
   }
 
+  if (role === 'CASHIER') {
+    return '/admin/pos';
+  }
+
   return DEFAULT_HOME_PATH;
 }
 

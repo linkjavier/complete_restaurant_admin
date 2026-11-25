@@ -8,17 +8,22 @@ import {
   Delete,
   Query,
   BadRequestException,
+  ForbiddenException,
   UseGuards,
   Req,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
-import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateOrderDto, OrderSource } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { Request } from 'express';
 import { CurrentTenant } from '../auth/decorators/tenant.decorator';
+import { CurrentUser } from '../auth/decorators/user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { User, UserRole } from '@prisma/client';
 
 
 @ApiTags('orders')
@@ -30,7 +35,21 @@ export class OrdersController {
   @Public()
   @Post()
   create(@Body() createOrderDto: CreateOrderDto, @CurrentTenant() tenantId: string) {
+    if (createOrderDto.source === OrderSource.POS) {
+      throw new ForbiddenException('POS orders must use the authenticated POS endpoint.');
+    }
     return this.ordersService.create(createOrderDto, tenantId);
+  }
+
+  @Post('pos')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF, UserRole.CASHIER)
+  createFromPos(
+    @Body() createOrderDto: CreateOrderDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.ordersService.createFromPos(createOrderDto, tenantId, user);
   }
 
   @Get()

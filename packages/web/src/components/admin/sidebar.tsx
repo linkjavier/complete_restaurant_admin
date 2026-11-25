@@ -71,7 +71,7 @@ const routes = [
     label: "pos",
     icon: ShoppingCart,
     href: "/admin/pos",
-    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'CASHIER'],
   },
   {
     label: "orders",

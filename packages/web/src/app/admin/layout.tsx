@@ -50,7 +50,7 @@ export default function AdminLayout({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF', 'STAFF']}>
+      <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF', 'STAFF', 'CASHIER']}>
         <RoleRouteGuard>
         <div className="h-full">
           {/* Desktop Sidebar */}

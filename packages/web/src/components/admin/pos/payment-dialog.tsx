@@ -27,7 +27,7 @@ interface PaymentDialogProps {
   isOpen: boolean
   onClose: () => void
   orderId: string
-  onPaymentProcessed?: () => void
+  onPaymentProcessed?: (method: PaymentMethod) => void | Promise<void>
   isPrePayment?: boolean
   prePaymentAmount?: number
 }
@@ -93,7 +93,7 @@ export function PaymentDialog({
         // Para pre-pagos, solo notificar que el pago fue procesado
         // La orden se creará después
         if (onPaymentProcessed) {
-          onPaymentProcessed()
+          await onPaymentProcessed(paymentMethod)
         }
         onClose()
       } else {
@@ -101,7 +101,7 @@ export function PaymentDialog({
         await processPayment(orderId, parseFloat(amount), paymentMethod)
         await loadPaymentDetails()
         if (onPaymentProcessed) {
-          onPaymentProcessed()
+          await onPaymentProcessed(paymentMethod)
         }
         if (paymentDetails && parseFloat(amount) >= paymentDetails.remainingBalance) {
           onClose()

@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toFiniteInteger } from "@/lib/utils"
+import type { BillingCustomerInput, PaymentMethod } from "@/lib/api"
+import { InvoiceCustomerDialog } from "@/components/admin/pos/invoice-customer-dialog"
+import { useToast } from "@/components/ui/use-toast"
 
 interface ProductVariantWithGroup extends ProductVariant {
   groupName?: string;
@@ -34,7 +37,11 @@ interface CartProps {
   tables: Table[]
   onOrderTypeChange: (type: "table" | "takeout" | "delivery") => void
   onTableSelect: (tableId: string) => void
-  onSubmit: (assignedLocationId?: string) => void
+  onSubmit: (
+    assignedLocationId?: string,
+    invoiceCustomer?: BillingCustomerInput | null,
+    paymentMethod?: PaymentMethod,
+  ) => void | Promise<void>
   loading?: boolean
   customerName: string
   onCustomerNameChange: (name: string) => void
@@ -44,12 +51,14 @@ interface CartProps {
   onNeighborhoodChange: (neighborhood: string) => void
   phone: string
   onPhoneChange: (phone: string) => void
-  paymentMethod: "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER"
-  onPaymentMethodChange: (method: "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER") => void
+  paymentMethod: PaymentMethod
+  onPaymentMethodChange: (method: PaymentMethod) => void
   currentOrders: {
     id: string
     status: string
     total: number
+    isPaid: boolean
+    billingRequestStatus: "NOT_REQUESTED" | "REQUESTED" | "DECLINED"
     items: {
       id: string
       product: {
@@ -60,6 +69,11 @@ interface CartProps {
       status: string
     }[]
   }[]
+  onTableOrdersChanged: () => Promise<CartProps["currentOrders"]>
+  onTableInvoiceDecision: (
+    customer: BillingCustomerInput | null,
+    orderIds: string[],
+  ) => Promise<void>
   locations?: Location[]
 }
 
@@ -86,12 +100,20 @@ export function Cart({
   paymentMethod,
   onPaymentMethodChange,
   currentOrders = [],
+  onTableOrdersChanged,
+  onTableInvoiceDecision,
   locations = [],
 }: CartProps) {
+  const { toast } = useToast()
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [tempOrderId, setTempOrderId] = useState<string | null>(null)
+  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false)
+  const [invoiceDialogMode, setInvoiceDialogMode] = useState<"takeout" | "delivery" | "table" | null>(null)
+  const [pendingInvoiceCustomer, setPendingInvoiceCustomer] = useState<BillingCustomerInput | null>(null)
+  const [pendingDeliveryLocationId, setPendingDeliveryLocationId] = useState<string | undefined>()
+  const [tableInvoiceOrderIds, setTableInvoiceOrderIds] = useState<string[]>([])
 
   // Address validation state
   const [isValidating, setIsValidating] = useState(false)
@@ -190,18 +212,18 @@ export function Cart({
   const allOrdersTotal = ordersTotal + cartTotal
 
   const handleSubmit = async () => {
+    if (orderType === "takeout" || orderType === "delivery") {
+      setInvoiceDialogMode(orderType)
+      setPendingDeliveryLocationId(
+        orderType === "delivery" ? addressValidation.assignedLocation?.id : undefined,
+      )
+      setIsInvoiceDialogOpen(true)
+      return
+    }
+
     try {
       setIsProcessing(true)
-      if (orderType === "takeout") {
-        // Para llevar: mostrar diálogo de pago primero
-        setTempOrderId("temp")  // ID temporal para el diálogo de pago
-        setIsPaymentDialogOpen(true)
-      } else {
-        // Mesa o Domicilio: crear orden primero
-        // Si es domicilio, pasar el ID de la sede asignada
-        const assignedLocationId = orderType === "delivery" ? addressValidation.assignedLocation?.id : undefined;
-        await onSubmit(assignedLocationId)
-      }
+      await onSubmit()
     } catch (error) {
       console.error('Error submitting order:', error)
     } finally {
@@ -209,13 +231,84 @@ export function Cart({
     }
   }
 
-  const handlePaymentProcessed = async () => {
-    if (orderType === "takeout") {
-      // Después del pago, crear la orden
-      await onSubmit()
+  const handleInvoiceCustomerConfirm = async (customer: BillingCustomerInput | null) => {
+    setIsInvoiceDialogOpen(false)
+    if (invoiceDialogMode === "takeout") {
+      setPendingInvoiceCustomer(customer)
+      setTempOrderId("temp")
+      setIsPaymentDialogOpen(true)
+      return
     }
-    setIsPaymentDialogOpen(false)
-    setTempOrderId(null)
+    if (invoiceDialogMode === "delivery") {
+      setIsProcessing(true)
+      try {
+        await onSubmit(pendingDeliveryLocationId, customer, paymentMethod)
+      } catch (error) {
+        toast({
+          title: "No se pudo crear el pedido",
+          description: error instanceof Error ? error.message : "Inténtalo nuevamente.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsProcessing(false)
+        setInvoiceDialogMode(null)
+      }
+      return
+    }
+    if (invoiceDialogMode === "table") {
+      setIsProcessing(true)
+      try {
+        await onTableInvoiceDecision(customer, tableInvoiceOrderIds)
+      } catch (error) {
+        toast({
+          title: "No se pudo procesar la factura",
+          description: error instanceof Error ? error.message : "Inténtalo nuevamente.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsProcessing(false)
+        setInvoiceDialogMode(null)
+        setTableInvoiceOrderIds([])
+      }
+    }
+  }
+
+  const handlePaymentProcessed = async (method: PaymentMethod) => {
+    if (orderType === "takeout") {
+      setIsProcessing(true)
+      try {
+        await onSubmit(undefined, pendingInvoiceCustomer, method)
+      } finally {
+        setIsProcessing(false)
+        setPendingInvoiceCustomer(null)
+        setIsPaymentDialogOpen(false)
+        setTempOrderId(null)
+      }
+    } else if (selectedOrderId) {
+      try {
+        const orders = await onTableOrdersChanged()
+        const pendingOrderIds = orders
+          .filter(
+            (order) =>
+              order.isPaid &&
+              order.billingRequestStatus === "NOT_REQUESTED" &&
+              order.status !== "CANCELLED",
+          )
+          .map(({ id }) => id)
+        if (orders.length > 0 && orders.every((order) => order.isPaid) && pendingOrderIds.length > 0) {
+          setTableInvoiceOrderIds(pendingOrderIds)
+          setInvoiceDialogMode("table")
+          setIsInvoiceDialogOpen(true)
+        }
+      } catch (error) {
+        console.error("Could not refresh table orders after payment:", error)
+        toast({
+          title: "Pago registrado",
+          description: "No se pudo actualizar el estado de la cuenta de la mesa.",
+          variant: "destructive",
+        })
+      }
+    }
   }
 
   return (
@@ -358,7 +451,7 @@ export function Cart({
                   />
                   <Select
                     value={paymentMethod}
-                    onValueChange={(value: "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER") => onPaymentMethodChange(value)}
+                    onValueChange={(value: PaymentMethod) => onPaymentMethodChange(value)}
                   >
                     <SelectTrigger className="h-8">
                       <SelectValue placeholder="Método de pago" />
@@ -428,18 +521,22 @@ export function Cart({
                           </span>
                         </div>
                         <div className="flex justify-end">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedOrderId(order.id)
-                              setIsPaymentDialogOpen(true)
-                            }}
-                            disabled={isProcessing || loading}
-                            className="h-6 text-xs"
-                          >
-                            Pagar
-                          </Button>
+                            {order.isPaid ? (
+                              <Badge variant="secondary">Pagada</Badge>
+                            ) : (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedOrderId(order.id)
+                                  setIsPaymentDialogOpen(true)
+                                }}
+                                disabled={isProcessing || loading}
+                                className="h-6 text-xs"
+                              >
+                                Pagar
+                              </Button>
+                            )}
                         </div>
                       </div>
                     ))}
@@ -603,6 +700,7 @@ export function Cart({
             setIsPaymentDialogOpen(false)
             setSelectedOrderId(null)
             setTempOrderId(null)
+            setPendingInvoiceCustomer(null)
           }}
           orderId={selectedOrderId || "temp"}
           onPaymentProcessed={handlePaymentProcessed}
@@ -610,6 +708,11 @@ export function Cart({
           prePaymentAmount={orderType === "takeout" ? cartTotal : undefined}
         />
       )}
+      <InvoiceCustomerDialog
+        open={isInvoiceDialogOpen}
+        onOpenChange={setIsInvoiceDialogOpen}
+        onConfirm={handleInvoiceCustomerConfirm}
+      />
     </Card>
   )
 }

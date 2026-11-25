@@ -420,7 +420,25 @@ export interface ProductComponent {
   updatedAt: string
 }
 
-export type PaymentMethod = 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'QR';
+export type PaymentMethod = 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'QR' | 'TRANSFER';
+
+export interface BillingCustomerInput {
+  identificationDocumentCode: string
+  identification: string
+  legalOrganizationCode: string
+  company?: string
+  names?: string
+  dv?: string
+  email?: string
+}
+
+export interface BillingDocumentResult {
+  id: string
+  status: string
+  documentNumber?: string | null
+  cufe?: string | null
+  errorMessage?: string | null
+}
 
 export interface Payment {
   id: string;
@@ -440,6 +458,21 @@ export interface PaymentDetails {
   remainingBalance: number;
   isFullyPaid: boolean;
   payments: Payment[];
+}
+
+export interface ActiveOrder {
+  id: string
+  createdAt: string
+  status: string
+  total: number
+  isPaid: boolean
+  billingRequestStatus: "NOT_REQUESTED" | "REQUESTED" | "DECLINED"
+  items: Array<{
+    id: string
+    product: { name: string; price: number }
+    quantity: number
+    status: string
+  }>
 }
 
 // User types
@@ -1244,7 +1277,10 @@ export interface CreateOrderData {
   splitBill?: string[]
 }
 
-export async function createOrder(data: CreateOrderData) {
+async function postOrder(
+  data: CreateOrderData,
+  endpoint: string,
+): Promise<{ id: string; total: number }> {
   // Adaptar items con variantes múltiples al formato backend y asegurar que 'variants' siempre es array
   const items = (data.items || []).map((item) => {
     // Si ya tiene 'variants' como array, transformar
@@ -1267,7 +1303,7 @@ export async function createOrder(data: CreateOrderData) {
     return { ...item, variants: [] };
   });
   const payload = { ...data, items };
-  const response = await fetch(`${API_URL}/orders`, {
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       ...getAuthHeaders(),
@@ -1279,6 +1315,73 @@ export async function createOrder(data: CreateOrderData) {
     throw new Error('Failed to create order');
   }
   return response.json();
+}
+
+export async function createOrder(data: CreateOrderData) {
+  return postOrder(data, `${API_URL}/orders`);
+}
+
+export async function createPosOrder(data: CreateOrderData) {
+  return postOrder(data, `${API_URL}/orders/pos`);
+}
+
+async function postBillingRequest<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok) {
+    const errorData: unknown = await response.json().catch(() => null);
+    const message =
+      typeof errorData === 'object' &&
+      errorData !== null &&
+      'message' in errorData &&
+      typeof errorData.message === 'string'
+        ? errorData.message
+        : `Billing request failed (${response.status}).`;
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+export async function issuePosInvoice(
+  orderIds: string[],
+  customer: BillingCustomerInput,
+): Promise<BillingDocumentResult> {
+  return postBillingRequest('/billing/pos/orders', { orderIds, customer });
+}
+
+export async function issuePosTableInvoice(
+  tableId: string,
+  orderIds: string[],
+  customer: BillingCustomerInput,
+): Promise<BillingDocumentResult> {
+  return postBillingRequest(`/billing/pos/tables/${encodeURIComponent(tableId)}`, {
+    orderIds,
+    customer,
+  });
+}
+
+export async function declinePosTableInvoice(
+  tableId: string,
+  orderIds: string[],
+): Promise<void> {
+  await postBillingRequest(
+    `/billing/pos/tables/${encodeURIComponent(tableId)}/decline`,
+    { orderIds },
+  );
+}
+
+export async function retryPosInvoice(
+  billingDocumentId: string,
+): Promise<BillingDocumentResult> {
+  return postBillingRequest(
+    `/billing/pos/documents/${encodeURIComponent(billingDocumentId)}/retry`,
+  );
 }
 
 export async function updateOrderItemStatus(
@@ -1406,7 +1509,7 @@ export async function printKitchenTicket(orderId: string): Promise<unknown> {
   return response.json();
 }
 
-export async function getActiveOrders(tableId: string) {
+export async function getActiveOrders(tableId: string): Promise<ActiveOrder[]> {
   try {
     const response = await fetch(`${API_URL}/orders?tableId=${tableId}`, {
       headers: getAuthHeaders(),

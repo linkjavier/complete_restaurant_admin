@@ -83,10 +83,12 @@ export class PosService {
     }
 
     // Calculate total amount and remaining balance
-    const totalAmount = order.items.reduce(
-      (sum, item) => sum + item.product.price * item.quantity,
-      0,
-    );
+    const totalAmount =
+      order.total ??
+      order.items.reduce(
+        (sum, item) => sum + (item.price ?? item.product.price) * item.quantity,
+        Number(order.deliveryFee ?? 0),
+      );
 
     const paidAmount = order.payments.reduce(
       (sum, payment) =>

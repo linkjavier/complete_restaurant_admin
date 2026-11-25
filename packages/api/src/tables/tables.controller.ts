@@ -40,7 +40,7 @@ export class TablesController {
   }
 
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'CASHIER')
   @ApiOperation({ summary: 'Get all tables' })
   @ApiResponse({ status: 200, description: 'Return all tables' })
   async findAll(@Req() req: Request) {

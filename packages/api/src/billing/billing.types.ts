@@ -63,6 +63,7 @@ export interface EmitInvoiceCommand {
   idempotencyKey: string;
   invoice: BillingInvoiceInput;
   orderId?: string;
+  orderIds?: string[];
 }
 
 export interface BillingProviderContext {

@@ -297,6 +297,7 @@ function makeDocument(data: Prisma.BillingDocumentUncheckedCreateInput): Billing
     cufe: null,
     requestHash: data.requestHash,
     responseMetadata: null,
+    requestPayload: null,
     errorCode: null,
     errorMessage: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),

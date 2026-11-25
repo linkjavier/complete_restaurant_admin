@@ -6,7 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BillingDocument, BillingDocumentStatus, BillingDocumentType } from '@prisma/client';
+import {
+  BillingDocument,
+  BillingDocumentStatus,
+  BillingDocumentType,
+  Prisma,
+} from '@prisma/client';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingEmissionError, BillingProviderError } from './billing.errors';
@@ -37,6 +42,31 @@ export class BillingService {
     return this.issueInvoiceInternal(command, true);
   }
 
+  async retryStoredInvoice(
+    tenantId: string,
+    billingDocumentId: string,
+  ): Promise<BillingDocument> {
+    const document = await this.prisma.billingDocument.findFirst({
+      where: { id: billingDocumentId, tenantId },
+      include: { orderLinks: { select: { orderId: true } } },
+    });
+    if (!document) {
+      throw new NotFoundException('Billing document not found for this tenant.');
+    }
+    if (!document.requestPayload) {
+      throw new BadRequestException('This billing document has no stored request to retry.');
+    }
+
+    return this.retryInvoice({
+      tenantId,
+      locationId: document.locationId,
+      idempotencyKey: document.idempotencyKey,
+      orderId: document.orderId ?? undefined,
+      orderIds: document.orderLinks.map(({ orderId }) => orderId),
+      invoice: parseBillingInvoiceInput(document.requestPayload),
+    });
+  }
+
   private async issueInvoiceInternal(
     command: EmitInvoiceCommand,
     retryFailed: boolean,
@@ -62,6 +92,8 @@ export class BillingService {
       ...inputInvoice,
       numberingRangeId: context.numberingRangeId,
     };
+    const orderIds = normalizeOrderIds(command);
+    const primaryOrderId = command.orderId ?? orderIds[0];
 
     const provider = this.providers.forCountry(countryCode);
     this.assertSandboxEnabled(provider);
@@ -69,7 +101,8 @@ export class BillingService {
     const requestHash = hashPayload({
       countryCode,
       providerName: provider.name,
-      orderId: command.orderId ?? null,
+      orderId: primaryOrderId ?? null,
+      orderIds,
       locationId,
       invoice,
     });
@@ -89,9 +122,20 @@ export class BillingService {
       throw new NotFoundException('No retryable billing document exists for this idempotency key.');
     }
 
-    if (command.orderId) {
+    if (orderIds.length > 1) {
+      const orders = await this.prisma.order.findMany({
+        where: { id: { in: orderIds }, tenantId },
+        select: { id: true, locationId: true },
+      });
+      if (orders.length !== orderIds.length) {
+        throw new NotFoundException('One or more orders were not found for this tenant.');
+      }
+      if (orders.some((order) => order.locationId !== locationId)) {
+        throw new BadRequestException('Orders do not belong to the configured location.');
+      }
+    } else if (primaryOrderId) {
       const order = await this.prisma.order.findFirst({
-        where: { id: command.orderId, tenantId },
+        where: { id: primaryOrderId, tenantId },
         select: { id: true, locationId: true },
       });
       if (!order) {
@@ -108,7 +152,7 @@ export class BillingService {
         data: {
           tenantId,
           locationId,
-          orderId: command.orderId,
+          orderId: primaryOrderId,
           countryCode,
           providerName: provider.name,
           type: BillingDocumentType.SALES_INVOICE,
@@ -116,6 +160,16 @@ export class BillingService {
           idempotencyKey,
           referenceCode,
           requestHash,
+          requestPayload: JSON.parse(JSON.stringify(invoice)) as Prisma.InputJsonValue,
+          ...(orderIds.length > 0
+            ? {
+                orderLinks: {
+                  create: orderIds.map((orderId) => ({
+                    order: { connect: { id: orderId } },
+                  })),
+                },
+              }
+            : {}),
         },
       });
     } catch (error) {
@@ -298,6 +352,13 @@ export class BillingService {
 
 function hashPayload(value: unknown): string {
   return createHash('sha256').update(stableSerialize(value)).digest('hex');
+}
+
+function normalizeOrderIds(command: EmitInvoiceCommand): string[] {
+  return [...new Set([...(command.orderIds ?? []), ...(command.orderId ? [command.orderId] : [])])]
+    .map((orderId) => orderId.trim())
+    .filter(Boolean)
+    .sort();
 }
 
 function stableSerialize(value: unknown): string {

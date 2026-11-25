@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Inject,
@@ -7,8 +8,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Order, Prisma } from '@prisma/client';
-import { CreateOrderDto } from './dto/create-order.dto';
+import { Order, Prisma, User, UserRole } from '@prisma/client';
+import { CreateOrderDto, OrderSource } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrdersGateway } from './orders.gateway';
 import { OrdersQueueService } from './orders-workers/orders-queue.service';
@@ -94,6 +95,47 @@ export class OrdersService {
     });
   }
 
+  async createFromPos(
+    createOrderDto: CreateOrderDto,
+    tenantId: string,
+    user: User,
+  ) {
+    const locationId = createOrderDto.locationId?.trim();
+    if (!locationId || createOrderDto.source !== OrderSource.POS) {
+      throw new BadRequestException('A POS order must include a selected location.');
+    }
+    if (user.tenantId !== tenantId) {
+      throw new ForbiddenException('User does not belong to this tenant.');
+    }
+    if (user.role !== UserRole.SUPER_ADMIN && user.locationId !== locationId) {
+      throw new ForbiddenException('POS orders must use the user’s assigned location.');
+    }
+
+    const location = await this.prisma.location.findFirst({
+      where: { id: locationId, tenantId },
+      select: { id: true },
+    });
+    if (!location) {
+      throw new NotFoundException('Selected location was not found for this tenant.');
+    }
+
+    if (createOrderDto.tableId) {
+      const table = await this.prisma.table.findFirst({
+        where: {
+          id: createOrderDto.tableId,
+          tenantId,
+          locationId,
+        },
+        select: { id: true },
+      });
+      if (!table) {
+        throw new BadRequestException('Selected table does not belong to the selected location.');
+      }
+    }
+
+    return this.create({ ...createOrderDto, locationId }, tenantId);
+  }
+
   async create(createOrderDto: CreateOrderDto, tenantId: string) {
     try {
       this.logger.log(`Creating order from DTO: ${JSON.stringify(createOrderDto)}`);
@@ -101,7 +143,11 @@ export class OrdersService {
       const { userId, items, ...orderData } = createOrderDto;
 
       // Handle Delivery Address Validation and Location Assignment
-      if (orderData.type === 'DELIVERY' && orderData.deliveryAddress) {
+      if (
+        orderData.type === 'DELIVERY' &&
+        orderData.deliveryAddress &&
+        createOrderDto.source !== OrderSource.POS
+      ) {
         this.logger.log(`Performing backend address validation for delivery order...`);
         try {
           const validation = await this.geocodingService.validateAndAssignLocation(

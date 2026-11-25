@@ -405,6 +405,8 @@ model Order {
   items           OrderItem[]
   payments        Payment[]
   billingDocuments BillingDocument[]
+  billingDocumentLinks BillingDocumentOrder[]
+  billingRequestStatus BillingRequestStatus @default(NOT_REQUESTED)
   deliveryFee     Float?
   subtotal        Float?
   total           Float?
@@ -443,6 +445,12 @@ model OrderItemVariant {
   productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
   productVariantId String
   groupName        String?
+}
+
+enum BillingRequestStatus {
+  NOT_REQUESTED
+  REQUESTED
+  DECLINED
 }
 
 enum OrderItemStatus {
@@ -757,15 +765,27 @@ model BillingDocument {
   cufe                String?
   requestHash         String
   responseMetadata    Json?
+  requestPayload      Json?
   errorCode           String?
   errorMessage        String?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
+  orderLinks          BillingDocumentOrder[]
 
   @@unique([tenantId, locationId, idempotencyKey])
   @@unique([tenantId, providerName, referenceCode])
   @@index([tenantId, locationId, createdAt])
   @@index([orderId])
+}
+
+model BillingDocumentOrder {
+  billingDocumentId String
+  orderId           String
+  billingDocument   BillingDocument @relation(fields: [billingDocumentId], references: [id], onDelete: Restrict)
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@id([billingDocumentId, orderId])
+  @@unique([orderId])
 }
 
 model BillingLocationConfiguration {
