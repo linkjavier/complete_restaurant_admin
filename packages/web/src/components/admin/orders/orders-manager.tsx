@@ -26,7 +26,7 @@ import {
 import { useOrderSocket } from "@/hooks/use-order-socket"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { getLocations, Location } from "@/lib/api"
+import { API_URL, getAuthHeaders, getLocations, Location } from "@/lib/api"
 import {
   Select,
   SelectContent,
@@ -34,7 +34,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { API_URL } from '@/lib/api'
 
 // Tipos para las órdenes
 type OrderStatus = "PENDING" | "IN_PROGRESS" | "READY" | "CANCELLED" | "PAID"
@@ -291,9 +290,7 @@ export function OrdersManager() {
       }
 
       const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -334,8 +331,8 @@ export function OrdersManager() {
       const response = await fetch(`${API_URL}/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
+          ...getAuthHeaders(),
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({ status })
       })
@@ -365,8 +362,8 @@ export function OrdersManager() {
       const response = await fetch(`${API_URL}/payments/process`, {
         method: 'POST',
         headers: {
+          ...getAuthHeaders(),
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
           orderId,
@@ -398,9 +395,7 @@ export function OrdersManager() {
   const handlePrintReceipt = async (orderId: string) => {
     try {
       const response = await fetch(`${API_URL}/orders/${orderId}/receipt`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        headers: getAuthHeaders()
       })
 
       if (!response.ok) {
@@ -526,9 +521,7 @@ export function OrdersManager() {
       }
 
       const response = await fetch(`${API_URL}/orders/deleted/list${locationParam ? `?${locationParam}` : ''}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+        headers: getAuthHeaders(),
       });
       if (!response.ok) throw new Error('Error al cargar las órdenes eliminadas');
       const data = await response.json();
@@ -546,9 +539,7 @@ export function OrdersManager() {
     try {
       const response = await fetch(`${API_URL}/orders/${orderId}/delete`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+        headers: getAuthHeaders(),
       });
       if (!response.ok) throw new Error('Error al eliminar la orden');
       toast({ title: 'Orden eliminada', description: 'La orden fue eliminada correctamente.' });

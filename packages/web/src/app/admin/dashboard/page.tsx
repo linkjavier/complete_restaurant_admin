@@ -11,7 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { API_URL } from '@/lib/api'
+import { API_URL, getAuthHeaders } from '@/lib/api'
 import { useLanguage } from "@/hooks/use-language"
 
 interface Order {
@@ -194,9 +194,7 @@ export default function AdminDashboard() {
   const fetchOrderStats = async () => {
     try {
       const response = await fetch(`${API_URL}/orders?kitchen=false`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+        headers: getAuthHeaders(),
       })
 
       if (!response.ok) {

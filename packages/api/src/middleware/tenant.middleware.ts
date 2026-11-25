@@ -8,11 +8,6 @@ export class TenantMiddleware implements NestMiddleware {
 
   async use(req: Request, res: Response, next: NextFunction) {
     try {
-      // LOG: Imprime todas las cabeceras relevantes para debug
-      console.log('[TenantMiddleware] HEADERS:', JSON.stringify(req.headers, null, 2));
-      // DEBUG: imprime la URL real para ver cómo llega
-      console.log('[TenantMiddleware] originalUrl:', req.originalUrl, 'path:', req.path);
-
       // Rutas públicas que no requieren tenant
       const publicPaths = [
         '/auth/register',

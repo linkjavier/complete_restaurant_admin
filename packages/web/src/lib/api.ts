@@ -478,8 +478,6 @@ export const getAuthHeaders = (isMultipart = false) => {
 
   if (!tenantId) {
     console.warn('[getAuthHeaders] WARNING: No tenantId detected from subdomain! Host:', window.location.hostname);
-  } else {
-    console.log('[getAuthHeaders] tenantId:', tenantId, 'headers:', headers);
   }
   return headers;
 };
