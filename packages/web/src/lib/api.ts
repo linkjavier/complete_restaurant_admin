@@ -1393,9 +1393,7 @@ export async function processPayment(
 // User API functions
 export async function getUsers(): Promise<User[]> {
   const response = await fetch(`${API_URL}/users`, {
-    headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
-    },
+    headers: getAuthHeaders(),
     credentials: 'include',
   })
   if (!response.ok) throw new Error('Failed to fetch users')
@@ -1438,7 +1436,7 @@ export async function createUser(data: CreateUserDto): Promise<User> {
   const response = await fetch(`${API_URL}/users`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
+      ...getAuthHeaders(),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(data),
@@ -1452,7 +1450,7 @@ export async function updateUser(id: string, data: UpdateUserDto): Promise<User>
   const response = await fetch(`${API_URL}/users/${id}`, {
     method: 'PATCH',
     headers: {
-      'Authorization': `Bearer ${getAuthToken()}`,
+      ...getAuthHeaders(),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(data),
