@@ -2,6 +2,8 @@ x-api-environment: &api-environment
   NODE_ENV: production
   PORT: 3000
   DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+  BILLING_ENV: ${BILLING_ENV:-}
+  BILLING_CREDENTIALS_ENCRYPTION_KEY: ${BILLING_CREDENTIALS_ENCRYPTION_KEY:-}
   REDIS_HOST: redis
   REDIS_PORT: 6379
   FRONTEND_URL: ${FRONTEND_URL:-https://kutchen.online}

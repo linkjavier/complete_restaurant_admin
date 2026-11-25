@@ -519,6 +519,13 @@ Keep `.env.production` only on the server; it is ignored by Git. Ensure
 `api.kutchen.xyz` resolves to the VPS and that inbound TCP ports 80 and 443 are
 open before starting Caddy. Do not expose ports 3000, 5432, or 6379.
 
+For Factus configuration, set `BILLING_CREDENTIALS_ENCRYPTION_KEY` in
+`.env.production` to a separately generated base64-encoded 32-byte key
+(`openssl rand -base64 32`). Keep it private and backed up: losing it makes
+stored Factus credentials unreadable. The current Factus provider only permits
+sandbox issuance, so set `BILLING_ENV=sandbox` only while testing; live
+electronic invoicing is not enabled by this implementation.
+
 From the repository root on the VPS, start the stack:
 
 ```bash
