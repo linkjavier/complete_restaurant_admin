@@ -117,6 +117,7 @@ export function ImageUpload({ onImageUploaded, currentImage, buttonText }: Image
           id="image-upload"
         />
         <Button
+          type="button"
           variant="outline"
           disabled={uploading}
           className="flex items-center gap-2 cursor-pointer"

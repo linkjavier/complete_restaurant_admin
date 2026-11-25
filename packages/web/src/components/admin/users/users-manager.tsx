@@ -373,7 +373,17 @@ export function UsersManager() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4">
+          <form
+            className="grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (editingUser) {
+                void handleUpdateUser()
+              } else {
+                void handleCreateUser()
+              }
+            }}
+          >
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -395,6 +405,7 @@ export function UsersManager() {
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="new-password"
                   placeholder="********"
                   value={newUser.password}
                   onChange={(e) =>
@@ -495,11 +506,12 @@ export function UsersManager() {
             <div className="flex gap-2">
               {editingUser ? (
                 <>
-                  <Button onClick={handleUpdateUser}>
+                  <Button type="submit">
                     <Pencil className="mr-2 h-4 w-4" />
                     Actualizar Usuario
                   </Button>
                   <Button
+                    type="button"
                     variant="outline"
                     onClick={() => setEditingUser(null)}
                   >
@@ -507,13 +519,13 @@ export function UsersManager() {
                   </Button>
                 </>
               ) : (
-                <Button onClick={handleCreateUser}>
+                <Button type="submit">
                   <Plus className="mr-2 h-4 w-4" />
                   Crear Usuario
                 </Button>
               )}
             </div>
-          </div>
+          </form>
         </CardContent>
       </Card>
 
