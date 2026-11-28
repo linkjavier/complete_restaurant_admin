@@ -77,7 +77,18 @@ describe('BillingLocationConfigurationService', () => {
     expect(saved.factusCredentialsEncrypted).not.toContain('factus-password');
     expect(result.credentialsConfigured).toBe(true);
     expect(result.isReady).toBe(true);
+    expect(result.missingFields).toEqual([]);
     expect(JSON.stringify(result)).not.toContain('factus-password');
+  });
+
+  it('identifies required location settings missing before invoice emission', async () => {
+    await expect(service.getForEmission('tenant-1', 'location-1')).rejects.toMatchObject({
+      response: {
+        code: 'BILLING_CONFIGURATION_INCOMPLETE',
+        missingFields: expect.arrayContaining(['issuerLegalName', 'factusCredentials']),
+        message: expect.stringContaining('razón social del emisor'),
+      },
+    });
   });
 
   it('requires all Factus credentials when replacing them', async () => {
@@ -125,6 +136,55 @@ describe('BillingLocationConfigurationService', () => {
     expect(result.countryCode).toBe('CO');
     expect(result.context.numberingRangeId).toBe(7);
     expect(result.context.credentials.clientSecret).toBe('client-secret');
+  });
+
+  it('allows invoice emission when no specific numbering range is configured', async () => {
+    const encrypted = credentialEncryption.encrypt({
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      username: 'factus-user',
+      password: 'factus-password',
+    });
+    configurationFindUnique.mockResolvedValueOnce(
+      makeConfiguration({
+        issuerLegalName: 'Restaurant SAS',
+        issuerTaxId: '900123456',
+        issuerTaxIdDv: '7',
+        establishmentName: 'Centro',
+        establishmentAddress: 'Calle 1 # 2-3',
+        establishmentMunicipalityCode: '11001',
+        establishmentPhone: '6015550101',
+        establishmentEmail: 'billing@example.test',
+        factusCredentialsEncrypted: encrypted,
+      }),
+    );
+
+    const result = await service.getForEmission('tenant-1', 'location-1');
+
+    expect(result.context.numberingRangeId).toBeUndefined();
+  });
+
+  it('loads credentials for a connection test without requiring a complete fiscal profile', async () => {
+    const encrypted = credentialEncryption.encrypt({
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      username: 'factus-user',
+      password: 'factus-password',
+    });
+    configurationFindUnique.mockResolvedValueOnce(
+      makeConfiguration({ factusCredentialsEncrypted: encrypted }),
+    );
+
+    const result = await service.getForConnectionTest('tenant-1', 'location-1');
+
+    expect(result.countryCode).toBe('CO');
+    expect(result.context.credentials).toEqual({
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      username: 'factus-user',
+      password: 'factus-password',
+    });
+    expect(result.context.numberingRangeId).toBeUndefined();
   });
 });
 

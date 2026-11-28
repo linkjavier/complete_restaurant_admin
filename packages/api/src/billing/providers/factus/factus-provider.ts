@@ -13,6 +13,13 @@ import { BillingProviderError } from '../../billing.errors';
 
 const SANDBOX_URL = 'https://api-sandbox.factus.com.co';
 const REQUEST_TIMEOUT_MS = 15_000;
+const OAUTH_ERROR_CODES = new Set([
+  'invalid_client',
+  'invalid_grant',
+  'invalid_request',
+  'unauthorized_client',
+  'unsupported_grant_type',
+]);
 
 interface FactusConfiguration {
   baseUrl: string;
@@ -37,6 +44,11 @@ export class FactusProvider implements BillingProvider {
   private readonly tokenRequests = new Map<string, Promise<string>>();
 
   constructor(private readonly configService: ConfigService) {}
+
+  async testConnection(context: BillingProviderContext): Promise<void> {
+    const config = this.getConfiguration(context);
+    await this.getAccessToken(config);
+  }
 
   async issueInvoice(
     referenceCode: string,
@@ -339,8 +351,11 @@ function toProviderError(error: unknown, stage: 'AUTH' | 'DOCUMENT'): BillingPro
 
   const status = error.response?.status;
   if (stage === 'AUTH') {
+    const oauthErrorCode = getOAuthErrorCode(error.response?.data);
     return new BillingProviderError(
-      status ? `FACTUS_AUTH_HTTP_${status}` : 'FACTUS_AUTH_NETWORK_ERROR',
+      status
+        ? `FACTUS_AUTH_HTTP_${status}${oauthErrorCode ? `_${oauthErrorCode}` : ''}`
+        : 'FACTUS_AUTH_NETWORK_ERROR',
       'FAILED_RETRYABLE',
       'Factus authentication failed before document submission.',
     );
@@ -367,10 +382,13 @@ function toProviderError(error: unknown, stage: 'AUTH' | 'DOCUMENT'): BillingPro
     );
   }
   if (status && status >= 400 && status < 500) {
+    const validationFields = status === 422 ? getValidationFieldNames(error.response?.data) : [];
     return new BillingProviderError(
       `FACTUS_DOCUMENT_HTTP_${status}`,
       'REJECTED',
-      'Factus rejected the invoice request.',
+      validationFields.length
+        ? `Factus rejected the invoice request. Validation fields: ${validationFields.join(', ')}.`
+        : 'Factus rejected the invoice request.',
     );
   }
   return new BillingProviderError(
@@ -378,6 +396,26 @@ function toProviderError(error: unknown, stage: 'AUTH' | 'DOCUMENT'): BillingPro
     'RECONCILIATION_REQUIRED',
     'Factus request outcome is unknown; reconcile before retrying.',
   );
+}
+
+function getOAuthErrorCode(data: unknown): string | undefined {
+  const errorCode = asRecord(data)?.error;
+  return typeof errorCode === 'string' && OAUTH_ERROR_CODES.has(errorCode)
+    ? errorCode.toUpperCase()
+    : undefined;
+}
+
+function getValidationFieldNames(data: unknown): string[] {
+  const response = asRecord(data);
+  const nestedData = asRecord(response?.data);
+  const errors = asRecord(response?.errors) ?? asRecord(nestedData?.errors);
+  if (!errors) {
+    return [];
+  }
+
+  return Object.keys(errors)
+    .filter((field) => /^[a-zA-Z0-9_.[\]-]{1,120}$/.test(field))
+    .slice(0, 20);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Search,
   CheckCircle2,
+  AlertCircle,
   ShoppingCart,
   Clock3,
   Loader2,
@@ -34,6 +36,7 @@ import {
   openPosShift,
   getPosShiftSummary,
   closePosShift,
+  BillingRequestError,
 } from "@/lib/api";
 import type {
   ActiveOrder,
@@ -645,6 +648,7 @@ export default function PosPage() {
 
       let billingResult: BillingDocumentResult | null = null;
       let billingError: string | null = null;
+      let billingFailure: BillingRequestError | null = null;
       if (invoiceCustomer) {
         try {
           billingResult = await issuePosInvoice(
@@ -652,6 +656,9 @@ export default function PosPage() {
             invoiceCustomer,
           );
         } catch (error) {
+          if (error instanceof BillingRequestError) {
+            billingFailure = error;
+          }
           billingError =
             error instanceof Error
               ? error.message
@@ -672,30 +679,51 @@ export default function PosPage() {
         await refreshActiveOrders();
       }
 
+      const billingNeedsAttention =
+        Boolean(billingError) || Boolean(billingResult && billingResult.status !== "ACCEPTED");
       toast({
         title: billingError
-          ? "Pedido creado; factura pendiente"
+          ? billingFailure?.billingDocumentId
+            ? "Pedido creado; factura requiere revisión"
+            : "Pedido creado; factura no registrada"
           : billingResult
-            ? "Pedido y factura procesados"
+            ? billingResult.status === "ACCEPTED"
+              ? "Pedido y factura emitidos"
+              : "Pedido creado; factura pendiente"
             : "Éxito",
         description: (
           <span
-            className={`flex items-center justify-between ${billingError ? "text-destructive" : "text-green-600"}`}
+            className={`flex items-center justify-between ${billingNeedsAttention ? "text-destructive" : "text-green-600"}`}
           >
-            <span>
+            <span className="space-y-1">
               {billingError
-                ? `El pedido quedó creado${orderType === "takeout" ? " y cobrado" : ""}, pero Factus no emitió la factura: ${billingError}`
+                ? billingFailure?.billingDocumentId
+                  ? `El pedido quedó creado${orderType === "takeout" ? " y cobrado" : ""}. El documento ${billingFailure.billingDocumentId} está en estado ${billingFailure.billingStatus ?? "sin confirmar"}: ${billingError}`
+                  : `El pedido quedó creado${orderType === "takeout" ? " y cobrado" : ""}, pero no se pudo registrar la factura: ${billingError}`
                 : billingResult
-                  ? `Pedido creado. Estado de factura: ${billingResult.status}.`
+                  ? billingResult.status === "ACCEPTED"
+                    ? `Pedido creado. Factura ${billingResult.documentNumber ? `N.º ${billingResult.documentNumber} ` : ""}aceptada por Factus.`
+                    : `Pedido creado. Estado de factura: ${billingResult.status}.`
                   : "Pedido creado correctamente"}
+              {(billingResult?.id || billingFailure?.billingDocumentId) && (
+                <span className="block">
+                  <Link
+                    className="font-semibold underline"
+                    href={`/admin/billing/${encodeURIComponent(billingResult?.id ?? billingFailure?.billingDocumentId ?? "")}`}
+                  >
+                    Ver seguimiento de la factura
+                  </Link>
+                </span>
+              )}
             </span>
-            <CheckCircle2
-              className="ml-4"
-              style={{ width: "60px", height: "60px" }}
-            />
+            {billingNeedsAttention ? (
+              <AlertCircle className="ml-4 h-10 w-10 shrink-0" />
+            ) : (
+              <CheckCircle2 className="ml-4 h-10 w-10 shrink-0" />
+            )}
           </span>
         ),
-        variant: billingError ? "destructive" : "default",
+        variant: billingNeedsAttention ? "destructive" : "default",
       });
     } catch (err) {
       console.error("Error creating order:", err);
@@ -772,13 +800,32 @@ export default function PosPage() {
         const result = await closeSelectedTableAccount(allowIncompleteOrders);
         toast({
           title: "Mesa liberada",
-          description: `Factura procesada (${document.status}). ${result.closedOrderCount} órdenes quedan en el historial.`,
+          description: (
+            <span>
+              {document.status === "ACCEPTED"
+                ? `Factura ${document.documentNumber ? `N.º ${document.documentNumber} ` : ""}emitida. `
+                : `Factura pendiente de confirmación (${document.status}). `}
+              {result.closedOrderCount} órdenes quedan en el historial.{" "}
+              <Link className="font-semibold underline" href={`/admin/billing/${encodeURIComponent(document.id)}`}>
+                Ver factura
+              </Link>
+            </span>
+          ),
         });
       } else {
         await refreshActiveOrders();
         toast({
-          title: "Factura de mesa procesada",
-          description: `Estado de Factus: ${document.status}.`,
+          title: document.status === "ACCEPTED" ? "Factura de mesa emitida" : "Factura de mesa pendiente",
+          description: (
+            <span>
+              {document.status === "ACCEPTED"
+                ? `Número ${document.documentNumber ?? "pendiente"} · CUFE ${document.cufe ?? "pendiente"}. `
+                : `Estado de Factus: ${document.status}. `}
+              <Link className="font-semibold underline" href={`/admin/billing/${encodeURIComponent(document.id)}`}>
+                Ver factura
+              </Link>
+            </span>
+          ),
         });
       }
     } catch (error) {

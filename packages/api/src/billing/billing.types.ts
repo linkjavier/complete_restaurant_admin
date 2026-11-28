@@ -84,6 +84,7 @@ export interface BillingProviderResult {
 export interface BillingProvider {
   readonly name: BillingProviderName;
   readonly supportedCountries: readonly string[];
+  testConnection(context: BillingProviderContext): Promise<void>;
   issueInvoice(
     referenceCode: string,
     invoice: BillingInvoiceInput,

@@ -115,6 +115,7 @@ interface ProductArAssetResponse {
 
 interface ApiErrorResponse {
   message?: string | string[];
+  code?: string;
 }
 
 function isProductArAssetResponse(
@@ -224,7 +225,19 @@ export interface BillingLocationConfiguration {
   numberingRangeId: number | null;
   credentialsConfigured: boolean;
   isReady: boolean;
+  missingFields: BillingLocationMissingField[];
 }
+
+export type BillingLocationMissingField =
+  | "issuerLegalName"
+  | "issuerTaxId"
+  | "issuerTaxIdDv"
+  | "establishmentName"
+  | "establishmentAddress"
+  | "establishmentMunicipalityCode"
+  | "establishmentPhone"
+  | "establishmentEmail"
+  | "factusCredentials";
 
 export interface BillingLocationConfigurationUpdate {
   issuerLegalName: string | null;
@@ -463,6 +476,109 @@ export interface BillingDocumentResult {
   documentNumber?: string | null;
   cufe?: string | null;
   errorMessage?: string | null;
+}
+
+export type BillingDocumentStatus =
+  | "PENDING"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "FAILED_RETRYABLE"
+  | "RECONCILIATION_REQUIRED";
+
+export interface BillingDocumentListItem {
+  id: string;
+  locationId: string;
+  locationName: string;
+  status: BillingDocumentStatus;
+  providerName: string;
+  documentNumber: string | null;
+  cufe: string | null;
+  referenceCode: string;
+  createdAt: string;
+  updatedAt: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  orderIds: string[];
+  customerName: string | null;
+  customerIdentification: string | null;
+  totalAmount: number | null;
+}
+
+export interface BillingDocumentDetail extends BillingDocumentListItem {
+  type: string;
+  countryCode: string;
+  providerReferenceId: string | null;
+  requestPayload: unknown;
+  responseMetadata: unknown;
+  orderLinks: Array<{
+    id: string;
+    createdAt: string;
+    total: number | null;
+    isPaid?: boolean;
+    status?: string;
+  }>;
+  payments: Array<{
+    id: string;
+    orderId: string;
+    amount: number;
+    method: PaymentMethod;
+    status?: string;
+    createdAt?: string;
+  }>;
+}
+
+export interface BillingDocumentsResponse {
+  items: BillingDocumentListItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+  summary: {
+    total: number;
+    byStatus: Record<BillingDocumentStatus, number>;
+  };
+}
+
+export interface SalesReport {
+  period: { from: string; to: string };
+  locationId: string | null;
+  summary: {
+    salesTotal: number;
+    paidOrderCount: number;
+    averageTicket: number;
+    previousSalesTotal: number;
+    salesChangePercent: number | null;
+    collectedTotal: number;
+    outstandingTotal: number;
+    unpaidOrderCount: number;
+  };
+  dailySales: Array<{ date: string; sales: number; orderCount: number }>;
+  salesByLocation: Array<{
+    locationId: string | null;
+    locationName: string;
+    sales: number;
+    paidOrderCount: number;
+  }>;
+  paymentMethods: Array<{ method: string; amount: number }>;
+  topProducts: Array<{ productId: string; name: string; quantity: number }>;
+  recentOrders: Array<{
+    id: string;
+    createdAt: string;
+    total: number | null;
+    isPaid: boolean;
+    status: string;
+    type: string;
+    customerName: string | null;
+    billingRequestStatus: "NOT_REQUESTED" | "REQUESTED" | "DECLINED";
+    billingDocuments: Array<{
+      id: string;
+      status: BillingDocumentStatus;
+      documentNumber: string | null;
+      cufe: string | null;
+    }>;
+  }>;
 }
 
 export interface Payment {
@@ -790,6 +906,29 @@ export async function saveBillingLocationConfiguration(
     );
   }
   return response.json();
+}
+
+export async function testBillingLocationConnection(
+  locationId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/billing/configuration/${encodeURIComponent(locationId)}/test-connection`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+    },
+  );
+  if (!response.ok) {
+    const error = (await response.json().catch(() => ({}))) as ApiErrorResponse;
+    const message = Array.isArray(error.message)
+      ? error.message.join(", ")
+      : error.message;
+    throw new Error(
+      message
+        ? `${message}${error.code ? ` (${error.code})` : ""}`
+        : `No se pudo validar la conexión con Factus (HTTP ${response.status})${error.code ? ` (${error.code})` : ""}`,
+    );
+  }
 }
 
 export async function createLocation(data: {
@@ -1465,17 +1604,98 @@ async function postBillingRequest<T>(path: string, body?: unknown): Promise<T> {
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   if (!response.ok) {
-    const errorData: unknown = await response.json().catch(() => null);
-    const message =
-      typeof errorData === "object" &&
-      errorData !== null &&
-      "message" in errorData &&
-      typeof errorData.message === "string"
-        ? errorData.message
-        : `Billing request failed (${response.status}).`;
-    throw new Error(message);
+    throw toBillingRequestError(
+      await response.json().catch(() => null),
+      response.status,
+    );
   }
   return response.json();
+}
+
+async function getBillingRequest<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw toBillingRequestError(
+      await response.json().catch(() => null),
+      response.status,
+    );
+  }
+  return response.json();
+}
+
+export class BillingRequestError extends Error {
+  constructor(
+    message: string,
+    readonly billingDocumentId?: string,
+    readonly billingStatus?: string,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = BillingRequestError.name;
+  }
+}
+
+function toBillingRequestError(
+  errorData: unknown,
+  status: number,
+): BillingRequestError {
+  const body =
+    typeof errorData === "object" && errorData !== null
+      ? (errorData as Record<string, unknown>)
+      : {};
+  const rawMessage = body.message;
+  const message = Array.isArray(rawMessage)
+    ? rawMessage
+        .filter((value): value is string => typeof value === "string")
+        .join(", ")
+    : typeof rawMessage === "string"
+      ? rawMessage
+      : `Billing request failed (${status}).`;
+  return new BillingRequestError(
+    message,
+    typeof body.billingDocumentId === "string"
+      ? body.billingDocumentId
+      : undefined,
+    typeof body.status === "string" ? body.status : undefined,
+    typeof body.code === "string" ? body.code : undefined,
+  );
+}
+
+export async function listBillingDocuments(query: {
+  locationId?: string;
+  status?: BillingDocumentStatus;
+  from?: string;
+  to?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<BillingDocumentsResponse> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const search = params.toString();
+  return getBillingRequest(`/billing/documents${search ? `?${search}` : ""}`);
+}
+
+export async function getBillingDocument(
+  documentId: string,
+): Promise<BillingDocumentDetail> {
+  return getBillingRequest(
+    `/billing/documents/${encodeURIComponent(documentId)}`,
+  );
+}
+
+export async function getSalesReport(query: {
+  locationId?: string;
+  from: string;
+  to: string;
+}): Promise<SalesReport> {
+  const params = new URLSearchParams({ from: query.from, to: query.to });
+  if (query.locationId) params.set("locationId", query.locationId);
+  return getBillingRequest(`/reports/sales?${params.toString()}`);
 }
 
 export async function issuePosInvoice(
@@ -1564,6 +1784,14 @@ export async function retryPosInvoice(
 ): Promise<BillingDocumentResult> {
   return postBillingRequest(
     `/billing/pos/documents/${encodeURIComponent(billingDocumentId)}/retry`,
+  );
+}
+
+export async function refreshPosInvoice(
+  billingDocumentId: string,
+): Promise<BillingDocumentResult> {
+  return postBillingRequest(
+    `/billing/pos/documents/${encodeURIComponent(billingDocumentId)}/refresh`,
   );
 }
 

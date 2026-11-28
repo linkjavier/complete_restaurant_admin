@@ -388,6 +388,18 @@ export class PosBillingService {
     return this.billingService.retryStoredInvoice(tenantId, billingDocumentId);
   }
 
+  async refreshDocument(tenantId: string, user: User, billingDocumentId: string) {
+    const document = await this.prisma.billingDocument.findFirst({
+      where: { id: billingDocumentId, tenantId },
+      select: { locationId: true },
+    });
+    if (!document) {
+      throw new NotFoundException('Billing document not found for this tenant.');
+    }
+    this.assertLocationAccess(user, tenantId, document.locationId);
+    return this.billingService.refreshInvoiceStatus(tenantId, billingDocumentId);
+  }
+
   private async loadTablePayments(
     tenantId: string,
     table: { id: string; locationId: string },

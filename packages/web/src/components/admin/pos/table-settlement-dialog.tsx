@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   ActiveOrder,
   BillingCustomerInput,
+  BillingRequestError,
   PaymentMethod,
   declinePosTablePaymentInvoice,
   issuePosTablePaymentInvoice,
@@ -384,7 +386,7 @@ export function TableSettlementDialog({
     setIsSubmitting(true);
     try {
       if (customer) {
-        await issuePosTablePaymentInvoice(
+        const document = await issuePosTablePaymentInvoice(
           tableId,
           participant.paymentIds,
           customer,
@@ -394,8 +396,20 @@ export function TableSettlementDialog({
           billingRequestStatus: "REQUESTED",
         }));
         toast({
-          title: `Factura individual de ${participant.label} solicitada`,
-          description: "No se realizó un cobro adicional.",
+          title: document.status === "ACCEPTED"
+            ? `Factura individual de ${participant.label} emitida`
+            : `Factura individual de ${participant.label} pendiente`,
+          description: (
+            <span>
+              {document.status === "ACCEPTED"
+                ? `Número ${document.documentNumber ?? "pendiente"} · CUFE ${document.cufe ?? "pendiente"}. `
+                : `Estado de Factus: ${document.status}. `}
+              No se realizó un cobro adicional.{" "}
+              <Link className="font-semibold underline" href={`/admin/billing/${encodeURIComponent(document.id)}`}>
+                Ver factura
+              </Link>
+            </span>
+          ),
         });
       } else {
         await declinePosTablePaymentInvoice(tableId, participant.paymentIds);
@@ -410,10 +424,30 @@ export function TableSettlementDialog({
       }
       await refreshAfterPayerAction();
     } catch (error) {
+      const billingError = error instanceof BillingRequestError ? error : null;
       toast({
-        title: `No se pudo registrar el comprobante de ${participant.label}`,
-        description:
-          error instanceof Error ? error.message : "Inténtalo nuevamente.",
+        title: billingError?.billingDocumentId
+          ? `Factura de ${participant.label} requiere revisión`
+          : `No se pudo registrar el comprobante de ${participant.label}`,
+        description: (
+          <span>
+            {billingError?.billingDocumentId
+              ? `Documento ${billingError.billingDocumentId} · ${billingError.billingStatus ?? "sin confirmar"}. `
+              : ""}
+            {error instanceof Error ? error.message : "Inténtalo nuevamente."}
+            {billingError?.billingDocumentId && (
+              <>
+                {" "}
+                <Link
+                  className="font-semibold underline"
+                  href={`/admin/billing/${encodeURIComponent(billingError.billingDocumentId)}`}
+                >
+                  Ver seguimiento
+                </Link>
+              </>
+            )}
+          </span>
+        ),
         variant: "destructive",
       });
       await refreshAfterPayerAction();
@@ -487,23 +521,54 @@ export function TableSettlementDialog({
 
       if (customer) {
         try {
-          await issuePosTablePaymentInvoice(tableId, paymentIds, customer);
+          const document = await issuePosTablePaymentInvoice(tableId, paymentIds, customer);
           updateParticipant(participantId, (current) => ({
             ...current,
             billingRequestStatus: "REQUESTED",
           }));
           toast({
-            title: `Factura individual de ${participant.label} solicitada`,
-            description:
-              "El pago ya estaba registrado; no se realizó otro cobro.",
+            title: document.status === "ACCEPTED"
+              ? `Factura individual de ${participant.label} emitida`
+              : `Factura individual de ${participant.label} pendiente`,
+            description: (
+              <span>
+                {document.status === "ACCEPTED"
+                  ? `Número ${document.documentNumber ?? "pendiente"} · CUFE ${document.cufe ?? "pendiente"}. `
+                  : `Estado de Factus: ${document.status}. `}
+                El pago ya estaba registrado; no se realizó otro cobro.{" "}
+                <Link className="font-semibold underline" href={`/admin/billing/${encodeURIComponent(document.id)}`}>
+                  Ver factura
+                </Link>
+              </span>
+            ),
           });
         } catch (error) {
+          const billingError = error instanceof BillingRequestError ? error : null;
           toast({
-            title: "Pago registrado; factura pendiente",
-            description:
-              error instanceof Error
-                ? error.message
-                : "Completa el comprobante antes de liberar la mesa.",
+            title: billingError?.billingDocumentId
+              ? "Pago registrado; factura requiere revisión"
+              : "Pago registrado; factura no emitida",
+            description: (
+              <span>
+                {billingError?.billingDocumentId
+                  ? `Documento ${billingError.billingDocumentId} · ${billingError.billingStatus ?? "sin confirmar"}. `
+                  : ""}
+                {error instanceof Error
+                  ? error.message
+                  : "Completa el comprobante antes de liberar la mesa."}
+                {billingError?.billingDocumentId && (
+                  <>
+                    {" "}
+                    <Link
+                      className="font-semibold underline"
+                      href={`/admin/billing/${encodeURIComponent(billingError.billingDocumentId)}`}
+                    >
+                      Ver seguimiento
+                    </Link>
+                  </>
+                )}
+              </span>
+            ),
             variant: "destructive",
           });
         }
@@ -718,7 +783,7 @@ export function TableSettlementDialog({
                                   <p className="text-xs text-muted-foreground">
                                     {participant.billingRequestStatus ===
                                     "REQUESTED"
-                                      ? "Factura electrónica solicitada"
+                                      ? "Solicitud enviada; confirma el estado en Facturación"
                                       : "Recibo normal"}
                                   </p>
                                 )}

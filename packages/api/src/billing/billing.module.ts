@@ -5,6 +5,8 @@ import { BillingProviderRegistry, BILLING_PROVIDERS } from './billing-provider.r
 import { BillingService } from './billing.service';
 import { FactusProvider } from './providers/factus/factus-provider';
 import { BillingLocationConfigurationController } from './billing-location-configuration.controller';
+import { BillingDocumentsController } from './billing-documents.controller';
+import { BillingDocumentsService } from './billing-documents.service';
 import { BillingLocationConfigurationService } from './billing-location-configuration.service';
 import { BillingCredentialEncryptionService } from './billing-credential-encryption.service';
 import { PosBillingController } from './pos-billing.controller';
@@ -12,7 +14,11 @@ import { PosBillingService } from './pos-billing.service';
 
 @Module({
   imports: [ConfigModule, PrismaModule],
-  controllers: [BillingLocationConfigurationController, PosBillingController],
+  controllers: [
+    BillingLocationConfigurationController,
+    BillingDocumentsController,
+    PosBillingController,
+  ],
   providers: [
     FactusProvider,
     {
@@ -23,6 +29,7 @@ import { PosBillingService } from './pos-billing.service';
     BillingProviderRegistry,
     BillingLocationConfigurationService,
     BillingCredentialEncryptionService,
+    BillingDocumentsService,
     BillingService,
     PosBillingService,
   ],

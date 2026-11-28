@@ -22,15 +22,50 @@ export interface BillingLocationConfigurationView {
   numberingRangeId: number | null;
   credentialsConfigured: boolean;
   isReady: boolean;
+  missingFields: BillingLocationMissingField[];
 }
+
+export type BillingLocationMissingField =
+  | 'issuerLegalName'
+  | 'issuerTaxId'
+  | 'issuerTaxIdDv'
+  | 'establishmentName'
+  | 'establishmentAddress'
+  | 'establishmentMunicipalityCode'
+  | 'establishmentPhone'
+  | 'establishmentEmail'
+  | 'factusCredentials';
 
 export interface BillingConfigurationForEmission {
   countryCode: string;
   context: BillingProviderContext;
 }
 
+const REQUIRED_CONFIGURATION_FIELDS: BillingLocationMissingField[] = [
+  'issuerLegalName',
+  'issuerTaxId',
+  'issuerTaxIdDv',
+  'establishmentName',
+  'establishmentAddress',
+  'establishmentMunicipalityCode',
+  'establishmentPhone',
+  'establishmentEmail',
+  'factusCredentials',
+];
+
+const MISSING_FIELD_LABELS: Record<BillingLocationMissingField, string> = {
+  issuerLegalName: 'razón social del emisor',
+  issuerTaxId: 'NIT del emisor',
+  issuerTaxIdDv: 'dígito de verificación del emisor',
+  establishmentName: 'nombre del establecimiento',
+  establishmentAddress: 'dirección del establecimiento',
+  establishmentMunicipalityCode: 'código DANE del municipio',
+  establishmentPhone: 'teléfono del establecimiento',
+  establishmentEmail: 'correo del establecimiento',
+  factusCredentials: 'credenciales Factus (Client ID, Client secret, usuario y contraseña)',
+};
+
 type ReadyBillingLocationConfiguration = BillingLocationConfiguration & {
-  numberingRangeId: number;
   factusCredentialsEncrypted: string;
 };
 
@@ -112,9 +147,15 @@ export class BillingLocationConfigurationService {
       where: { tenantId_locationId: { tenantId, locationId } },
     });
     if (!configuration || !isReady(configuration)) {
-      throw new BadRequestException(
-        'Electronic billing is not fully configured for this location.',
-      );
+      const missingFields = configuration
+        ? getMissingConfigurationFields(configuration)
+        : REQUIRED_CONFIGURATION_FIELDS;
+      const missingLabels = missingFields.map((field) => MISSING_FIELD_LABELS[field]);
+      throw new BadRequestException({
+        code: 'BILLING_CONFIGURATION_INCOMPLETE',
+        message: `Completa la configuración de facturación de esta ubicación. Faltan: ${missingLabels.join(', ')}.`,
+        missingFields,
+      });
     }
 
     const credentials = this.credentialEncryption.decrypt(configuration.factusCredentialsEncrypted);
@@ -122,7 +163,29 @@ export class BillingLocationConfigurationService {
       countryCode: configuration.countryCode,
       context: {
         credentials,
-        numberingRangeId: configuration.numberingRangeId,
+        ...(configuration.numberingRangeId !== null
+          ? { numberingRangeId: configuration.numberingRangeId }
+          : {}),
+      },
+    };
+  }
+
+  async getForConnectionTest(
+    tenantId: string,
+    locationId: string,
+  ): Promise<BillingConfigurationForEmission> {
+    await this.assertLocationBelongsToTenant(tenantId, locationId);
+    const configuration = await this.prisma.billingLocationConfiguration.findUnique({
+      where: { tenantId_locationId: { tenantId, locationId } },
+    });
+    if (!configuration?.factusCredentialsEncrypted) {
+      throw new BadRequestException('Factus credentials are not configured for this location.');
+    }
+
+    return {
+      countryCode: configuration.countryCode,
+      context: {
+        credentials: this.credentialEncryption.decrypt(configuration.factusCredentialsEncrypted),
       },
     };
   }
@@ -163,18 +226,16 @@ function normalizeOptional(value: string | null | undefined): string | null {
 function isReady(
   configuration: BillingLocationConfiguration,
 ): configuration is ReadyBillingLocationConfiguration {
-  return Boolean(
-    configuration.issuerLegalName &&
-      configuration.issuerTaxId &&
-      configuration.issuerTaxIdDv &&
-      configuration.establishmentName &&
-      configuration.establishmentAddress &&
-      configuration.establishmentMunicipalityCode &&
-      configuration.establishmentPhone &&
-      configuration.establishmentEmail &&
-      configuration.numberingRangeId &&
-      configuration.factusCredentialsEncrypted,
-  );
+  return getMissingConfigurationFields(configuration).length === 0;
+}
+
+function getMissingConfigurationFields(
+  configuration: BillingLocationConfiguration,
+): BillingLocationMissingField[] {
+  return REQUIRED_CONFIGURATION_FIELDS.filter((field) => {
+    if (field === 'factusCredentials') return !configuration.factusCredentialsEncrypted;
+    return !configuration[field];
+  });
 }
 
 function toView(configuration: BillingLocationConfiguration): BillingLocationConfigurationView {
@@ -192,6 +253,7 @@ function toView(configuration: BillingLocationConfiguration): BillingLocationCon
     numberingRangeId: configuration.numberingRangeId,
     credentialsConfigured: Boolean(configuration.factusCredentialsEncrypted),
     isReady: isReady(configuration),
+    missingFields: getMissingConfigurationFields(configuration),
   };
 }
 
@@ -210,5 +272,6 @@ function emptyConfiguration(locationId: string): BillingLocationConfigurationVie
     numberingRangeId: null,
     credentialsConfigured: false,
     isReady: false,
+    missingFields: [...REQUIRED_CONFIGURATION_FIELDS],
   };
 }

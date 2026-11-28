@@ -26,7 +26,9 @@ import {
   MessageCircle,
   ContactRound,
   QrCode,
-  Sparkles
+  Sparkles,
+  BarChart3,
+  FileText,
 } from "lucide-react"
 import {
   Tooltip,
@@ -73,6 +75,16 @@ const routes = [
     label: "orders",
     icon: Receipt,
     href: "/admin/orders",
+  },
+  {
+    label: "sales",
+    icon: BarChart3,
+    href: "/admin/sales",
+  },
+  {
+    label: "billing",
+    icon: FileText,
+    href: "/admin/billing",
   },
   {
     label: "tables",
@@ -253,6 +265,8 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
               const isActive = pathname === route.href ||
                 (route.href === '/admin/pos' && pathname.startsWith('/admin/pos/')) ||
                 (route.href === '/admin/orders' && pathname.startsWith('/admin/orders/')) ||
+                (route.href === '/admin/sales' && pathname.startsWith('/admin/sales/')) ||
+                (route.href === '/admin/billing' && pathname.startsWith('/admin/billing/')) ||
                 (route.href === '/admin/tables' && pathname.startsWith('/admin/tables/')) ||
                 (route.href === '/admin/qr-menu' && pathname.startsWith('/admin/qr-menu')) ||
                 (route.href === '/admin/products' && pathname.startsWith('/admin/products/')) ||

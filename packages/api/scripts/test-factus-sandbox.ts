@@ -75,7 +75,7 @@ main().catch((error: unknown) => {
     console.error(
       JSON.stringify({
         documentId: error.billingDocumentId,
-        status: error.status,
+        status: error.billingStatus,
         code: error.code,
         message: error.message,
       }),

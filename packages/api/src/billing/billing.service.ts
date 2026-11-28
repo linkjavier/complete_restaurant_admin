@@ -1,8 +1,10 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -27,6 +29,8 @@ import {
 
 @Injectable()
 export class BillingService {
+  private readonly logger = new Logger(BillingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly providers: BillingProviderRegistry,
@@ -66,6 +70,32 @@ export class BillingService {
       paymentIds: document.payments?.map(({ id }) => id) ?? [],
       invoice: parseBillingInvoiceInput(document.requestPayload),
     });
+  }
+
+  async testConnection(tenantId: string, locationId: string): Promise<{ connected: true }> {
+    const billingConfiguration = await this.locationConfigurations.getForConnectionTest(
+      tenantId,
+      locationId,
+    );
+    const provider = this.providers.forCountry(
+      billingConfiguration.countryCode.trim().toUpperCase(),
+    );
+    this.assertSandboxEnabled(provider);
+    try {
+      await provider.testConnection(billingConfiguration.context);
+      this.logger.log(
+        `Billing provider connection test succeeded: provider=${provider.name}; location=${locationId}`,
+      );
+    } catch (error) {
+      if (error instanceof BillingProviderError) {
+        this.logger.warn(
+          `Billing provider connection test failed: ${error.code}; location=${locationId}`,
+        );
+        throw new BadGatewayException({ code: error.code, message: error.message });
+      }
+      throw error;
+    }
+    return { connected: true };
   }
 
   private async issueInvoiceInternal(
@@ -272,6 +302,9 @@ export class BillingService {
               'The provider outcome is unknown; reconcile before retrying.',
             );
       const status = dispositionToStatus(providerError.disposition);
+      this.logger.warn(
+        `Billing provider submission failed: document=${document.id}; provider=${provider.name}; status=${status}; code=${providerError.code}; detail=${providerError.message}`,
+      );
       await this.prisma.billingDocument.update({
         where: { id: document.id },
         data: {
@@ -288,6 +321,9 @@ export class BillingService {
       );
     }
 
+    this.logger.log(
+      `Billing provider response received: document=${document.id}; provider=${provider.name}; status=${providerResult.status}; validated=${providerResult.isValidated}; validationCodes=${providerResult.errorCodes.join(',') || 'none'}`,
+    );
     return this.prisma.billingDocument.update({
       where: { id: document.id },
       data: {
@@ -315,6 +351,13 @@ export class BillingService {
     if (!document) {
       throw new NotFoundException('Billing document not found for this tenant.');
     }
+    if (
+      document.status !== BillingDocumentStatus.PENDING &&
+      document.status !== BillingDocumentStatus.FAILED_RETRYABLE &&
+      document.status !== BillingDocumentStatus.RECONCILIATION_REQUIRED
+    ) {
+      throw new ConflictException('Only unresolved billing documents can be refreshed.');
+    }
 
     const billingConfiguration = await this.locationConfigurations.getForEmission(
       tenantId,
@@ -327,17 +370,44 @@ export class BillingService {
     }
     const provider = this.providers.forCountry(document.countryCode);
     this.assertSandboxEnabled(provider);
-    const providerResult = document.providerReferenceId
-      ? await provider.getInvoiceStatus(document.providerReferenceId, billingConfiguration.context)
-      : await provider.findInvoiceByReferenceCode(
-          document.referenceCode,
-          billingConfiguration.context,
+    let providerResult: BillingProviderResult | null;
+    try {
+      providerResult = document.providerReferenceId
+        ? await provider.getInvoiceStatus(
+            document.providerReferenceId,
+            billingConfiguration.context,
+          )
+        : await provider.findInvoiceByReferenceCode(
+            document.referenceCode,
+            billingConfiguration.context,
+          );
+    } catch (error) {
+      if (error instanceof BillingProviderError) {
+        this.logger.warn(
+          `Billing provider status check failed: document=${document.id}; provider=${provider.name}; code=${error.code}`,
         );
+        throw new BadGatewayException({
+          statusCode: 502,
+          error: 'Billing provider status check failed',
+          message: error.message,
+          billingDocumentId: document.id,
+          status: document.status,
+          code: error.code,
+        });
+      }
+      throw error;
+    }
 
     if (!providerResult) {
+      this.logger.log(
+        `Billing provider status check returned no document: document=${document.id}; provider=${provider.name}`,
+      );
       throw new ConflictException('Factus has not returned a document for this reference yet.');
     }
 
+    this.logger.log(
+      `Billing provider status received: document=${document.id}; provider=${provider.name}; status=${providerResult.status}; validated=${providerResult.isValidated}; validationCodes=${providerResult.errorCodes.join(',') || 'none'}`,
+    );
     return this.prisma.billingDocument.update({
       where: { id: document.id },
       data: {

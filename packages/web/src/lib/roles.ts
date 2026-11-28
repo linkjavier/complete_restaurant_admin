@@ -8,6 +8,8 @@ const ADMIN_MODULE_ACCESS = [
   { path: '/admin/ai-manager-v2', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'] },
   { path: '/admin/pos', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'CASHIER'] },
   { path: '/admin/orders', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'] },
+  { path: '/admin/sales', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] },
+  { path: '/admin/billing', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'CASHIER'] },
   { path: '/admin/tables', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'] },
   { path: '/admin/qr-menu', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] },
   { path: '/admin/kitchen-manager', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF'] },

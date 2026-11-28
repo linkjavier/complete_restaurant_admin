@@ -6,6 +6,7 @@ describe('BillingProviderRegistry', () => {
   const factusProvider: BillingProvider = {
     name: 'FACTUS',
     supportedCountries: ['CO'],
+    testConnection: jest.fn(),
     issueInvoice: jest.fn(),
     getInvoiceStatus: jest.fn(),
     findInvoiceByReferenceCode: jest.fn(),

@@ -14,7 +14,7 @@ const providerContext = {
   },
 };
 
-describe('toFactusInvoiceRequest', () => {
+describe('Factus invoice mapping and provider', () => {
   it('maps domain invoice fields without inventing tax or payment values', () => {
     const invoice: BillingInvoiceInput = {
       customer: {
@@ -72,6 +72,143 @@ describe('toFactusInvoiceRequest', () => {
         },
       ],
     });
+  });
+
+  describe('FactusProvider connection test', () => {
+    it('validates sandbox credentials through OAuth without requesting a bill', async () => {
+      const postSpy = jest.spyOn(axios, 'post').mockResolvedValue({
+        data: {
+          access_token: 'sandbox-access-token',
+          refresh_token: 'sandbox-refresh-token',
+          expires_in: 3600,
+        },
+      } as never);
+      const requestSpy = jest.spyOn(axios, 'request');
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          FactusProvider,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: (key: string, defaultValue?: string) =>
+                key === 'BILLING_ENV' ? 'sandbox' : defaultValue,
+            },
+          },
+        ],
+      }).compile();
+
+      try {
+        const provider = moduleRef.get(FactusProvider);
+        await provider.testConnection(providerContext);
+
+        expect(postSpy).toHaveBeenCalledWith(
+          'https://api-sandbox.factus.com.co/oauth/token',
+          expect.any(URLSearchParams),
+          expect.objectContaining({ timeout: 15_000 }),
+        );
+        expect(requestSpy).not.toHaveBeenCalled();
+      } finally {
+        await moduleRef.close();
+        postSpy.mockRestore();
+        requestSpy.mockRestore();
+      }
+    });
+
+    it('surfaces only allow-listed OAuth error codes from Factus', async () => {
+      const postSpy = jest.spyOn(axios, 'post').mockRejectedValue({
+        isAxiosError: true,
+        response: {
+          status: 400,
+          data: {
+            error: 'invalid_grant',
+            error_description: 'Sensitive provider response details',
+          },
+        },
+      });
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          FactusProvider,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: (key: string, defaultValue?: string) =>
+                key === 'BILLING_ENV' ? 'sandbox' : defaultValue,
+            },
+          },
+        ],
+      }).compile();
+
+      try {
+        const provider = moduleRef.get(FactusProvider);
+        await expect(provider.testConnection(providerContext)).rejects.toMatchObject({
+          code: 'FACTUS_AUTH_HTTP_400_INVALID_GRANT',
+          message: 'Factus authentication failed before document submission.',
+        });
+      } finally {
+        await moduleRef.close();
+        postSpy.mockRestore();
+      }
+    });
+  });
+
+  it('includes rejected field paths without logging provider field values', async () => {
+    const postSpy = jest.spyOn(axios, 'post').mockResolvedValue({
+      data: {
+        access_token: 'sandbox-access-token',
+        refresh_token: 'sandbox-refresh-token',
+        expires_in: 3600,
+      },
+    } as never);
+    const requestSpy = jest.spyOn(axios, 'request').mockRejectedValue({
+      isAxiosError: true,
+      response: {
+        status: 422,
+        data: {
+          errors: {
+            'customer.names': ['Sensitive customer value must not be logged'],
+            'items.0.taxes.0.rate': ['Invalid tax rate'],
+          },
+        },
+      },
+    });
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        FactusProvider,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string, defaultValue?: string) =>
+              key === 'BILLING_ENV' ? 'sandbox' : defaultValue,
+          },
+        },
+      ],
+    }).compile();
+
+    try {
+      const provider = moduleRef.get(FactusProvider);
+      const invoice: BillingInvoiceInput = {
+        customer: {
+          identificationDocumentCode: '13',
+          identification: 'TEST-CUSTOMER',
+          legalOrganizationCode: '2',
+          names: 'Sandbox Customer',
+        },
+        items: [],
+        paymentDetails: [],
+      };
+
+      await expect(
+        provider.issueInvoice('KREFERENCE', invoice, providerContext),
+      ).rejects.toMatchObject({
+        code: 'FACTUS_DOCUMENT_HTTP_422',
+        message:
+          'Factus rejected the invoice request. Validation fields: customer.names, items.0.taxes.0.rate.',
+      });
+    } finally {
+      await moduleRef.close();
+      postSpy.mockRestore();
+      requestSpy.mockRestore();
+    }
   });
 
   it('uses the numbering range configured for the selected location', () => {

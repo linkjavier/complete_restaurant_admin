@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ActiveOrder, Location, Product, ProductVariant } from "@/lib/api";
 import type { Payment } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { toFiniteInteger } from "@/lib/utils";
 import type { BillingCustomerInput, PaymentMethod } from "@/lib/api";
+import { BillingRequestError } from "@/lib/api";
 import { InvoiceCustomerDialog } from "@/components/admin/pos/invoice-customer-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { TableSettlementDialog } from "@/components/admin/pos/table-settlement-dialog";
@@ -448,8 +450,23 @@ export function Cart({
             customer,
           );
           toast({
-            title: `Factura individual de ${pendingPayerInvoice.label} solicitada`,
-            description: `Estado de Factus: ${document.status}. No se realizó otro cobro.`,
+            title: document.status === "ACCEPTED"
+              ? `Factura individual de ${pendingPayerInvoice.label} emitida`
+              : `Factura individual de ${pendingPayerInvoice.label} pendiente`,
+            description: (
+              <span>
+                {document.status === "ACCEPTED"
+                  ? `Número ${document.documentNumber ?? "pendiente"} · CUFE ${document.cufe ?? "pendiente"}. `
+                  : `Estado de Factus: ${document.status}. `}
+                No se realizó otro cobro.{" "}
+                <Link
+                  className="font-semibold underline"
+                  href={`/admin/billing/${encodeURIComponent(document.id)}`}
+                >
+                  Ver factura
+                </Link>
+              </span>
+            ),
           });
         } else {
           await declinePosTablePaymentInvoice(
@@ -464,10 +481,30 @@ export function Cart({
         }
         await onTableOrdersChanged();
       } catch (error) {
+        const billingError = error instanceof BillingRequestError ? error : null;
         toast({
-          title: `No se pudo completar el comprobante de ${pendingPayerInvoice.label}`,
-          description:
-            error instanceof Error ? error.message : "Inténtalo nuevamente.",
+          title: billingError?.billingDocumentId
+            ? `Factura de ${pendingPayerInvoice.label} requiere revisión`
+            : `No se pudo completar el comprobante de ${pendingPayerInvoice.label}`,
+          description: (
+            <span>
+              {billingError?.billingDocumentId
+                ? `Documento ${billingError.billingDocumentId} · ${billingError.billingStatus ?? "sin confirmar"}. `
+                : ""}
+              {error instanceof Error ? error.message : "Inténtalo nuevamente."}
+              {billingError?.billingDocumentId && (
+                <>
+                  {" "}
+                  <Link
+                    className="font-semibold underline"
+                    href={`/admin/billing/${encodeURIComponent(billingError.billingDocumentId)}`}
+                  >
+                    Ver seguimiento
+                  </Link>
+                </>
+              )}
+            </span>
+          ),
           variant: "destructive",
         });
       } finally {
@@ -487,10 +524,30 @@ export function Cart({
           allowIncompleteCloseAfterBillingDecision,
         );
       } catch (error) {
+        const billingError = error instanceof BillingRequestError ? error : null;
         toast({
-          title: "No se pudo procesar la factura",
-          description:
-            error instanceof Error ? error.message : "Inténtalo nuevamente.",
+          title: billingError?.billingDocumentId
+            ? "Factura requiere revisión"
+            : "No se pudo registrar la factura",
+          description: (
+            <span>
+              {billingError?.billingDocumentId
+                ? `Documento ${billingError.billingDocumentId} · ${billingError.billingStatus ?? "sin confirmar"}. `
+                : ""}
+              {error instanceof Error ? error.message : "Inténtalo nuevamente."}
+              {billingError?.billingDocumentId && (
+                <>
+                  {" "}
+                  <Link
+                    className="font-semibold underline"
+                    href={`/admin/billing/${encodeURIComponent(billingError.billingDocumentId)}`}
+                  >
+                    Ver seguimiento
+                  </Link>
+                </>
+              )}
+            </span>
+          ),
           variant: "destructive",
         });
       } finally {

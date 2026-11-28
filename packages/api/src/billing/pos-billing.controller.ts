@@ -96,4 +96,13 @@ export class PosBillingController {
   ) {
     return this.posBillingService.retryDocument(tenantId, user, documentId);
   }
+
+  @Post('documents/:documentId/refresh')
+  refreshDocument(
+    @Param('documentId') documentId: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.posBillingService.refreshDocument(tenantId, user, documentId);
+  }
 }

@@ -67,6 +67,7 @@ describe('BillingService', () => {
     provider = {
       name: 'FACTUS',
       supportedCountries: ['CO'],
+      testConnection: jest.fn(),
       issueInvoice: issueInvoiceMock,
       getInvoiceStatus: jest.fn(),
       findInvoiceByReferenceCode: jest.fn(),
@@ -123,12 +124,64 @@ describe('BillingService', () => {
                 numberingRangeId: 7,
               },
             })),
+            getForConnectionTest: jest.fn(async () => ({
+              countryCode: 'CO',
+              context: {
+                credentials: {
+                  clientId: 'client-id',
+                  clientSecret: 'client-secret',
+                  username: 'test-user',
+                  password: 'test-password',
+                },
+              },
+            })),
           },
         },
       ],
     }).compile();
 
     service = moduleRef.get(BillingService);
+  });
+
+  it('tests the configured location credentials without issuing an invoice', async () => {
+    const result = await service.testConnection('tenant-1', 'location-1');
+
+    expect(result).toEqual({ connected: true });
+    expect(provider.testConnection).toHaveBeenCalledWith({
+      credentials: {
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        username: 'test-user',
+        password: 'test-password',
+      },
+    });
+    expect(issueInvoiceMock).not.toHaveBeenCalled();
+    expect(createDocument).not.toHaveBeenCalled();
+  });
+
+  it('surfaces Factus authentication failures and refuses connection checks outside Sandbox', async () => {
+    (provider.testConnection as jest.Mock).mockRejectedValueOnce(
+      new BillingProviderError(
+        'FACTUS_AUTH_FAILED',
+        'FAILED_RETRYABLE',
+        'Factus rejected credentials.',
+      ),
+    );
+    await expect(service.testConnection('tenant-1', 'location-1')).rejects.toMatchObject({
+      status: 502,
+      response: {
+        code: 'FACTUS_AUTH_FAILED',
+        message: 'Factus rejected credentials.',
+      },
+    });
+
+    billingEnvironment = 'production';
+    await expect(service.testConnection('tenant-1', 'location-1')).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(provider.testConnection).toHaveBeenCalledTimes(1);
+    expect(issueInvoiceMock).not.toHaveBeenCalled();
+    expect(createDocument).not.toHaveBeenCalled();
   });
 
   it('persists and reuses the same document for repeated idempotency keys', async () => {
@@ -145,6 +198,47 @@ describe('BillingService', () => {
     expect(first.id).toBe(repeated.id);
     expect(createDocument).toHaveBeenCalledTimes(1);
     expect(issueInvoiceMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes a stored invoice status from the provider', async () => {
+    const issued = await service.issueInvoice({
+      tenantId: 'tenant-1',
+      locationId: 'location-1',
+      idempotencyKey: 'sandbox-refresh-1',
+      invoice,
+    });
+    storedDocument = { ...issued, providerReferenceId: 'FACTUS-1' };
+    (provider.getInvoiceStatus as jest.Mock).mockResolvedValue({
+      status: 'ACCEPTED',
+      providerReferenceId: 'FACTUS-1',
+      documentNumber: 'FV-1001',
+      cufe: 'CUFE-1001',
+      errorCodes: [],
+      isValidated: true,
+    });
+
+    await service.refreshInvoiceStatus('tenant-1', issued.id);
+
+    expect(provider.getInvoiceStatus).toHaveBeenCalledWith('FACTUS-1', {
+      credentials: {
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        username: 'test-user',
+        password: 'test-password',
+      },
+      numberingRangeId: 7,
+    });
+    expect(updateDocument).toHaveBeenCalledWith({
+      where: { id: issued.id },
+      data: expect.objectContaining({
+        status: 'ACCEPTED',
+        providerReferenceId: 'FACTUS-1',
+        documentNumber: 'FV-1001',
+        cufe: 'CUFE-1001',
+        errorCode: null,
+        errorMessage: null,
+      }),
+    });
   });
 
   it('rejects reuse of an idempotency key with a different payload', async () => {
