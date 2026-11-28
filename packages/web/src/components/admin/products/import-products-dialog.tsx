@@ -242,7 +242,7 @@ export function ImportProductsDialog({
                                 type="file"
                                 className="hidden"
                                 id="file-upload"
-                                accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.doc,.csv,image/*"
+                                accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.xlsx,.xls,.docx,.doc,.csv,image/*"
                                 onChange={handleFileChange}
                             />
                             <Button asChild variant="outline">

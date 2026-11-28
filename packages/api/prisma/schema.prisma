@@ -22,7 +22,9 @@ model Tenant {
   products                   Product[]
   orders                     Order[]
   categories                 Category[]
+  ingredientCategories       IngredientCategory[]
   ingredients                Ingredient[]
+  suppliers                  Supplier[]
   customers                  Customer[]
   tables                     Table[]
   payments                   Payment[]
@@ -279,26 +281,44 @@ model Category {
   @@index([order])
 }
 
+model IngredientCategory {
+  id          String       @id @default(cuid())
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  ingredients Ingredient[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
 model Ingredient {
-  id            String              @id @default(cuid())
-  code          String              @unique @default(dbgenerated("('ING-'::text || lpad(nextval('ingredient_code_seq'::regclass)::text, 6, '0'::text))"))
-  tenantId      String
-  tenant        Tenant              @relation(fields: [tenantId], references: [id])
-  name          String
-  description   String?
-  quantity      Float
-  unit          String
-  minQuantity   Float
-  location      Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  locationId    String
-  products      ProductIngredient[]
-  inventory     InventoryItem[]
-  purchaseItems PurchaseItem[]
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id              String               @id @default(cuid())
+  code            String               @unique @default(dbgenerated("('ING-'::text || lpad(nextval('ingredient_code_seq'::regclass)::text, 6, '0'::text))"))
+  tenantId        String
+  tenant          Tenant               @relation(fields: [tenantId], references: [id])
+  name            String
+  description     String?
+  quantity        Float
+  unit            String
+  minQuantity     Float
+  location        Location             @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId      String
+  category        IngredientCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId      String?
+  products        ProductIngredient[]
+  inventory       InventoryItem[]
+  purchaseItems   PurchaseItem[]
+  supplierCatalog SupplierIngredient[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   @@unique([tenantId, name])
   @@index([locationId])
+  @@index([categoryId])
 }
 
 model ProductIngredient {
@@ -402,6 +422,8 @@ model Purchase {
   locationId   String
   location     Location       @relation(fields: [locationId], references: [id])
   supplierName String
+  supplierId   String?
+  supplier     Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   purchaseDate DateTime
   totalCost    Float?
   createdById  String
@@ -409,6 +431,50 @@ model Purchase {
   items        PurchaseItem[]
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+
+  @@index([tenantId, supplierId, purchaseDate])
+}
+
+model Supplier {
+  id          String               @id @default(cuid())
+  tenantId    String
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  taxId       String?
+  contactName String?
+  email       String?
+  phone       String?
+  address     String?
+  notes       String?
+  isActive    Boolean              @default(true)
+  purchases   Purchase[]
+  ingredients SupplierIngredient[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, taxId])
+  @@index([tenantId, isActive, name])
+}
+
+model SupplierIngredient {
+  id                   String     @id @default(cuid())
+  supplierId           String
+  supplier             Supplier   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  ingredientId         String
+  ingredient           Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  supplierSku          String?
+  unitCost             Float?
+  packaging            String?
+  minimumOrderQuantity Float?
+  leadTimeDays         Int?
+  notes                String?
+  isActive             Boolean    @default(true)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@unique([supplierId, ingredientId])
+  @@index([ingredientId])
 }
 
 model PurchaseItem {

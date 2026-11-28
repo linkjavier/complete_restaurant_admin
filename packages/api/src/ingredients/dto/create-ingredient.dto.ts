@@ -21,4 +21,8 @@ export class CreateIngredientDto {
 
   @IsString()
   locationId: string;
+
+  @IsString()
+  @IsOptional()
+  categoryId?: string;
 } 

@@ -41,6 +41,16 @@ export class IngredientsService {
           throw new BadRequestException('La sucursal seleccionada no pertenece a este negocio.');
         }
 
+        if (createIngredientDto.categoryId) {
+          const category = await tx.ingredientCategory.findFirst({
+            where: { id: createIngredientDto.categoryId, tenantId: createIngredientDto.tenantId },
+            select: { id: true },
+          });
+          if (!category) {
+            throw new BadRequestException('La categoría seleccionada no pertenece a este negocio.');
+          }
+        }
+
         const created = await tx.ingredient.create({
           data: {
             name: createIngredientDto.name,
@@ -48,11 +58,15 @@ export class IngredientsService {
             quantity,
             unit,
             minQuantity,
+            ...(createIngredientDto.categoryId && {
+              category: { connect: { id: createIngredientDto.categoryId } },
+            }),
             location: { connect: { id: createIngredientDto.locationId } },
             tenant: { connect: { id: createIngredientDto.tenantId } },
           },
           include: {
             location: true,
+            category: true,
           },
         });
 
@@ -78,6 +92,7 @@ export class IngredientsService {
         where: params?.where,
         include: {
           location: true,
+          category: true,
         },
       });
     } catch (error) {
@@ -92,6 +107,7 @@ export class IngredientsService {
         where: { id },
         include: {
           location: true,
+          category: true,
         },
       });
     } catch (error) {
@@ -100,18 +116,37 @@ export class IngredientsService {
     }
   }
 
-  async update(id: string, updateIngredientDto: UpdateIngredientDto) {
+  async update(id: string, updateIngredientDto: UpdateIngredientDto, tenantId: string) {
     try {
       this.logger.debug(
         `Updating ingredient ${id} with data: ${JSON.stringify(updateIngredientDto)}`,
       );
 
-      return this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.ingredient.findFirst({
+          where: { id, tenantId },
+          select: { id: true },
+        });
+        if (!existing) {
+          throw new BadRequestException('Ingrediente no encontrado.');
+        }
+
+        if (updateIngredientDto.categoryId) {
+          const category = await tx.ingredientCategory.findFirst({
+            where: { id: updateIngredientDto.categoryId, tenantId },
+            select: { id: true },
+          });
+          if (!category) {
+            throw new BadRequestException('La categoría seleccionada no pertenece a este negocio.');
+          }
+        }
+
         const ingredient = await tx.ingredient.update({
           where: { id },
           data: updateIngredientDto,
           include: {
             location: true,
+            category: true,
           },
         });
 
@@ -126,6 +161,7 @@ export class IngredientsService {
       });
     } catch (error) {
       this.logger.error(`Error updating ingredient ${id}: ${error.message}`);
+      if (error instanceof HttpException) throw error;
       throw new InternalServerErrorException(`Error updating ingredient: ${error.message}`);
     }
   }

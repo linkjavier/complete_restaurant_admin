@@ -31,6 +31,8 @@ import { QrMenuModule } from './qr-menu/qr-menu.module';
 import { WhatsappCloudModule } from './whatsapp-cloud/whatsapp-cloud.module';
 import { BillingModule } from './billing/billing.module';
 import { ReportsModule } from './reports/reports.module';
+import { SuppliersModule } from './suppliers/suppliers.module';
+import { IngredientCategoriesModule } from './ingredient-categories/ingredient-categories.module';
 
 @Module({
   imports: [
@@ -69,6 +71,8 @@ import { ReportsModule } from './reports/reports.module';
     WhatsappCloudModule,
     BillingModule,
     ReportsModule,
+    SuppliersModule,
+    IngredientCategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

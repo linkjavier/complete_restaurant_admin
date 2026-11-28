@@ -5,7 +5,7 @@ import { CreatePurchaseItemDto } from './create-purchase-item.dto'
 export class CreatePurchaseDto {
   @IsString()
   @IsNotEmpty()
-  supplierName: string
+  supplierId: string
 
   @IsString()
   @IsNotEmpty()

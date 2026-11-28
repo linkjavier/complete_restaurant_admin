@@ -10,7 +10,7 @@ import type { UploadApiOptions } from 'cloudinary';
 import { Express } from 'express';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
-import * as heicConvert from 'heic-convert';
+import heicConvert from 'heic-convert';
 import * as sharp from 'sharp';
 
 @Injectable()

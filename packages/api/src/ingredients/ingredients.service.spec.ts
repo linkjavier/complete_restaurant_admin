@@ -9,6 +9,7 @@ describe('IngredientsService', () => {
 
   const transaction = {
     location: { findFirst: jest.fn() },
+    ingredientCategory: { findFirst: jest.fn() },
     ingredient: { create: jest.fn() },
   };
   const prisma = {
@@ -75,6 +76,24 @@ describe('IngredientsService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
+    expect(transaction.ingredient.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects categories from another tenant', async () => {
+    transaction.ingredientCategory.findFirst.mockResolvedValue(null);
+    await expect(service.create({
+      name: 'Arroz',
+      quantity: 0,
+      unit: 'kg',
+      minQuantity: 0,
+      locationId: 'location-1',
+      tenantId: 'tenant-1',
+      categoryId: 'other-category',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(transaction.ingredientCategory.findFirst).toHaveBeenCalledWith({
+      where: { id: 'other-category', tenantId: 'tenant-1' },
+      select: { id: true },
+    });
     expect(transaction.ingredient.create).not.toHaveBeenCalled();
   });
 });

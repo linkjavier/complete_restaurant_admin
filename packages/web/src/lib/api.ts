@@ -313,8 +313,50 @@ export interface Ingredient {
   quantity: number;
   unit: string;
   minQuantity: number;
+  categoryId?: string | null;
+  category?: IngredientCategory | null;
   locationId: string;
   location?: Location;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IngredientCategory {
+  id: string;
+  tenantId: string;
+  name: string;
+  description: string | null;
+  _count?: { ingredients: number };
+}
+
+export interface SupplierIngredient {
+  id: string;
+  supplierId: string;
+  ingredientId: string;
+  supplierSku: string | null;
+  unitCost: number | null;
+  packaging: string | null;
+  minimumOrderQuantity: number | null;
+  leadTimeDays: number | null;
+  notes: string | null;
+  isActive: boolean;
+  ingredient: Ingredient;
+}
+
+export interface Supplier {
+  id: string;
+  tenantId: string;
+  name: string;
+  taxId: string | null;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  isActive: boolean;
+  ingredients?: SupplierIngredient[];
+  purchases?: Purchase[];
+  _count?: { purchases: number; ingredients: number };
   createdAt: string;
   updatedAt: string;
 }
@@ -422,6 +464,8 @@ export interface Purchase {
   tenantId: string;
   locationId: string;
   supplierName: string;
+  supplierId?: string | null;
+  supplier?: Supplier | null;
   purchaseDate: string;
   totalCost?: number | null;
   createdById: string;
@@ -430,6 +474,17 @@ export interface Purchase {
   items?: PurchaseItem[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PurchaseDocumentExtraction {
+  supplierName: string | null;
+  purchaseDate: string | null;
+  items: {
+    ingredientName: string;
+    categoryName?: string | null;
+    quantity: number;
+    unitCost: number;
+  }[];
 }
 
 export interface ProductIngredient {
@@ -1074,6 +1129,132 @@ export async function getIngredients(): Promise<Ingredient[]> {
   return response.json();
 }
 
+  export async function getIngredientCategories(): Promise<IngredientCategory[]> {
+    const response = await fetch(`${API_URL}/ingredient-categories`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error("Error al obtener las categorías de ingredientes");
+    return response.json();
+  }
+
+  export async function createIngredientCategory(data: {
+    name: string;
+    description?: string;
+  }): Promise<IngredientCategory> {
+    const response = await fetch(`${API_URL}/ingredient-categories`, {
+      method: "POST",
+      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.message || "Error al crear la categoría de ingredientes");
+    }
+    return response.json();
+  }
+
+  export async function getSuppliers(params?: {
+    search?: string;
+    includeInactive?: boolean;
+  }): Promise<Supplier[]> {
+    const query = new URLSearchParams();
+    if (params?.search) query.set("search", params.search);
+    if (params?.includeInactive) query.set("includeInactive", "true");
+    const response = await fetch(
+      `${API_URL}/suppliers${query.size ? `?${query.toString()}` : ""}`,
+      { headers: getAuthHeaders() },
+    );
+    if (!response.ok) throw new Error("Error al obtener los proveedores");
+    return response.json();
+  }
+
+  export async function getSupplier(id: string): Promise<Supplier> {
+    const response = await fetch(`${API_URL}/suppliers/${id}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error("Error al obtener el proveedor");
+    return response.json();
+  }
+
+  export async function createSupplier(data: {
+    name: string;
+    taxId?: string;
+    contactName?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    notes?: string;
+  }): Promise<Supplier> {
+    const response = await fetch(`${API_URL}/suppliers`, {
+      method: "POST",
+      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.message || "Error al crear el proveedor");
+    }
+    return response.json();
+  }
+
+  export async function updateSupplier(
+    id: string,
+    data: Partial<Pick<Supplier, "name" | "taxId" | "contactName" | "email" | "phone" | "address" | "notes" | "isActive">>,
+  ): Promise<Supplier> {
+    const response = await fetch(`${API_URL}/suppliers/${id}`, {
+      method: "PATCH",
+      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.message || "Error al actualizar el proveedor");
+    }
+    return response.json();
+  }
+
+  export async function archiveSupplier(id: string): Promise<void> {
+    const response = await fetch(`${API_URL}/suppliers/${id}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error("Error al archivar el proveedor");
+  }
+
+  export async function saveSupplierIngredient(
+    supplierId: string,
+    data: {
+      ingredientId: string;
+      supplierSku?: string;
+      unitCost?: number;
+      packaging?: string;
+      minimumOrderQuantity?: number;
+      leadTimeDays?: number;
+      notes?: string;
+    },
+  ): Promise<SupplierIngredient> {
+    const response = await fetch(`${API_URL}/suppliers/${supplierId}/ingredients`, {
+      method: "POST",
+      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.message || "Error al guardar el ingrediente del proveedor");
+    }
+    return response.json();
+  }
+
+  export async function removeSupplierIngredient(
+    supplierId: string,
+    ingredientId: string,
+  ): Promise<void> {
+    const response = await fetch(
+      `${API_URL}/suppliers/${supplierId}/ingredients/${ingredientId}`,
+      { method: "DELETE", headers: getAuthHeaders() },
+    );
+    if (!response.ok) throw new Error("Error al quitar el ingrediente del catálogo");
+  }
 export async function getInventoryOverview(
   locationId?: string,
 ): Promise<InventoryStockItem[]> {
@@ -1173,6 +1354,7 @@ export async function createIngredient(data: {
   unit: string;
   minQuantity: number;
   locationId: string;
+  categoryId?: string;
 }): Promise<Ingredient> {
   const response = await fetch(`${API_URL}/ingredients`, {
     method: "POST",
@@ -1203,6 +1385,7 @@ export async function updateIngredient(
     unit?: string;
     minQuantity?: number;
     locationId?: string;
+    categoryId?: string | null;
   },
 ): Promise<Ingredient> {
   const response = await fetch(`${API_URL}/ingredients/${id}`, {
@@ -1234,6 +1417,7 @@ export async function getPurchases(params?: {
   toDate?: string;
   ingredientId?: string;
   locationId?: string;
+  supplierId?: string;
 }): Promise<Purchase[]> {
   const searchParams = new URLSearchParams();
   if (params?.fromDate) searchParams.append("fromDate", params.fromDate);
@@ -1241,6 +1425,7 @@ export async function getPurchases(params?: {
   if (params?.ingredientId)
     searchParams.append("ingredientId", params.ingredientId);
   if (params?.locationId) searchParams.append("locationId", params.locationId);
+  if (params?.supplierId) searchParams.append("supplierId", params.supplierId);
 
   const url = `${API_URL}/purchases${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
   const response = await fetch(url, {
@@ -1253,7 +1438,7 @@ export async function getPurchases(params?: {
 }
 
 export async function createPurchase(data: {
-  supplierName: string;
+  supplierId: string;
   purchaseDate: string;
   locationId: string;
   totalCost?: number;
@@ -1274,6 +1459,29 @@ export async function createPurchase(data: {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || "Error al crear la compra");
+  }
+  return response.json();
+}
+
+export async function extractPurchaseDocument(
+  file: File,
+): Promise<PurchaseDocumentExtraction> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_URL}/ai-import/extract-purchase`, {
+    method: "POST",
+    headers: getAuthHeaders(true),
+    body: formData,
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = typeof errorData.message === "string"
+      ? errorData.message
+      : Array.isArray(errorData.message)
+        ? errorData.message.join(". ")
+        : "No se pudo analizar el documento de compra.";
+    throw new Error(message);
   }
   return response.json();
 }

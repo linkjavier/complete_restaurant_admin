@@ -23,10 +23,12 @@ import { STTModule } from '../stt/stt.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { CustomersModule } from '../customers/customers.module';
 import { LocationsModule } from '../locations/locations.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule,
+    AuthModule,
     forwardRef(() => ProductsModule),
     forwardRef(() => OrdersModule),
     SettingsModule,

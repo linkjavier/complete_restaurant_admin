@@ -53,7 +53,10 @@ Full-stack web system for comprehensive restaurant and bakery management with ta
 - Ingredient-based stock control
 - Low inventory alerts
 - Movement history
-- Supplier integration
+- Suppliers shared by the business, with contact details, an ingredient catalog and purchase history
+- Manual purchases or document-assisted drafts (including HEIC/HEIF images); inventory changes only when the purchase is registered
+- The purchase assistant can create suppliers, ingredient categories and ingredients immediately; new ingredients start with zero stock
+- The supplier migration links historical purchases by tenant and supplier name; blank names remain unlinked
 
 ### Dashboard and Reports
 - Real-time metrics

@@ -26,4 +26,8 @@ export class UpdateIngredientDto {
   @IsString()
   @IsOptional()
   locationId?: string;
+
+  @IsString()
+  @IsOptional()
+  categoryId?: string | null;
 } 

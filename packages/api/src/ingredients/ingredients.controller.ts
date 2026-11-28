@@ -15,10 +15,11 @@ import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../auth/decorators/tenant.decorator';
+import { TenantRequiredGuard } from '../auth/guards/tenant-required.guard';
 
 @ApiTags('ingredients')
 @Controller('ingredients')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantRequiredGuard)
 export class IngredientsController {
   constructor(private readonly ingredientsService: IngredientsService) {}
 
@@ -38,13 +39,17 @@ export class IngredientsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateIngredientDto: UpdateIngredientDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateIngredientDto: UpdateIngredientDto,
+    @CurrentTenant() tenantId: string,
+  ) {
     if (updateIngredientDto.quantity !== undefined) {
       throw new BadRequestException(
         'Para modificar existencias, crea una modificación desde el módulo Inventarios.',
       );
     }
-    return this.ingredientsService.update(id, updateIngredientDto);
+    return this.ingredientsService.update(id, updateIngredientDto, tenantId);
   }
 
   @Delete(':id')

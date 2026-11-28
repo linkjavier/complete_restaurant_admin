@@ -18,6 +18,7 @@ const ADMIN_MODULE_ACCESS = [
   { path: '/admin/ingredients', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] },
   { path: '/admin/inventory', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] },
   { path: '/admin/purchases', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] },
+  { path: '/admin/suppliers', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] },
   { path: '/admin/production', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] },
   { path: '/admin/locations', roles: ['SUPER_ADMIN', 'ADMIN'] },
   { path: '/admin/customers', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] },

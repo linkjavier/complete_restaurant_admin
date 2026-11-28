@@ -5,10 +5,11 @@ import { PurchasesService } from './purchases.service'
 import { CreatePurchaseDto } from './dto/create-purchase.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CurrentTenant } from '../auth/decorators/tenant.decorator'
+import { TenantRequiredGuard } from '../auth/guards/tenant-required.guard'
 
 @ApiTags('purchases')
 @Controller('purchases')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantRequiredGuard)
 export class PurchasesController {
   constructor(private readonly purchasesService: PurchasesService) {}
 
@@ -33,12 +34,14 @@ export class PurchasesController {
     @Query('toDate') toDate?: string,
     @Query('ingredientId') ingredientId?: string,
     @Query('locationId') locationId?: string,
+    @Query('supplierId') supplierId?: string,
   ) {
     return this.purchasesService.findAll(tenantId, {
       fromDate,
       toDate,
       ingredientId,
       locationId,
+      supplierId,
     })
   }
 }

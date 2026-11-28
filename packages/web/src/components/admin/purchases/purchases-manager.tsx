@@ -1,20 +1,34 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Trash2 } from "lucide-react"
-import { getPurchases, createPurchase, getIngredients, getLocations, Purchase, Ingredient, Location } from "@/lib/api"
+import { Plus, Sparkles, Trash2 } from "lucide-react"
+import {
+  getPurchases,
+  createPurchase,
+  getIngredients,
+  getSuppliers,
+  getIngredientCategories,
+  Purchase,
+  Ingredient,
+  IngredientCategory,
+  Supplier,
+} from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
+import { ALL_LOCATIONS, useLocationSelection } from "@/hooks/use-location-selection"
+import { PurchaseAssistantDialog, PurchaseAssistantDraft } from "./purchase-assistant-dialog"
 
 interface PurchaseLine {
   id: string
   ingredientId: string
   quantity: number
   unitCost: number
+  detectedName?: string
 }
 
 const createNewLine = (): PurchaseLine => ({
@@ -25,50 +39,87 @@ const createNewLine = (): PurchaseLine => ({
 })
 
 export function PurchasesManager() {
+  const { locations, selectedLocationId, isLoadingLocations } = useLocationSelection()
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
-  const [locations, setLocations] = useState<Location[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [ingredientCategories, setIngredientCategories] = useState<IngredientCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [supplierName, setSupplierName] = useState("")
+  const [supplierId, setSupplierId] = useState("")
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0, 10))
-  const [locationId, setLocationId] = useState("")
   const [purchaseLines, setPurchaseLines] = useState<PurchaseLine[]>([createNewLine()])
+  const requestId = useRef(0)
   const { toast } = useToast()
 
   const totalCost = useMemo(
     () => purchaseLines.reduce((sum, item) => sum + item.quantity * item.unitCost, 0),
     [purchaseLines],
   )
+  const availableIngredients = useMemo(
+    () => selectedLocationId !== ALL_LOCATIONS
+      ? ingredients.filter((ingredient) => ingredient.locationId === selectedLocationId)
+      : ingredients,
+    [ingredients, selectedLocationId],
+  )
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    const currentRequest = ++requestId.current
     setLoading(true)
     setError(null)
 
     try {
-      const [purchaseData, ingredientsData, locationsData] = await Promise.all([
-        getPurchases(),
+      const [purchaseData, ingredientsData, supplierData, categoryData] = await Promise.all([
+        getPurchases(
+          selectedLocationId !== ALL_LOCATIONS
+            ? { locationId: selectedLocationId }
+            : undefined,
+        ),
         getIngredients(),
-        getLocations(),
+        getSuppliers(),
+        getIngredientCategories(),
       ])
+      if (currentRequest !== requestId.current) return
       setPurchases(purchaseData)
       setIngredients(ingredientsData)
-      setLocations(locationsData)
+      setSuppliers(supplierData)
+      setIngredientCategories(categoryData)
     } catch (err) {
+      if (currentRequest !== requestId.current) return
       console.error('Error fetching purchases data:', err)
       const errorMessage = err instanceof Error
         ? err.message
         : 'Error al cargar los datos de compras. Por favor, asegúrate de estar autenticado.'
       setError(errorMessage)
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
-  }
+  }, [selectedLocationId])
+
+  useEffect(() => {
+    setIsAssistantOpen(false)
+  }, [selectedLocationId])
+
+  useEffect(() => {
+    if (!isLoadingLocations) {
+      void fetchData()
+    }
+  }, [fetchData, isLoadingLocations])
+
+  useEffect(() => {
+    if (selectedLocationId === ALL_LOCATIONS) return
+
+    setPurchaseLines((current) => current.map((line) => {
+      const selectedIngredient = ingredients.find(
+        (ingredient) => ingredient.id === line.ingredientId,
+      )
+      return selectedIngredient && selectedIngredient.locationId !== selectedLocationId
+        ? { ...line, ingredientId: '' }
+        : line
+    }))
+  }, [ingredients, selectedLocationId])
 
   const handleAddLine = () => {
     setPurchaseLines((current) => [...current, createNewLine()])
@@ -78,7 +129,11 @@ export function PurchasesManager() {
     setPurchaseLines((current) => current.filter((line) => line.id !== id))
   }
 
-  const updateLine = (id: string, field: keyof Omit<PurchaseLine, 'id'>, value: string | number) => {
+  const updateLine = (
+    id: string,
+    field: keyof Omit<PurchaseLine, 'id' | 'detectedName'>,
+    value: string | number,
+  ) => {
     setPurchaseLines((current) =>
       current.map((line) =>
         line.id === id
@@ -91,11 +146,55 @@ export function PurchasesManager() {
     )
   }
 
+  const handleOpenAssistant = () => {
+    if (selectedLocationId === ALL_LOCATIONS) {
+      toast({
+        title: 'Selecciona una ubicación',
+        description: 'Selecciona una ubicación específica en la barra superior antes de usar el asistente.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsAssistantOpen(true)
+  }
+
+  const handleUseExtraction = (draft: PurchaseAssistantDraft) => {
+    setSupplierId(draft.supplierId)
+    if (draft.purchaseDate) setPurchaseDate(draft.purchaseDate)
+    setPurchaseLines(draft.items.map((item) => ({
+      id: createNewLine().id,
+      ingredientId: item.ingredientId,
+      quantity: item.quantity,
+      unitCost: item.unitCost,
+      detectedName: item.detectedName,
+    })))
+    toast({
+      title: 'Borrador de compra listo',
+      description: 'Revisa los datos detectados y asigna los ingredientes que no se reconocieron.',
+    })
+  }
+
   const handleCreatePurchase = async () => {
-    if (!supplierName.trim() || !purchaseDate || !locationId) {
+    if (!supplierId || !purchaseDate || selectedLocationId === ALL_LOCATIONS) {
       toast({
         title: 'Error',
-        description: 'Por favor completa todos los campos requeridos.',
+        description: selectedLocationId === ALL_LOCATIONS
+          ? 'Selecciona una ubicación específica en la barra superior.'
+          : 'Por favor completa todos los campos requeridos.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (purchaseLines.some(
+      (line) =>
+        !line.ingredientId || !Number.isFinite(line.quantity) || line.quantity <= 0 ||
+        !Number.isFinite(line.unitCost) || line.unitCost < 0,
+    )) {
+      toast({
+        title: 'Revisa las líneas de compra',
+        description: 'Asigna un ingrediente y revisa la cantidad y el costo de cada línea antes de registrar la compra.',
         variant: 'destructive',
       })
       return
@@ -114,9 +213,9 @@ export function PurchasesManager() {
     setSaving(true)
     try {
       await createPurchase({
-        supplierName,
+        supplierId,
         purchaseDate,
-        locationId,
+        locationId: selectedLocationId,
         totalCost: totalCost > 0 ? totalCost : undefined,
         items: validLines.map((line) => ({
           ingredientId: line.ingredientId,
@@ -128,15 +227,14 @@ export function PurchasesManager() {
         title: 'Éxito',
         description: 'Compra registrada correctamente.',
       })
-      setSupplierName('')
-      setLocationId('')
+      setSupplierId('')
       setPurchaseLines([createNewLine()])
-      fetchData()
+      void fetchData()
     } catch (err) {
       console.error('Error creating purchase:', err)
       toast({
         title: 'Error',
-        description: 'No se pudo registrar la compra. Revisa los datos e inténtalo de nuevo.',
+        description: err instanceof Error ? err.message : 'No se pudo registrar la compra. Revisa los datos e inténtalo de nuevo.',
         variant: 'destructive',
       })
     } finally {
@@ -147,20 +245,45 @@ export function PurchasesManager() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>Registrar Compra</CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleOpenAssistant}
+            disabled={loading || saving || !!error}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Asistente de compras
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
+            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+              <span className="text-muted-foreground">Ubicación de la compra: </span>
+              {selectedLocationId === ALL_LOCATIONS
+                ? 'Selecciona una ubicación específica en la barra superior.'
+                : locations.find((location) => location.id === selectedLocationId)?.name
+                  ?? 'Se usará la ubicación seleccionada en la barra superior.'}
+            </div>
             <div className="grid gap-2 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="supplierName">Proveedor</Label>
-                <Input
-                  id="supplierName"
-                  placeholder="Nombre del proveedor"
-                  value={supplierName}
-                  onChange={(event) => setSupplierName(event.target.value)}
-                />
+                <Label htmlFor="purchaseSupplier">Proveedor</Label>
+                <Select value={supplierId} onValueChange={setSupplierId}>
+                  <SelectTrigger id="purchaseSupplier">
+                    <SelectValue placeholder="Selecciona un proveedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.filter((supplier) => supplier.isActive).map((supplier) => (
+                      <SelectItem key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Link href="/admin/suppliers" className="text-sm text-primary underline">
+                  Administrar o crear proveedores
+                </Link>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="purchaseDate">Fecha de Compra</Label>
@@ -173,22 +296,7 @@ export function PurchasesManager() {
               </div>
             </div>
 
-            <div className="grid gap-2 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="locationId">Ubicación</Label>
-                <Select value={locationId} onValueChange={(value) => setLocationId(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una ubicación" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {location.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid gap-2">
               <div className="grid gap-2">
                 <Label>Total Estimado</Label>
                 <Input value={`${totalCost.toFixed(2)}`} readOnly />
@@ -208,7 +316,7 @@ export function PurchasesManager() {
               </div>
 
               <div className="space-y-4">
-                {purchaseLines.map((line, index) => (
+                {purchaseLines.map((line) => (
                   <div key={line.id} className="grid gap-4 rounded-lg border p-4 md:grid-cols-[1.5fr_1fr_1fr_auto]">
                     <div className="grid gap-2">
                       <Label>Ingrediente</Label>
@@ -217,13 +325,19 @@ export function PurchasesManager() {
                           <SelectValue placeholder="Selecciona un ingrediente" />
                         </SelectTrigger>
                         <SelectContent>
-                          {ingredients.map((ingredient) => (
+                          {availableIngredients.map((ingredient) => (
                             <SelectItem key={ingredient.id} value={ingredient.id}>
                               {ingredient.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      {line.detectedName && (
+                        <p className="text-xs text-muted-foreground">
+                          Detectado por IA: {line.detectedName}
+                          {!line.ingredientId && ' · selecciona el ingrediente correspondiente'}
+                        </p>
+                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label>Cantidad</Label>
@@ -255,7 +369,10 @@ export function PurchasesManager() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleCreatePurchase} disabled={saving}>
+                <Button
+                  onClick={handleCreatePurchase}
+                  disabled={loading || !!error || saving || selectedLocationId === ALL_LOCATIONS}
+                >
                   {saving ? 'Guardando...' : 'Registrar Compra'}
                 </Button>
               </div>
@@ -263,6 +380,20 @@ export function PurchasesManager() {
           </div>
         </CardContent>
       </Card>
+
+      <PurchaseAssistantDialog
+        key={selectedLocationId}
+        isOpen={isAssistantOpen}
+        locationId={selectedLocationId === ALL_LOCATIONS ? "" : selectedLocationId}
+        suppliers={suppliers}
+        ingredients={ingredients}
+        categories={ingredientCategories}
+        onClose={() => setIsAssistantOpen(false)}
+        onUseExtraction={handleUseExtraction}
+        onSupplierCreated={(supplier) => setSuppliers((current) => [...current, supplier])}
+        onIngredientCreated={(ingredient) => setIngredients((current) => [...current, ingredient])}
+        onCategoryCreated={(category) => setIngredientCategories((current) => [...current, category])}
+      />
 
       <Card>
         <CardHeader>

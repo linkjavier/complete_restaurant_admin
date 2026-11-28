@@ -29,6 +29,7 @@ import {
   Sparkles,
   BarChart3,
   FileText,
+  Truck,
 } from "lucide-react"
 import {
   Tooltip,
@@ -125,6 +126,11 @@ const routes = [
     label: "purchases",
     icon: ShoppingCart,
     href: "/admin/purchases",
+  },
+  {
+    label: "suppliers",
+    icon: Truck,
+    href: "/admin/suppliers",
   },
   {
     label: "production",

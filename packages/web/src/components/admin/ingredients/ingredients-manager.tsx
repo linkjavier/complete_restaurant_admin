@@ -6,7 +6,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Trash2, Pencil } from "lucide-react"
-import { getIngredients, createIngredient, deleteIngredient, updateIngredient, Ingredient } from "@/lib/api"
+import {
+  getIngredients,
+  createIngredient,
+  deleteIngredient,
+  updateIngredient,
+  Ingredient,
+  getIngredientCategories,
+  createIngredientCategory,
+  IngredientCategory,
+} from "@/lib/api"
 import { getLocations, Location } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { toFiniteNumber } from "@/lib/utils"
@@ -31,13 +40,17 @@ export function IngredientsManager() {
     unit: "",
     minQuantity: 0,
     locationId: "",
+    categoryId: "",
   })
+  const [categories, setCategories] = useState<IngredientCategory[]>([])
+  const [newCategoryName, setNewCategoryName] = useState("")
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchIngredients()
     fetchLocations()
+    fetchCategories()
   }, [])
 
   const fetchIngredients = async () => {
@@ -60,6 +73,35 @@ export function IngredientsManager() {
       setLocations(data)
     } catch (err) {
       console.error('Error fetching locations:', err)
+    }
+  }
+
+  const fetchCategories = async () => {
+    try {
+      setCategories(await getIngredientCategories())
+    } catch (err) {
+      console.error("Error fetching ingredient categories:", err)
+      toast({
+        title: "No se pudieron cargar las categorías",
+        description: err instanceof Error ? err.message : "Intenta de nuevo.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return
+    try {
+      const category = await createIngredientCategory({ name: newCategoryName.trim() })
+      setCategories((current) => [...current, category])
+      setNewCategoryName("")
+      toast({ title: "Categoría creada", description: category.name })
+    } catch (err) {
+      toast({
+        title: "No se pudo crear la categoría",
+        description: err instanceof Error ? err.message : "Intenta de nuevo.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -89,6 +131,7 @@ export function IngredientsManager() {
         unit: newIngredient.unit.trim(),
         minQuantity: newIngredient.minQuantity,
         locationId: newIngredient.locationId,
+        categoryId: newIngredient.categoryId || undefined,
       })
 
       toast({
@@ -103,6 +146,7 @@ export function IngredientsManager() {
         unit: "",
         minQuantity: 0,
         locationId: "",
+        categoryId: "",
       })
 
       fetchIngredients()
@@ -141,6 +185,7 @@ export function IngredientsManager() {
         unit: editingIngredient.unit.trim(),
         minQuantity: editingIngredient.minQuantity,
         locationId: editingIngredient.locationId,
+        categoryId: editingIngredient.categoryId || null,
       })
 
       toast({
@@ -269,6 +314,50 @@ export function IngredientsManager() {
               />
             </div>
             <div className="grid gap-2">
+              <Label>Categoría de ingrediente</Label>
+              <Select
+                value={
+                  editingIngredient
+                    ? editingIngredient.categoryId || ""
+                    : newIngredient.categoryId
+                }
+                onValueChange={(value) =>
+                  editingIngredient
+                    ? setEditingIngredient({ ...editingIngredient, categoryId: value === "__none__" ? null : value })
+                    : setNewIngredient({ ...newIngredient, categoryId: value === "__none__" ? "" : value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin categoría</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!editingIngredient && (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Crear categoría de ingredientes"
+                    value={newCategoryName}
+                    onChange={(event) => setNewCategoryName(event.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCreateCategory}
+                    disabled={!newCategoryName.trim()}
+                  >
+                    Crear
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="locationId">Ubicación</Label>
               <Select
                 value={editingIngredient ? editingIngredient.locationId : newIngredient.locationId}
@@ -361,6 +450,11 @@ export function IngredientsManager() {
                       <p className="text-sm text-muted-foreground">
                         Ubicación: {ingredient.location?.name}
                       </p>
+                      {ingredient.category && (
+                        <p className="text-sm text-muted-foreground">
+                          Categoría: {ingredient.category.name}
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button

@@ -38,11 +38,20 @@ export class PurchasesService {
         throw new BadRequestException('Ubicación inválida')
       }
 
+      const supplier = await tx.supplier.findFirst({
+        where: { id: createPurchaseDto.supplierId, tenantId, isActive: true },
+      })
+
+      if (!supplier) {
+        throw new BadRequestException('Proveedor inválido o inactivo')
+      }
+
       const purchase = await tx.purchase.create({
         data: {
           tenant: { connect: { id: tenantId } },
           location: { connect: { id: location.id } },
-          supplierName: createPurchaseDto.supplierName,
+          supplier: { connect: { id: supplier.id } },
+          supplierName: supplier.name,
           purchaseDate,
           totalCost: createPurchaseDto.totalCost ?? undefined,
           createdBy: { connect: { id: createdById } },
@@ -97,6 +106,24 @@ export class PurchasesService {
             unitCost: item.unitCost,
           },
         })
+
+        await tx.supplierIngredient.upsert({
+          where: {
+            supplierId_ingredientId: {
+              supplierId: supplier.id,
+              ingredientId: ingredient.id,
+            },
+          },
+          create: {
+            supplierId: supplier.id,
+            ingredientId: ingredient.id,
+            unitCost: item.unitCost,
+          },
+          update: {
+            unitCost: item.unitCost,
+            isActive: true,
+          },
+        })
       }
 
       const result = await tx.purchase.findUnique({
@@ -104,6 +131,7 @@ export class PurchasesService {
         include: {
           items: { include: { ingredient: true } },
           location: true,
+          supplier: true,
           createdBy: true,
         },
       })
@@ -123,12 +151,17 @@ export class PurchasesService {
       toDate?: string
       ingredientId?: string
       locationId?: string
+      supplierId?: string
     },
   ): Promise<Purchase[]> {
     const where: Prisma.PurchaseWhereInput = { tenantId }
 
     if (filters.locationId) {
       where.locationId = filters.locationId
+    }
+
+    if (filters.supplierId) {
+      where.supplierId = filters.supplierId
     }
 
     if (filters.ingredientId) {
@@ -168,6 +201,7 @@ export class PurchasesService {
         include: {
           items: { include: { ingredient: true } },
           location: true,
+          supplier: true,
           createdBy: true,
         },
       })
