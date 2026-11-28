@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Overview } from "@/components/admin/overview"
 import { Button } from "@/components/ui/button"
 import { Building2, Users, Utensils, DollarSign, Package, ShoppingCart, CheckCircle2, XCircle, TrendingUp, Calendar, Clock, AlertTriangle, AlertCircle, Bell, QrCode, ShoppingBag, MessageCircle, ArrowRight, CreditCard } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart, Rectangle, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { API_URL, getAuthHeaders } from '@/lib/api'
 import { useLanguage } from "@/hooks/use-language"
+import { ALL_LOCATIONS, useLocationSelection } from "@/hooks/use-location-selection"
 
 interface Order {
   id: string
@@ -27,6 +28,11 @@ interface Order {
   isPaid: boolean
   total: number
   source?: string
+  locationId?: string | null
+  location?: {
+    id: string
+    name: string
+  } | null
 }
 
 interface OrderStats {
@@ -42,6 +48,39 @@ interface OrderStats {
     count: number
     total: number
   }
+}
+
+function calculateOrderTotal(order: Order) {
+  if (!order?.items?.length) return 0
+  return order.items.reduce(
+    (total, item) => total + item.quantity * (item.product?.price || 0),
+    0,
+  )
+}
+
+function calculateTopProducts(orders: Order[]) {
+  const productMap = new Map<string, { quantity: number; total: number }>()
+
+  orders.forEach((order) => {
+    order.items.forEach((item) => {
+      const productName = item.product.name
+      const current = productMap.get(productName) || { quantity: 0, total: 0 }
+
+      productMap.set(productName, {
+        quantity: current.quantity + item.quantity,
+        total: current.total + item.quantity * item.product.price,
+      })
+    })
+  })
+
+  return Array.from(productMap.entries())
+    .map(([name, stats]) => ({
+      name,
+      quantity: stats.quantity,
+      total: stats.total,
+    }))
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 5)
 }
 
 interface TopProduct {
@@ -132,6 +171,7 @@ interface CartAbandonment {
 export default function AdminDashboard() {
   const { tNested } = useLanguage()
   const dashboardTranslations = tNested('dashboard')
+  const { selectedLocationId, isLoadingLocations } = useLocationSelection()
   
   const [orderStats, setOrderStats] = useState<OrderStats>({
     activeOrders: { count: 0, total: 0 },
@@ -156,45 +196,20 @@ export default function AdminDashboard() {
   const [menuSections, setMenuSections] = useState<MenuSection[]>([])
   const [cartAbandonment, setCartAbandonment] = useState<CartAbandonment[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+  const [salesByLocation, setSalesByLocation] = useState<Array<{ name: string; total: number }>>([])
   const [totalSales, setTotalSales] = useState<number>(0)
   const [unpaidOrders, setUnpaidOrders] = useState<{ count: number; total: number }>({ count: 0, total: 0 })
 
-  const calculateOrderTotal = (order: Order) => {
-    if (!order?.items?.length) return 0
-    return order.items.reduce((total, item) => {
-      return total + (item.quantity * (item.product?.price || 0))
-    }, 0)
-  }
-
-  const calculateTopProducts = (orders: Order[]) => {
-    const productMap = new Map<string, { quantity: number; total: number }>()
-
-    orders.forEach(order => {
-      order.items.forEach(item => {
-        const productName = item.product.name
-        const current = productMap.get(productName) || { quantity: 0, total: 0 }
-        
-        productMap.set(productName, {
-          quantity: current.quantity + item.quantity,
-          total: current.total + (item.quantity * item.product.price)
-        })
-      })
-    })
-
-    return Array.from(productMap.entries())
-      .map(([name, stats]) => ({
-        name,
-        quantity: stats.quantity,
-        total: stats.total
-      }))
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 5)
-  }
-
-  const fetchOrderStats = async () => {
+  const fetchOrderStats = useCallback(async (signal: AbortSignal) => {
     try {
-      const response = await fetch(`${API_URL}/orders?kitchen=false`, {
+      const params = new URLSearchParams({ kitchen: "false" })
+      if (selectedLocationId !== ALL_LOCATIONS) {
+        params.set("locationId", selectedLocationId)
+      }
+
+      const response = await fetch(`${API_URL}/orders?${params.toString()}`, {
         headers: getAuthHeaders(),
+        signal,
       })
 
       if (!response.ok) {
@@ -203,6 +218,26 @@ export default function AdminDashboard() {
 
       const orders: Order[] = await response.json()
       setOrders(orders)
+
+      const locationSales = new Map<string, { name: string; total: number }>()
+      orders.forEach((order) => {
+        if (order.status === "CANCELLED") return
+        const locationName = order.location?.name || "Sin ubicación"
+        const locationId = order.location?.id ?? order.locationId ?? locationName
+        const current = locationSales.get(locationId) ?? {
+          name: locationName,
+          total: 0,
+        }
+        locationSales.set(locationId, {
+          ...current,
+          total: current.total + calculateOrderTotal(order),
+        })
+      })
+      setSalesByLocation(
+        Array.from(locationSales.values()).sort(
+          (first, second) => second.total - first.total,
+        ),
+      )
       
       // Calculate total sales (excluding cancelled orders)
       const totalSales = orders
@@ -245,9 +280,10 @@ export default function AdminDashboard() {
       setTotalSales(totalSales)
       setUnpaidOrders(unpaidOrdersData)
     } catch (error) {
+      if (signal.aborted) return
       console.error('Error fetching order stats:', error)
     }
-  }
+  }, [selectedLocationId])
 
   // Mock data for Pareto chart
   const generateMockParetoData = () => {
@@ -433,10 +469,30 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => {
-    fetchOrderStats()
-    const interval = setInterval(fetchOrderStats, 30000)
-    return () => clearInterval(interval)
-  }, [])
+    if (isLoadingLocations) return
+
+    const controller = new AbortController()
+    setOrders([])
+    setSalesByLocation([])
+    setTotalSales(0)
+    setTopProducts([])
+    setOrderStats({
+      activeOrders: { count: 0, total: 0 },
+      paidOrders: { count: 0, total: 0 },
+      cancelledOrders: { count: 0, total: 0 },
+    })
+    setUnpaidOrders({ count: 0, total: 0 })
+
+    void fetchOrderStats(controller.signal)
+    const interval = setInterval(
+      () => void fetchOrderStats(controller.signal),
+      30000,
+    )
+    return () => {
+      controller.abort()
+      clearInterval(interval)
+    }
+  }, [fetchOrderStats, isLoadingLocations])
 
   useEffect(() => {
     setParetoData(generateMockParetoData())
@@ -740,7 +796,7 @@ export default function AdminDashboard() {
                 <CardTitle>{dashboardTranslations.salesByLocation}</CardTitle>
               </CardHeader>
               <CardContent className="pl-2">
-                <Overview />
+                <Overview data={salesByLocation} />
               </CardContent>
             </Card>
             <Card className="col-span-3">

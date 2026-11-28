@@ -10,23 +10,13 @@ import { getKitchenOrders, updateKitchenOrderItemStatus, printKitchenTicket, Kit
 import { useToast } from "@/components/ui/use-toast"
 import { useOrderSocket } from "@/hooks/use-order-socket"
 import { useAuth } from "@/hooks/use-auth"
+import { useLocationSelection } from "@/hooks/use-location-selection"
 import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { getLocations, Location } from "@/lib/api"
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { MapPin } from "lucide-react"
 
 export function KitchenManager() {
   const [orders, setOrders] = useState<KitchenOrder[]>([])
-  const [locations, setLocations] = useState<Location[]>([])
-  const [selectedLocationId, setSelectedLocationId] = useState<string>("all")
+  const { selectedLocationId } = useLocationSelection()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [itemToCancel, setItemToCancel] = useState<{ id: string, name: string } | null>(null)
@@ -95,20 +85,7 @@ export function KitchenManager() {
     // Set up polling as a fallback (every 2 minutes)
     const interval = setInterval(fetchOrders, 120000)
     return () => clearInterval(interval)
-  }, [selectedLocationId]) // Recarga cuando cambia la sede
-
-  // Fetch locations for labels and selector
-  useEffect(() => {
-    const fetchLocationsData = async () => {
-      try {
-        const data = await getLocations();
-        setLocations(data);
-      } catch (err) {
-        console.error('Error fetching locations:', err);
-      }
-    };
-    fetchLocationsData();
-  }, []);
+  }, [selectedLocationId, user?.locationId, user?.role]) // Recarga cuando cambia la sede
 
   const fetchOrders = async () => {
     try {
@@ -465,33 +442,6 @@ export function KitchenManager() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <CardTitle>Órdenes Activas</CardTitle>
-              <div className="text-sm text-muted-foreground mt-1">
-                {user?.role === 'SUPER_ADMIN' ? (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="font-medium whitespace-nowrap text-primary">Sede:</span>
-                    <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                      <SelectTrigger className="w-[180px] h-8 text-xs">
-                        <SelectValue placeholder="Seleccionar sede" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas las sedes</SelectItem>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={loc.id}>
-                            {loc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 mt-1">
-                    <MapPin className="h-3 w-3 text-emerald-600" />
-                    <span className="font-semibold text-emerald-700 uppercase">
-                      {locations.find(l => l.id === user?.locationId)?.name || user?.locationId || 'Sin sede asignada'}
-                    </span>
-                  </div>
-                )}
-              </div>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <Button

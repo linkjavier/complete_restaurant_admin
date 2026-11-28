@@ -11,8 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/hooks/use-auth"
+import { ALL_LOCATIONS, useLocationSelection } from "@/hooks/use-location-selection"
 import {
-  getLocations,
   getQrMenuConfiguration,
   QrMenuConfiguration,
   QrMenuConfigurationUpdate,
@@ -21,44 +21,15 @@ import {
 
 export default function QrMenuManagerPage() {
   const { user } = useAuth()
-  const [locationId, setLocationId] = useState("")
-  const [locations, setLocations] = useState<{ id: string; name: string }[]>([])
+  const { selectedLocationId } = useLocationSelection()
+  const locationId = user?.role === "SUPER_ADMIN"
+    ? selectedLocationId === ALL_LOCATIONS ? "" : selectedLocationId
+    : user?.locationId ?? ""
   const [configuration, setConfiguration] = useState<QrMenuConfiguration | null>(null)
-  const [loadingLocations, setLoadingLocations] = useState(true)
   const [loadingConfiguration, setLoadingConfiguration] = useState(false)
   const [configurationError, setConfigurationError] = useState("")
-  const [locationsError, setLocationsError] = useState("")
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    setLoadingLocations(true)
-    getLocations()
-      .then((availableLocations) => {
-        if (!active) return
-        const manageableLocations = user?.role === "MANAGER"
-          ? availableLocations.filter((location) => location.id === user.locationId)
-          : availableLocations
-        setLocations(manageableLocations)
-        const preferredLocation = user?.locationId
-          ? manageableLocations.find((location) => location.id === user.locationId)
-          : undefined
-        const initialLocation = preferredLocation?.id ||
-          (user?.role === "SUPER_ADMIN" && manageableLocations.length > 1
-            ? ""
-            : manageableLocations[0]?.id || "")
-        setLocationId(initialLocation)
-      })
-      .catch((error: unknown) => {
-        if (active) {
-          setLocationsError(error instanceof Error ? error.message : "No se pudieron cargar las ubicaciones")
-        }
-      })
-      .finally(() => {
-        if (active) setLoadingLocations(false)
-      })
-    return () => { active = false }
-  }, [user?.locationId, user?.role])
+  const [configurationRetry, setConfigurationRetry] = useState(0)
 
   useEffect(() => {
     if (!locationId) {
@@ -85,7 +56,7 @@ export default function QrMenuManagerPage() {
         if (active) setLoadingConfiguration(false)
       })
     return () => { active = false }
-  }, [locationId])
+  }, [configurationRetry, locationId])
 
   const publicUrl = useMemo(() => (
     typeof window !== "undefined" && locationId
@@ -134,8 +105,8 @@ export default function QrMenuManagerPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Menú QR</h1>
           <p className="mt-1 text-muted-foreground">
-            {user?.role === "SUPER_ADMIN"
-              ? "Selecciona la sede que quieres administrar y configura su menú."
+            {user?.role === "SUPER_ADMIN" && !locationId
+              ? "Selecciona la ubicación desde la barra superior para configurar su menú."
               : "Diseña y comparte la página interactiva de tu negocio."}
           </p>
         </div>
@@ -147,39 +118,14 @@ export default function QrMenuManagerPage() {
         )}
       </div>
 
-      <Card>
-        <CardContent className="space-y-2 p-4">
-          <Label htmlFor="qr-location">Sede del menú</Label>
-          {loadingLocations ? (
-            <p className="text-sm text-muted-foreground">Cargando sedes…</p>
-          ) : locationsError ? (
-            <p role="alert" className="text-sm text-destructive">{locationsError}</p>
-          ) : locations.length ? (
-            <select
-              id="qr-location"
-              value={locationId}
-              onChange={(event) => setLocationId(event.target.value)}
-              className="h-10 w-full max-w-md rounded-md border border-input bg-background px-3 text-sm"
-            >
-              {user?.role === "SUPER_ADMIN" && locations.length > 1 && (
-                <option value="">Selecciona una sede…</option>
-              )}
-              {locations.map((location) => (
-                <option key={location.id} value={location.id}>{location.name}</option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-sm text-muted-foreground">No hay sedes disponibles para configurar el menú.</p>
-          )}
-        </CardContent>
-      </Card>
-
       {loadingConfiguration && (
         <p role="status" className="p-4 text-center text-muted-foreground">Cargando la configuración de esta sede…</p>
       )}
-      {!loadingLocations && !locationsError && locations.length > 0 && !locationId && (
+      {!loadingConfiguration && !locationId && (
         <p className="rounded-md border border-dashed p-6 text-center text-muted-foreground">
-          Selecciona una sede para abrir su editor de Menú QR.
+          {user?.role === "SUPER_ADMIN"
+            ? "Selecciona una ubicación desde la barra superior para abrir su editor de Menú QR."
+            : "Tu usuario no tiene una ubicación asignada para configurar el Menú QR."}
         </p>
       )}
       {configurationError && (
@@ -192,7 +138,7 @@ export default function QrMenuManagerPage() {
           <Button
             className="mt-3"
             variant="outline"
-            onClick={() => setLocationId((current) => `${current}`)}
+            onClick={() => setConfigurationRetry((current) => current + 1)}
           >
             Reintentar
           </Button>

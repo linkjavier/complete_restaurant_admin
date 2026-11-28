@@ -5,13 +5,19 @@ import { usePathname, useRouter } from "next/navigation"
 import { Sidebar } from "@/components/admin/sidebar"
 import { UserNav } from "@/components/user-nav"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { Menu } from "lucide-react"
+import { MapPin, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { Toaster } from "@/components/ui/toaster"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/hooks/use-auth"
 import { getHomePathForRole, isPathAllowedForRole } from "@/lib/roles"
+import {
+  ALL_LOCATIONS,
+  LocationSelectionProvider,
+  useLocationSelection,
+} from "@/hooks/use-location-selection"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Create a client
 const queryClient = new QueryClient()
@@ -39,6 +45,35 @@ function RoleRouteGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function LocationSwitcher() {
+  const { user } = useAuth()
+  const { locations, selectedLocationId, setSelectedLocationId, isLoadingLocations } =
+    useLocationSelection()
+
+  if (user?.role !== "SUPER_ADMIN" || isLoadingLocations || locations.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <MapPin className="hidden h-4 w-4 text-muted-foreground sm:block" />
+      <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+        <SelectTrigger aria-label="Seleccionar ubicación" className="h-9 w-[150px] bg-background sm:w-[210px]">
+          <SelectValue placeholder="Ubicación" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_LOCATIONS}>Todas las ubicaciones</SelectItem>
+          {locations.map((location) => (
+            <SelectItem key={location.id} value={location.id}>
+              {location.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
 export default function AdminLayout({
   children,
 }: {
@@ -51,38 +86,42 @@ export default function AdminLayout({
   return (
     <QueryClientProvider client={queryClient}>
       <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CHEF', 'STAFF', 'CASHIER']}>
-        <RoleRouteGuard>
-        <div className="h-full">
-          {/* Desktop Sidebar */}
-          <div className="hidden md:flex h-full flex-col fixed inset-y-0 z-50 transition-all duration-300" id="sidebar">
-            <Sidebar />
-          </div>
-          
-          {/* Mobile Header with Menu Button */}
-          <div className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-width)] h-16 bg-background border-b border-border z-40 flex items-center px-4 transition-all duration-300">
-            <div className="md:hidden">
-              <Sheet open={isOpen} onOpenChange={setIsOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="mr-2">
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-72">
-                  <SheetTitle className="sr-only">Menú de Navegación</SheetTitle>
-                  <Sidebar isMobile onClose={() => setIsOpen(false)} />
-                </SheetContent>
-              </Sheet>
+        <LocationSelectionProvider>
+          <RoleRouteGuard>
+            <div className="h-full">
+              <div
+                className="fixed inset-y-0 z-50 hidden h-full flex-col transition-all duration-300 md:flex"
+                id="sidebar"
+              >
+                <Sidebar />
+              </div>
+
+              <div className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center border-b border-border bg-background px-4 transition-all duration-300 md:left-[var(--sidebar-width)]">
+                <div className="md:hidden">
+                  <Sheet open={isOpen} onOpenChange={setIsOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" size="icon" className="mr-2">
+                        <Menu className="h-5 w-5" />
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="w-72 p-0">
+                      <SheetTitle className="sr-only">Menú de Navegación</SheetTitle>
+                      <Sidebar isMobile onClose={() => setIsOpen(false)} />
+                    </SheetContent>
+                  </Sheet>
+                </div>
+                <div className="ml-auto flex min-w-0 items-center gap-2">
+                  <LocationSwitcher />
+                  <UserNav />
+                </div>
+              </div>
+
+              <main className="h-full pt-16 transition-all duration-300 md:pl-[var(--sidebar-width)]">
+                {children}
+              </main>
             </div>
-            <div className="ml-auto">
-              <UserNav />
-            </div>
-          </div>
-          
-          <main className="md:pl-[var(--sidebar-width)] pt-16 h-full transition-all duration-300">
-            {children}
-          </main>
-        </div>
-        </RoleRouteGuard>
+          </RoleRouteGuard>
+        </LocationSelectionProvider>
       </ProtectedRoute>
       <Toaster />
     </QueryClientProvider>

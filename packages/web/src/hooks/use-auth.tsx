@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
-import { getAuthToken } from "@/lib/auth";
+import { getAuthToken, removeAuthToken } from "@/lib/auth";
 import { getAuthHeaders } from "@/lib/api";
 import { getUser, User, API_URL } from "@/lib/api";
 import { useRouter } from 'next/navigation';
@@ -45,7 +45,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = await getUser();
         setState({ user: userData, isLoading: false, error: null });
       } catch (error) {
-        setState({ user: null, isLoading: false, error: 'Failed to fetch user' });
+        const isExpiredSession =
+          error instanceof Error &&
+          error.message === "Authentication expired or invalid";
+        if (isExpiredSession) removeAuthToken();
+        setState({
+          user: null,
+          isLoading: false,
+          error: isExpiredSession
+            ? null
+            : error instanceof TypeError
+              ? "No se pudo conectar con el servidor. Verifica la conexión e inténtalo de nuevo."
+              : error instanceof Error
+                ? error.message
+                : "No se pudo cargar el usuario.",
+        });
       }
     };
     fetchUser();
@@ -108,7 +122,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await getUser();
       setState({ user: userData, isLoading: false, error: null });
     } catch (error) {
-      setState({ user: null, isLoading: false, error: 'Failed to fetch user' });
+      const isExpiredSession =
+        error instanceof Error &&
+        error.message === "Authentication expired or invalid";
+      if (isExpiredSession) removeAuthToken();
+      setState({
+        user: null,
+        isLoading: false,
+        error: isExpiredSession
+          ? null
+          : error instanceof TypeError
+            ? "No se pudo conectar con el servidor. Verifica la conexión e inténtalo de nuevo."
+            : error instanceof Error
+              ? error.message
+              : "No se pudo cargar el usuario.",
+      });
     }
   };
 

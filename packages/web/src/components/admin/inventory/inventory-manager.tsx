@@ -14,11 +14,10 @@ import {
   Warehouse,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { ALL_LOCATIONS, useLocationSelection } from "@/hooks/use-location-selection";
 import {
   getInventoryOverview,
-  getLocations,
   InventoryStockItem,
-  Location,
 } from "@/lib/api";
 import { InventoryModificationsPanel } from "@/components/admin/inventory/inventory-modifications-panel";
 import { useToast } from "@/components/ui/use-toast";
@@ -26,7 +25,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -42,7 +40,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const ALL_LOCATIONS = "all";
 type InventoryFilter = "ALL" | "PRODUCT" | "INTERMEDIATE" | "INGREDIENT";
 type StatusFilter = "ALL" | "LOW" | "OUT" | "AVAILABLE";
 type InventoryView = "GRID" | "LIST";
@@ -110,13 +107,12 @@ function StatusBadge({ item }: { item: InventoryStockItem }) {
 export function InventoryManager() {
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { locations, selectedLocationId, setSelectedLocationId } = useLocationSelection();
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
   const canManageInventory = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(
     user?.role ?? "",
   );
   const [items, setItems] = useState<InventoryStockItem[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocationId, setSelectedLocationId] = useState(ALL_LOCATIONS);
   const [filter, setFilter] = useState<InventoryFilter>("ALL");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [view, setView] = useState<InventoryView>("GRID");
@@ -141,12 +137,8 @@ export function InventoryManager() {
       if (!isSuperAdmin && !user.locationId) {
         throw new Error("Tu usuario no tiene una sucursal asignada.");
       }
-      const [stockItems, locationData] = await Promise.all([
-        getInventoryOverview(activeLocationId),
-        isSuperAdmin ? getLocations() : Promise.resolve([]),
-      ]);
+      const stockItems = await getInventoryOverview(activeLocationId);
       setItems(stockItems);
-      setLocations(locationData);
     } catch (loadError) {
       console.error("Error loading inventory overview:", loadError);
       const message =
@@ -212,30 +204,6 @@ export function InventoryManager() {
 
   return (
     <div className="min-w-0 space-y-5">
-      {isSuperAdmin && (
-        <div className="w-full space-y-2 sm:max-w-sm">
-          <Label htmlFor="inventory-location">Sucursal</Label>
-          <Select
-            value={selectedLocationId}
-            onValueChange={setSelectedLocationId}
-          >
-            <SelectTrigger id="inventory-location">
-              <SelectValue placeholder="Selecciona una sucursal" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_LOCATIONS}>
-                Todas las sucursales
-              </SelectItem>
-              {locations.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
       {error && (
         <div className="flex flex-col justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm sm:flex-row sm:items-center">
           <span>{error}</span>

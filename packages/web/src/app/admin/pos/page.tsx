@@ -26,8 +26,6 @@ import {
   getActiveOrders,
   processPayment,
   getCategories,
-  getLocations,
-  Location,
   issuePosInvoice,
   issuePosTableInvoice,
   declinePosTableInvoice,
@@ -57,6 +55,7 @@ import { Cart } from "@/components/admin/pos/cart";
 import { ProductGrid } from "@/components/admin/pos/product-grid";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/hooks/use-auth";
+import { ALL_LOCATIONS, useLocationSelection } from "@/hooks/use-location-selection";
 import {
   Dialog,
   DialogContent,
@@ -66,7 +65,6 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
-const ALL_LOCATIONS = "all";
 const PAYMENT_METHODS: Array<{ value: PaymentMethod; label: string }> = [
   { value: "CASH", label: "Efectivo" },
   { value: "CREDIT_CARD", label: "Tarjeta de crédito" },
@@ -92,8 +90,7 @@ export default function PosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocationId, setSelectedLocationId] = useState(ALL_LOCATIONS);
+  const { selectedLocationId } = useLocationSelection();
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [cart, setCart] = useState<
@@ -142,6 +139,11 @@ export default function PosPage() {
       ? ""
       : selectedLocationId
     : (user?.locationId ?? "");
+
+  useEffect(() => {
+    setCart({});
+    setSelectedTable("");
+  }, [posLocationId]);
 
   const refreshShiftStatus = useCallback(async () => {
     if (!posLocationId) {
@@ -322,14 +324,13 @@ export default function PosPage() {
         throw new Error("Tu usuario no tiene una sucursal asignada.");
       }
 
-      const [productsData, tablesData, categoriesData, locationsData] =
+      const [productsData, tablesData, categoriesData] =
         await Promise.all([
           getProducts(
             isSuperAdmin ? undefined : (user.locationId ?? undefined),
           ),
           getTables(),
           getCategories(),
-          getLocations(),
         ]);
       setProducts(
         productsData
@@ -340,7 +341,6 @@ export default function PosPage() {
       );
       setTables(tablesData);
       setCategories(categoriesData);
-      setLocations(locationsData);
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Error al cargar los datos. Por favor, intente de nuevo.");
@@ -944,35 +944,11 @@ export default function PosPage() {
           <CardHeader>
             <CardTitle>Selecciona una sede</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Para iniciar o continuar una caja, primero elige la sede donde vas
-              a operar.
+              {isSuperAdmin
+                ? "Elige una ubicación desde el selector de la barra superior para iniciar o continuar una caja."
+                : "Tu usuario no tiene una ubicación asignada. Contacta al administrador."}
             </p>
           </CardHeader>
-          <CardContent>
-            <Select
-              value={
-                selectedLocationId === ALL_LOCATIONS
-                  ? undefined
-                  : selectedLocationId
-              }
-              onValueChange={(locationId) => {
-                setSelectedLocationId(locationId);
-                setCart({});
-                setSelectedTable("");
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona una sede" />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {location.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
         </Card>
       </div>
     );
@@ -1108,31 +1084,6 @@ export default function PosPage() {
                     />
                   </div>
                 </div>
-                {isSuperAdmin && (
-                  <Select
-                    value={
-                      selectedLocationId === ALL_LOCATIONS
-                        ? undefined
-                        : selectedLocationId
-                    }
-                    onValueChange={(locationId) => {
-                      setSelectedLocationId(locationId);
-                      setCart({});
-                      setSelectedTable("");
-                    }}
-                  >
-                    <SelectTrigger className="w-full md:w-[200px]">
-                      <SelectValue placeholder="Selecciona una sede" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations.map((location) => (
-                        <SelectItem key={location.id} value={location.id}>
-                          {location.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
                 <Select
                   value={selectedCategory}
                   onValueChange={setSelectedCategory}

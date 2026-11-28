@@ -1,3 +1,8 @@
+import {
+  getAuthToken as getStoredAuthToken,
+  removeAuthToken as clearStoredAuthToken,
+} from "@/lib/auth";
+
 function getApiUrl() {
   if (typeof window === "undefined") {
     return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -577,8 +582,7 @@ export const getTenantIdFromSubdomain = () => {
 };
 
 export const getAuthHeaders = (isMultipart = false) => {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = getStoredAuthToken();
   const tenantId = getTenantIdFromSubdomain();
   const headers: Record<string, string> = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -599,8 +603,7 @@ export const getAuthHeaders = (isMultipart = false) => {
 };
 
 export function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("token");
+  return getStoredAuthToken();
 }
 
 export async function getProducts(
@@ -1605,13 +1608,12 @@ export async function getUser(): Promise<User> {
 
   if (!response.ok) {
     if (response.status === 401) {
-      // Remove invalid token
-      localStorage.removeItem("token");
+      clearStoredAuthToken();
       throw new Error("Authentication expired or invalid");
     }
     const errorText = await response.text();
     console.error("[getUser] Error response:", errorText);
-    throw new Error("Failed to fetch user");
+    throw new Error(`Failed to fetch user (${response.status})`);
   }
 
   const userData = await response.json();

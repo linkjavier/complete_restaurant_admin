@@ -2,30 +2,22 @@
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
 
-const data = [
-  {
-    name: "Sede 1",
-    total: 4000,
-  },
-  {
-    name: "Sede 2",
-    total: 3000,
-  },
-  {
-    name: "Sede 3",
-    total: 2000,
-  },
-  {
-    name: "Sede 4",
-    total: 2780,
-  },
-  {
-    name: "Sede 5",
-    total: 1890,
-  },
-]
+interface OverviewProps {
+  data: Array<{
+    name: string
+    total: number
+  }>
+}
 
-export function Overview() {
+export function Overview({ data }: OverviewProps) {
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[350px] items-center justify-center text-sm text-muted-foreground">
+        No hay ventas para la ubicación seleccionada.
+      </div>
+    )
+  }
+
   return (
     <ResponsiveContainer width="100%" height={350}>
       <BarChart data={data}>

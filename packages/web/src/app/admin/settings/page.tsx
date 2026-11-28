@@ -11,8 +11,9 @@ import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { ImageUpload } from "@/components/admin/products/image-upload"
 import { CategoryOrderManager } from "@/components/admin/settings/category-order-manager"
-import { API_URL, getAuthHeaders, getLocations, type Location } from '@/lib/api'
+import { API_URL, getAuthHeaders } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
+import { ALL_LOCATIONS, useLocationSelection } from '@/hooks/use-location-selection'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BillingSettingsTab } from "@/components/admin/settings/billing-settings-tab"
 
@@ -20,9 +21,6 @@ export default function SettingsPage() {
   const [businessName, setBusinessName] = useState("")
   const [businessIcon, setBusinessIcon] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingLocations, setIsLoadingLocations] = useState(false)
-  const [locations, setLocations] = useState<Location[]>([])
-  const [selectedLocationId, setSelectedLocationId] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [aiName, setAiName] = useState("")
   const [aiGender, setAiGender] = useState("")
@@ -30,59 +28,14 @@ export default function SettingsPage() {
   const [deliveryFee, setDeliveryFee] = useState<number>(0)
   const [defaultOpeningCash, setDefaultOpeningCash] = useState("0")
   const { user, isLoading: isAuthLoading } = useAuth()
+  const { selectedLocationId } = useLocationSelection()
   const isSuperAdmin = user?.role === "SUPER_ADMIN"
   const canManageCashShift = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(user?.role ?? "")
-  const locationId = selectedLocationId
+  const locationId = isSuperAdmin
+    ? selectedLocationId === ALL_LOCATIONS ? "" : selectedLocationId
+    : user?.locationId ?? ""
 
   const { toast } = useToast()
-
-  useEffect(() => {
-    if (isAuthLoading) return
-    if (!user) {
-      setSelectedLocationId("")
-      setIsLoadingLocations(false)
-      setIsLoading(false)
-      return
-    }
-
-    if (user.role !== "SUPER_ADMIN") {
-      setSelectedLocationId(user.locationId ?? "")
-      return
-    }
-
-    let cancelled = false
-    setIsLoadingLocations(true)
-    getLocations()
-      .then((result) => {
-        if (cancelled) return
-        setLocations(result)
-        const preferredLocationId =
-          user.locationId && result.some((location) => location.id === user.locationId)
-            ? user.locationId
-            : result[0]?.id ?? ""
-        setSelectedLocationId((current) =>
-          result.some((location) => location.id === current)
-            ? current
-            : preferredLocationId,
-        )
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          toast({
-            title: "Error",
-            description: error instanceof Error ? error.message : "Error al cargar las ubicaciones",
-            variant: "destructive",
-          })
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoadingLocations(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [isAuthLoading, user, toast])
 
   useEffect(() => {
     let cancelled = false
@@ -256,7 +209,7 @@ export default function SettingsPage() {
     }
   }
 
-  if (isAuthLoading || isLoadingLocations) {
+  if (isAuthLoading) {
     return (
       <div className="p-6 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -267,28 +220,6 @@ export default function SettingsPage() {
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6">Configuración</h1>
-
-      {isSuperAdmin ? (
-        <div className="mb-6 max-w-sm space-y-2">
-          <Label htmlFor="settings-location">Ubicación</Label>
-          <Select
-            value={locationId || undefined}
-            onValueChange={setSelectedLocationId}
-            disabled={locations.length === 0}
-          >
-            <SelectTrigger id="settings-location">
-              <SelectValue placeholder="Selecciona una ubicación" />
-            </SelectTrigger>
-            <SelectContent>
-              {locations.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.name}{location.city ? ` · ${location.city}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
 
       <Tabs defaultValue="general" className="space-y-4">
         <TabsList>
@@ -304,7 +235,9 @@ export default function SettingsPage() {
               <CardHeader>
                 <CardTitle>Selecciona una ubicación</CardTitle>
                 <CardDescription>
-                  Asigna una ubicación a tu usuario o selecciona una para editar su configuración.
+                  {isSuperAdmin
+                    ? "Selecciona una ubicación desde la barra superior para editar su configuración."
+                    : "Asigna una ubicación a tu usuario para editar su configuración."}
                 </CardDescription>
               </CardHeader>
             </Card>

@@ -26,14 +26,8 @@ import {
 import { useOrderSocket } from "@/hooks/use-order-socket"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { API_URL, getAuthHeaders, getLocations, Location } from "@/lib/api"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { API_URL, getAuthHeaders } from "@/lib/api"
+import { useLocationSelection } from "@/hooks/use-location-selection"
 
 // Tipos para las órdenes
 type OrderStatus = "PENDING" | "IN_PROGRESS" | "READY" | "CANCELLED" | "PAID"
@@ -98,8 +92,7 @@ interface Order {
 
 export function OrdersManager() {
   const [orders, setOrders] = useState<Order[]>([])
-  const [locations, setLocations] = useState<Location[]>([])
-  const [selectedLocationId, setSelectedLocationId] = useState<string>("all")
+  const { selectedLocationId } = useLocationSelection()
   const [deletedOrders, setDeletedOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -125,20 +118,7 @@ export function OrdersManager() {
     initialFetch();
     const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
-  }, [selectedLocationId]); // Recargar cuando cambie la ubicación seleccionada
-
-  // Fetch locations
-  useEffect(() => {
-    const fetchLocationsData = async () => {
-      try {
-        const data = await getLocations();
-        setLocations(data);
-      } catch (err) {
-        console.error('Error fetching locations:', err);
-      }
-    };
-    fetchLocationsData();
-  }, []);
+  }, [selectedLocationId, user?.locationId, user?.role]); // Recargar cuando cambie la ubicación seleccionada
 
   // Join orders room when socket is connected and user has a locationId
   useEffect(() => {
@@ -558,33 +538,6 @@ export function OrdersManager() {
           <div className="flex justify-between items-center sm:flex-row flex-col gap-4">
             <div className="flex flex-col gap-1 w-full sm:w-auto">
               <CardTitle>Gestión de Órdenes</CardTitle>
-              <div className="text-sm text-muted-foreground">
-                {user?.role === 'SUPER_ADMIN' ? (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="font-medium whitespace-nowrap text-primary">Ubicación:</span>
-                    <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                      <SelectTrigger className="w-[200px] h-8 text-xs">
-                        <SelectValue placeholder="Seleccionar ubicación" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas las sedes</SelectItem>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={loc.id}>
-                            {loc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 mt-1">
-                    <MapPin className="h-3 w-3 text-emerald-600" />
-                    <span className="font-semibold text-emerald-700">
-                      Sede: {locations.find(l => l.id === user?.locationId)?.name || user?.locationId || 'Sin asignar'}
-                    </span>
-                  </div>
-                )}
-              </div>
             </div>
             {connectionStatus}
           </div>

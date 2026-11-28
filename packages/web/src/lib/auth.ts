@@ -1,10 +1,10 @@
 export function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
-  // Busca el token en la cookie primero
-  const match = document.cookie.match(/(^| )token=([^;]+)/);
-  if (match) return match[2];
-  // Si no está en la cookie, busca en localStorage
-  return localStorage.getItem('token');
+  const storedToken = localStorage.getItem('token');
+  if (storedToken) return storedToken;
+
+  const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
+  return match?.[1] ?? null;
 }
 
 export function setAuthToken(token: string): void {
@@ -15,4 +15,6 @@ export function setAuthToken(token: string): void {
 export function removeAuthToken(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem('token');
+  const secureCookie = window.location.protocol === 'https:' ? ' secure;' : '';
+  document.cookie = `token=; path=/; max-age=0; samesite=lax;${secureCookie}`;
 } 

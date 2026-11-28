@@ -42,6 +42,7 @@ import { cn, toFiniteNumber } from "@/lib/utils"
 import { ImportProductsDialog } from "./import-products-dialog"
 import { FileText } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
+import { ALL_LOCATIONS, useLocationSelection } from "@/hooks/use-location-selection"
 
 // Custom hook for mobile viewport height
 function useMobileViewportHeight() {
@@ -99,7 +100,7 @@ export function ProductsManager() {
   const [modifiedFilter, setModifiedFilter] = useState<"all" | "recent">("all")
   const [priceRange, setPriceRange] = useState<"all" | "under-25000" | "25000-50000" | "over-50000">("all")
   const [sortOrder, setSortOrder] = useState<"name" | "recent" | "price">("name")
-  const [selectedLocationId, setSelectedLocationId] = useState("all")
+  const { selectedLocationId } = useLocationSelection()
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
@@ -530,7 +531,7 @@ export function ProductsManager() {
   const filteredProducts = useMemo(() => products.filter(product => {
     const matchesLocation =
       !isSuperAdmin ||
-      selectedLocationId === "all" ||
+      selectedLocationId === ALL_LOCATIONS ||
       product.locationId === selectedLocationId
     const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory
     const matchesProductType =
@@ -575,7 +576,7 @@ export function ProductsManager() {
   ])
 
   const locationScopedProducts = products.filter((product) =>
-    !isSuperAdmin || selectedLocationId === "all" || product.locationId === selectedLocationId,
+    !isSuperAdmin || selectedLocationId === ALL_LOCATIONS || product.locationId === selectedLocationId,
   )
   const productsWithNoStock = locationScopedProducts.filter((product) => product.quantity <= 0).length
   const recentlyUpdatedCount = locationScopedProducts.filter((product) => {
@@ -665,7 +666,7 @@ export function ProductsManager() {
                   setNewProduct((current) => ({
                     ...current,
                     locationId: isSuperAdmin
-                      ? selectedLocationId === "all" ? "" : selectedLocationId
+                      ? selectedLocationId === ALL_LOCATIONS ? "" : selectedLocationId
                       : user?.locationId ?? "",
                     isIntermediate: selectedProductType === "intermediate",
                     price: selectedProductType === "intermediate" ? 0 : current.price,
@@ -704,20 +705,7 @@ export function ProductsManager() {
             </div>
           </div>
 
-          <div className={cn("grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap", isSuperAdmin ? "xl:flex-nowrap" : "")}>
-            {isSuperAdmin && (
-              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                <SelectTrigger aria-label="Filtrar por sucursal" className="min-w-0 bg-background shadow-sm lg:w-auto lg:flex-1">
-                  <SelectValue placeholder="Sucursal" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las sucursales</SelectItem>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+          <div className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
             <Select
               value={selectedCategory}
               onValueChange={(value) => {

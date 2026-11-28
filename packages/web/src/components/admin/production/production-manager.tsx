@@ -3,15 +3,14 @@
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  getLocations,
   getProducts,
   getProductionHistory,
-  Location,
   Product,
   ProductionLog,
   produceProduct,
 } from "@/lib/api"
 import { useAuth } from "@/hooks/use-auth"
+import { ALL_LOCATIONS, useLocationSelection } from "@/hooks/use-location-selection"
 import { useToast } from "@/components/ui/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -29,7 +28,6 @@ import {
 import {
   AlertCircle,
   Boxes,
-  Building2,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -56,7 +54,6 @@ import {
   printProduction,
 } from "@/components/admin/production/production-report"
 
-const ALL_LOCATIONS = "all"
 const HISTORY_PAGE_SIZE = 4
 
 function formatQuantity(quantity: number) {
@@ -149,11 +146,10 @@ function QuantityStepper({
 export function ProductionManager() {
   const { toast } = useToast()
   const { user, isLoading: isAuthLoading } = useAuth()
+  const { selectedLocationId } = useLocationSelection()
   const isSuperAdmin = user?.role === "SUPER_ADMIN"
   const [products, setProducts] = useState<Product[]>([])
-  const [locations, setLocations] = useState<Location[]>([])
   const [history, setHistory] = useState<ProductionLog[]>([])
-  const [selectedLocationId, setSelectedLocationId] = useState(ALL_LOCATIONS)
   const [productId, setProductId] = useState("")
   const [quantity, setQuantity] = useState(1)
   const [wasteQuantity, setWasteQuantity] = useState(0)
@@ -180,10 +176,9 @@ export function ProductionManager() {
         throw new Error("Tu usuario no tiene una sucursal asignada.")
       }
 
-      const [productData, historyData, locationData] = await Promise.all([
+      const [productData, historyData] = await Promise.all([
         getProducts(activeLocationId),
         getProductionHistory(activeLocationId),
-        isSuperAdmin ? getLocations() : Promise.resolve([]),
       ])
       const producibleProducts = productData.filter(
         (product) =>
@@ -195,7 +190,6 @@ export function ProductionManager() {
 
       setProducts(producibleProducts)
       setHistory(historyData)
-      setLocations(locationData)
       setProductId((current) =>
         producibleProducts.some((product) => product.id === current)
           ? current
@@ -351,30 +345,6 @@ export function ProductionManager() {
           Prepara productos por lote, controla la merma y revisa el inventario utilizado.
         </p>
       </header>
-
-      {isSuperAdmin && (
-        <section className="space-y-2">
-          <Label className="text-xs font-medium text-slate-300">Sucursal</Label>
-          <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg border border-slate-700 bg-[#101827] p-1 shadow-inner shadow-black/20">
-            {[{ id: ALL_LOCATIONS, name: "Todas las sucursales" }, ...locations].map((location) => (
-              <button
-                key={location.id}
-                type="button"
-                aria-pressed={selectedLocationId === location.id}
-                onClick={() => setSelectedLocationId(location.id)}
-                className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-md px-3 text-xs font-medium transition-colors ${
-                  selectedLocationId === location.id
-                    ? "bg-slate-700 text-white shadow-sm"
-                    : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
-                }`}
-              >
-                <Building2 className="h-3.5 w-3.5" />
-                {location.name}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
 
       {error && (
         <div className="flex flex-col items-stretch justify-between gap-3 rounded-lg border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100 sm:flex-row sm:items-center">
